@@ -7,13 +7,20 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     CheckConstraint,
+    Computed,
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
+    Index,
     Integer,
     Numeric,
     String,
+    UniqueConstraint,
+    false,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -28,6 +35,25 @@ if TYPE_CHECKING:
 
 class Visit(Base):
     __tablename__ = "visits"
+    __table_args__ = (
+        Index("uq_visits_allfree_identity", "id", "patient_id", "allfree_encounter_identity", unique=True),
+        UniqueConstraint("id", "patient_id", name="uq_visits_id_patient"),
+        UniqueConstraint("id", "patient_id", "encounter_id", name="uq_visits_id_patient_encounter"),
+        CheckConstraint("encounter_id IS NULL OR patient_id IS NOT NULL", name="ck_visits_encounter_patient_present"),
+        CheckConstraint(
+            "started_appointment_id IS NULL OR started_appointment_checked",
+            name="ck_visits_started_appointment_checked",
+        ),
+        Index(
+            "uq_visits_started_appointment", "started_appointment_id", unique=True,
+            postgresql_where=text("started_appointment_id IS NOT NULL"),
+            sqlite_where=text("started_appointment_id IS NOT NULL"),
+        ),
+        ForeignKeyConstraint(
+            ["encounter_id", "patient_id"], ["encounters.id", "encounters.patient_id"],
+            name="fk_visits_encounter_patient", deferrable=True, initially="DEFERRED",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     # ✅ SECURITY: patient_id is NOT NULL, so we can't use SET NULL
@@ -39,6 +65,13 @@ class Visit(Base):
         ),  # Prevent deletion if visits exist
         nullable=False,
         index=True,
+    )
+    encounter_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("encounters.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    allfree_encounter_identity: Mapped[str | None] = mapped_column(
+        String(24),
+        Computed("CASE WHEN encounter_id IS NULL THEN 'N' ELSE 'I' || CAST(encounter_id AS TEXT) END", persisted=True),
     )
 
     status: Mapped[str] = mapped_column(
@@ -71,6 +104,18 @@ class Visit(Base):
     )  # ✅ SECURITY: SET NULL to preserve visit if doctor deleted
     visit_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     visit_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    # A checked NULL is known absence, including when a captured row was deleted.
+    # Unchecked visits predate this observation or started on another surface.
+    started_appointment_checked: Mapped[bool] = mapped_column(
+        Boolean, server_default=false(), nullable=False,
+    )
+    started_appointment_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "appointments.id", ondelete="SET NULL",
+            name="fk_visits_started_appointment", use_alter=True,
+        ),
+        nullable=True,
+    )
     department: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )  # Department name/key
@@ -98,10 +143,29 @@ class Visit(Base):
         String(64), nullable=True
     )  # user_id, telegram_id, или phone
 
+    # Narrow clinical identity fence; does not change on ordinary confirmation.
+    price_context_generation: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="1")
+
     # Server-owned generation binds Telegram actions to this clinical context.
     confirmation_context_epoch: Mapped[int] = mapped_column(
         BigInteger, nullable=False, server_default="0"
     )
+
+    # Historical completed visits are intentionally unknown until a
+    # completion workflow records a consultation snapshot. The generation
+    # fences that snapshot against subsequent clinical context mutations.
+    repeat_evidence_generation: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, server_default="0"
+    )
+    repeat_proof_generation: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    repeat_proof_consultation: Mapped[bool | None] = mapped_column(nullable=True)
+    repeat_proof_doctor_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    repeat_assigned_doctor_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    repeat_assigned_owner_generation: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     # ✅ Идемпотентность reminder-пайплайна (arq job send_visit_reminder):
     # штампуется воркером после успешной отправки напоминания; повторные
@@ -161,6 +225,7 @@ class Visit(Base):
 class VisitService(Base):
     __tablename__ = "visit_services"
     __table_args__ = (
+        Index("uq_visit_services_allfree_identity", "id", "visit_id", "service_id", unique=True),
         CheckConstraint(
             "duration_minutes_snapshot IS NULL OR duration_minutes_snapshot > 0",
             name="ck_visit_services_duration_snapshot_positive",
@@ -177,6 +242,8 @@ class VisitService(Base):
     duration_minutes_snapshot: Mapped[int | None] = mapped_column(
         Integer, nullable=True
     )
+
+    price_line_generation: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="1")
 
     qty: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)

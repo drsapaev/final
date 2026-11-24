@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
+from sqlalchemy import insert
 from sqlalchemy.orm import Session, selectinload
 
+from app.models.audit import AuditLog
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.visit import Visit
 
@@ -57,3 +61,39 @@ class PaymentInvoiceRepository:
             .all()
         )
         return {int(row[0]) for row in rows}
+
+
+def record_invoice_visit_release(
+    db: Session,
+    invoice: PaymentInvoice,
+    *,
+    visit_id: int,
+    previous_total: Decimal,
+    released_amount: Decimal,
+    actor_user_id: int | None,
+    actor_role: str | None,
+) -> None:
+    """Append the release in the caller's invoice transaction."""
+    db.execute(
+        insert(AuditLog.__table__).inline().values(
+            action="invoice.cancel_visit",
+            event_type="INVOICE.CANCEL_VISIT",
+            entity_type="payment_invoice",
+            entity_id=invoice.id,
+            resource_type="payment_invoice",
+            resource_id=str(invoice.id),
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            actor_type="staff" if actor_user_id is not None else "system",
+            outcome="success",
+            payload={
+                "visit_id": visit_id,
+                "currency": invoice.currency,
+                "released_amount": format(released_amount, "f"),
+                "previous_total": format(previous_total, "f"),
+                "total": format(invoice.total_amount, "f"),
+                "previous_status": "pending",
+                "status": invoice.status,
+            },
+        )
+    )

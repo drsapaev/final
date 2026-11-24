@@ -2,23 +2,99 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
+from uuid import UUID
 
-from sqlalchemy import insert
+from sqlalchemy import delete, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import clinic_today
 from app.crud.queue_resource_routing import resolve_registry_tag_queue_for_specialist
+from app.models.audit import AuditLog
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.refund_deposit import (
     DepositTransaction,
+    DepositTransactionType,
     PatientDeposit,
     PaymentRefundClaim,
     RefundRequest,
 )
 from app.models.visit import Visit
+
+
+class RefundClaimEvidenceError(Exception):
+    """A stored refund reservation cannot be matched to the current request."""
+
+
+def delete_bank_refund_claim(
+    db: Session, *, claim_id: int, payment_id: int, refund_request_id: int | None,
+) -> bool:
+    """Delete only the reservation whose payment and evidence were checked."""
+    statement = (
+        delete(PaymentRefundClaim)
+        .where(
+            PaymentRefundClaim.id == claim_id,
+            PaymentRefundClaim.payment_id == payment_id,
+            PaymentRefundClaim.refund_request_id == refund_request_id,
+            PaymentRefundClaim.channel == "refund_request",
+            PaymentRefundClaim.deposit_transaction_id.is_(None),
+        )
+        .returning(PaymentRefundClaim.id)
+        .execution_options(synchronize_session="fetch")
+    )
+    return db.execute(statement).scalar_one_or_none() is not None
+
+
+def _record_refund_request_event(
+    db: Session,
+    request: RefundRequest,
+    *,
+    action: str,
+    actor_user_id: int | None,
+    actor_role: str | None,
+    created_at: datetime | None,
+    previous_status: str | None = None,
+) -> None:
+    payload = {
+        "payment_id": request.payment_id,
+        "new_status": request.status,
+        "refund_amount": format(request.refund_amount, "f"),
+        "currency": request.payment_currency_snapshot,
+    }
+    if previous_status is not None:
+        payload["previous_status"] = previous_status
+    db.execute(
+        insert(AuditLog.__table__).inline().values(
+            action=action,
+            event_type=action.upper(),
+            entity_type="refund_request",
+            entity_id=request.id,
+            resource_type="refund_request",
+            resource_id=str(request.id),
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            actor_type="staff" if actor_user_id is not None else "system",
+            outcome="success",
+            created_at=created_at,
+            payload=payload,
+        )
+    )
+
+
+def record_refund_request_creation(
+    db: Session, request: RefundRequest, *, actor_user_id: int | None,
+) -> None:
+    """Record a new request inside the caller's refund transaction."""
+    _record_refund_request_event(
+        db,
+        request,
+        action="refund_request_created",
+        actor_user_id=actor_user_id,
+        actor_role=None,
+        created_at=request.created_at,
+    )
 
 
 class ForceMajeureApiRepository:
@@ -129,31 +205,42 @@ class ForceMajeureApiRepository:
             .first()
         )
 
-    def release_refund_claim_for_request(self, refund_request_id: int) -> bool:
-        """3808 review round 5 (P1 claim lifecycle): кассирский ``reject``
-        — терминальный НЕ-платящий статус: деньги пациенту не ушли, и
-        единый claim платежа (``payment_refund_claims``, миграция 0088)
-        должен освободиться в ТОЙ ЖЕ транзакции, что и смена статуса,
-        чтобы повторный возврат (исправленная заявка или депозит) стал
-        возможен.
-
-        Удаляется ТОЛЬКО claim, связанный с ЭТОЙ заявкой; свежий claim
-        более поздней заявки (созданной после отклонения этой) не
-        затрагивается. True — claim найден и удалён, False — заявка
-        claim-а не держала (ручная заявка или строка до 0088).
-
-        Lives in the repository so the API service keeps the
-        no-direct-session-calls boundary (test_service_repository_boundary).
-        """
-        claim = (
-            self.db.query(PaymentRefundClaim)
+    def release_refund_claim_for_request(
+        self, refund_request_id: int, *, payment_id: int,
+    ) -> bool:
+        """Release the locked request's reservation in the rejection transaction."""
+        claims = (
+            self.db.query(PaymentRefundClaim.id)
             .filter(PaymentRefundClaim.refund_request_id == refund_request_id)
-            .first()
+            .limit(2)
+            .all()
         )
-        if claim is None:
+        if not claims:
             return False
-        self.db.delete(claim)
+        if len(claims) != 1 or not delete_bank_refund_claim(
+            self.db, claim_id=claims[0].id, payment_id=payment_id,
+            refund_request_id=refund_request_id,
+        ):
+            raise RefundClaimEvidenceError
         return True
+
+    def record_refund_request_transition(
+        self,
+        request: RefundRequest,
+        *,
+        previous_status: str,
+        actor_role: str | None,
+    ) -> None:
+        """Append the decision in the caller's transaction with INSERT-only access."""
+        _record_refund_request_event(
+            self.db,
+            request,
+            action="refund_request_status_changed",
+            actor_user_id=request.processed_by,
+            actor_role=actor_role,
+            created_at=request.processed_at,
+            previous_status=previous_status,
+        )
 
     def list_deposits(
         self,
@@ -260,8 +347,28 @@ class ForceMajeureApiRepository:
         assert created is not None
         return created, True
 
-    def get_visit(self, visit_id: int) -> Visit | None:
-        return self.db.query(Visit).filter(Visit.id == visit_id).first()
+    def get_visit(self, visit_id: int, *, lock: bool = True) -> Visit | None:
+        """Load the live deposit debit target, optionally acquiring the visit lock."""
+        query = (
+            self.db.query(Visit)
+            .filter(Visit.id == visit_id)
+            .populate_existing()
+        )
+        return (query.with_for_update(of=Visit) if lock else query).first()
+
+    def find_manual_deposit_receipt(self, client_request_id: UUID) -> DepositTransaction | None:
+        return (
+            self.db.query(DepositTransaction)
+            .filter(DepositTransaction.client_request_id == client_request_id)
+            .one_or_none()
+        )
+
+    def visit_has_unpaired_deposit_debit(self, visit_id: int) -> bool:
+        return self.db.query(DepositTransaction.id).filter(
+            DepositTransaction.visit_id == visit_id,
+            DepositTransaction.transaction_type == DepositTransactionType.DEBIT.value,
+            DepositTransaction.payment_id.is_(None),
+        ).first() is not None
 
     def list_deposit_transactions(
         self,

@@ -16,7 +16,13 @@ from app.models.payment import Payment
 from app.models.visit import Visit
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.billing_service import BillingService
+from app.services.money_input import MoneyInputError, parse_money
 from app.services.payment_invariant_service import PaymentInvariantService
+from app.services.payment_refund_guard import (
+    has_external_refund,
+    local_refund_requires_reconciliation,
+    lock_refund_evidence,
+)
 from app.services.queue_service import QueueBusinessService
 from app.services.visit_lifecycle_service import VisitLifecycleService
 
@@ -681,19 +687,25 @@ class TelegramStaffActionAdapterService:
             telegram_chat_id=telegram_chat_id,
         )
         try:
+            lock_refund_evidence(self.db)
             payment, invariant_service = self._lock_payment_change_context(payment_id)
             if not payment:
                 raise TelegramStaffActionAdapterError("payment_not_found")
             if payment.status not in {"paid", "completed"}:
                 raise TelegramStaffActionAdapterError("payment_status_not_refundable")
-            if payment.provider:
+            if local_refund_requires_reconciliation(payment):
                 raise TelegramStaffActionAdapterError(
                     "payment_provider_refund_requires_cashier"
                 )
+            if has_external_refund(self.db, payment_id):
+                raise TelegramStaffActionAdapterError("payment_refund_already_routed")
 
             already_refunded = payment.refunded_amount or Decimal("0")
             available = payment.amount - already_refunded
-            refund_amount = available if amount is None else Decimal(str(amount))
+            try:
+                refund_amount = parse_money(available if amount is None else amount)
+            except MoneyInputError as exc:
+                raise TelegramStaffActionAdapterError("payment_refund_amount_invalid") from exc
             if refund_amount <= 0:
                 raise TelegramStaffActionAdapterError("refund_amount_not_positive")
             if refund_amount > available:

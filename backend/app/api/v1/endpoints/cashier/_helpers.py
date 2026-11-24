@@ -27,6 +27,13 @@ from app.services.canonical_visit_service import (  # noqa: F401
 )
 from app.services.notifications import notification_sender_service  # noqa: F401
 from app.services.payment_read_service import PaymentReadService  # noqa: F401
+from app.services.payment_refund_guard import CASHIER_IMMEDIATE_PAID_METHODS
+from app.services.payment_refund_guard import (
+    local_refund_requires_reconciliation as _cashier_refund_requires_reconciliation,
+)
+from app.services.payment_refund_guard import (
+    recorded_payment_currency as _cashier_payment_currency,  # noqa: F401
+)
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +117,8 @@ def _cashier_payment_action_contract(payment: Payment) -> dict[str, Any]:
     payment_status = _cashier_payment_status(payment)
     can_confirm = payment_status not in {"paid", "completed", "cancelled", "refunded", "void"}
     can_cancel = payment_status in {"pending", "processing"}
-    can_refund = payment_status in {"paid", "completed"} and _cashier_payment_available_amount(payment) > 0
+    can_refund = (payment_status in {"paid", "completed"} and _cashier_payment_available_amount(payment) > 0
+                  and not _cashier_refund_requires_reconciliation(payment))
     can_print_receipt = True
 
     action_flags = {
@@ -165,6 +173,7 @@ class PaymentHistoryItem(BaseModel):
     patient_name: str
     visit_id: int | None = None
     amount: Decimal
+    currency: str | None = None
     method: str
     status: str
     created_at: datetime
@@ -199,7 +208,6 @@ class PaginatedResponse(BaseModel, Generic[T]):
 # (click/payme/kaspi) обязаны идти через payment_init_service
 # (pending → провайдер → webhook → paid): кассир не может «провести» их
 # одним POST без доказательства списания провайдером.
-CASHIER_IMMEDIATE_PAID_METHODS = frozenset({"cash", "card"})
 CASHIER_HOSTED_PROVIDER_METHODS = frozenset({"click", "payme", "kaspi"})
 
 
@@ -304,6 +312,7 @@ class PaymentResponse(BaseModel):
     visit_id: int | None = None
     patient_id: int | None = None
     amount: Decimal
+    currency: str | None = None
     method: str
     status: str
     created_at: datetime
@@ -363,6 +372,7 @@ class GroupedPaymentResponse(BaseModel):
     """Response for backend-owned grouped cashier payment allocation."""
     patient_id: int
     amount: Decimal
+    currency: str | None = None
     method: str
     status: str
     created_at: datetime
@@ -379,12 +389,14 @@ class RefundRequest(BaseModel):
     """Запрос на возврат средств"""
     amount: Decimal = Field(..., gt=0, description="Сумма возврата")
     reason: str = Field(..., min_length=3, description="Причина возврата")
+    client_request_id: UUID = Field(..., description="Постоянный ключ одной операции возврата")
 
 
 class RefundResponse(BaseModel):
     """Ответ на запрос возврата"""
     id: int
     original_amount: Decimal
+    currency: str | None = None
     refunded_amount: Decimal
     remaining_amount: Decimal
     reason: str

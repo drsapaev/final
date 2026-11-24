@@ -14,7 +14,11 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.core.audit import extract_model_changes
 from app.core.config import settings
-from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, DOCTOR_ROLE_SPELLINGS, is_doctor_role_spelling
+from app.core.roles import (
+    DOCTOR_FAMILY_GATE_ROLES,
+    DOCTOR_ROLE_SPELLINGS,
+    is_doctor_role_spelling,
+)
 from app.crud import emr as crud_emr
 from app.crud.appointment import appointment as crud_appointment
 from app.models.clinic import Doctor
@@ -120,6 +124,39 @@ def _ensure_appointment_doctor_access(
     raise HTTPException(status_code=403, detail="Access denied")
 
 
+def _prepare_visit_doctor_access(db: Session, hint: Any, actor: User):
+    """Lock actor and doctor first; recheck the Visit after acquiring its lock."""
+    expected = (actor.role, actor.is_superuser, actor.auth_epoch)
+    doctor_id = hint.doctor_id
+    locked_actor = (db.query(User).filter(User.id == actor.id)
+                    .with_for_update(of=User).populate_existing().first())
+    if (locked_actor is None or not locked_actor.is_active or
+            (locked_actor.role, locked_actor.is_superuser, locked_actor.auth_epoch) != expected):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if is_doctor_role_spelling(locked_actor.role) and not locked_actor.is_superuser:
+        from sqlalchemy import or_
+
+        doctors = (db.query(Doctor)
+                   .filter(or_(Doctor.user_id == locked_actor.id, Doctor.id == doctor_id))
+                   .order_by(Doctor.id).with_for_update(of=Doctor).populate_existing().all())
+        active = next((doctor for doctor in doctors
+                       if doctor.user_id == locked_actor.id and doctor.active), None)
+        assigned = next((doctor for doctor in doctors if doctor.id == doctor_id), None)
+        if active is None or not (
+            doctor_id == active.id or
+            (assigned is not None and assigned.user_id == locked_actor.id) or
+            (assigned is None and doctor_id == locked_actor.id)
+        ):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    def check_locked_visit(visit: Any) -> None:
+        if visit.doctor_id != doctor_id:
+            raise HTTPException(status_code=409, detail="Контекст визита изменился")
+
+    return check_locked_visit
+
+
 def _resolve_appointment_and_visit(
     db: Session,
     appointment_id: int,
@@ -135,6 +172,10 @@ def _resolve_appointment_and_visit(
             appointment, _visit = appointment_flow_api_service.resolve_appointment_from_visit(
                 appointment_id=appointment_id,
                 emr_data=SimpleNamespace(appointment_id=appointment_id),
+                prepare_visit=(
+                    (lambda visit: _prepare_visit_doctor_access(db, visit, current_user))
+                    if current_user is not None else None
+                ),
             )
         except AppointmentFlowApiDomainError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

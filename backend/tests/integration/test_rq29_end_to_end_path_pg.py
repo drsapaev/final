@@ -94,6 +94,7 @@ SCRATCH_DB = f"rq29_check_{uuid.uuid4().hex[:12]}"
 sys.path.insert(0, str(BACKEND_DIR))
 
 from tests._pg_admin_guard import is_local_admin_dsn  # noqa: E402
+from tests._rq_cashier_runtime import cashier_request  # noqa: E402
 
 pytestmark = pytest.mark.integration
 
@@ -265,6 +266,8 @@ def pg_engine():
 
     engine = None
     try:
+        with psycopg.connect(psycopg_dsn, autocommit=True) as scratch:
+            scratch.execute("ALTER SCHEMA public OWNER TO CURRENT_USER")
         env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
         import subprocess
 
@@ -1145,29 +1148,27 @@ def _step7_partial_payment_then_partial_service_cancel(
     cashier_h = _auth_headers(world["cashier"])
     registrar_h = world["registrar_h"]
 
-    # --- partial payment on the cart's invoice (60000 + 30000) ------
-    resp = pg_client.get(CASHIER_PENDING, headers=cashier_h)
-    assert resp.status_code == 200, resp.text
-    rows = resp.json().get("items") or resp.json().get("payments") or []
-    target = next(
-        (r for r in rows if r.get("patient_id") == world["patient"]["id"]),
-        None,
-    )
-    assert target is not None, "the cashier must see the cart patient's bill"
-    visit_ids = target["visit_ids"]
-    assert set(visit_ids) == set(step3["cart"]["visit_ids"])
-
-    resp = pg_client.post(
-        CASHIER_GROUPED,
-        json={
+    patient_id = world["patient"]["id"]
+    with cashier_request(pg_client, pg_session) as runtime_client:
+        # Partial payment on the cart invoice (60000 + 30000).
+        pending = runtime_client.get(CASHIER_PENDING, headers=cashier_h)
+        assert pending.status_code == 200, pending.text
+        rows = pending.json().get("items") or pending.json().get("payments") or []
+        target = next((row for row in rows if row.get("patient_id") == patient_id), None)
+        assert target is not None, "the cashier must see the cart patient's bill"
+        visit_ids = target["visit_ids"]
+        assert set(visit_ids) == set(step3["cart"]["visit_ids"])
+        command = {
             "visit_ids": visit_ids,
-            "patient_id": world["patient"]["id"],
+            "patient_id": patient_id,
             "amount": 30000,
             "method": "cash",
-        },
-        headers=cashier_h,
-    )
-    assert resp.status_code in (200, 201), resp.text
+            "client_request_id": str(uuid.uuid4()),
+        }
+        resp = runtime_client.post(CASHIER_GROUPED, json=command, headers=cashier_h)
+        assert resp.status_code in (200, 201), resp.text
+        remaining = runtime_client.get(CASHIER_PENDING, headers=cashier_h)
+        assert remaining.status_code == 200, remaining.text
     payment = resp.json()
     assert payment["allocations"] and payment["payments"]
 
@@ -1190,9 +1191,7 @@ def _step7_partial_payment_then_partial_service_cancel(
     assert sum(float(a["amount"]) for a in payment["allocations"]) == 30000.0, payment[
         "allocations"
     ]
-    resp = pg_client.get(CASHIER_PENDING, headers=cashier_h)
-    assert resp.status_code == 200, resp.text
-    rows2 = resp.json().get("items") or resp.json().get("payments") or []
+    rows2 = remaining.json().get("items") or remaining.json().get("payments") or []
     target2 = next(
         (r for r in rows2 if r.get("patient_id") == world["patient"]["id"]),
         None,

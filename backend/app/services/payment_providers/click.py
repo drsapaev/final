@@ -9,11 +9,72 @@ from typing import Any
 
 import httpx
 
+from app.services.money_input import MoneyInputError, parse_exact_json, parse_money
+
 from .base import BasePaymentProvider, PaymentResult, PaymentStatus
+
+_CLICK_STATUSES = {
+    0: PaymentStatus.PENDING,
+    1: PaymentStatus.PROCESSING,
+    2: PaymentStatus.COMPLETED,
+    -1: PaymentStatus.FAILED,
+    -2: PaymentStatus.CANCELLED,
+}
+
+
+def _click_status(data: dict[str, Any]) -> str | None:
+    raw_status = data.get("status")
+    return _CLICK_STATUSES.get(raw_status) if type(raw_status) is int else None
+
+
+def matches_click_status_evidence(
+    result: PaymentResult, *, order_id: str, amount: Decimal, currency: str,
+) -> bool:
+    """Match a Click response to the order and exact terms before booking it."""
+    data = result.provider_data
+    if not result.success or not isinstance(data, dict) or not order_id:
+        return False
+
+    status = _click_status(data)
+    raw_amount = data.get("amount")
+    error_code = data.get("error_code", 0)
+    if (
+        status is None
+        or status != result.status
+        or result.payment_id != order_id
+        or data.get("merchant_trans_id") != order_id
+        or currency != "UZS"
+        or data.get("currency", "UZS") != currency
+        or type(error_code) is not int
+        or error_code != 0
+        or type(raw_amount) not in (Decimal, str, int)
+    ):
+        return False
+    try:
+        return parse_money(raw_amount) == amount
+    except MoneyInputError:
+        return False
+
+
+def click_transaction_reference(data: dict[str, Any]) -> str | None:
+    reference = data.get("click_trans_id")
+    if type(reference) is int and 0 < reference < 10**19:
+        reference = str(reference)
+    if (
+        isinstance(reference, str)
+        and 1 <= len(reference) <= 19
+        and reference.isascii()
+        and reference.isdecimal()
+        and not reference.startswith("0")
+    ):
+        return reference
+    return None
 
 
 class ClickProvider(BasePaymentProvider):
     """Провайдер для Click платежной системы"""
+
+    supports_payment_creation = False
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config)
@@ -38,60 +99,8 @@ class ClickProvider(BasePaymentProvider):
         cancel_url: str = None,
         **kwargs,
     ) -> PaymentResult:
-        """Создание платежа в Click"""
-
-        try:
-            # Click работает только с UZS
-            if currency != "UZS":
-                return PaymentResult(
-                    success=False,
-                    error_message=f"Click поддерживает только UZS, получен {currency}",
-                )
-
-            # Форматируем сумму (в тийинах)
-            amount_tiyin = self.format_amount(amount, currency)
-
-            # Параметры для Click
-            params = {
-                "service_id": self.service_id,
-                "merchant_id": self.merchant_id,
-                "amount": amount_tiyin,
-                "transaction_param": order_id,
-                "return_url": return_url or "",
-                "cancel_url": cancel_url or "",
-            }
-
-            # Генерируем подпись
-            sign_string = f"{params['service_id']}{params['merchant_id']}{params['amount']}{params['transaction_param']}{self.secret_key}"
-            params["sign"] = hashlib.md5(sign_string.encode(), usedforsecurity=False).hexdigest()
-
-            # Формируем URL для оплаты
-            payment_url = f"{self.base_url}/services/pay"
-            query_params = "&".join([f"{k}={v}" for k, v in params.items()])
-            full_payment_url = f"{payment_url}?{query_params}"
-
-            self.log_operation(
-                "create_payment",
-                {"order_id": order_id, "amount": str(amount), "currency": currency},
-            )
-
-            return PaymentResult(
-                success=True,
-                payment_id=order_id,  # Click использует наш order_id
-                status=PaymentStatus.PENDING,
-                payment_url=full_payment_url,
-                provider_data={
-                    "service_id": self.service_id,
-                    "merchant_id": self.merchant_id,
-                    "amount_tiyin": amount_tiyin,
-                },
-            )
-
-        except Exception as e:
-            self.log_error("create_payment", str(e), {"order_id": order_id})
-            return PaymentResult(
-                success=False, error_message="Внутренняя ошибка"
-            )
+        """Hold new checkout while Click settlement requires reconciliation."""
+        return PaymentResult(success=False, error_message="Оплата Click временно недоступна")
 
     def check_payment_status(self, payment_id: str) -> PaymentResult:
         """Проверка статуса платежа в Click"""
@@ -114,24 +123,21 @@ class ClickProvider(BasePaymentProvider):
             response.raise_for_status()
 
             data = response.json()
+            our_status = _click_status(data) if isinstance(data, dict) else None
+            if our_status is None:
+                self.log_error("check_payment_status", "Unrecognized provider status")
+                return PaymentResult(success=False, error_message="Статус платежа не подтверждён")
 
-            # Маппинг статусов Click
-            status_mapping = {
-                0: PaymentStatus.PENDING,  # Ожидает оплаты
-                1: PaymentStatus.PROCESSING,  # В процессе
-                2: PaymentStatus.COMPLETED,  # Успешно
-                -1: PaymentStatus.FAILED,  # Ошибка
-                -2: PaymentStatus.CANCELLED,  # Отменен
-            }
-
-            click_status = data.get("status", -1)
-            our_status = status_mapping.get(click_status, PaymentStatus.FAILED)
+            if type(data.get("amount")) is float:
+                # Preserve the provider's lexical amount and keep the evidence JSON-serializable.
+                exact_amount = parse_exact_json(response.content)["amount"]
+                data["amount"] = str(exact_amount)
 
             self.log_operation(
                 "check_status",
                 {
                     "payment_id": payment_id,
-                    "click_status": click_status,
+                    "click_status": data["status"],
                     "our_status": our_status,
                 },
             )
@@ -144,7 +150,7 @@ class ClickProvider(BasePaymentProvider):
             )
 
         except Exception as e:
-            self.log_error("check_payment_status", str(e), {"payment_id": payment_id})
+            self.log_error("check_payment_status", f"Internal error type={type(e).__name__}")
             return PaymentResult(
                 success=False, error_message="Внутренняя ошибка"
             )
@@ -168,7 +174,7 @@ class ClickProvider(BasePaymentProvider):
             # Валидация подписи
             expected_sign = self._generate_webhook_signature(webhook_data)
             if sign_string != expected_sign:
-                self.log_error("process_webhook", "Неверная подпись", webhook_data)
+                self.log_error("process_webhook", "Неверная подпись")
                 return PaymentResult(
                     success=False, error_message="Неверная подпись webhook"
                 )
@@ -189,17 +195,7 @@ class ClickProvider(BasePaymentProvider):
                 self.parse_amount(amount, "UZS") if amount else Decimal("0")
             )
 
-            self.log_operation(
-                "process_webhook",
-                {
-                    "click_trans_id": click_trans_id,
-                    "transaction_param": transaction_param,
-                    "action": action,
-                    "error": error,
-                    "status": status,
-                    "amount": str(amount_decimal),
-                },
-            )
+            self.log_operation("process_webhook", {"status": status})
 
             return PaymentResult(
                 success=True,
@@ -223,7 +219,7 @@ class ClickProvider(BasePaymentProvider):
             )
 
         except Exception as e:
-            self.log_error("process_webhook", str(e), webhook_data)
+            self.log_error("process_webhook", f"Internal error type={type(e).__name__}")
             return PaymentResult(
                 success=False, error_message="Внутренняя ошибка"
             )
@@ -259,16 +255,13 @@ class ClickProvider(BasePaymentProvider):
     ) -> bool:
         """Валидация подписи webhook"""
         if not signature:
-            self.log_error("validate_webhook_signature", "Missing signature", webhook_data)
+            self.log_error("validate_webhook_signature", "Missing signature")
             return False
 
         expected_signature = self._generate_webhook_signature(webhook_data)
         is_valid = hmac.compare_digest(signature, expected_signature)
 
         if not is_valid:
-            self.log_error("validate_webhook_signature", "Signature mismatch", {
-                "received": signature[:20] if signature else None,
-                "expected": expected_signature[:20] if expected_signature else None
-            })
+            self.log_error("validate_webhook_signature", "Signature mismatch")
 
         return is_valid

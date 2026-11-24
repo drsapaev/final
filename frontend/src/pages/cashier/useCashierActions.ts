@@ -40,6 +40,7 @@ import {
   buildCashierPaymentPayload,
   canCreateDirectCashierPayment,
   createGroupedCashierPayment,
+  generateCashierClientRequestId,
   isBackendGroupedCashierPayment,
   resolvePaymentId,
   resolveSingleCashierVisitId,
@@ -107,6 +108,8 @@ export const useCashierActions = ({
   // re-POST the non-idempotent /cashier/payments. A ref (not state) so the
   // check is synchronous inside the same tick as the duplicate call.
   const processPaymentInFlightRef = useRef(false);
+  const refundInFlightRef = useRef(false);
+  const refundRequestIdsRef = useRef(new Map<string, string>());
 
   const { getDateParams, setPendingPage, bumpRefreshKey, triggerDataReload } = worklist;
   const {
@@ -341,18 +344,26 @@ export const useCashierActions = ({
 
   // ✅ v2.0: Обработчик возврата
   const handleRefund = async () => {
-    if (!refundAmount || !refundReason || refundReason.length < 3) {
+    if (!refundPaymentId || !refundAmount || !refundReason || refundReason.length < 3) {
       notify.warning(tI18n('cashier.refund_fields_required'));
       return;
     }
+    if (refundInFlightRef.current) return;
+
+    const paymentKey = String(refundPaymentId);
+    const requestId = refundRequestIdsRef.current.get(paymentKey) ?? generateCashierClientRequestId();
+    refundRequestIdsRef.current.set(paymentKey, requestId);
+    refundInFlightRef.current = true;
     try {
       // UX Audit #4.5: anti-double-click protection.
       setProcessingAction({ type: 'refund', id: refundPaymentId ?? undefined });
-      const result = await paymentsApi.refundPayment(refundPaymentId ?? 0, {
-        amount: parseFloat(refundAmount),
-        reason: refundReason
+      const result = await paymentsApi.refundPayment(refundPaymentId, {
+        amount: refundAmount,
+        reason: refundReason,
+        client_request_id: requestId,
       });
       if ((result as { success?: boolean }).success) {
+        refundRequestIdsRef.current.delete(paymentKey);
         resetRefundDialog();
         notify.success(tI18n('cashier.refund_success_amount', { amount: ((result as { data?: { refunded_amount?: number } }).data?.refunded_amount) }));
         triggerDataReload();
@@ -362,6 +373,7 @@ export const useCashierActions = ({
     } catch (error: unknown) {
       notify.error(getErrorMessage(error, tI18n('cashier.refund_failed')));
     } finally {
+      refundInFlightRef.current = false;
       setProcessingAction(null);
     }
   };

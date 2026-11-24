@@ -5,6 +5,8 @@ Split from qr_queue_service.py.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from app.services.qr_queue._base import *  # noqa: F401, F403
 from app.services.qr_queue._base import QRQueueServiceMixinBase
 
@@ -21,6 +23,7 @@ class VisitsMixin(QRQueueServiceMixinBase):
         visit_type: str = "paid",
         discount_mode: str = "none",
         notes: str | None = None,
+        trusted_currency_by_service: Mapping[int, str] | None = None,
     ) -> Visit:
         """
         ⭐ FIX 2: Создаёт Visit для QR-регистрации.
@@ -41,10 +44,13 @@ class VisitsMixin(QRQueueServiceMixinBase):
         """
         from decimal import Decimal
 
+        from app.crud.visit import _validated_currency_map
         from app.models.visit import Visit, VisitService
         from app.services.appointment_duration_snapshot import (
             duration_snapshot_for_service_id,
         )
+
+        currencies = _validated_currency_map(services, trusted_currency_by_service)
 
         # Создаём Visit
         # ✅ SSOT: source='online' для QR/Telegram регистрации
@@ -76,9 +82,11 @@ class VisitsMixin(QRQueueServiceMixinBase):
                 qty=svc_data.get("quantity", 1),
                 price=(
                     Decimal(str(svc_data.get("price", 0)))
-                    if svc_data.get("price")
+                    if svc_data.get("price") is not None
                     else None
                 ),
+                currency=(currencies[svc_data.get("service_id") or svc_data.get("id")]
+                          if currencies is not None else None),
             )
             self.db.add(visit_service)
 

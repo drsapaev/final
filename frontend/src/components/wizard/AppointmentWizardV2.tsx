@@ -40,6 +40,7 @@ import { useQueueApi } from '../../hooks/useQueueApi';
 import { usePatientsApi } from '../../hooks/usePatientsApi';
 import { api } from '../../api/client';
 import { fetchRegistrarDoctors, fetchRegistrarServices } from '../../api/registrar';
+import { getSavedRegistrarBenefitCart, type SavedRegistrarBenefitCart } from '../../api/registrarBenefits';
 // UX Audit Stage 3 (Wizard issue 5.1):
 // Все 13 raw fetch() к /patients/* и /registrar/cart заменены на
 // централизованный patients API client. Это убирает дублирование
@@ -56,57 +57,17 @@ import './AppointmentWizardV2.css';
 // PatientStepV2 и CartStepV2 вынесены в отдельные файлы для уменьшения размера.
 import PatientStepV2 from './PatientStepV2';
 import CartStepV2 from './CartStepV2';
+import RegistrarBenefitReview from './RegistrarBenefitReview';
 import type { CartService } from './CartStepV2';
 // PR-45 / High-15: extracted sub-components to reduce god component size
 import EditModeBanner from './EditModeBanner';
 import StepProgressIndicator from './StepProgressIndicator';
+import type { CartItem, DoctorData, PatientRecord, RepeatCandidate, VisitGroup, VisitServiceItem } from './wizardTypes';
 import { getErrorMessage } from '../../utils/type-guards';
 
 // ============================================================================
 // Type definitions (TypeScript strict-mode migration)
 // ============================================================================
-
-interface CartItem {
-  id?: string | number;
-  service_id?: string | number;
-  service_name?: string;
-  service_price?: number;
-  doctor_id?: string | number | null;
-  doctor_name?: string;
-  notes?: string;
-  _temp_name?: string;
-  _temp_price?: number;
-  quantity?: number;
-  visit_date?: string;
-  visit_time?: string | null;
-  original_queue_id?: string | number;
-  service_code?: string;
-  name?: string;
-  _source?: string;
-  code?: string;
-  [k: string]: unknown;
-}
-
-interface PatientRecord {
-  id?: string | number;
-  phone?: string;
-  fio?: string;
-  last_name?: string;
-  first_name?: string;
-  middle_name?: string;
-  gender?: string;
-  birth_date?: string;
-  [k: string]: unknown;
-}
-
-interface DoctorData {
-  id?: string | number;
-  name?: string;
-  full_name?: string;
-  specialty?: string;
-  department?: string;
-  [k: string]: unknown;
-}
 
 interface WizardProps {
   isOpen?: boolean;
@@ -119,6 +80,12 @@ interface WizardProps {
   initialData?: Record<string, unknown> | null;
 }
 
+interface PendingBenefitReview {
+  cart: SavedRegistrarBenefitCart;
+  patientId: number;
+  result: Record<string, unknown>;
+}
+
 interface WizardAction {
   label?: string;
   variant?: string;
@@ -127,35 +94,6 @@ interface WizardAction {
   loading?: boolean;
   icon?: React.ReactNode;
   [k: string]: unknown;
-}
-
-interface VisitServiceItem {
-  service_id?: string | number;
-  service_name?: string;
-  service_price?: number;
-  quantity?: number | string;
-  original_queue_id?: string | number;
-  service_code?: string;
-  name?: string;
-  _source?: string;
-  [k: string]: unknown;
-}
-
-interface VisitGroup {
-  doctor_id?: string | number | null;
-  services: VisitServiceItem[];
-  visit_date?: string;
-  visit_time?: string | null;
-  department?: string;
-  notes?: string | null;
-  [k: string]: unknown;
-}
-
-interface RepeatCandidate {
-  candidate_key: string;
-  doctor_id?: string | number;
-  service_id?: string | number;
-  visit_date: string;
 }
 
 // UX Audit Stage 3 (Wizard issue 5.1):
@@ -283,6 +221,8 @@ const AppointmentWizardV2 = ({
 
   // Состояние мастера
   const [currentStep, setCurrentStep] = useState(STEP_PATIENT);
+  const [benefitReview, setBenefitReview] = useState<PendingBenefitReview | null>(null);
+  const pendingBenefitReviewRef = useRef<PendingBenefitReview | null>(null);
 
   // Данные мастера
   const [wizardData, setWizardData] = useState<{
@@ -514,6 +454,8 @@ const AppointmentWizardV2 = ({
   // ✅ ИСПРАВЛЕНО: Сброс состояния мастера при закрытии
   useEffect(() => {
     if (!isOpen) {
+      pendingBenefitReviewRef.current = null;
+      setBenefitReview(null);
       // Сбрасываем состояние при закрытии
       setWizardData({
         patient: { id: null, fio: '', birth_date: '', phone: '', address: '', gender: '' },
@@ -1490,8 +1432,6 @@ const AppointmentWizardV2 = ({
       if (service) {
         if (wizardData.cart.discount_mode === 'repeat' && service.is_consultation) {
           itemPrice = 0; // Повторная консультация бесплатна
-        } else if (wizardData.cart.discount_mode === 'benefit' && service.is_consultation) {
-          itemPrice = 0; // Льготная консультация бесплатна
         } else if (wizardData.cart.all_free) {
           itemPrice = 0; // Всё бесплатно
         }
@@ -1659,7 +1599,7 @@ const AppointmentWizardV2 = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen) return;
+      if (!isOpen || pendingBenefitReviewRef.current) return;
       // Codex R3 PR 3097 (P2): при открытом диалоге подтверждения шорткаты
       // принадлежат ему (иначе Enter продвигал мастер под диалогом, а второй
       // confirm() заменял ожидающий).
@@ -1714,7 +1654,24 @@ const AppointmentWizardV2 = ({
 
   // ===================== ЗАВЕРШЕНИЕ =====================
 
-  const handleComplete = async () => {
+  const selectedPatientId = Number(wizardData.patient.id);
+  const canStartBenefitReview = hasRole(['Admin']) && !editMode && currentStep === totalSteps &&
+    Number.isInteger(selectedPatientId) && selectedPatientId > 0 &&
+    wizardData.cart.discount_mode === 'none' && !wizardData.cart.all_free &&
+    cartQuoteStatus === 'ready' && Number(cartQuote?.total_amount) > 0;
+
+  const finishBenefitReview = useCallback((verifiedTotal: string | null) => {
+    const saved = pendingBenefitReviewRef.current;
+    if (!saved) return;
+    pendingBenefitReviewRef.current = null;
+    onComplete?.(verifiedTotal === null
+      ? { ...saved.result, payment_dialog_deferred: true }
+      : { ...saved.result, total_amount: verifiedTotal });
+    onClose?.();
+  }, [onComplete, onClose]);
+
+  const handleComplete = async (reviewBenefit = false) => {
+    if (benefitReview || pendingBenefitReviewRef.current || (reviewBenefit && !canStartBenefitReview)) return;
     // Fix C: реентерабельный лок — повторный вызов во время обработки
     // (двойной Enter, Enter + Ctrl+Enter, клик + Enter) игнорируется.
     if (submitLockRef.current) {
@@ -1723,12 +1680,12 @@ const AppointmentWizardV2 = ({
     }
     submitLockRef.current = true;
     try {
-      await runHandleComplete();
+      await runHandleComplete(reviewBenefit);
     } finally {
       submitLockRef.current = false;
     }
   };
-  const runHandleComplete = async () => {
+  const runHandleComplete = async (reviewBenefit: boolean) => {
     if (!validateStep(currentStep)) return;
 
     // P-022 fix: previously used toast.warning/toast.info as blocking validation
@@ -1829,6 +1786,7 @@ const AppointmentWizardV2 = ({
       doctorCount > 1 ? t('misc.aw_summary_doctors_count', { count: doctorCount }) : null,
       totalAmount !== 0 ? t('misc.aw_summary_total', { amount: formatQuoteAmount(totalAmount) }) : t('misc.aw_summary_free'),
       cartQuote.approval_status === 'pending' ? t('misc.aw_quote_pending_approval') : null,
+      reviewBenefit ? t('misc.aw_benefit_save_first') : null,
     ].filter(Boolean);
 
     // UX Audit Registrar #2: window.confirm() → useConfirm hook.
@@ -2818,9 +2776,6 @@ const AppointmentWizardV2 = ({
 
       logger.log('✅ Запись создана успешно на backend:', result);
 
-      // Всегда завершаем после создания корзины (без онлайн оплаты в UI)
-      // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
-
       // Обработка удалённых записей очереди (cart path)
       // REG-FE-085: нормализованная идентичность записи (см. getRemovedQueueEntryIds)
       // вместо сырого Set<string|number> сравнения.
@@ -2836,6 +2791,21 @@ const AppointmentWizardV2 = ({
       if (removedQueueIds.length > 0) {
         logger.log(`🗑️ Найдены удаленные записи очереди (Cart Path): ${removedQueueIds.join(', ')}`);
         await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'cart-update');
+      }
+
+      if (reviewBenefit) {
+        const currency = 'currency' in cartQuote ? cartQuote.currency : null;
+        const savedCart = getSavedRegistrarBenefitCart(result, currency);
+        if (savedCart && Number(patientId) === selectedPatientId) {
+          const saved = { cart: savedCart, patientId: selectedPatientId, result };
+          pendingBenefitReviewRef.current = saved;
+          setBenefitReview(saved);
+          return;
+        }
+        toast.warning(t('misc.aw_benefit_saved_receipt_error'));
+        onComplete?.({ ...result, payment_dialog_deferred: true });
+        onClose?.();
+        return;
       }
 
       toast.success(editMode ? t('misc.aw_record_updated_bang') : t('misc.aw_record_created_success'));
@@ -2890,9 +2860,15 @@ const AppointmentWizardV2 = ({
     icon: <ArrowLeft size={16} />,
     disabled: isProcessing
   } : null,
+  canStartBenefitReview ? {
+    label: t('misc.aw_benefit_create_action'),
+    onClick: () => { void handleComplete(true); },
+    variant: 'secondary',
+    disabled: isProcessing,
+  } : null,
   {
     label: currentStep === totalSteps ? t('misc.aw_finish') : t('misc.aw_next'),
-    onClick: currentStep === totalSteps ? handleComplete : nextStep,
+    onClick: currentStep === totalSteps ? () => { void handleComplete(); } : nextStep,
     variant: 'primary',
     icon: currentStep === totalSteps ? <Check size={16} /> : <ArrowRight size={16} />,
     disabled: isProcessing,
@@ -3207,6 +3183,17 @@ const AppointmentWizardV2 = ({
         </div>
       </ModernDialog>);
 
+  }
+
+  if (isOpen && benefitReview) {
+    return (
+      <RegistrarBenefitReview
+        key={benefitReview.cart.invoiceId}
+        cart={benefitReview.cart}
+        patientId={benefitReview.patientId}
+        onFinish={finishBenefitReview}
+      />
+    );
   }
 
   return (

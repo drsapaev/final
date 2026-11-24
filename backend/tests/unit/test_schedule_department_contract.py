@@ -83,6 +83,7 @@ def _find_appointment_entry(payload, appointment_id: int):
     return None
 
 
+@pytest.mark.usefixtures("patient_ownership_epochs")
 class TestScheduleDepartmentKeyContract:
     def test_daily_schedule_appointment_department_is_key_string(
         self,

@@ -242,231 +242,55 @@ class TestUpdatePaymentStatusTerminalShortCircuit:
 
 @pytest.mark.unit
 class TestClickTerminalStatePreservation:
-    """Terminal-state preservation tests for Click webhook handler.
+    """Keep recorded terminal states stable during the legacy Click hold."""
 
-    Mirrors TestPaymeTerminalStatePreservation but for Click.
-    Closes FINDING E: Click had no terminal-state regression tests.
-
-    These tests mock the repository and BillingService but do NOT mock
-    _update_payment_status — so the P2 fix logic runs.
-    """
-
-    def _make_click_service(
-        self,
-        db_session,
-        payment_status="refunded",
-        payment_provider_data=None,
-    ):
-        """Create a service with mocked repository for Click webhook testing."""
-        payment = SimpleNamespace(
-            id=44,
-            visit_id=10,
-            amount=Decimal("1000"),
-            status=payment_status,
-            paid_at=None,
-            provider_data=payment_provider_data or {"order_id": "clinic_44_1700000000"},
-        )
-        repository = SimpleNamespace(
-            get_existing_transaction=Mock(return_value=None),  # not a duplicate
-            get_payment_by_id=Mock(return_value=payment),
-            get_payment_by_id_for_update=Mock(return_value=payment),
-            create_webhook=Mock(return_value=SimpleNamespace(
-                id=33, status="pending", error_message=None,
-            )),
-            create_transaction=Mock(return_value=SimpleNamespace(id=77)),
-        )
-        service = ProviderWebhookService(db_session, repository=repository)
-
-        # Mock BillingService — when update_payment_status is called,
-        # it simulates the real behavior:
-        # - same-status: no-op (idempotent)
-        # - valid transition: set status
-        # - invalid transition (terminal→non-terminal): raise ValueError
-        from app.services.payment_state_checks import is_valid_payment_transition
-
-        def _billing_update(payment_id, new_status, commit=False):
-            if payment.status == new_status:
-                return payment  # idempotent
-            if not is_valid_payment_transition(payment.status, new_status):
-                raise ValueError(
-                    f"Переход статуса с '{payment.status}' на '{new_status}' недопустим"
-                )
-            payment.status = new_status
-            if new_status == "paid" and not payment.paid_at:
-                payment.paid_at = datetime.now(UTC)
-            return payment
-
-        billing_mock = Mock()
-        billing_mock.update_payment_status = Mock(side_effect=_billing_update)
-
-        return service, payment, billing_mock, repository
-
-    def _click_webhook_data(self, action="post"):
+    def _click_webhook_data(self):
         return {
-            "click_trans_id": "click_trans_123",
+            "click_trans_id": "SYNTHETIC-TRANSACTION",
             "merchant_trans_id": "clinic_44_1700000000",
-            "amount": 1000,
-            "action": action,
-            "sign_string": "valid_signature",
+            "amount": 100000,
+            "action": 1,
+            "sign_string": "synthetic-signature",
         }
 
-    def _mock_provider_manager(self, result_status="completed", payment_id="clinic_44_1700000000"):
-        """Mock the payment manager that processes the webhook."""
-        result = SimpleNamespace(
-            success=True,
-            status=result_status,
-            payment_id=payment_id,
-            amount=Decimal("1000"),
-            error_message=None,
-            provider_data={"method": "Click", "transaction_id": "click_trans_123"},
-        )
-        return SimpleNamespace(
-            get_provider=Mock(return_value=SimpleNamespace(
-                validate_webhook_signature=Mock(return_value=True),
-            )),
-            process_webhook=Mock(return_value=result),
-        )
+    def _mock_provider_manager(self):
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
+        return manager
 
-    def test_click_success_callback_preserves_refunded_payment(self, db_session):
-        """Click success callback on a refunded payment must NOT regress it.
-
-        The payment stays 'refunded'. The P2 fix short-circuits if the
-        mapped status is 'failed', but for a success callback the mapped
-        status is 'paid'. BillingService rejects refunded→paid (ValueError),
-        which is caught by the outer except and returns an error response.
-
-        This test pins the CURRENT behavior: the invariant is preserved
-        (payment stays refunded), but the webhook returns an error to the
-        provider (FINDING C — audit-trail loss is a separate follow-up).
-        """
-        service, payment, billing_mock, _ = self._make_click_service(
-            db_session, payment_status="refunded"
-        )
-
-        with patch(
-            "app.services.provider_webhook_service.get_payment_manager",
-            return_value=self._mock_provider_manager(),
-        ), patch(
-            "app.services.billing_service.BillingService",
-            return_value=billing_mock,
+    @pytest.mark.parametrize(("state", "error"), [
+        ("refunded", 0), ("cancelled", 0), ("void", 0), ("refunded", -1), ("cancelled", -1),
+    ])
+    def test_click_new_callback_preserves_terminal_state(self, db_session, state, error):
+        payment = SimpleNamespace(status=state)
+        receipt = SimpleNamespace()
+        repository = Mock()
+        repository.get_existing_transaction.return_value = None
+        repository.get_payment_by_id_for_update.return_value = payment
+        repository.create_webhook.return_value = receipt
+        manager = self._mock_provider_manager()
+        with (
+            patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager),
+            patch("app.services.billing_service.BillingService") as billing,
         ):
-            result = service.process_click_webhook(self._click_webhook_data())
+            callback = {**self._click_webhook_data(), "error": error}
+            result = ProviderWebhookService(db_session, repository=repository).process_click_webhook(callback)
+        assert result == {"error": -1, "error_note": "Payment reconciliation required"}
+        assert payment.status == state
+        assert receipt.error_message == "provider_reconciliation_required"
+        repository.get_payment_by_id_for_update.assert_not_called()
+        repository.create_transaction.assert_not_called()
+        manager.process_webhook.assert_not_called()
+        billing.assert_not_called()
 
-        # ─── THE REGRESSION ASSERTION ──────────────────────────────
-        # Payment status must NOT be regressed from 'refunded'.
-        assert payment.status == "refunded", (
-            f"Refunded payment was regressed to '{payment.status}'. "
-            f"Terminal payment state must be preserved."
-        )
-
-    def test_click_success_callback_preserves_cancelled_payment(self, db_session):
-        """Click success callback on a cancelled payment must NOT regress it."""
-        service, payment, billing_mock, _ = self._make_click_service(
-            db_session, payment_status="cancelled"
-        )
-
-        with patch(
-            "app.services.provider_webhook_service.get_payment_manager",
-            return_value=self._mock_provider_manager(),
-        ), patch(
-            "app.services.billing_service.BillingService",
-            return_value=billing_mock,
-        ):
-            result = service.process_click_webhook(self._click_webhook_data())
-
-        assert payment.status == "cancelled", (
-            f"Cancelled payment was regressed to '{payment.status}'."
-        )
-
-    def test_click_success_callback_preserves_void_payment(self, db_session):
-        """Click success callback on a void payment must NOT regress it."""
-        service, payment, billing_mock, _ = self._make_click_service(
-            db_session, payment_status="void"
-        )
-
-        with patch(
-            "app.services.provider_webhook_service.get_payment_manager",
-            return_value=self._mock_provider_manager(),
-        ), patch(
-            "app.services.billing_service.BillingService",
-            return_value=billing_mock,
-        ):
-            result = service.process_click_webhook(self._click_webhook_data())
-
-        assert payment.status == "void", (
-            f"Void payment was regressed to '{payment.status}'."
-        )
-
-    def test_click_failure_callback_short_circuits_on_refunded(self, db_session):
-        """Click failure callback on a refunded payment: P2 fix short-circuits.
-
-        The payment stays 'refunded'. BillingService is NOT called.
-        The webhook failure record is still committed (simulated here
-        by the create_webhook mock).
-        """
-        service, payment, billing_mock, repo = self._make_click_service(
-            db_session, payment_status="refunded"
-        )
-
-        # Failure callback: provider returns success=False
-        fail_manager = self._mock_provider_manager()
-        fail_manager.process_webhook.return_value = SimpleNamespace(
-            success=False,
-            status="failed",
-            payment_id="clinic_44_1700000000",
-            amount=Decimal("1000"),
-            error_message="Provider error",
-            provider_data={"method": "Click", "error": "timeout"},
-        )
-
-        with patch(
-            "app.services.provider_webhook_service.get_payment_manager",
-            return_value=fail_manager,
-        ), patch(
-            "app.services.billing_service.BillingService",
-            return_value=billing_mock,
-        ):
-            result = service.process_click_webhook(self._click_webhook_data())
-
-        # ─── THE REGRESSION ASSERTIONS ─────────────────────────────
-        # 1. Payment stays refunded (terminal preserved).
-        assert payment.status == "refunded", (
-            f"Refunded payment was regressed to '{payment.status}' "
-            f"by a failure callback."
-        )
-        # 2. BillingService.update_payment_status was NOT called
-        #    (P2 fix short-circuited).
-        billing_mock.update_payment_status.assert_not_called()
-
-    def test_click_failure_callback_short_circuits_on_cancelled(self, db_session):
-        """Click failure callback on a cancelled payment: P2 fix short-circuits."""
-        service, payment, billing_mock, _ = self._make_click_service(
-            db_session, payment_status="cancelled"
-        )
-
-        fail_manager = self._mock_provider_manager()
-        fail_manager.process_webhook.return_value = SimpleNamespace(
-            success=False,
-            status="failed",
-            payment_id="clinic_44_1700000000",
-            amount=Decimal("1000"),
-            error_message="Provider error",
-            provider_data={"method": "Click", "error": "timeout"},
-        )
-
-        with patch(
-            "app.services.provider_webhook_service.get_payment_manager",
-            return_value=fail_manager,
-        ), patch(
-            "app.services.billing_service.BillingService",
-            return_value=billing_mock,
-        ):
-            result = service.process_click_webhook(self._click_webhook_data())
-
-        assert payment.status == "cancelled"
-        billing_mock.update_payment_status.assert_not_called()
-
-    def test_click_duplicate_webhook_returns_already_processed(self, db_session):
+    @pytest.mark.parametrize(("callback_override", "error", "note"), [
+        ({}, 0, "Already processed"),
+        ({"merchant_trans_id": "clinic_44_1700000001"}, -1, "Payment order mismatch"),
+        ({"amount": 101000}, -1, "Payment amount mismatch"),
+    ])
+    def test_click_duplicate_webhook_requires_matching_order_and_amount(
+        self, db_session, callback_override, error, note,
+    ):
         """Click duplicate webhook (same click_trans_id) returns 'Already processed'
         without re-evaluating payment status.
 
@@ -478,10 +302,12 @@ class TestClickTerminalStatePreservation:
             payment_id=44,
             webhook_id=33,
             status="completed",
+            amount=100000,
         )
         payment = SimpleNamespace(
             id=44, visit_id=10, amount=Decimal("1000"),
             status="refunded", paid_at=None, provider_data={},
+            provider="click", currency="UZS", provider_payment_id="clinic_44_1700000000",
         )
         repository = SimpleNamespace(
             get_existing_transaction=Mock(return_value=existing_tx),
@@ -495,24 +321,27 @@ class TestClickTerminalStatePreservation:
         billing_mock = Mock()
         billing_mock.update_payment_status = Mock()
 
+        manager = self._mock_provider_manager()
         with patch(
             "app.services.provider_webhook_service.get_payment_manager",
-            return_value=self._mock_provider_manager(),
+            return_value=manager,
         ), patch(
             "app.services.billing_service.BillingService",
             return_value=billing_mock,
         ):
-            result = service.process_click_webhook(self._click_webhook_data())
+            callback = {**self._click_webhook_data(), **callback_override}
+            result = service.process_click_webhook(callback)
 
         # ─── THE REGRESSION ASSERTIONS ─────────────────────────────
-        assert result["error"] == 0
-        assert result["error_note"] == "Already processed"
+        assert result["error"] == error
+        assert result["error_note"] == note
         # Payment status NOT re-evaluated.
         assert payment.status == "refunded"
         # BillingService NOT called (idempotent short-circuit).
         billing_mock.update_payment_status.assert_not_called()
         # No new webhook record created.
         repository.create_webhook.assert_not_called()
+        manager.process_webhook.assert_not_called()
 
 
 @pytest.mark.unit

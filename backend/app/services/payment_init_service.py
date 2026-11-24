@@ -6,9 +6,10 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 from app.core.audit import extract_model_changes, log_critical_change
 from app.core.config import settings
@@ -41,7 +42,7 @@ def _with_payment_id(url: str, payment_id: int) -> str:
 @dataclass
 class PaymentInitDomainError(Exception):
     status_code: int
-    detail: str
+    detail: Any
 
 
 class PaymentInitService:
@@ -65,7 +66,7 @@ class PaymentInitService:
         return_url: str | None,
         cancel_url: str | None,
     ) -> dict:
-        payment = None
+        payment_id: int | None = None
         try:
             correlation_id = getattr(getattr(request, "state", None), "request_id", None)
             visit = self.repository.get_visit(visit_id)
@@ -110,6 +111,7 @@ class PaymentInitService:
                 current_user=type("User", (), {"id": current_user_id})(),
                 commit=False,
             )
+            payment_id = payment.id
 
             self.repository.flush()
             _, new_data = extract_model_changes(None, payment)
@@ -212,9 +214,8 @@ class PaymentInitService:
                         "payment_id": payment.id,
                         "visit_id": visit.id,
                         "provider": provider,
-                        "error": str(exc),
+                        "error_type": type(exc).__name__,
                     },
-                    exc_info=True,
                 )
             return {
                 "success": False,
@@ -224,18 +225,19 @@ class PaymentInitService:
         except PaymentInitDomainError:
             self.repository.rollback()
             raise
+        except HTTPException as exc:
+            self.repository.rollback()
+            raise PaymentInitDomainError(status_code=exc.status_code, detail=exc.detail) from exc
         except Exception as exc:
             self.repository.rollback()
-            if payment is not None and getattr(payment, "id", None):
-                return {
-                    "success": False,
-                    "payment_id": payment.id,
-                    "error_message": f"Ошибка инициализации платежа: {exc}",
-                }
-            return {
+            logger.warning("payment_init_service.failed", extra={"error_type": type(exc).__name__})
+            failure: dict[str, Any] = {
                 "success": False,
-                "error_message": f"Ошибка инициализации платежа: {exc}",
+                "error_message": "Ошибка инициализации платежа",
             }
+            if payment_id:
+                failure["payment_id"] = payment_id
+            return failure
 
     def _notify_payment_status(
         self,
@@ -315,6 +317,6 @@ class PaymentInitService:
                     "payment_id": payment_id,
                     "visit_id": visit_id,
                     "change_type": change_type,
-                    "error": str(exc),
+                    "error_type": type(exc).__name__,
                 },
             )

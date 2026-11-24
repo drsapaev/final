@@ -300,6 +300,7 @@ async def _handle_ticket_qr_start(
                 db,
                 patient_id=visit.patient_id,
                 chat_id=chat_id,
+                use_confirmation_subject_lock=True,
                 create_missing_profile=lambda: _upsert_ticket_qr_telegram_user(
                     db, message
                 ),
@@ -537,11 +538,14 @@ def _telegram_user_for_chat(db: Session, chat_id: int) -> TelegramUser | None:
 def _patient_for_telegram_chat(
     db: Session, chat_id: int
 ) -> tuple[TelegramUser | None, Patient | None]:
+    if type(chat_id) is not int or chat_id <= 0:
+        return None, None
     telegram_user = _telegram_user_for_chat(db, chat_id)
-    if not telegram_user or not telegram_user.patient_id:
-        return telegram_user, None
-    patient = db.query(Patient).filter(Patient.id == telegram_user.patient_id).first()
-    return telegram_user, patient
+    if not telegram_user or not telegram_user.patient_id or not telegram_user.active or telegram_user.blocked:
+        return None, None
+    patient = (db.query(Patient).filter(Patient.id == telegram_user.patient_id,
+                                      Patient.is_deleted.is_not(True)).first())
+    return (telegram_user, patient) if patient is not None else (None, None)
 
 
 def _patient_today_queue_entries(

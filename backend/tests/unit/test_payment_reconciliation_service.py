@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from app.services.payment_reconciliation import (
+    RECONCILIATION_UNAVAILABLE,
     SUPPORTED_RECONCILIATION_PROVIDERS,
     PaymentReconciliationService,
 )
@@ -37,7 +38,7 @@ class _RepositoryStub:
 
 
 class _ProviderStub:
-    def __init__(self, statement: dict):
+    def __init__(self, statement: dict | None):
         self._statement = statement
 
     def get_statement(self, _: date, __: date):
@@ -120,11 +121,119 @@ class TestPaymentReconciliationService:
         result = service.reconcile_provider("click", date(2026, 2, 1), date(2026, 2, 2))
 
         assert result["provider"] == "click"
+        assert result["statement_available"] is True
         assert result["summary"]["matched_count"] == 2
         assert result["summary"]["discrepancy_count"] == 2
         assert result["summary"]["missing_in_provider_count"] == 0
         assert result["summary"]["missing_internal_count"] == 1
         assert result["summary"]["difference"] == 350
+
+    @pytest.mark.parametrize("statement", [None, {}, {"transactions": None}])
+    def test_unavailable_statement_has_no_provider_totals(self, statement):
+        repository = _RepositoryStub(
+            transactions=[SimpleNamespace(transaction_id="SYNTHETIC", amount=100)],
+        )
+        provider = _ProviderStub(statement)
+        service = PaymentReconciliationService(
+            db=Mock(), repository=repository, payment_manager=_ManagerStub(provider),
+        )
+
+        result = service.reconcile_provider("click", date(2026, 2, 1), date(2026, 2, 2))
+
+        assert result["statement_available"] is False
+        assert result["summary"] == {
+            "total_internal": 100,
+            "total_provider": None,
+            "difference": None,
+            "matched_count": None,
+            "discrepancy_count": None,
+            "missing_in_provider_count": None,
+            "missing_internal_count": None,
+        }
+        assert service.alert_on_discrepancies({"providers": {"click": result}}) == [{
+            "severity": "warning", "provider": "click", "message": "Provider statement unavailable",
+        }]
+
+    def test_provider_read_failure_remains_unavailable(self, caplog):
+        provider = SimpleNamespace(
+            get_statement=Mock(side_effect=RuntimeError("SYNTHETIC provider diagnostics")),
+        )
+        service = PaymentReconciliationService(
+            db=Mock(), repository=_RepositoryStub(), payment_manager=_ManagerStub(provider),
+        )
+
+        result = service.reconcile_provider("click", date(2026, 2, 1), date(2026, 2, 2))
+
+        assert result["statement_available"] is False
+        assert result["summary"]["total_provider"] is None
+        assert "SYNTHETIC provider diagnostics" not in caplog.text
+
+    def test_received_empty_statement_reports_known_zero(self):
+        repository = _RepositoryStub(
+            transactions=[SimpleNamespace(transaction_id="SYNTHETIC", amount=100)],
+        )
+        service = PaymentReconciliationService(
+            db=Mock(),
+            repository=repository,
+            payment_manager=_ManagerStub(_ProviderStub({"transactions": []})),
+        )
+
+        result = service.reconcile_provider("click", date(2026, 2, 1), date(2026, 2, 2))
+
+        assert result["statement_available"] is True
+        assert result["summary"]["total_provider"] == 0
+        assert result["summary"]["missing_in_provider_count"] == 1
+        assert result["missing_in_provider"] == ["SYNTHETIC"]
+
+    def test_duplicate_statement_rows_are_unavailable(self):
+        rows = [{"transaction_id": "SYNTHETIC", "amount": 100, "status": "completed"}] * 2
+        service = PaymentReconciliationService(
+            db=Mock(),
+            repository=_RepositoryStub(),
+            payment_manager=_ManagerStub(_ProviderStub({"transactions": rows})),
+        )
+
+        result = service.reconcile_provider("click", date(2026, 2, 1), date(2026, 2, 2))
+
+        assert result["statement_available"] is False
+        assert result["error"] == RECONCILIATION_UNAVAILABLE
+
+    @pytest.mark.parametrize("has_local_transaction", [True, False])
+    def test_partial_comparison_never_reports_clean_results(self, has_local_transaction):
+        repository = _RepositoryStub(
+            transactions=[SimpleNamespace(transaction_id="SYNTHETIC", amount=100)]
+            if has_local_transaction else [],
+        )
+        provider = _ProviderStub({"transactions": []})
+        manager = SimpleNamespace(get_provider=lambda name: provider if name == "click" else None)
+        service = PaymentReconciliationService(
+            db=Mock(), repository=repository, payment_manager=manager,
+        )
+
+        result = service.reconcile_all_providers(date(2026, 2, 1), date(2026, 2, 2))
+
+        assert result["overall_summary"] == {
+            "comparison_complete": False,
+            "total_discrepancies": None,
+            "total_difference": None,
+            "has_discrepancies": True if has_local_transaction else None,
+        }
+
+    def test_complete_empty_comparison_has_no_discrepancies(self):
+        service = PaymentReconciliationService(
+            db=Mock(),
+            repository=_RepositoryStub(),
+            payment_manager=_ManagerStub(_ProviderStub({"transactions": []})),
+        )
+
+        result = service.reconcile_all_providers(date(2026, 2, 1), date(2026, 2, 2))
+
+        assert result["overall_summary"] == {
+            "comparison_complete": True,
+            "total_discrepancies": 0,
+            "total_difference": 0,
+            "has_discrepancies": False,
+        }
 
     def test_alerts_include_supported_provider_names_for_staff_summary(self):
         service = PaymentReconciliationService(

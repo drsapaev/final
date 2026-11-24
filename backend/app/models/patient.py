@@ -4,13 +4,16 @@ from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
     literal,
 )
@@ -25,6 +28,12 @@ if TYPE_CHECKING:
 
 class Patient(Base):
     __tablename__ = "patients"
+    __table_args__ = (
+        CheckConstraint(
+            "birth_date_precision IN ('unknown', 'year_only', 'reported_exact')",
+            name="ck_patient_birth_date_precision",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int | None] = mapped_column(
@@ -33,11 +42,17 @@ class Patient(Base):
         nullable=True,
         unique=True
     )  # ✅ SECURITY: SET NULL (patient can exist without user account)
+    # Advances in the database when account ownership or deletion changes.
+    notification_owner_generation: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
     last_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     first_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     middle_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # A migration trigger advances this generation on every date change;
+    # zero or missing evidence is never a verified birth date.
+    birth_date_generation: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    birth_date_precision: Mapped[str] = mapped_column(String(24), nullable=False, server_default="unknown")
     sex: Mapped[str | None] = mapped_column(
         String(8), nullable=True, name="gender"
     )  # M|F|X
@@ -114,3 +129,26 @@ class Patient(Base):
             + literal(" ")
             + func.coalesce(cls.middle_name, "")
         )
+
+
+class PatientBirthDateEvidence(Base):
+    """A reviewed date is usable only while its patient generation matches.
+
+    The schema alone does not establish the actor's authority or the accuracy
+    of the reviewed record. It deliberately does not copy the date into audit.
+    """
+
+    __tablename__ = "patient_birth_date_evidence"
+    __table_args__ = (
+        UniqueConstraint("patient_id", "birth_date_generation", name="uq_patient_birth_evidence_generation"),
+        CheckConstraint("patient_id_snapshot > 0 AND birth_date_generation > 0 AND actor_user_id_snapshot > 0", name="ck_patient_birth_evidence_identity"),
+        CheckConstraint("patient_id IS NULL OR patient_id = patient_id_snapshot", name="ck_patient_birth_evidence_patient"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id", ondelete="SET NULL"))
+    patient_id_snapshot: Mapped[int] = mapped_column(Integer, nullable=False)
+    birth_date_generation: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    actor_user_id_snapshot: Mapped[int] = mapped_column(Integer, nullable=False)
+    actor_role: Mapped[str] = mapped_column(String(64), nullable=False)
+    verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

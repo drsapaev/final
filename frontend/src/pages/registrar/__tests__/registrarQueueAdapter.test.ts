@@ -275,6 +275,7 @@ describe('adaptQueueEntry (PR-UI-13-1)', () => {
     expect(row.service_details).toEqual([]);
     expect(row.available_actions).toEqual([]);
     expect(row.can_mark_paid).toBe(false);
+    expect(row.blocks_group_payment).toBe(false);
     expect(row.can_start_visit).toBe(false);
     expect(row.can_cancel).toBe(false);
     expect(row.can_print_ticket).toBe(false);
@@ -296,6 +297,17 @@ describe('adaptQueueEntry (PR-UI-13-1)', () => {
     expect(row.can_mark_paid).toBe(true);
     expect(row.can_cancel).toBe(true);
     expect(row.can_start_visit).toBe(false);
+  });
+
+  it('preserves the explicit backend group payment decision', () => {
+    const row = adaptQueueEntry(
+      { data: { id: 13, blocks_group_payment: true, payment_status: 'pending' } },
+      baseQueue,
+      baseData,
+      '2026-08-29',
+      FALLBACK,
+    );
+    expect(row).toMatchObject({ blocks_group_payment: true, payment_status: 'pending' });
   });
 
   it('queue info block is shaped from entry + queue (number, tag, name, timezone fallback)', () => {

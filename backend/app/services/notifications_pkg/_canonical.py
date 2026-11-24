@@ -73,8 +73,10 @@ class CanonicalMixin(NotificationSenderMixinBase):
         patient_id: int,
         event_type: str,
         metadata: dict[str, Any] | None = None,
+        neutral: bool = False,
+        has_portal: bool = False,
     ) -> bool:
-        """Send a safe patient Telegram message for a canonical business event."""
+        """Send a patient Telegram message for a canonical business event."""
         normalized_event_type = _normalize_notification_event_type(
             event_type,
             fallback="notification",
@@ -109,11 +111,16 @@ class CanonicalMixin(NotificationSenderMixinBase):
         if not _patient_telegram_preferences_enabled(telegram_user, normalized_event_type):
             return False
 
-        message = _patient_telegram_event_message(
-            normalized_event_type,
-            getattr(telegram_user, "language_code", None),
-            metadata,
-        )
+        if neutral:
+            from app.services.notifications_pkg._helpers import neutral_patient_notice
+
+            message = neutral_patient_notice(has_portal=has_portal)
+        else:
+            message = _patient_telegram_event_message(
+                normalized_event_type,
+                getattr(telegram_user, "language_code", None),
+                metadata,
+            )
         if not message:
             return False
 

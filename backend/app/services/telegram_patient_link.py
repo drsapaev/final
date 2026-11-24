@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.patient import Patient
 from app.models.telegram_config import TelegramUser
+from app.services.patient_subject_lock import lock_patient_subject
 
 
 class TelegramPatientLinkConflict(Exception):
@@ -36,12 +37,17 @@ def link_telegram_patient(
     chat_id: int,
     expected_telegram_user_id: int | None = None,
     create_missing_profile: Callable[[], TelegramUser] | None = None,
+    use_confirmation_subject_lock: bool = False,
 ) -> TelegramUser:
     """Require verified proof from the caller and leave commit or rollback to it."""
     if chat_id <= 0:
         raise TelegramPatientLinkConflict()
 
-    lock_telegram_patient_target(db, patient_id)
+    if use_confirmation_subject_lock:
+        if not lock_patient_subject(db, patient_id):
+            raise TelegramPatientLinkConflict()
+    else:
+        lock_telegram_patient_target(db, patient_id)
 
     locked_chat = (
         select(TelegramUser)

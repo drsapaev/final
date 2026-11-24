@@ -15,6 +15,7 @@ import httpx
 import requests  # noqa: F401
 from sqlalchemy.orm import Session
 
+from app.core.logging_config import protect_telegram_preview_logs
 from app.crud import (
     appointment as crud_appointment,
 )
@@ -222,6 +223,16 @@ class TelegramBotService:
         if staff_menu_handler and await staff_menu_handler(update, db, self):
             return True
 
+        # Staff handlers keep their own contracts. Patient linking and menu
+        # actions require the verified sender in their own private chat.
+        from app.services.telegram_private_chat import is_private_patient_message
+
+        candidate = update.get("message")
+        if candidate and (not isinstance(candidate, dict) or "chat" not in candidate):
+            return False
+        if candidate and not is_private_patient_message(candidate):
+            return True
+
         if await ticket_start_handler(update, db, self):
             return True
 
@@ -374,16 +385,18 @@ class TelegramBotService:
                     try:
                         preview = await run_in_threadpool(_preview_visit)
                         keyboard = {"inline_keyboard": [
+                            [{"text": "Открыть визит", "url": preview["view_url"]}],
                             [{"text": "✅ Подтвердить", "callback_data": f"confirm_visit:{preview['action_token']}"}],
                             [{"text": "❌ Отменить", "callback_data": f"cancel_visit:{preview['action_token']}"}],
                         ]}
                         # Revocation can race after the final DB check and
                         # before provider delivery; no lock is held over I/O.
-                        response = await self._httpx_post(
-                            f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
-                            json={"chat_id": chat_id, "text": preview["text"], "reply_markup": keyboard},
-                            timeout=5,
-                        )
+                        with protect_telegram_preview_logs():
+                            response = await self._httpx_post(
+                                f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
+                                json={"chat_id": chat_id, "text": preview["text"], "reply_markup": keyboard},
+                                timeout=5,
+                            )
                         sent = response.status_code == 200 and response.json().get("ok", False)
                     except Exception:
                         sent = False

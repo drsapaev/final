@@ -65,6 +65,9 @@ async def mark_visit_as_paid(
 
         # Compute the full visit total — mark-paid creates a single
         # payment for the entire amount.
+        # Lock and check even when the total is zero: that path never creates
+        # a Payment row and therefore cannot rely on its invariant check.
+        payment_service.preflight_payment_groups([visit_id])
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
@@ -72,12 +75,25 @@ async def mark_visit_as_paid(
                 detail="Визит не найден"
             )
 
-        total_amount = payment_service.compute_total_cost(visit)
+        quote_summary = payment_service.summarize_visits([visit])
+        payment_currency = quote_summary["currency"]
+        if payment_currency is None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Валюта визита требует сверки")
+        if payment_currency != "UZS":
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Эта валюта пока недоступна в интерфейсе кассы")
+        total_amount = quote_summary["total_amount"]
+
+        if total_amount == 0:
+            # A zero-total response still claims "paid". An unresolved
+            # provider intent anywhere in the locked financial closure must
+            # be reconciled before returning that claim.
+            payment_service.assert_no_unresolved_payment_intent(visit_id)
 
         if total_amount > 0:
             new_payment = payment_service.create_payment_for_visit(
                 visit_id=visit_id,
                 amount=total_amount,
+                currency=payment_currency,
                 method="cash",
                 note="Помечен как оплаченный",
                 current_user=current_user,
@@ -109,6 +125,7 @@ async def mark_visit_as_paid(
         }
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception:
         db.rollback()

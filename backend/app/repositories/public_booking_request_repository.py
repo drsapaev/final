@@ -16,6 +16,7 @@ from app.models.public_booking_request import (
     PublicBookingRequest,
     PublicBookingRequestEvent,
 )
+from app.services.patient_subject_lock import lock_patient_subject
 
 
 def _future_or_unknown_time(value: str | None, after_time: time) -> bool:
@@ -52,12 +53,14 @@ class PublicBookingRequestRepository:
 
     def lock_patient_for_booking(self, *, patient_id: int) -> Patient | None:
         """Serialize patient quotas without blocking foreign-key key shares."""
+        if self.db.get_bind().dialect.name == "postgresql" and not lock_patient_subject(
+            self.db, patient_id, for_booking=True,
+        ):
+            return None
         return (
             self.db.query(Patient)
             .filter(Patient.id == patient_id)
             .populate_existing()
-            # SQLAlchemy renders FOR NO KEY UPDATE for PostgreSQL.
-            .with_for_update(key_share=True)
             .first()
         )
 

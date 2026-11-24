@@ -9,16 +9,20 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Numeric,
     String,
     Text,
+    Uuid,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -92,6 +96,9 @@ class RefundRequest(Base):
                 "('pending', 'approved', 'processing', 'completed')"
             ),
         ),
+        Index(
+            "uq_refund_requests_id_payment", "id", "payment_id", unique=True,
+        ).ddl_if(dialect="postgresql"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -129,6 +136,7 @@ class RefundRequest(Base):
         Numeric(12, 2), default=0, nullable=False,
         comment="Комиссия за возврат (банковская и т.д.)"
     )
+    payment_currency_snapshot: Mapped[str | None] = mapped_column(String(3), nullable=True)
 
     # Тип возврата
     refund_type: Mapped[str] = mapped_column(
@@ -258,6 +266,17 @@ class DepositTransaction(Base):
     # partial predicate pins exactly the force-majeure refund leg and
     # never the manual deposit surfaces.
     __table_args__ = (
+        CheckConstraint(
+            "refund_currency_snapshot IS NULL OR refund_currency_snapshot = 'UZS'",
+            name="ck_deposit_refund_currency",
+        ),
+        Index(
+            "uq_deposit_manual_request",
+            "client_request_id",
+            unique=True,
+            postgresql_where=text("client_request_id IS NOT NULL"),
+            sqlite_where=text("client_request_id IS NOT NULL"),
+        ),
         Index(
             "uq_deposit_transactions_credit_payment",
             "payment_id",
@@ -284,6 +303,14 @@ class DepositTransaction(Base):
     transaction_type: Mapped[str] = mapped_column(
         String(10), nullable=False
     )  # credit / debit
+
+    # Only new payment-linked deposit refunds carry settlement evidence.
+    refund_currency_snapshot: Mapped[str | None] = mapped_column(String(3), nullable=True)
+
+    client_request_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    command_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    command_currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    command_is_active: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     # Сумма
     amount: Mapped[Decimal] = mapped_column(
@@ -374,6 +401,15 @@ class PaymentRefundClaim(Base):
             "payment_id",
             unique=True,
         ),
+        # The single-column foreign key clears the request link on deletion.
+        # Check the pair at commit after that referential action has run.
+        ForeignKeyConstraint(
+            ["refund_request_id", "payment_id"],
+            ["refund_requests.id", "refund_requests.payment_id"],
+            name="fk_payment_refund_claims_request_payment",
+            deferrable=True,
+            initially="DEFERRED",
+        ).ddl_if(dialect="postgresql"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

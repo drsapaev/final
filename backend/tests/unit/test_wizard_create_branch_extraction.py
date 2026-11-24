@@ -54,6 +54,12 @@ class _FakeDb:
     # catalog snapshot and no PostgreSQL bind.
     bind = None
 
+    def __init__(self):
+        self._transaction = object()
+
+    def get_transaction(self):
+        return self._transaction
+
     def query(self, *_entities):
         return _EmptyQuery()
 

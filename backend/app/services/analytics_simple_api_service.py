@@ -2,17 +2,25 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
 from app.repositories.analytics_simple_repository import AnalyticsSimpleRepository
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class AnalyticsSimpleDomainError(Exception):
     status_code: int
     detail: str
+
+
+def _unexpected_failure(operation: str, exc: Exception) -> AnalyticsSimpleDomainError:
+    logger.warning("Analytics %s failed error_type=%s", operation, type(exc).__name__)
+    return AnalyticsSimpleDomainError(status_code=500, detail="Internal server error")
 
 
 class AnalyticsSimpleApiService:
@@ -36,10 +44,7 @@ class AnalyticsSimpleApiService:
                 "date": today.isoformat(),
             }
         except Exception as exc:
-            raise AnalyticsSimpleDomainError(
-                status_code=500,
-                detail=f"Ошибка получения статистики: {exc}",
-            ) from exc
+            raise _unexpected_failure("quick stats", exc) from None
 
     def get_dashboard_data(self) -> dict[str, Any]:
         try:
@@ -62,10 +67,7 @@ class AnalyticsSimpleApiService:
                 },
             }
         except Exception as exc:
-            raise AnalyticsSimpleDomainError(
-                status_code=500,
-                detail=f"Ошибка получения данных дашборда: {exc}",
-            ) from exc
+            raise _unexpected_failure("dashboard", exc) from None
 
     def get_trends_analytics(self, *, days: int) -> dict[str, Any]:
         try:
@@ -87,7 +89,4 @@ class AnalyticsSimpleApiService:
                 "trends": trends_data,
             }
         except Exception as exc:
-            raise AnalyticsSimpleDomainError(
-                status_code=500,
-                detail=f"Ошибка получения трендов: {exc}",
-            ) from exc
+            raise _unexpected_failure("trends", exc) from None

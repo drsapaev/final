@@ -9,11 +9,24 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.user import User
 from app.models.visit import Visit
+from app.services.click_receipt_service import (
+    ClickReceiptError,
+    ClickReceiptService,
+    configured_receipt_keys,
+    configured_webhook_credentials,
+    select_webhook_credential,
+)
+from app.services.click_webhook_protocol import (
+    ClickProtocolError,
+    authenticate_click_receipt,
+    parse_click_fields,
+)
 from app.services.notifications import notification_sender_service
 from app.services.provider_webhook_service import ProviderWebhookService
 
@@ -22,7 +35,7 @@ router = APIRouter()
 MAX_PAYMENT_WEBHOOK_BODY_BYTES = 256 * 1024
 
 
-async def _read_payment_webhook_json(request: Request) -> dict[str, Any]:
+async def _read_payment_webhook_body(request: Request) -> bytes:
     chunks: list[bytes] = []
     total_size = 0
 
@@ -34,9 +47,13 @@ async def _read_payment_webhook_json(request: Request) -> dict[str, Any]:
                 detail="Payment webhook payload is too large",
             )
         chunks.append(chunk)
+    return b"".join(chunks)
 
+
+async def _read_payment_webhook_json(request: Request) -> dict[str, Any]:
+    body = await _read_payment_webhook_body(request)
     try:
-        payload = json.loads(b"".join(chunks).decode("utf-8") or "{}")
+        payload = json.loads(body.decode("utf-8") or "{}")
     except (JSONDecodeError, UnicodeDecodeError) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -50,6 +67,34 @@ async def _read_payment_webhook_json(request: Request) -> dict[str, Any]:
         )
 
     return payload
+
+
+async def _store_click_callback(request: Request, db: Session):
+    """Durably store an authenticated callback before any reducer or ACK.
+
+    This helper is not connected to the route until the phase reducer and
+    legacy reconciliation are complete. Failure must cause provider retry.
+    """
+    body = await _read_payment_webhook_body(request)
+    media_type = request.headers.get("content-type", "")
+    try:
+        credentials = configured_webhook_credentials(
+            settings.CLICK_WEBHOOK_CREDENTIALS, settings.CLICK_SERVICE_ID, settings.CLICK_SECRET_KEY)
+        service_id, secret = select_webhook_credential(body, media_type, credentials)
+        fields = parse_click_fields(body, media_type)
+        observation, confidence = authenticate_click_receipt(fields, service_id=service_id, secret_key=secret)
+        keys = configured_receipt_keys(settings.CLICK_RECEIPT_KEYS, settings.CLICK_RECEIPT_ACTIVE_VERSION)
+        stored = ClickReceiptService(db, keyring=keys, active_version=settings.CLICK_RECEIPT_ACTIVE_VERSION,
+            trusted_schema=settings.CLICK_RECEIPT_DB_SCHEMA, trusted_owner=settings.CLICK_RECEIPT_DB_SCHEMA_OWNER,
+            trusted_owner_members=settings.TRUSTED_DB_OWNER_MEMBERS).store(
+                body=body, content_type=media_type, service_id=service_id, secret_key=secret)
+        if stored.confidence != confidence:
+            raise ClickReceiptError("receipt confidence unavailable")
+        return stored, observation
+    except ClickProtocolError:
+        raise HTTPException(status_code=400, detail="Invalid provider callback") from None
+    except ClickReceiptError:
+        raise HTTPException(status_code=503, detail="Provider callback temporarily unavailable") from None
 
 
 async def _emit_payment_notification_from_webhook_result(

@@ -146,6 +146,13 @@ QUEUE_NOTIFICATION_EVENT_TYPES = {
     "queue_update",
 }
 
+def neutral_patient_notice(*, has_portal: bool) -> str:
+    """No subject, clinical, financial or recipient information in transport."""
+    if has_portal:
+        return "У вас новое уведомление. Откройте личный кабинет."
+    return "Пожалуйста, свяжитесь с клиникой для уточнения информации."
+
+
 PATIENT_TELEGRAM_EVENT_PREFERENCES = {
     "appointment_reminder": "appointment_reminders",
     "appointment_confirmation": "appointment_reminders",

@@ -1,13 +1,25 @@
 import logging
 import re
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+)
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_current_user, get_db, require_active_roles, require_roles
 from app.core.i18n import t  # noqa: F401
 from app.crud import patient as patient_crud
 from app.crud import visit as visit_crud
@@ -44,11 +56,339 @@ from app.schemas.user_management import (
     UserNotificationSettingsUpdate,
 )
 from app.services.notification_platform_service import get_notification_platform_service
+from app.services.notification_subject_intent_service import (
+    create_patient_notification_intent,
+    dispatch_patient_notification_intent,
+)
 from app.services.notifications import notification_sender_service
+from app.services.profile_contact_security import (
+    ProfileBearerInvalid,
+    capture_profile_bearer,
+    check_bearer_expiry,
+    check_profile_bearer,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 _TIME_PATTERN = re.compile(r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$")
+
+
+class _InvitationReadRoute(APIRoute):
+    def get_route_handler(self):
+        original = super().get_route_handler()
+
+        async def handler(request: Request):
+            headers = {"Cache-Control": "private, no-store"}
+            try:
+                result = await original(request)
+            except RequestValidationError:
+                return JSONResponse(status_code=422, content={"detail": "Некорректный запрос"}, headers=headers)
+            except HTTPException as exc:
+                exc.headers = {**(exc.headers or {}), **headers}
+                raise
+            result.headers.update(headers)
+            return result
+
+        return handler
+
+
+_invitation_read_router = APIRouter(route_class=_InvitationReadRoute)
+
+
+class VisitInvitationTaskResponse(BaseModel):
+    visit_id: int
+    patient_name: str
+    patient_phone: str | None
+    visit_date: str
+    visit_time: str | None
+
+
+class VisitInvitationStatusResponse(BaseModel):
+    visit_id: int
+    state: Literal["none", "pending", "unknown", "sent", "cancelled", "reissue_required"]
+    channel: Literal["telegram", "pwa", "phone"] | None
+    confirmation_expired: bool
+
+
+@_invitation_read_router.get("/visit-invitation-status/{visit_id}", response_model=VisitInvitationStatusResponse)
+def read_visit_invitation_status(
+    visit_id: int, request: Request, response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_active_roles("Admin")),
+):
+    """Reveal only the current subject's delivery outcome to an active Admin."""
+    from app.api.v1.endpoints.visit_confirmation import (
+        _locked_reissue_subject,
+        _reissue_audit,
+    )
+    from app.models.doctor_price_override import DoctorPriceOverride
+    from app.models.visit_invitation_delivery import (
+        VisitInvitationApprovalRecovery,
+        VisitInvitationDelivery,
+    )
+    from app.services.visit_invitation_delivery import (
+        InvitationRuntimeUnavailable,
+        _digest,
+        _valid_visit,
+        pin_invitation_runtime,
+    )
+
+    response.headers["Cache-Control"] = "private, no-store"
+    try:
+        pin_invitation_runtime(db)
+        bearer = capture_profile_bearer(request, current_user)
+        actor, patient, visit = _locked_reissue_subject(db, visit_id, bearer)
+        now = datetime.now(UTC)
+        expires = visit.confirmation_expires_at
+        if expires is not None and expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        rows = []
+        if visit.confirmation_token:
+            rows = (db.query(VisitInvitationDelivery)
+                    .filter(VisitInvitationDelivery.visit_id == visit.id,
+                            VisitInvitationDelivery.visit_id_snapshot == visit.id,
+                            VisitInvitationDelivery.patient_id == patient.id,
+                            VisitInvitationDelivery.patient_id_snapshot == patient.id,
+                            VisitInvitationDelivery.owner_generation == patient.notification_owner_generation,
+                            VisitInvitationDelivery.context_epoch == visit.confirmation_context_epoch,
+                            VisitInvitationDelivery.token_digest == _digest(visit.confirmation_token))
+                    .order_by(VisitInvitationDelivery.id.desc()).limit(2).all())
+        if len(rows) > 1:
+            raise HTTPException(status_code=409, detail="Требуется проверка состояния")
+        row = rows[0] if rows else None
+        recoveries = []
+        if visit.status == "pending_confirmation" and not _valid_visit(visit, patient):
+            recoveries = (db.query(VisitInvitationApprovalRecovery)
+                .join(DoctorPriceOverride, DoctorPriceOverride.id == VisitInvitationApprovalRecovery.override_id)
+                .filter(VisitInvitationApprovalRecovery.visit_id == visit.id,
+                        VisitInvitationApprovalRecovery.visit_id_snapshot == visit.id,
+                        VisitInvitationApprovalRecovery.patient_id == patient.id,
+                        VisitInvitationApprovalRecovery.patient_id_snapshot == patient.id,
+                        VisitInvitationApprovalRecovery.owner_generation == patient.notification_owner_generation,
+                        VisitInvitationApprovalRecovery.context_epoch == visit.confirmation_context_epoch,
+                        VisitInvitationApprovalRecovery.previous_token_digest == (_digest(visit.confirmation_token) if visit.confirmation_token else None),
+                        VisitInvitationApprovalRecovery.state.in_(["pending", "dispatched"]),
+                        DoctorPriceOverride.status == "approved", DoctorPriceOverride.visit_id == visit.id,
+                        DoctorPriceOverride.approved_by == VisitInvitationApprovalRecovery.actor_user_id_snapshot)
+                .order_by(VisitInvitationApprovalRecovery.id.desc()).limit(2).all())
+        if len(recoveries) > 1:
+            raise HTTPException(status_code=409, detail="Требуется проверка состояния")
+        result = VisitInvitationStatusResponse(
+            visit_id=visit.id, state="reissue_required" if recoveries else (row.state if row else "none"),
+            channel=None if recoveries else (row.channel if row else None),
+            confirmation_expired=expires is None or expires <= now,
+        )
+        _reissue_audit(db, actor, visit.id, "visit_invitation_status_viewed")
+        check_profile_bearer(db, actor, bearer)
+        check_bearer_expiry(bearer)
+        db.commit()
+        return result
+    except ProfileBearerInvalid:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Сеанс недоступен", headers={"Cache-Control": "private, no-store"}) from None
+    except InvitationRuntimeUnavailable:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Состояние временно недоступно", headers={"Cache-Control": "private, no-store"}) from None
+    except HTTPException as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail, headers={"Cache-Control": "private, no-store"}) from None
+
+
+@_invitation_read_router.get("/visit-invitation-tasks/{handle}", response_model=VisitInvitationTaskResponse)
+def read_visit_invitation_task(
+    handle: str, request: Request, response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_active_roles("Admin", "Registrar")),
+):
+    """Resolve a neutral inbox handle only for its current authorized recipient."""
+    import hmac
+    from uuid import UUID
+
+    from app.models.notification import NotificationDelivery, NotificationEvent
+    from app.models.visit_invitation_delivery import VisitInvitationDelivery
+    from app.services.patient_access_audit import _build_patient_access_entry
+    from app.services.visit_invitation_delivery import (
+        InvitationRuntimeUnavailable,
+        _digest,
+        _lock_invitation_patient,
+        _valid_visit,
+        pin_invitation_runtime,
+    )
+
+    response.headers["Cache-Control"] = "private, no-store"
+    missing = HTTPException(status_code=404, detail="Задача недоступна", headers={"Cache-Control": "private, no-store"})
+    try:
+        if str(UUID(handle)) != handle:
+            raise missing
+        pin_invitation_runtime(db)
+        bearer = capture_profile_bearer(request, current_user)
+    except InvitationRuntimeUnavailable:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Задача временно недоступна", headers={"Cache-Control": "private, no-store"}) from None
+    except (ValueError, ProfileBearerInvalid):
+        raise missing from None
+    actor = db.query(User).filter(User.id == bearer.user_id).populate_existing().with_for_update().first()
+    try:
+        if actor is None:
+            raise ProfileBearerInvalid("Actor unavailable")
+        check_profile_bearer(db, actor, bearer)
+    except ProfileBearerInvalid:
+        db.rollback()
+        raise missing from None
+    if (actor.role or "").strip().lower() not in {"admin", "registrar"} and not actor.is_superuser:
+        db.rollback()
+        raise missing
+    # This probe is only a hint; every relation and role is re-read under
+    # locks below before any patient data is returned.
+    hint = (
+        db.query(VisitInvitationDelivery.patient_id, VisitInvitationDelivery.visit_id, VisitInvitationDelivery.id)
+        .join(NotificationEvent, NotificationEvent.entity_id == VisitInvitationDelivery.id.cast(NotificationEvent.entity_id.type))
+        .join(NotificationDelivery, NotificationDelivery.event_id == NotificationEvent.id)
+        .filter(NotificationEvent.correlation_id == handle,
+                NotificationEvent.source_module == "visit_confirmation_secure",
+                NotificationEvent.entity_type == "visit_invitation_delivery",
+                NotificationDelivery.recipient_id == actor.id)
+        .first()
+    )
+    if hint is None or hint.patient_id is None or hint.visit_id is None:
+        db.rollback()
+        raise missing
+    try:
+        patient = _lock_invitation_patient(db, hint.patient_id)
+    except InvitationRuntimeUnavailable:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Задача временно недоступна", headers={"Cache-Control": "private, no-store"}) from None
+    visit = db.query(Visit).filter(Visit.id == hint.visit_id).populate_existing().with_for_update().first()
+    intent = db.query(VisitInvitationDelivery).filter(VisitInvitationDelivery.id == hint.id).populate_existing().with_for_update().first()
+    authorized = (
+        db.query(NotificationDelivery.id)
+        .join(NotificationEvent, NotificationEvent.id == NotificationDelivery.event_id)
+        .filter(NotificationEvent.correlation_id == handle,
+                NotificationEvent.source_module == "visit_confirmation_secure",
+                NotificationEvent.entity_type == "visit_invitation_delivery",
+                NotificationEvent.entity_id == str(hint.id), NotificationDelivery.recipient_id == actor.id)
+        .with_for_update().first()
+    )
+    if (not authorized or patient is None or visit is None or intent is None
+        or intent.patient_id != patient.id or intent.visit_id != visit.id
+        or intent.state != "sent" or intent.channel != "phone" or visit.visit_date is None or not _valid_visit(visit, patient)
+        or intent.owner_generation != patient.notification_owner_generation
+        or intent.context_epoch != visit.confirmation_context_epoch
+        or not hmac.compare_digest(intent.token_digest, _digest(visit.confirmation_token))):
+        db.rollback()
+        raise missing
+    result = VisitInvitationTaskResponse(
+        visit_id=visit.id, patient_name=patient.short_name(), patient_phone=patient.phone,
+        visit_date=visit.visit_date.isoformat(), visit_time=visit.visit_time,
+    )
+    entry = _build_patient_access_entry(
+        db, actor_user=actor, subject_patient_id=patient.id, resource_type="visit_invitation_task",
+        resource_id=str(visit.id), action="view", request=request,
+    )
+    if entry is None:
+        db.rollback()
+        raise missing
+    db.add(entry)
+    try:
+        check_profile_bearer(db, actor, bearer)
+        check_bearer_expiry(bearer)
+        db.commit()
+    except ProfileBearerInvalid:
+        db.rollback()
+        raise missing from None
+    return result
+
+
+class VisitInvitationRecoveryResponse(BaseModel):
+    visit_id: int
+
+
+@_invitation_read_router.get("/visit-invitation-recoveries/{handle}", response_model=VisitInvitationRecoveryResponse)
+def read_visit_invitation_recovery(
+    handle: str, request: Request, response: Response, db: Session = Depends(get_db),
+    current_user: User = Depends(require_active_roles("Admin")),
+):
+    """Resolve a neutral recovery handle for its current Admin recipient."""
+    from uuid import UUID
+
+    from app.api.v1.endpoints.visit_confirmation import _reissue_audit
+    from app.models.doctor_price_override import DoctorPriceOverride
+    from app.models.notification import NotificationDelivery, NotificationEvent
+    from app.models.visit_invitation_delivery import VisitInvitationApprovalRecovery
+    from app.services.notification_platform_service import NotificationPlatformService
+    from app.services.visit_invitation_delivery import (
+        InvitationRuntimeUnavailable,
+        _lock_invitation_patient,
+        _recovery_matches_token,
+        _valid_visit,
+        pin_invitation_runtime,
+    )
+
+    response.headers["Cache-Control"] = "private, no-store"
+    missing = HTTPException(status_code=404, detail="Задача недоступна", headers={"Cache-Control": "private, no-store"})
+    try:
+        if str(UUID(handle)) != handle:
+            raise missing
+        pin_invitation_runtime(db)
+        bearer = capture_profile_bearer(request, current_user)
+        actor = db.query(User).filter(User.id == bearer.user_id).populate_existing().with_for_update().first()
+        if actor is None:
+            raise missing
+        check_profile_bearer(db, actor, bearer)
+        if not actor.is_superuser and (actor.role or "").strip().lower() != "admin":
+            raise missing
+        hint = (db.query(VisitInvitationApprovalRecovery.patient_id, VisitInvitationApprovalRecovery.visit_id,
+                         VisitInvitationApprovalRecovery.id)
+                .join(NotificationEvent, NotificationEvent.entity_id == VisitInvitationApprovalRecovery.id.cast(NotificationEvent.entity_id.type))
+                .join(NotificationDelivery, NotificationDelivery.event_id == NotificationEvent.id)
+                .filter(NotificationEvent.correlation_id == handle,
+                        NotificationEvent.source_module == "visit_confirmation_recovery",
+                        NotificationEvent.entity_type == "visit_invitation_approval_recovery",
+                        NotificationDelivery.recipient_type == "user",
+                        NotificationDelivery.channel == NotificationPlatformService.INBOX_CHANNEL,
+                        NotificationDelivery.recipient_id == actor.id).first())
+        if hint is None or hint.patient_id is None or hint.visit_id is None:
+            raise missing
+        patient = _lock_invitation_patient(db, hint.patient_id)
+        visit = db.query(Visit).filter(Visit.id == hint.visit_id).populate_existing().with_for_update().first()
+        recovery = db.query(VisitInvitationApprovalRecovery).filter(VisitInvitationApprovalRecovery.id == hint.id).populate_existing().with_for_update().first()
+        override = (db.query(DoctorPriceOverride).filter(DoctorPriceOverride.id == recovery.override_id)
+                    .populate_existing().with_for_update(nowait=True).first()) if recovery is not None and recovery.override_id is not None else None
+        recipient = (db.query(NotificationDelivery.id).join(NotificationEvent, NotificationEvent.id == NotificationDelivery.event_id)
+                     .filter(NotificationEvent.correlation_id == handle,
+                             NotificationEvent.source_module == "visit_confirmation_recovery",
+                             NotificationEvent.entity_type == "visit_invitation_approval_recovery",
+                             NotificationEvent.entity_id == str(hint.id),
+                             NotificationDelivery.recipient_type == "user",
+                             NotificationDelivery.channel == NotificationPlatformService.INBOX_CHANNEL,
+                             NotificationDelivery.recipient_id == actor.id)
+                     .with_for_update().first())
+        if (not recipient or patient is None or visit is None or recovery is None or override is None
+            or patient.is_deleted or recovery.patient_id != patient.id or recovery.visit_id != visit.id
+            or visit.patient_id != patient.id or visit.status != "pending_confirmation"
+            or recovery.state != "dispatched" or patient.notification_owner_generation != recovery.owner_generation
+            or visit.confirmation_context_epoch != recovery.context_epoch or override.status != "approved"
+            or override.approved_by != recovery.actor_user_id_snapshot or override.visit_id != visit.id
+            or not _recovery_matches_token(recovery, visit) or _valid_visit(visit, patient)):
+            raise missing
+        result = VisitInvitationRecoveryResponse(visit_id=visit.id)
+        _reissue_audit(db, actor, visit.id, "visit_invitation_recovery_viewed")
+        check_profile_bearer(db, actor, bearer)
+        check_bearer_expiry(bearer)
+        db.commit()
+        return result
+    except (ProfileBearerInvalid, ValueError):
+        db.rollback()
+        raise missing from None
+    except InvitationRuntimeUnavailable:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Задача временно недоступна", headers={"Cache-Control": "private, no-store"}) from None
+    except HTTPException:
+        db.rollback()
+        raise
+
+
+router.include_router(_invitation_read_router)
 
 
 def _is_admin_or_superuser(user: User) -> bool:
@@ -316,6 +656,15 @@ def _normalize_notification_policy_payload(
     return normalized_policy
 
 
+def _notification_bearer(request: Request | None, current_user: User):
+    if request is None:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+    try:
+        return capture_profile_bearer(request, current_user)
+    except ProfileBearerInvalid as exc:
+        raise HTTPException(status_code=403, detail="Доступ запрещён") from exc
+
+
 @router.post("/send-appointment-reminder", response_model=dict[str, Any])
 async def send_appointment_reminder(
     background_tasks: BackgroundTasks,
@@ -325,55 +674,30 @@ async def send_appointment_reminder(
     department: str,
     current_user: User = Depends(require_roles(["admin", "doctor"])),
     db: Session = Depends(get_db),
+    request: Request = None,
+    visit_id: int | None = None,
 ):
-    """Отправка напоминания о записи"""
-    if not _is_admin_or_superuser(current_user):
-        doctor = _active_doctor_for_user(db, current_user)
-        if doctor is None:
+    """Queue a neutral reminder for one explicit, currently authorized Visit."""
+    # The legacy name/department inputs are accepted but never trusted or sent.
+    del doctor_name, department
+    if visit_id is None:
+        if not _is_admin_or_superuser(current_user):
             raise HTTPException(status_code=404, detail=t("visit.not_found"))
-        assigned_visit = (
-            db.query(Visit)
-            .filter(
-                Visit.patient_id == patient_id,
-                Visit.doctor_id == doctor.id,
-                Visit.visit_date == appointment_date.date(),
-                Visit.status != "canceled",
-            )
-            .order_by(Visit.id.desc())
-            .first()
-        )
-        if assigned_visit is None:
-            raise HTTPException(status_code=404, detail=t("visit.not_found"))
-        appointment_date = _combine_date_and_time(
-            assigned_visit.visit_date, assigned_visit.visit_time
-        )
-        doctor_name = current_user.full_name or current_user.username
-        department = assigned_visit.department or doctor.specialty
-
-    # Check the doctor's visit scope before looking up the patient. Returning
-    # patient.not_found for an unassigned but existing patient would let a
-    # Doctor distinguish existing patient IDs from nonexistent ones.
-    patient = patient_crud.get(db, id=patient_id)
-    if not patient:
-        raise HTTPException(status_code=404, detail=t("patient.not_found"))
-
-    # Отправляем уведомление в фоновом режиме
-    background_tasks.add_task(
-        notification_sender_service.send_appointment_reminder,
-        patient.email,
-        patient.phone,
-        appointment_date,
-        doctor_name,
-        department,
-        db,
-        patient_id,
+        raise HTTPException(status_code=409, detail="Укажите визит для напоминания")
+    visit = visit_crud.get_visit(db, visit_id)
+    if visit is None or visit.patient_id != patient_id:
+        raise HTTPException(status_code=404, detail=t("visit.not_found"))
+    _assert_doctor_owns_visit(db=db, current_user=current_user, visit=visit)
+    if visit.visit_date != appointment_date.date():
+        raise HTTPException(status_code=409, detail="Дата визита изменилась")
+    intent = create_patient_notification_intent(
+        db, bearer=_notification_bearer(request, current_user),
+        purpose="appointment_reminder", visit_id=visit_id,
+        requested_patient_id=patient_id,
     )
-
-    return {
-        "message": "Напоминание отправлено",
-        "patient_id": patient_id,
-        "sent_at": datetime.now(UTC).isoformat(),
-    }
+    background_tasks.add_task(dispatch_patient_notification_intent, intent)
+    return {"message": "Попытка уведомления поставлена в очередь", "queued": True,
+            "eligible_channels": list(intent.eligible_channels)}
 
 
 @router.post("/send-visit-confirmation", response_model=dict[str, Any])
@@ -383,37 +707,21 @@ async def send_visit_confirmation(
     queue_number: int | None = None,
     current_user: User = Depends(require_roles(["admin", "doctor"])),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
-    """Отправка подтверждения визита"""
-    # Получаем данные визита
-    visit = visit_crud.get(db, id=visit_id)
-    if not visit:
+    """Queue a neutral notice; details stay in the patient's protected view."""
+    del queue_number  # Caller-supplied queue information is never transported.
+    visit = visit_crud.get_visit(db, visit_id)
+    if visit is None:
         raise HTTPException(status_code=404, detail=t("visit.not_found"))
     _assert_doctor_owns_visit(db=db, current_user=current_user, visit=visit)
-
-    # Получаем данные пациента
-    patient = patient_crud.get(db, id=visit.patient_id)
-    if not patient:
-        raise HTTPException(status_code=404, detail=t("patient.not_found"))
-
-    # Отправляем уведомление в фоновом режиме
-    background_tasks.add_task(
-        notification_sender_service.send_visit_confirmation,
-        patient.email,
-        patient.phone,
-        _combine_date_and_time(visit.visit_date, visit.visit_time),
-        "Врач",  # TODO: получить имя врача
-        "Отделение",  # TODO: получить название отделения
-        queue_number,
-        db,
-        visit.patient_id,
+    intent = create_patient_notification_intent(
+        db, bearer=_notification_bearer(request, current_user),
+        purpose="visit_confirmation", visit_id=visit_id,
     )
-
-    return {
-        "message": "Подтверждение визита отправлено",
-        "visit_id": visit_id,
-        "sent_at": datetime.now(UTC).isoformat(),
-    }
+    background_tasks.add_task(dispatch_patient_notification_intent, intent)
+    return {"message": "Попытка уведомления поставлена в очередь", "queued": True,
+            "eligible_channels": list(intent.eligible_channels)}
 
 
 @router.post("/send-payment-notification", response_model=dict[str, Any])
@@ -424,37 +732,22 @@ async def send_payment_notification(
     currency: str,
     current_user: User = Depends(require_roles(["admin", "doctor"])),
     db: Session = Depends(get_db),
+    request: Request = None,
+    payment_id: int | None = None,
 ):
-    """Отправка уведомления об оплате"""
-    # Получаем данные визита
-    visit = visit_crud.get(db, id=visit_id)
-    if not visit:
+    """Queue a neutral notice for a confirmed payment belonging to this Visit."""
+    del amount, currency  # Legacy caller values do not establish a payment.
+    visit = visit_crud.get_visit(db, visit_id)
+    if visit is None:
         raise HTTPException(status_code=404, detail=t("visit.not_found"))
     _assert_doctor_owns_visit(db=db, current_user=current_user, visit=visit)
-
-    # Получаем данные пациента
-    patient = patient_crud.get(db, id=visit.patient_id)
-    if not patient:
-        raise HTTPException(status_code=404, detail=t("patient.not_found"))
-
-    # Отправляем уведомление в фоновом режиме
-    background_tasks.add_task(
-        notification_sender_service.send_payment_notification,
-        patient.email,
-        patient.phone,
-        amount,
-        currency,
-        _combine_date_and_time(visit.visit_date, visit.visit_time),
-        "Врач",  # TODO: получить имя врача
-        db,
-        visit.patient_id,
+    intent = create_patient_notification_intent(
+        db, bearer=_notification_bearer(request, current_user),
+        purpose="payment_notification", visit_id=visit_id, payment_id=payment_id,
     )
-
-    return {
-        "message": "Уведомление об оплате отправлено",
-        "visit_id": visit_id,
-        "sent_at": datetime.now(UTC).isoformat(),
-    }
+    background_tasks.add_task(dispatch_patient_notification_intent, intent)
+    return {"message": "Попытка уведомления поставлена в очередь", "queued": True,
+            "eligible_channels": list(intent.eligible_channels)}
 
 
 @router.post("/send-queue-update", response_model=dict[str, Any])

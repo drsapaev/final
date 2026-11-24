@@ -28,11 +28,17 @@ from app.schemas.clinic import (
     TicketPrintSettingsOut,
     TicketPrintSettingsUpdate,
 )
+from app.services.all_free_policy import ALL_FREE_AUTO_APPROVE_KEY, lock_all_free_policy
 from app.services.public_booking_calendar_settings import (
     is_public_booking_calendar_setting_key,
 )
 from app.services.public_booking_settings import is_public_booking_settings_key
 from app.services.registrar_tabs import is_registrar_tabs_setting_key
+from app.services.repeat_policy_input import (
+    RepeatSettingsWriter,
+    finish_repeat_settings_write,
+    repeat_settings_writer,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -197,20 +203,36 @@ def get_clinic_setting(
 def update_clinic_settings_batch(
     settings: ClinicSettingsBatch,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    writer: RepeatSettingsWriter = Depends(repeat_settings_writer),
 ):
     """Массовое обновление настроек клиники"""
+    if writer.values:
+        settings = settings.model_copy(update={"settings": {**settings.settings, **writer.values}})
+    if ALL_FREE_AUTO_APPROVE_KEY in settings.settings:
+        lock_all_free_policy(db)
     for key in settings.settings:
         _reject_reserved_public_booking_setting_key(key)
     _validate_clinic_working_hours_update(db, settings.settings)
     _canonicalize_clinic_working_hours_categories(db, settings.settings)
     try:
         updated_settings = crud_clinic.update_settings_batch(
-            db, "clinic", settings.settings, current_user.id
+            db, "clinic", settings.settings, writer.actor.id, commit=False
         )
-        return updated_settings
+        result = [ClinicSettingsOut.model_validate(row) for row in updated_settings]
+        finish_repeat_settings_write(writer)
+        db.commit()
+        return result
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
+        db.rollback()
         raise _admin_clinic_http_error(e) from e
+
+
+# This handler's complete replay authorization is the global Admin role;
+# it has no patient, visit or other per-resource authorization predicate.
+update_clinic_settings_batch.idempotency_replay_global_roles = ("Admin",)
 
 
 @router.put("/clinic/settings/{key}", response_model=ClinicSettingsOut)
@@ -218,37 +240,58 @@ def update_clinic_setting(
     key: str,
     setting: ClinicSettingsUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    writer: RepeatSettingsWriter = Depends(repeat_settings_writer),
 ):
     """Обновить конкретную настройку"""
-    _reject_reserved_public_booking_setting_key(key)
-    existing_setting = crud_clinic.get_setting_by_key(db, key)
-    if not existing_setting:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Настройка с ключом '{key}' не найдена",
-        )
-    if key in CLINIC_WORKING_HOURS_KEYS:
-        if "value" in setting.model_fields_set:
-            _validate_clinic_working_hours_update(db, {key: setting.value})
-        existing_setting.category = "clinic"
-    updated_setting = crud_clinic.update_setting(db, key, setting, current_user.id)
-    if not updated_setting:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Настройка с ключом '{key}' не найдена",
-        )
-    return updated_setting
+    try:
+        if key in writer.values:
+            setting = setting.model_copy(update={"value": writer.values[key]})
+        if key == ALL_FREE_AUTO_APPROVE_KEY:
+            lock_all_free_policy(db)
+        _reject_reserved_public_booking_setting_key(key)
+        existing_setting = crud_clinic.get_setting_by_key(db, key)
+        if not existing_setting:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Настройка с ключом '{key}' не найдена",
+            )
+        if key in CLINIC_WORKING_HOURS_KEYS:
+            if "value" in setting.model_fields_set:
+                _validate_clinic_working_hours_update(db, {key: setting.value})
+            existing_setting.category = "clinic"
+        updated_setting = crud_clinic.update_setting(db, key, setting, writer.actor.id, commit=False)
+        if not updated_setting:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Настройка с ключом '{key}' не найдена",
+            )
+        result = ClinicSettingsOut.model_validate(updated_setting)
+        finish_repeat_settings_write(writer)
+        db.commit()
+        return result
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise _admin_clinic_http_error(e) from e
+
+
+update_clinic_setting.idempotency_replay_global_roles = ("Admin",)
 
 
 @router.post("/clinic/settings", response_model=ClinicSettingsOut)
 def create_clinic_setting(
     setting: ClinicSettingsCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    writer: RepeatSettingsWriter = Depends(repeat_settings_writer),
 ):
     """Создать новую настройку"""
+    if setting.key in writer.values:
+        setting = setting.model_copy(update={"value": writer.values[setting.key]})
     try:
+        if setting.key == ALL_FREE_AUTO_APPROVE_KEY:
+            lock_all_free_policy(db)
         _reject_reserved_public_booking_setting_key(setting.key)
         # Проверяем, не существует ли уже такая настройка
         existing = crud_clinic.get_setting_by_key(db, setting.key)
@@ -261,12 +304,20 @@ def create_clinic_setting(
         if setting.key in CLINIC_WORKING_HOURS_KEYS:
             _validate_clinic_working_hours_update(db, {setting.key: setting.value})
             setting = setting.model_copy(update={"category": "clinic"})
-        new_setting = crud_clinic.create_setting(db, setting, current_user.id)
-        return new_setting
+        new_setting = crud_clinic.create_setting(db, setting, writer.actor.id, commit=False)
+        result = ClinicSettingsOut.model_validate(new_setting)
+        finish_repeat_settings_write(writer)
+        db.commit()
+        return result
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         raise _admin_clinic_http_error(e) from e
+
+
+create_clinic_setting.idempotency_replay_global_roles = ("Admin",)
 
 
 @router.get("/clinic/ticket-print-settings", response_model=TicketPrintSettingsOut)

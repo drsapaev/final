@@ -1,13 +1,13 @@
 """PostgreSQL interleavings for Telegram patient links and visit actions."""
 
 import asyncio
-import importlib.util
 import os
 import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from queue import SimpleQueue
 from types import SimpleNamespace
@@ -16,17 +16,19 @@ from unittest.mock import AsyncMock
 import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.schema import CreateSchema, DropSchema
 
 from app.api.v1.endpoints.telegram_webhook import _handle_ticket_qr_start
 from app.api.v1.endpoints.telegram_webhook._helpers import _localized_text
-from app.db.base_class import Base
-from app.models import Patient, User, Visit  # noqa: F401 - model registration
+from app.core.config import settings
+from app.models import Patient, User, Visit
 from app.models.clinic import Doctor
+from app.models.encounter import Encounter
+from app.models.service import Service
 from app.models.telegram_config import PatientOnboardingRequest, TelegramUser
+from app.models.visit import VisitService
 from app.schemas.patient_onboarding import (
     OnboardingPatientSearchRequest,
     RegistrarPatientLinkDecisionRequest,
@@ -44,72 +46,86 @@ from app.services.visit_confirmation_service import (
     consume_telegram_ticket_start_token,
     parse_telegram_ticket_start_token,
 )
+from tests.integration.test_staff_confirmation_guard_pg import (
+    _module,
+    isolated_staff_guard_postgres,
+)
 
 
 @pytest.fixture(scope="module")
-def pg_engine():
+def telegram_pg():
     url = make_url(os.environ.get("DATABASE_URL", "sqlite:///:memory:"))
     if url.get_backend_name() != "postgresql":
         pytest.skip("PostgreSQL required for row-lock interleavings")
-    if os.environ.get("CI", "").lower() != "true" and not (
-        url.database or ""
-    ).startswith("clinic_test"):
-        pytest.skip("requires an explicitly disposable clinic_test database")
-    schema = "test_tg_visit_" + uuid.uuid4().hex
-    admin = create_engine(url, pool_pre_ping=True)
-    with admin.begin() as connection:
-        connection.execute(CreateSchema(schema))
-    engine = create_engine(
-        url,
-        pool_pre_ping=True,
-        connect_args={
-            "options": f"-csearch_path={schema} -cstatement_timeout=10000 -clock_timeout=8000"
-        },
+    ci_service = (
+        os.environ.get("CI", "").lower() == "true"
+        and url.database == "clinicdb"
+        and url.host in {"localhost", "127.0.0.1", "::1"}
     )
-    try:
-        Base.metadata.create_all(engine)
-        yield engine
-    finally:
-        engine.dispose()
-        with admin.begin() as connection:
-            connection.execute(DropSchema(schema, cascade=True))
-        admin.dispose()
+    if not ci_service and not (url.database or "").startswith("clinic_test"):
+        pytest.skip("requires an explicitly disposable clinic_test database")
+    with pytest.MonkeyPatch.context() as patch, isolated_staff_guard_postgres(url, patch) as (owner, runtime, _):
+        patch.setattr(settings, "FRONTEND_URL", "https://clinic.example.test")
+        with owner.begin() as conn:
+            quote = conn.dialect.identifier_preparer.quote
+            schema_name = conn.dialect.default_schema_name
+            schema, role = quote(schema_name), quote(runtime.url.username)
+            links = f"{schema}.telegram_users"
+            # The metadata fixture already has this column. Install the
+            # actual migration and epoch trigger before any Telegram seed.
+            conn.exec_driver_sql(f"ALTER TABLE {links} DROP COLUMN patient_link_epoch")
+            versions = Path(__file__).resolve().parents[2] / "alembic/versions"
+            operations = Operations(MigrationContext.configure(conn, opts={"version_table_schema": schema_name}))
+            # The scoped finance trigger also participates in owner invalidation.
+            for revision in ("0101_telegram_patient_link_epoch", "0141_confirmation_financial_trigger"):
+                migration = _module(versions / f"{revision}.py")
+                migration.op = operations
+                migration.upgrade()
+            conn.exec_driver_sql(f"ALTER TABLE {links} ENABLE ROW LEVEL SECURITY")
+            conn.exec_driver_sql(f"ALTER TABLE {links} FORCE ROW LEVEL SECURITY")
+            conn.exec_driver_sql(f"GRANT SELECT, UPDATE (id) ON {links} TO {role}")
+            conn.exec_driver_sql(
+                "GRANT UPDATE (confirmation_token, confirmation_expires_at) "
+                f"ON {schema}.visits TO {role}"
+            )
+            conn.exec_driver_sql(f"CREATE POLICY synthetic_telegram_read ON {links} FOR SELECT TO {role} USING (true)")
+            conn.exec_driver_sql(
+                f"CREATE POLICY synthetic_telegram_lock ON {links} FOR UPDATE TO {role} USING (true) WITH CHECK (false)"
+            )
+        yield owner, runtime
 
 
 def _seed(engine):
     suffix = uuid.uuid4().hex[:12]
     with Session(engine) as db:
         patient = Patient(first_name="SYNTHETIC", last_name="SYNTHETIC")
-        user = User(
-            username=f"SYNTHETIC-{suffix}",
-            hashed_password="!disabled",
-            role="Doctor",
-            is_active=True,
-        )
-        db.add_all([patient, user])
+        user = User(username=f"SYNTHETIC-{suffix}", hashed_password="!disabled",
+                    role="Doctor", is_active=True)
+        service = Service(code=f"TGS{suffix}", name="Synthetic consultation", price=Decimal("10.00"))
+        db.add_all([patient, user, service])
         db.flush()
         doctor = Doctor(user_id=user.id, specialty="Cardiology", active=True)
-        db.add(doctor)
+        encounter = Encounter(patient_id=patient.id, provenance="new")
+        db.add_all([doctor, encounter])
         db.flush()
         token = f"SYNTHETIC-token-{suffix}"
         visit = Visit(
-            patient_id=patient.id,
-            doctor_id=doctor.id,
-            visit_date=date.today() + timedelta(days=3),
-            visit_time="10:00",
-            status="pending_confirmation",
-            confirmation_token=token,
-            confirmation_channel="telegram",
-            confirmation_expires_at=datetime.now(UTC) + timedelta(hours=1),
+            patient_id=patient.id, doctor_id=doctor.id, encounter_id=encounter.id,
+            visit_date=date.today() + timedelta(days=3), visit_time="10:00",
+            status="pending_confirmation", source="desk", discount_mode="none", confirmation_channel="telegram",
         )
-        link = TelegramUser(
-            patient_id=patient.id,
-            chat_id=int(uuid.uuid4().hex[:12], 16),
-            active=True,
-            blocked=False,
-        )
+        link = TelegramUser(patient_id=patient.id, chat_id=int(uuid.uuid4().hex[:12], 16),
+                            active=True, blocked=False, notifications_enabled=True, appointment_reminders=True)
         db.add_all([visit, link])
+        db.flush()
+        db.add(VisitService(visit_id=visit.id, service_id=service.id, name=service.name,
+                            qty=1, price=service.price, currency="UZS"))
+        db.flush()
+        db.refresh(visit)
+        visit.confirmation_token = token
+        visit.confirmation_expires_at = datetime.now(UTC) + timedelta(hours=1)
         db.commit()
+        assert visit.confirmation_context_epoch > 0 and link.patient_link_epoch > 0
         capability = build_telegram_visit_action_token(
             visit_id=visit.id,
             confirmation_token=token,
@@ -138,8 +154,9 @@ def _assert_postgres_blocks(pg_engine, *, waiter_pid: int, blocker_pid: int) -> 
 
 @pytest.mark.integration
 @pytest.mark.parametrize("shared_row", ["patient", "chat"])
-def test_concurrent_patient_links_commit_only_one_association(pg_engine, shared_row):
-    with Session(pg_engine) as db:
+def test_concurrent_patient_links_commit_only_one_association(telegram_pg, shared_row):
+    owner, _ = telegram_pg
+    with Session(owner) as db:
         patients = [
             Patient(first_name="SYNTHETIC", last_name=f"SYNTHETIC-{uuid.uuid4().hex}")
             for _ in range(2)
@@ -168,7 +185,7 @@ def test_concurrent_patient_links_commit_only_one_association(pg_engine, shared_
     losing_pid: SimpleQueue[int] = SimpleQueue()
 
     def competing_link():
-        with Session(pg_engine) as db:
+        with Session(owner) as db:
             # Keep a stale ORM row alive while the other transaction commits.
             profile = db.get(TelegramUser, losing_profile_id)
             assert profile.patient_id is None
@@ -179,7 +196,7 @@ def test_concurrent_patient_links_commit_only_one_association(pg_engine, shared_
                 )
             db.rollback()
 
-    with Session(pg_engine) as winner, ThreadPoolExecutor(max_workers=1) as executor:
+    with Session(owner) as winner, ThreadPoolExecutor(max_workers=1) as executor:
         winner_pid = winner.execute(text("SELECT pg_backend_pid()")).scalar_one()
         link_telegram_patient(
             winner, patient_id=winning_patient_id, chat_id=winning_chat_id
@@ -187,13 +204,13 @@ def test_concurrent_patient_links_commit_only_one_association(pg_engine, shared_
         competitor = executor.submit(competing_link)
         try:
             _assert_postgres_blocks(
-                pg_engine, waiter_pid=losing_pid.get(timeout=5), blocker_pid=winner_pid
+                owner, waiter_pid=losing_pid.get(timeout=5), blocker_pid=winner_pid
             )
         finally:
             winner.commit()
         competitor.result(timeout=10)
 
-    with Session(pg_engine) as db:
+    with Session(owner) as db:
         (linked,) = (
             db.query(TelegramUser)
             .filter(TelegramUser.patient_id.in_(patient_ids))
@@ -217,16 +234,17 @@ def test_concurrent_patient_links_commit_only_one_association(pg_engine, shared_
 
 @pytest.mark.integration
 def test_ticket_qr_rolls_back_consumption_when_concurrent_registrar_link_wins(
-    pg_engine,
+    telegram_pg,
 ):
-    visit_id, _, registrar_chat_id, _ = _seed(pg_engine)
+    owner, runtime = telegram_pg
+    visit_id, _, registrar_chat_id, _ = _seed(owner)
     expires_at = datetime.now(UTC) + timedelta(hours=1)
     ticket = build_telegram_ticket_start_token(expires_at=expires_at)
     token_hash = parse_telegram_ticket_start_token(ticket)["token_hash"]
     qr_chat_id = int(uuid.uuid4().hex[:12], 16)
     candidate_name = f"SYNTHETIC-{uuid.uuid4().hex}"
 
-    with Session(pg_engine) as db:
+    with Session(owner) as db:
         visit = db.get(Visit, visit_id)
         patient_id = visit.patient_id
         db.get(Patient, patient_id).last_name = candidate_name
@@ -272,18 +290,18 @@ def test_ticket_qr_rolls_back_consumption_when_concurrent_registrar_link_wins(
 
     def process_qr():
         assert committing.wait(8)
-        with Session(pg_engine) as db:
+        with Session(runtime) as db:
             qr_pid.put(db.execute(text("SELECT pg_backend_pid()")).scalar_one())
             return asyncio.run(_handle_ticket_qr_start(update, db, bot))
 
-    with Session(pg_engine) as winner, ThreadPoolExecutor(max_workers=1) as executor:
+    with Session(owner) as winner, ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(process_qr)
         winner_pid = winner.execute(text("SELECT pg_backend_pid()")).scalar_one()
 
         def observe_qr_wait(_session):
             committing.set()
             _assert_postgres_blocks(
-                pg_engine, waiter_pid=qr_pid.get(timeout=5), blocker_pid=winner_pid
+                owner, waiter_pid=qr_pid.get(timeout=5), blocker_pid=winner_pid
             )
 
         event.listen(winner, "before_commit", observe_qr_wait, once=True)
@@ -300,7 +318,7 @@ def test_ticket_qr_rolls_back_consumption_when_concurrent_registrar_link_wins(
         qr_chat_id,
         _localized_text("ticket_qr_link_failed", "ru"),
     )
-    with Session(pg_engine) as db:
+    with Session(owner) as db:
         (linked,) = db.query(TelegramUser).filter_by(patient_id=patient_id).all()
         assert linked.chat_id == registrar_chat_id
         assert (
@@ -315,12 +333,13 @@ def test_ticket_qr_rolls_back_consumption_when_concurrent_registrar_link_wins(
 
 
 @pytest.mark.integration
-def test_ticket_qr_waits_for_patient_before_locking_visit(pg_engine):
-    visit_id, _, _, _ = _seed(pg_engine)
+def test_ticket_qr_waits_for_patient_before_locking_visit(telegram_pg):
+    owner, runtime = telegram_pg
+    visit_id, _, _, _ = _seed(owner)
     expires_at = datetime.now(UTC) + timedelta(hours=1)
     ticket = build_telegram_ticket_start_token(expires_at=expires_at)
     token_hash = parse_telegram_ticket_start_token(ticket)["token_hash"]
-    with Session(pg_engine) as db:
+    with Session(owner) as db:
         visit = db.get(Visit, visit_id)
         patient_id = visit.patient_id
         visit.confirmation_token = token_hash
@@ -330,19 +349,19 @@ def test_ticket_qr_waits_for_patient_before_locking_visit(pg_engine):
     consumer_pid: SimpleQueue[int] = SimpleQueue()
 
     def consume_ticket():
-        with Session(pg_engine) as db:
+        with Session(runtime) as db:
             consumer_pid.put(db.execute(text("SELECT pg_backend_pid()")).scalar_one())
             return consume_telegram_ticket_start_token(db, ticket)
 
     with ThreadPoolExecutor(max_workers=1) as executor:
-        with Session(pg_engine) as writer:
+        with Session(owner) as writer:
             writer.query(Patient.id).filter_by(id=patient_id).with_for_update(
                 key_share=True
             ).one()
             writer_pid = writer.execute(text("SELECT pg_backend_pid()")).scalar_one()
             consumer = executor.submit(consume_ticket)
             _assert_postgres_blocks(
-                pg_engine,
+                owner,
                 waiter_pid=consumer_pid.get(timeout=5),
                 blocker_pid=writer_pid,
             )
@@ -363,22 +382,19 @@ def test_ticket_qr_waits_for_patient_before_locking_visit(pg_engine):
 
 @pytest.mark.integration
 @pytest.mark.parametrize("operation", ["confirm", "cancel"])
-@pytest.mark.parametrize(
-    "mutation", ["token", "expiry", "channel", "status", "revoked"]
-)
-def test_mutation_after_precheck_cannot_authorize_stale_invitation(
-    pg_engine, operation, mutation
-):
+@pytest.mark.parametrize("mutation", ["token", "expiry", "channel", "status", "revoked"])
+def test_mutation_after_precheck_cannot_authorize_stale_invitation(telegram_pg, operation, mutation):
     """Pause after the optimistic check, commit a real concurrent mutation,
     then prove the locked update rechecks all relevant state.
     """
-    visit_id, token, chat_id, capability = _seed(pg_engine)
-    SessionLocal = sessionmaker(bind=pg_engine, autoflush=False)
+    owner, runtime = telegram_pg
+    visit_id, _, chat_id, capability = _seed(owner)
+    runtime_sessions = sessionmaker(bind=runtime, autoflush=False)
     checked = threading.Event()
     proceed = threading.Event()
 
     def request_action():
-        with SessionLocal() as session:
+        with runtime_sessions() as session:
             service = VisitConfirmationService(session)
             validate = service.security_service.validate_confirmation_request
 
@@ -405,7 +421,7 @@ def test_mutation_after_precheck_cannot_authorize_stale_invitation(
         future = executor.submit(request_action)
         assert checked.wait(8)
         try:
-            with SessionLocal() as session:
+            with Session(owner) as session:
                 if mutation == "revoked":
                     link = session.query(TelegramUser).filter_by(chat_id=chat_id).one()
                     link.active = False
@@ -422,36 +438,28 @@ def test_mutation_after_precheck_cannot_authorize_stale_invitation(
                     else:
                         visit.status = "open"
                 session.commit()
+                row = session.get(Visit, visit_id)
+                writer_state = (row.status, row.confirmation_token, row.confirmation_context_epoch)
         finally:
             proceed.set()
         assert future.result(timeout=10) in (400, 403, 404, 409)
 
-    with SessionLocal() as session:
+    with Session(owner) as session:
         visit = session.get(Visit, visit_id)
-        assert visit.status == (
-            "open" if mutation == "status" else "pending_confirmation"
-        )
-        if mutation == "token":
-            assert visit.confirmation_token == "SYNTHETIC-replaced-token"
-        else:
-            assert visit.confirmation_token == token
+        assert visit.status == ("open" if mutation == "status" else "pending_confirmation")
+        assert (visit.status, visit.confirmation_token, visit.confirmation_context_epoch) == writer_state
 
 
 @pytest.mark.integration
 @pytest.mark.parametrize("operation", ["confirm", "cancel"])
-def test_action_waits_for_competing_visit_lock_and_rechecks_status(
-    pg_engine, operation
-):
-    visit_id, token, chat_id, capability = _seed(pg_engine)
-    SessionLocal = sessionmaker(bind=pg_engine, autoflush=False)
+def test_action_rejects_a_competing_visit_lock_and_rechecks_status(telegram_pg, operation):
+    owner, runtime = telegram_pg
+    visit_id, _, chat_id, capability = _seed(owner)
+    runtime_sessions = sessionmaker(bind=runtime, autoflush=False)
     checked = threading.Event()
-    request_pid = []
 
-    def request_action():
-        with SessionLocal() as session:
-            request_pid.append(
-                session.execute(text("SELECT pg_backend_pid()")).scalar_one()
-            )
+    def request_action(*, observe=False):
+        with runtime_sessions() as session:
             service = VisitConfirmationService(session)
             validate = service.security_service.validate_confirmation_request
 
@@ -461,7 +469,8 @@ def test_action_waits_for_competing_visit_lock_and_rechecks_status(
                 checked.set()
                 return result
 
-            service.security_service.validate_confirmation_request = observed_validate
+            if observe:
+                service.security_service.validate_confirmation_request = observed_validate
             try:
                 getattr(service, f"{operation}_by_telegram")(
                     token=capability,
@@ -473,58 +482,30 @@ def test_action_waits_for_competing_visit_lock_and_rechecks_status(
                 return exc.status_code
             return 200
 
-    with SessionLocal() as writer:
+    with Session(owner) as writer:
         locked = writer.query(Visit).filter_by(id=visit_id).with_for_update().one()
         locked.status = "open"
         writer.flush()
         with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(request_action)
+            future = executor.submit(request_action, observe=True)
             assert checked.wait(8)
             try:
-                # Check an actual PostgreSQL lock wait; timing alone cannot
-                # establish that the second action observed the locked row.
-                deadline = time.monotonic() + 8
-                waiting = False
-                with pg_engine.connect() as observer:
-                    while time.monotonic() < deadline:
-                        waiting = (
-                            observer.execute(
-                                text(
-                                    "SELECT wait_event_type = 'Lock' FROM pg_stat_activity WHERE pid = :pid"
-                                ),
-                                {"pid": request_pid[0]},
-                            ).scalar()
-                            is True
-                        )
-                        if waiting:
-                            break
-                        time.sleep(0.05)
-                assert waiting, "patient action did not wait on competing transaction"
+                assert future.result(timeout=6) == 409
             finally:
                 writer.commit()
-            assert future.result(timeout=10) in (400, 403, 404, 409)
-    with SessionLocal() as session:
+    assert request_action() in (400, 403, 404, 409)
+    with Session(owner) as session:
         visit = session.get(Visit, visit_id)
         assert visit.status == "open"
-        assert visit.confirmation_token == token
+        assert visit.confirmation_token is None
 
 
 @pytest.mark.integration
-def test_migrated_context_change_invalidates_previously_viewed_action(pg_engine):
-    """Use the actual 0102 trigger, then change date and restore it via bulk SQL."""
-    path = (
-        Path(__file__).resolve().parents[2]
-        / "alembic/versions/0102_visit_confirmation_context.py"
-    )
-    spec = importlib.util.spec_from_file_location("test_visit_context_migration", path)
-    migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)
-    with pg_engine.begin() as conn:
-        conn.execute(text("ALTER TABLE visits DROP COLUMN confirmation_context_epoch"))
-        migration.op = Operations(MigrationContext.configure(conn))
-        migration.upgrade()
-    visit_id, raw_token, chat_id, _ = _seed(pg_engine)
-    with Session(pg_engine) as db:
+def test_migrated_context_change_invalidates_previously_viewed_action(telegram_pg):
+    """The installed context triggers invalidate a changed date or service list."""
+    owner, runtime = telegram_pg
+    visit_id, raw_token, chat_id, _ = _seed(owner)
+    with Session(runtime) as db:
         visit = db.get(Visit, visit_id)
         link = db.query(TelegramUser).filter_by(chat_id=chat_id).one()
         view = build_telegram_visit_action_token(
@@ -542,30 +523,24 @@ def test_migrated_context_change_invalidates_previously_viewed_action(pg_engine)
         )
         original_date = visit.visit_date
         db.rollback()
-    with pg_engine.begin() as conn:
-        conn.execute(
-            text("UPDATE visits SET visit_date = :changed WHERE id = :id"),
-            {"changed": original_date + timedelta(days=1), "id": visit_id},
-        )
-        conn.execute(
-            text("UPDATE visits SET visit_date = :original WHERE id = :id"),
-            {"original": original_date, "id": visit_id},
-        )
-    with Session(pg_engine) as db:
-        with pytest.raises(VisitConfirmationDomainError):
+    with owner.begin() as conn:
+        conn.execute(text("UPDATE visits SET visit_date = :changed WHERE id = :id"),
+                     {"changed": original_date + timedelta(days=1), "id": visit_id})
+        conn.execute(text("UPDATE visits SET visit_date = :original WHERE id = :id"),
+                     {"original": original_date, "id": visit_id})
+    with Session(runtime) as db:
+        with pytest.raises(VisitConfirmationDomainError) as refused:
             VisitConfirmationService(db).cancel_by_telegram(
-                token=preview["action_token"],
-                telegram_user_id=str(chat_id),
-                source_ip=None,
-                user_agent="telegram",
-            )
+                token=preview["action_token"], telegram_user_id=str(chat_id), source_ip=None, user_agent="telegram")
+        assert refused.value.status_code in (400, 403, 404, 409)
+    with Session(owner) as db:
         visit = db.get(Visit, visit_id)
         assert (
             visit.status == "pending_confirmation" and visit.confirmation_token is None
         )
 
-    visit_id, raw_token, chat_id, _ = _seed(pg_engine)
-    with Session(pg_engine) as db:
+    visit_id, raw_token, chat_id, _ = _seed(owner)
+    with Session(runtime) as db:
         visit = db.get(Visit, visit_id)
         link = db.query(TelegramUser).filter_by(chat_id=chat_id).one()
         view = build_telegram_visit_action_token(
@@ -582,19 +557,16 @@ def test_migrated_context_change_invalidates_previously_viewed_action(pg_engine)
             token=view, telegram_user_id=str(chat_id)
         )
         db.rollback()
-    with pg_engine.begin() as conn:
-        conn.execute(
-            text(
-                "INSERT INTO visit_services (visit_id, service_id, name, qty, created_at) VALUES (:id, 1, 'SYNTHETIC', 1, now())"
-            ),
-            {"id": visit_id},
-        )
-    with Session(pg_engine) as db:
-        with pytest.raises(VisitConfirmationDomainError):
+    with owner.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO visit_services (visit_id, service_id, name, qty, price, currency, created_at)
+            SELECT visit_id, service_id, 'SYNTHETIC added line', 1, 10.00, 'UZS', now()
+            FROM visit_services WHERE visit_id=:id
+        """), {"id": visit_id})
+    with Session(runtime) as db:
+        with pytest.raises(VisitConfirmationDomainError) as refused:
             VisitConfirmationService(db).confirm_by_telegram(
-                token=preview["action_token"],
-                telegram_user_id=str(chat_id),
-                source_ip=None,
-                user_agent="telegram",
-            )
+                token=preview["action_token"], telegram_user_id=str(chat_id), source_ip=None, user_agent="telegram")
+        assert refused.value.status_code in (400, 403, 404, 409)
+    with Session(owner) as db:
         assert db.get(Visit, visit_id).confirmation_token is None

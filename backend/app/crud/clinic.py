@@ -26,6 +26,7 @@ from app.schemas.clinic import (
     ServiceCategoryCreate,
     ServiceCategoryUpdate,
 )
+from app.services.all_free_policy import ALL_FREE_AUTO_APPROVE_KEY, lock_all_free_policy
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
 
@@ -92,21 +93,38 @@ def get_setting_by_key(db: Session, key: str) -> ClinicSettings | None:
 
 
 def create_setting(
-    db: Session, setting: ClinicSettingsCreate, user_id: int
+    db: Session, setting: ClinicSettingsCreate, user_id: int, *, commit: bool = True
 ) -> ClinicSettings:
     """Создать настройку"""
+    from app.services.repeat_policy_input import validate_repeat_setting
+
+    validate_repeat_setting(setting.key, setting.value)
+    if setting.key == ALL_FREE_AUTO_APPROVE_KEY:
+        lock_all_free_policy(db)
     db_setting = ClinicSettings(**setting.model_dump(), updated_by=user_id)
     db.add(db_setting)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(db_setting)
     return db_setting
 
 
 def update_setting(
-    db: Session, key: str, setting: ClinicSettingsUpdate, user_id: int
+    db: Session, key: str, setting: ClinicSettingsUpdate, user_id: int, *, commit: bool = True
 ) -> ClinicSettings | None:
     """Обновить настройку"""
-    db_setting = get_setting_by_key(db, key)
+    from app.services.repeat_policy_input import validate_repeat_setting
+
+    if "value" in setting.model_fields_set:
+        validate_repeat_setting(key, setting.value)
+    if key == ALL_FREE_AUTO_APPROVE_KEY:
+        lock_all_free_policy(db)
+        db_setting = (db.query(ClinicSettings).filter(ClinicSettings.key == key)
+                      .populate_existing().first())
+    else:
+        db_setting = get_setting_by_key(db, key)
     if not db_setting:
         return None
 
@@ -114,23 +132,37 @@ def update_setting(
         setattr(db_setting, field, value)
 
     db_setting.updated_by = user_id
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(db_setting)
     return db_setting
 
 
 def update_settings_batch(
-    db: Session, category: str, settings: dict[str, Any], user_id: int
+    db: Session, category: str, settings: dict[str, Any], user_id: int, *, commit: bool = True
 ) -> list[ClinicSettings]:
     """Массовое обновление настроек"""
     if category == "clinic":
         settings = normalize_clinic_setting_keys(settings)
 
+    from app.services.repeat_policy_input import validate_repeat_setting
+
+    for key, value in settings.items():
+        validate_repeat_setting(key, value)
+
+    if ALL_FREE_AUTO_APPROVE_KEY in settings:
+        lock_all_free_policy(db)
+
     updated_settings = []
 
     for key, value in settings.items():
         # Проверяем существование настройки
-        db_setting = db.query(ClinicSettings).filter(ClinicSettings.key == key).first()
+        query = db.query(ClinicSettings).filter(ClinicSettings.key == key)
+        if key == ALL_FREE_AUTO_APPROVE_KEY:
+            query = query.populate_existing()
+        db_setting = query.first()
 
         if db_setting:
             # Обновляем существующую
@@ -145,7 +177,10 @@ def update_settings_batch(
 
         updated_settings.append(db_setting)
 
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     for setting in updated_settings:
         db.refresh(setting)
 

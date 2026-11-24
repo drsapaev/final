@@ -126,6 +126,14 @@ async def _dispatch_clinic_bot_update(
     if await _handle_staff_read_only_menu(update, db, bot_service):
         return True
 
+    from app.services.telegram_private_chat import is_private_patient_message
+
+    candidate = update.get("message")
+    if candidate and (not isinstance(candidate, dict) or "chat" not in candidate):
+        return False
+    if candidate and not is_private_patient_message(candidate):
+        return True
+
     if await _handle_ticket_qr_start(update, db, bot_service):
         return True
 

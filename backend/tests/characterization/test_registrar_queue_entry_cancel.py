@@ -29,12 +29,15 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.models.audit import AuditLog
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
-from app.models.payment import Payment
+from app.models.payment import Payment, PaymentVisit
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.models.refund_deposit import RefundType
 from app.models.service import Service
 from app.models.visit import Visit, VisitService
+from app.services.force_majeure_service import ForceMajeureService
 from app.services.online_queue_new_service import (
     OnlineQueueNewDomainError,
     OnlineQueueNewService,
@@ -133,10 +136,11 @@ def _create_entry(
     visit: Visit | None,
     status: str = "waiting",
     total_amount: int = 500,
+    number: int = 9,
 ) -> OnlineQueueEntry:
     entry = OnlineQueueEntry(
         queue_id=queue.id,
-        number=9,
+        number=number,
         patient_id=patient.id,
         patient_name=patient.short_name(),
         phone=patient.phone,
@@ -250,7 +254,18 @@ def test_cancel_reduces_multi_visit_invoice_and_keeps_other_links(db_session, ca
     invoice.total_amount = Decimal(1200)
     db_session.commit()
 
-    OnlineQueueNewService(db_session).cancel_entry(entry_id=entry_a.id)
+    sibling = _create_entry(
+        db_session, queue=cancel_world["queue"], patient=patient, visit=visit_a, number=10,
+    )
+    service = OnlineQueueNewService(db_session)
+    service.cancel_entry(entry_id=entry_a.id)
+    db_session.expire_all()
+    assert db_session.get(Visit, visit_a.id).status == "open"
+    assert db_session.get(OnlineQueueEntry, sibling.id).status == "waiting"
+    assert db_session.get(PaymentInvoice, invoice.id).total_amount == Decimal(1200)
+    assert db_session.query(AuditLog).filter_by(action="invoice.cancel_visit", entity_id=invoice.id).count() == 0
+
+    service.cancel_entry(entry_id=sibling.id)
     db_session.expire_all()
 
     refreshed_invoice = (
@@ -274,7 +289,66 @@ def test_cancel_reduces_multi_visit_invoice_and_keeps_other_links(db_session, ca
     assert link_a == 0
 
 
+def test_force_cancel_releases_unpaid_group_with_one_audit_event(db_session, cancel_world, admin_user):
+    patient = cancel_world["patient"]
+    visit = _create_visit(db_session, patient=patient, service=cancel_world["service"])
+    other = _create_visit(db_session, patient=patient, service=cancel_world["service"])
+    entry = _create_entry(db_session, queue=cancel_world["queue"], patient=patient, visit=visit)
+    invoice = _create_invoice(db_session, patient=patient, visit=visit, amount=500)
+    invoice.total_amount = Decimal(1200)
+    db_session.add(PaymentInvoiceVisit(invoice_id=invoice.id, visit_id=other.id, visit_amount=Decimal(700)))
+    db_session.commit()
+
+    service = ForceMajeureService(db_session)
+    options = {
+        "reason": "Synthetic cancellation",
+        "refund_type": RefundType.DEPOSIT,
+        "performed_by_id": admin_user.id,
+        "send_notifications": False,
+    }
+    outcome = service.cancel_entries_with_refund([entry], **options)
+    assert (outcome["cancelled"], outcome["failed"]) == (1, 0)
+    retry = service.cancel_entries_with_refund([entry], **options)
+    assert (retry["cancelled"], retry["skipped"]) == (0, 1)
+
+    db_session.expire_all()
+    assert db_session.get(OnlineQueueEntry, entry.id).status == "cancelled"
+    assert db_session.get(Visit, visit.id).status == "canceled"
+    assert db_session.get(Visit, other.id).status == "open"
+    assert db_session.get(PaymentInvoice, invoice.id).total_amount == Decimal(700)
+    event = db_session.query(AuditLog).filter_by(action="invoice.cancel_visit", entity_id=invoice.id).one()
+    assert event.actor_user_id == admin_user.id
+    assert event.payload == {
+        "visit_id": visit.id, "currency": "UZS", "released_amount": "500.00",
+        "previous_total": "1200.00", "total": "700.00",
+        "previous_status": "pending", "status": "pending",
+    }
+
+
 # ─── Гварды: потреблённые/оплаченные позиции ──────────────────────────
+
+
+def test_cancel_refuses_payment_allocated_to_the_visit(db_session, cancel_world):
+    patient, service = cancel_world["patient"], cancel_world["service"]
+    visit = _create_visit(db_session, patient=patient, service=service)
+    other = _create_visit(db_session, patient=patient, service=service)
+    entry = _create_entry(db_session, queue=cancel_world["queue"], patient=patient, visit=visit)
+    invoice = _create_invoice(db_session, patient=patient, visit=visit, amount=500)
+    payment = Payment(visit_id=other.id, amount=Decimal(500), currency="UZS", method="cash", status="paid")
+    db_session.add(payment)
+    db_session.flush()
+    db_session.add(PaymentVisit(payment_id=payment.id, visit_id=visit.id, amount=Decimal(500)))
+    db_session.commit()
+
+    with pytest.raises(OnlineQueueNewDomainError) as denied:
+        OnlineQueueNewService(db_session).cancel_entry(entry_id=entry.id)
+    assert denied.value.status_code == 409
+    db_session.commit()
+    db_session.expire_all()
+    assert db_session.get(OnlineQueueEntry, entry.id).status == "waiting"
+    assert db_session.get(Visit, visit.id).status == "open"
+    assert db_session.get(PaymentInvoice, invoice.id).total_amount == Decimal(500)
+    assert db_session.query(AuditLog).filter_by(action="invoice.cancel_visit", entity_id=invoice.id).count() == 0
 
 
 def test_cancel_rejects_consumed_entry(db_session, cancel_world):

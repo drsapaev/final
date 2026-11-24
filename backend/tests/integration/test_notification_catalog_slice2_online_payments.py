@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from types import SimpleNamespace
 
 from app.core.security import get_password_hash
@@ -8,7 +9,7 @@ from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.user import User
-from app.models.visit import Visit
+from app.models.visit import Visit, VisitService
 
 
 def _payment_event_deliveries(db_session, *, recipient_id: int):
@@ -55,6 +56,7 @@ def _create_patient_visit_with_user(db_session, *, username: str):
         discount_mode="none",
         approval_status="none",
         source="desk",
+        confirmation_context_epoch=1,
     )
     db_session.add(visit)
     db_session.commit()
@@ -134,11 +136,17 @@ def test_payment_init_failed_creates_payment_notification(
     client,
     db_session,
     auth_headers,
+    test_service,
     monkeypatch,
 ):
     patient_user, _, visit = _create_patient_visit_with_user(
         db_session, username="slice2_init_failure_patient"
     )
+    db_session.add(VisitService(
+        visit_id=visit.id, service_id=test_service.id, name="Synthetic consultation",
+        qty=1, price=Decimal("95000.00"), currency="UZS",
+    ))
+    db_session.commit()
 
     class _FakePaymentManager:
         def get_providers_for_currency(self, currency):
@@ -185,6 +193,7 @@ def test_payment_init_failed_creates_payment_notification(
     body = response.json()
     assert body["success"] is False
     assert body["payment_id"] is not None
+    assert db_session.get(Payment, body["payment_id"]).status == "failed"
 
     deliveries = _payment_event_deliveries(db_session, recipient_id=patient_user.id)
     assert len(deliveries) == 1

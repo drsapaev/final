@@ -260,9 +260,15 @@ describe('PatientBookingPage', () => {
     expect(mockedCreateRequest).not.toHaveBeenCalled();
   });
 
-  it('retries an ambiguous confirmed booking with the exact same payload and key', async () => {
+  it.each([
+    ['the response is lost', { isAxiosError: true, request: {} }],
+    ['the operation requires reconciliation', {
+      isAxiosError: true,
+      response: { status: 409, data: { code: 'idempotency_reconciliation_required' } },
+    }],
+  ])('retries a confirmed booking with the same payload and key when %s', async (_case, error) => {
     mockedOptions.mockResolvedValue({ ...OPTIONS, mode: 'confirmed_appointment' } as never);
-    mockedCreateAppointment.mockRejectedValueOnce({ isAxiosError: true, request: {} });
+    mockedCreateAppointment.mockRejectedValueOnce(error);
     renderPage();
     await chooseSlot();
     fireEvent.click(screen.getByRole('button', { name: 'Подтвердить запись' }));

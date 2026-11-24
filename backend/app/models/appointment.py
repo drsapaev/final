@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     String,
     Text,
@@ -33,6 +34,19 @@ class Appointment(Base):
             "duration_minutes_snapshot IS NULL OR duration_minutes_snapshot > 0",
             name="ck_appointments_duration_snapshot_positive",
         ),
+        ForeignKeyConstraint(
+            ["encounter_id", "patient_id"], ["encounters.id", "encounters.patient_id"],
+            name="fk_appointments_encounter_patient", deferrable=True, initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            ["source_visit_id", "patient_id"], ["visits.id", "visits.patient_id"],
+            name="fk_appointments_source_patient", deferrable=True, initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            ["source_visit_id", "patient_id", "encounter_id"],
+            ["visits.id", "visits.patient_id", "visits.encounter_id"],
+            name="fk_appointments_source_encounter", deferrable=True, initially="DEFERRED",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -42,6 +56,12 @@ class Appointment(Base):
         nullable=False,
         index=True,
     )  # ✅ FIX: Appointments must always reference a patient (medical domain requirement)
+    encounter_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("encounters.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    source_visit_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("visits.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     doctor_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("doctors.id", ondelete="SET NULL"),

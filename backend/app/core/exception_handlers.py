@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 
 from app.core.pii_masker import (
     SECRET_FIELD_PATTERNS,
+    is_sensitive_payment_evidence_path,
     is_sensitive_verification_path,
     mask_pii,
 )
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 _VALIDATION_INPUT_PREVIEW_LEN = 256
 
 
-def _sanitize_validation_errors(errors: list, *, sensitive_verification: bool = False) -> list:
+def _sanitize_validation_errors(errors: list, *, sensitive_verification: bool = False, sensitive_payment: bool = False) -> list:
     """Scrub rejected raw inputs out of RequestValidationError details.
 
     Pydantic v2 embeds the offending value under the "input" key of each
@@ -49,12 +50,14 @@ def _sanitize_validation_errors(errors: list, *, sensitive_verification: bool = 
             sanitized.append(err)
             continue
         item = dict(err)
-        if sensitive_verification:
+        if sensitive_verification or sensitive_payment:
             # These bodies carry one-time proofs or arbitrary SMS content.
             # A Pydantic error may attach a whole body or validator text.
             if "input" in item:
                 item["input"] = "[REDACTED]"
-            item["msg"] = "Invalid verification request"
+            item["msg"] = "Invalid sensitive request" if sensitive_payment else "Invalid verification request"
+            if sensitive_payment:
+                item["loc"] = ("body",)
             item.pop("ctx", None)
             sanitized.append(item)
             continue
@@ -283,7 +286,8 @@ def register_exception_handlers(app: FastAPI) -> None:
         into logs and the 422 response. Sanitized before both uses.
         """
         safe_errors = _sanitize_validation_errors(
-            exc.errors(), sensitive_verification=is_sensitive_verification_path(request.url.path)
+            exc.errors(), sensitive_verification=is_sensitive_verification_path(request.url.path),
+            sensitive_payment=is_sensitive_payment_evidence_path(request.url.path)
         )
         logger.warning(
             "RequestValidationError: %s (path: %s)",
@@ -292,6 +296,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            headers={"Cache-Control": "no-store"} if is_sensitive_payment_evidence_path(request.url.path) else None,
             content={
                 "error": "validation_error",
                 "message": "Ошибка валидации запроса",

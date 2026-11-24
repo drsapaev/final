@@ -1,5 +1,10 @@
 import { parseRegistrarTimestamp } from './dateUtils';
 
+export const PAYMENT_RECONCILIATION_REQUIRED = 'reconciliation_required';
+
+export const isAllFreeApprovalPending = (discountMode: unknown, approvalStatus: unknown) =>
+  discountMode === 'all_free' && approvalStatus !== 'approved' && approvalStatus !== 'rejected';
+
 export const normalizeRegistrationMode = (value: unknown) => {
   const normalized = String(value || 'none').toLowerCase();
   return ['none', 'repeat', 'benefit', 'all_free'].includes(normalized) ? normalized : 'none';
@@ -7,6 +12,7 @@ export const normalizeRegistrationMode = (value: unknown) => {
 
 export const normalizePaymentStatus = (value: unknown) => {
   const status = String(value || 'pending').toLowerCase();
+  if (status === PAYMENT_RECONCILIATION_REQUIRED) return status;
   return status === 'paid' || status === 'partial' ? status : 'pending';
 };
 
@@ -480,6 +486,7 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
       visit_id: pickCanonicalVisitId(appointment),
       available_actions: Array.isArray(appointment.available_actions) ? [...appointment.available_actions] : [],
       can_mark_paid: Boolean(appointment.can_mark_paid),
+      blocks_group_payment: appointment.blocks_group_payment === true,
       can_start_visit: Boolean(appointment.can_start_visit),
       can_cancel: Boolean(appointment.can_cancel),
       can_print_ticket: Boolean(appointment.can_print_ticket),
@@ -589,6 +596,7 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
     const uniqueRegistrationModes = [...new Set(groupedDiscountModes.filter(Boolean))];
     const groupedPaymentStatuses: unknown[] = Array.isArray(group.grouped_payment_statuses) ? group.grouped_payment_statuses as unknown[] : [];
     const uniquePaymentStatuses = [...new Set(groupedPaymentStatuses.filter(Boolean))];
+    const needsPaymentReconciliation = uniquePaymentStatuses.includes(PAYMENT_RECONCILIATION_REQUIRED);
     const groupedPaymentTypes: unknown[] = Array.isArray(group.grouped_payment_types) ? group.grouped_payment_types as unknown[] : [];
     const uniquePaymentTypes = [...new Set(groupedPaymentTypes.filter(Boolean))];
 
@@ -602,13 +610,13 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
     ));
 
     const allPendingAllFree = records.length > 0 && (records as Record<string, unknown>[]).every(
-      (record: Record<string, unknown>) => record.discount_mode === 'all_free' && record.approval_status !== 'approved',
+      (record: Record<string, unknown>) => isAllFreeApprovalPending(record.discount_mode, record.approval_status),
     );
     const allPaid = records.length > 0 && (records as Record<string, unknown>[]).every((record: Record<string, unknown>) => record.payment_status === 'paid');
     const allUnpaidMonetary = records.length > 0 && (records as Record<string, unknown>[]).every((record: Record<string, unknown>) => (
       Number(record.cost) > 0 &&
       record.payment_status !== 'paid' &&
-      record.discount_mode !== 'all_free'
+      (record.discount_mode !== 'all_free' || record.approval_status === 'rejected')
     ));
     const hasMixedPaymentState = uniquePaymentStatuses.length > 1;
     const hasMixedPaymentMethod = uniquePaymentTypes.length > 1;
@@ -634,10 +642,12 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
       ...groupPublic,
       visit_type: uniqueRegistrationModes.length === 1 ? group.visit_type : 'mixed',
       discount_mode: uniqueRegistrationModes.length === 1 ? uniqueRegistrationModes[0] : 'mixed',
-      payment_type: aggregatePaymentType,
-      payment_status: uniquePaymentStatuses.length === 1 ? uniquePaymentStatuses[0] : 'mixed',
+      payment_type: needsPaymentReconciliation ? null : aggregatePaymentType,
+      payment_status: needsPaymentReconciliation
+        ? PAYMENT_RECONCILIATION_REQUIRED
+        : (uniquePaymentStatuses.length === 1 ? uniquePaymentStatuses[0] : 'mixed'),
       cost: Number(group.cost as number | string | undefined || 0),
-      cost_display: Number(group.cost as number | string | undefined || 0) <= 0 ? 'free' : null,
+      cost_display: Number(group.cost as number | string | undefined || 0) <= 0 && !allPendingAllFree ? 'free' : null,
     };
   });
 };

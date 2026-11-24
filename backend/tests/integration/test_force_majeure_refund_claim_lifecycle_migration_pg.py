@@ -49,6 +49,7 @@ from pathlib import Path
 import psycopg
 import pytest
 import sqlalchemy as sa
+from alembic.script import ScriptDirectory
 from sqlalchemy.engine import make_url
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -318,6 +319,7 @@ def test_0088_backfill_skips_rejected_and_amended_0087_allows_retry() -> None:
             engine.dispose()
 
         # ---- 2) прогоняем amended 0087 + 0088 --------------------------
+        expected_head = ScriptDirectory(str(BACKEND_ROOT / "alembic")).get_current_head()
         result = _alembic(sa_url, "upgrade", "head")
         failure_details = "\n".join((result.stdout[-2000:], result.stderr[-2000:]))
         if result.returncode != 0:
@@ -329,8 +331,7 @@ def test_0088_backfill_skips_rejected_and_amended_0087_allows_retry() -> None:
                 version = conn.execute(
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar_one()
-                # The fixture must reach the current repository head.
-                assert version == "0103_public_site_daily_counts", version
+                assert version == expected_head, version
 
                 def _claims(payment_id: int) -> list[tuple]:
                     return conn.execute(

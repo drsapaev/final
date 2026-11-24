@@ -12,11 +12,15 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from typing import Any, Final
 
-from sqlalchemy import func, insert
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy import false, func, insert, or_, text, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.engine import Row
+from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.orm import Session, lazyload, load_only
 
 from app.crud.clinic import clinic_today
 from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
@@ -28,7 +32,7 @@ from app.crud.queue_resource_routing import (
 )
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.payment import Payment
+from app.models.payment import Payment, PaymentVisit
 from app.models.refund_deposit import (
     DepositTransaction,
     DepositTransactionType,
@@ -39,8 +43,22 @@ from app.models.refund_deposit import (
     RefundType,
 )
 from app.models.visit import Visit
+from app.repositories.force_majeure_api_repository import (
+    delete_bank_refund_claim,
+    record_refund_request_creation,
+)
 from app.repositories.queue_api_repository import QueueApiRepository
+from app.services.encounter_financial_fence import FinancialFenceError
 from app.services.fcm_service import get_fcm_service
+from app.services.money_input import MoneyInputError, parse_money
+from app.services.online_queue_new_service import (
+    OnlineQueueNewDomainError,
+    OnlineQueueNewService,
+)
+from app.services.payment_refund_guard import (
+    require_visible_refund_history,
+    require_visible_refund_payments,
+)
 from app.services.queue_service import queue_service
 
 logger = logging.getLogger(__name__)
@@ -393,130 +411,110 @@ class ForceMajeureService:
         skipped = []
         notification_targets = []
 
+        if self.db.get_bind().dialect.name == "sqlite":
+            # Keep all entry savepoints inside an active write transaction.
+            self.db.execute(update(OnlineQueueEntry).where(false()).values(id=OnlineQueueEntry.id))
+
         for entry in entries:
+            entry_id = entry.id
             try:
-                # 3808 review round 3 (P1 re-check): fresh statement per
-                # entry — READ COMMITTED re-read; an entry already processed
-                # by a concurrent writer is neither cancelled again nor
-                # refunded again (idempotent replay guard).
-                self.db.refresh(entry)
-                if entry.status not in self._PENDING_STATUSES:
-                    skipped.append(
-                        {"entry_id": entry.id, "status": entry.status}
-                    )
-                    continue
+                with self.db.begin_nested():
+                    # Serialize with ordinary cancellation before checking payment evidence.
+                    self.db.refresh(entry, with_for_update=True)
+                    if entry.status not in self._PENDING_STATUSES:
+                        skipped.append({"entry_id": entry_id, "status": entry.status})
+                        continue
 
-                # Получаем связанный платёж
-                payment = self._get_payment_for_entry(entry)
-
-                # Отмечаем запись как отменённую
-                entry.status = "cancelled"
-                entry.incomplete_reason = f"Форс-мажор: {reason}"
-
-                refund_info = None
-
-                if payment and payment.status == "paid" and payment.amount > 0:
-                    # Создаём заявку на возврат
-                    if refund_type == RefundType.DEPOSIT:
-                        refund_info = self._add_to_deposit(
-                            patient_id=entry.patient_id,
-                            amount=payment.amount,
-                            reason=reason,
-                            payment_id=payment.id,
-                            visit_id=entry.visit_id,
-                            performed_by_id=performed_by_id,
-                        )
-                        # 3808 review round 12 (P2): зачисления на депозит —
-                        # в собственные счётчики (идемпотентный повтор, как
-                        # у банковских заявок, — в existing, не в created).
-                        if refund_info.get("already_refunded"):
-                            # 3808 review round 13 (P2 prior_channel):
-                            # already_refunded говорит ТОЛЬКО «платёж уже
-                            # возвращён», но не каким каналом. Если ранее
-                            # оформлен БАНКОВСКИЙ возврат (prior_channel ==
-                            # refund_request), депозитного зачисления НЕ
-                            # существует — инкремент deposit_credits_existing
-                            # приписывал несуществующее зачисление (UI/аудит
-                            # видели «деньги уже на депозите», хотя они —
-                            # в pending-заявке). Честный счётчик для этого
-                            # случая — refund_requests_existing.
-                            if (
-                                refund_info.get("prior_channel")
-                                == self.REFUND_CHANNEL_REFUND_REQUEST
-                            ):
-                                refund_requests_existing += 1
-                            else:
-                                deposit_credits_existing += 1
+                    payment = self._get_payment_for_entry(entry)
+                    refund_info = None
+                    entry_refund_type = refund_type
+                    if payment and payment.status == "paid" and payment.amount > 0:
+                        if payment.method == "deposit":
+                            entry_refund_type = RefundType.DEPOSIT
+                        if entry_refund_type == RefundType.DEPOSIT:
+                            refund_info = self._add_to_deposit(
+                                patient_id=entry.patient_id, amount=payment.amount, reason=reason,
+                                payment_id=payment.id, visit_id=entry.visit_id, performed_by_id=performed_by_id,
+                            )
                         else:
-                            deposit_credits_created += 1
-                    else:
-                        refund_info = self._create_refund_request(
-                            patient_id=entry.patient_id,
-                            payment_id=payment.id,
-                            visit_id=entry.visit_id,
-                            amount=payment.amount,
-                            reason=reason,
-                            refund_type=refund_type,
-                            is_automatic=True,
-                        )
-                        # 3808 review round 7 (P2): already_refunded —
-                        # идемпотентный повтор без новой строки: в счётчик
-                        # НОВЫХ заявок не входит (двухочередной визит:
-                        # второй банковский перенос создаёт 0 строк).
-                        if refund_info.get("already_refunded"):
-                            # 3808 review round 13 (P2 prior_channel):
-                            # симметрично депозитной ветке — платёж мог
-                            # быть возвращён ЗАЧИСЛЕНИЕМ НА ДЕПОЗИТ
-                            # (отменой другой очереди): банковской заявки
-                            # не существует, честный счётчик —
-                            # deposit_credits_existing, НЕ refund_requests_existing.
-                            if (
-                                refund_info.get("prior_channel")
-                                == self.REFUND_CHANNEL_DEPOSIT
-                            ):
-                                deposit_credits_existing += 1
-                            else:
-                                refund_requests_existing += 1
-                        else:
-                            refund_requests.append(refund_info)
+                            refund_info = self._create_refund_request(
+                                patient_id=entry.patient_id, payment_id=payment.id, visit_id=entry.visit_id,
+                                amount=payment.amount, reason=reason, refund_type=entry_refund_type, is_automatic=True,
+                                performed_by_id=performed_by_id,
+                            )
 
-                cancelled.append(
-                    {
-                        "entry_id": entry.id,
+                    elif payment is None and entry.visit_id:
+                        try:
+                            OnlineQueueNewService(self.db).stage_unused_grouped_draft(
+                                entry=entry, performed_by_id=performed_by_id, reason=reason,
+                            )
+                        except OnlineQueueNewDomainError as exc:
+                            raise ForceMajeureError(exc.detail) from exc
+
+                    # The refund evidence and queue transition share this
+                    # savepoint, including errors after staging a refund.
+                    entry.status = "cancelled"
+                    entry.incomplete_reason = f"Форс-мажор: {reason}"
+                    details = {
+                        "entry_id": entry_id,
                         "patient_name": entry.patient_name,
                         "phone": entry.phone,
-                        "refund_type": refund_type.value if refund_type else None,
+                        "refund_type": entry_refund_type.value if entry_refund_type else None,
                         "refund_amount": float(payment.amount) if payment else 0,
                         "refund_info": refund_info,
                     }
+                    telegram_id = entry.telegram_id
+            except ForceMajeureError as exc:
+                failed.append({"entry_id": entry_id, "error": str(exc)})
+                continue
+            except Exception as exc:
+                logger.error(
+                    "force_majeure.cancel_entry_failed",
+                    extra={"entry_id": entry_id, "error_type": type(exc).__name__},
                 )
+                if not self.db.is_active:
+                    self.db.rollback()
+                    raise ForceMajeureError("Состояние отмены требует сверки") from None
+                failed.append({"entry_id": entry_id, "error": "Не удалось отменить запись"})
+                continue
 
-                # Добавляем в список для уведомлений
-                if entry.phone or entry.telegram_id:
-                    notification_targets.append(
-                        {
-                            "phone": entry.phone,
-                            "telegram_id": entry.telegram_id,
-                            "patient_name": entry.patient_name,
-                            "refund_type": refund_type.value if refund_type else None,
-                            "refund_amount": float(payment.amount) if payment else 0,
-                        }
-                    )
+            cancelled.append(details)
+            if details["phone"] or telegram_id:
+                notification_targets.append({
+                    "phone": details["phone"], "telegram_id": telegram_id,
+                    "patient_name": details["patient_name"], "refund_type": details["refund_type"],
+                    "refund_amount": details["refund_amount"],
+                })
+            if refund_info is not None:
+                deposit_refund = entry_refund_type == RefundType.DEPOSIT
+                if refund_info.get("already_refunded"):
+                    prior_channel = refund_info.get("prior_channel")
+                    if prior_channel == self.REFUND_CHANNEL_DEPOSIT or (
+                        deposit_refund and prior_channel != self.REFUND_CHANNEL_REFUND_REQUEST
+                    ):
+                        deposit_credits_existing += 1
+                    else:
+                        refund_requests_existing += 1
+                elif deposit_refund:
+                    deposit_credits_created += 1
+                else:
+                    refund_requests.append(refund_info)
 
-            except Exception as e:
-                logger.error(f"Ошибка при отмене записи {entry.id}: {e}")
-                failed.append({"entry_id": entry.id, "error": str(e)})
-
-        self.db.commit()
+        try:
+            self.db.commit()
+        except Exception as exc:
+            self.db.rollback()
+            logger.error(
+                "force_majeure.cancel_commit_failed", extra={"error_type": type(exc).__name__},
+            )
+            raise ForceMajeureError("Состояние отмены требует сверки") from None
 
         # Отправляем уведомления
         if send_notifications and notification_targets:
             self._send_cancellation_notifications(notification_targets, reason)
 
-        logger.info(
-            f"Форс-мажор отмена: {len(cancelled)} записей отменено, "
-            f"{len(failed)} ошибок, {len(skipped)} пропущено. Причина: {reason}"
-        )
+        logger.info("Форс-мажор отмена: %s записей отменено, %s ошибок, %s пропущено",
+                    len(cancelled), len(failed), len(skipped))
 
         return {
             "success": True,
@@ -789,23 +787,59 @@ class ForceMajeureService:
         return self._get_or_create_queue(specialist_id, target_date)
 
     def _get_payment_for_entry(self, entry: OnlineQueueEntry) -> Payment | None:
-        """Получить платёж для записи"""
-        if not entry.visit_id:
+        """Select a single settled receipt after serializing with collection."""
+        if entry.visit_id is None:
             return None
 
-        visit = self.db.query(Visit).filter(Visit.id == entry.visit_id).first()
-        if not visit:
-            return None
-        if visit.patient_id != entry.patient_id:
-            raise ForceMajeureError(
-                "Queue entry visit does not belong to the queue patient"
-            )
-
-        return (
-            self.db.query(Payment)
-            .filter(Payment.visit_id == entry.visit_id, Payment.status == "paid")
+        if self.db.get_bind().dialect.name == "postgresql":
+            self.db.execute(text("SET LOCAL lock_timeout='2s'"))
+        try:
+            require_visible_refund_payments(self.db)
+        except FinancialFenceError as exc:
+            raise ForceMajeureError(str(exc)) from exc
+        visit = (
+            self.db.query(Visit.patient_id)
+            .filter(Visit.id == entry.visit_id)
+            .with_for_update(of=Visit, key_share=True)
             .first()
         )
+        if visit is None:
+            raise ForceMajeureError("Визит записи требует сверки")
+        if visit.patient_id != entry.patient_id:
+            raise ForceMajeureError("Queue entry visit does not belong to the queue patient")
+
+        payments = (
+            self.db.query(Payment)
+            .options(load_only(Payment.id, Payment.visit_id, Payment.amount, Payment.status, Payment.method),
+                     lazyload(Payment.payment_visits))
+            .filter(
+                or_(Payment.visit_id == entry.visit_id,
+                    Payment.payment_visits.any(PaymentVisit.visit_id == entry.visit_id)),
+                Payment.status.in_(("paid", "completed")),
+                Payment.amount != 0,
+            )
+            .order_by(Payment.id)
+            .limit(2)
+            .all()
+        )
+        if not payments:
+            return None
+        payment = payments[0]
+        if len(payments) != 1 or payment.visit_id != entry.visit_id or payment.status != "paid":
+            raise ForceMajeureError("Платежи визита требуют сверки")
+        try:
+            amount = parse_money(payment.amount)
+        except MoneyInputError:
+            raise ForceMajeureError("Сумма платежа требует сверки") from None
+        links = (
+            self.db.query(PaymentVisit.visit_id, PaymentVisit.amount)
+            .filter(PaymentVisit.payment_id == payment.id)
+            .limit(2)
+            .all()
+        )
+        if links and links != [(entry.visit_id, amount)]:
+            raise ForceMajeureError("Распределение оплаты визита требует сверки")
+        return payment
 
     @staticmethod
     def _already_refunded_by_claim(
@@ -822,51 +856,57 @@ class ForceMajeureService:
         }
 
     def _claim_is_stale(self, claim: PaymentRefundClaim) -> bool:
-        """3808 round 5 (P1 claim lifecycle): claim мёртв, если его
-        банковская заявка закончилась БЕЗ выплаты денег.
-
-        * ``deposit``-канал мёртвым быть не может: зачисление на депозит —
-          уже свершшееся движение денег, обратных статусов у него нет;
-        * ``refund_request``-канал мёртв, когда связанная заявка в
-          терминальном не-платящем статусе (rejected/cancelled) — деньги
-          пациенту НЕ ушли;
-        * если связанная заявка не найдена (строку удалили — FK SET NULL
-          обнулил ссылку), ищем любую ЖИВУЮ автоматическую заявку этого
-          платежа: есть — claim жив (fail-closed к деньгам); живых нет, но
-          есть отклонённые — мёртв; нет вообще — консервативно жив
-          (orphan-claim, разбирается вручную, логируем предупреждение).
-        """
+        """Verify a prior outcome or identify a bank reservation that can be released."""
         if claim.channel == self.REFUND_CHANNEL_DEPOSIT:
+            if claim.refund_request_id is not None or claim.deposit_transaction_id is None:
+                raise ForceMajeureError("Резерв возврата требует сверки")
+            credit = (
+                self.db.query(DepositTransaction.id)
+                .filter(
+                    DepositTransaction.id == claim.deposit_transaction_id,
+                    DepositTransaction.payment_id == claim.payment_id,
+                    DepositTransaction.transaction_type == DepositTransactionType.CREDIT.value,
+                )
+                .scalar()
+            )
+            if credit is None:
+                raise ForceMajeureError("Резерв возврата требует сверки")
             return False
-        request = None
+        if claim.channel != self.REFUND_CHANNEL_REFUND_REQUEST or claim.deposit_transaction_id is not None:
+            raise ForceMajeureError("Резерв возврата требует сверки")
+
+        known_statuses = self.REFUND_REQUEST_ACTIVE_STATUSES + self.REFUND_REQUEST_FAILED_STATUSES
         if claim.refund_request_id is not None:
-            request = self.db.get(RefundRequest, claim.refund_request_id)
-        if request is not None:
+            request = (
+                self.db.query(RefundRequest.status)
+                .filter(
+                    RefundRequest.id == claim.refund_request_id,
+                    RefundRequest.payment_id == claim.payment_id,
+                )
+                .first()
+            )
+            if request is None or request.status not in known_statuses:
+                raise ForceMajeureError("Резерв возврата требует сверки")
             return request.status in self.REFUND_REQUEST_FAILED_STATUSES
+
+        # A deleted legacy request clears the foreign key. Release its
+        # reservation only with terminal evidence for this payment.
         automatic_requests = (
-            self.db.query(RefundRequest)
+            self.db.query(RefundRequest.status)
             .filter(
                 RefundRequest.payment_id == claim.payment_id,
                 RefundRequest.is_automatic.is_(True),
             )
             .all()
         )
-        if any(
-            req.status in self.REFUND_REQUEST_ACTIVE_STATUSES
-            for req in automatic_requests
-        ):
-            return False
-        if automatic_requests:
-            return True
+        if automatic_requests and all(req.status in known_statuses for req in automatic_requests):
+            return all(req.status in self.REFUND_REQUEST_FAILED_STATUSES for req in automatic_requests)
         logger.warning(
-            "PaymentRefundClaim %s (payment %s, channel %s) has no bound "
-            "refund request and no automatic requests — treating as live "
-            "(fail-closed); investigate manually",
+            "PaymentRefundClaim %s (payment %s) has no verified bank refund history",
             claim.id,
             claim.payment_id,
-            claim.channel,
         )
-        return False
+        raise ForceMajeureError("Резерв возврата требует сверки")
 
     def _claim_payment_refund(
         self,
@@ -893,18 +933,9 @@ class ForceMajeureService:
         самоисцеление покрывает любой путь отклонения/отмены заявки,
         включая строки, занесённые до этого фикса.
 
-        Savepoint берётся НА УРОВНЕ ПОДКЛЮЧЕНИЯ
-        (``session.connection().begin_nested()``), а не сессии: session-level
-        begin_nested ломает внешнюю savepoint-машину тестовой фикстуры
-        db_session (listener after_transaction_end), а get_bind() для
-        сессии, привязанной к engine, возвращает сам engine. Явный flush
-        ДО savepoint выталкивает pending-изменения ORM (например,
-        status="cancelled" текущей записи) НАРУЖУ отката: IntegrityError
-        откатывает только INSERT claim-а, отмена записи не теряется.
-        Вставка — Core, без ORM объекта: после rollback в сессии не
-        остаётся рассинхронизированного состояния.
-        ``uq_payment_refund_claims_payment`` — DB-бэкстоп для любых путей
-        в обход сервиса.
+        Savepoint подключения сохраняет транзакцию вызывающего при ошибке.
+        Конфликт только по ``payment_id`` допускает чтение резерва победителя.
+        Остальные ошибки и отсутствие подтверждённого резерва требуют сверки.
         """
         existing = (
             self.db.query(PaymentRefundClaim)
@@ -913,49 +944,137 @@ class ForceMajeureService:
         )
         if existing is not None:
             if self._claim_is_stale(existing):
-                # 3808 round 5: терминальный не-платящий статус заявки —
-                # деньги не вернулись, платёж снова доступен для возврата.
+                if not delete_bank_refund_claim(
+                    self.db, claim_id=existing.id, payment_id=payment_id,
+                    refund_request_id=existing.refund_request_id,
+                ):
+                    raise ForceMajeureError("Резерв возврата требует сверки")
                 logger.info(
-                    "Releasing stale PaymentRefundClaim %s (payment %s, "
-                    "channel %s): bound refund request ended without a payout",
+                    "Released stale PaymentRefundClaim %s (payment %s): "
+                    "refund request ended without a payout",
                     existing.id,
                     payment_id,
-                    existing.channel,
                 )
-                self.db.delete(existing)
-                self.db.flush()
             else:
                 return self._already_refunded_by_claim(payment_id, existing)
 
-        # Pending-изменения ORM — наружу savepoint (см. docstring).
+        claims = PaymentRefundClaim.__table__
+        insert_claim = sqlite_insert if self.db.get_bind().dialect.name == "sqlite" else pg_insert
+        statement = (
+            insert_claim(claims)
+            .values(payment_id=payment_id, channel=channel, reason=reason)
+            .on_conflict_do_nothing(index_elements=[claims.c.payment_id])
+            .returning(claims.c.id)
+        )
+
         self.db.flush()
-        bind = self.db.connection()
         try:
-            with bind.begin_nested():
-                result = self.db.execute(
-                    insert(PaymentRefundClaim)
-                    .values(payment_id=payment_id, channel=channel, reason=reason)
-                )
+            with self.db.connection().begin_nested():
+                claim_id = self.db.execute(statement).scalar_one_or_none()
         except IntegrityError:
-            # Проиграли гонку за платёж: другая транзакция закоммитила
-            # (или держит) claim — в READ COMMITTED после ожидания на
-            # уникальном индексе победитель уже виден. Деньги не двигаем.
-            winner = (
-                self.db.query(PaymentRefundClaim)
-                .filter(PaymentRefundClaim.payment_id == payment_id)
-                .first()
-            )
-            if winner is not None:
-                return self._already_refunded_by_claim(payment_id, winner)
-            return {
-                "already_refunded": True,
-                "payment_id": payment_id,
-                "prior_channel": channel,
-                "conflict": "unique_payment_refund_claim",
-            }
-        return int(result.inserted_primary_key[0])
+            raise ForceMajeureError("Резерв возврата требует сверки") from None
+        if claim_id is not None:
+            return claim_id
+
+        winner = (
+            self.db.query(PaymentRefundClaim)
+            .filter(PaymentRefundClaim.payment_id == payment_id)
+            .first()
+        )
+        if winner is None or self._claim_is_stale(winner):
+            raise ForceMajeureError("Резерв возврата требует сверки")
+        return self._already_refunded_by_claim(payment_id, winner)
+
+    def _require_refund_history(self) -> None:
+        if self.db.get_bind().dialect.name != "postgresql":
+            return
+        try:
+            with self.db.connection().begin_nested():
+                self.db.execute(text("SET LOCAL lock_timeout='2s'"))
+                require_visible_refund_history(self.db)
+        except FinancialFenceError as exc:
+            raise ForceMajeureError(str(exc)) from exc
+        except DBAPIError as exc:
+            sqlstate = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+            if sqlstate == "42501":
+                raise ForceMajeureError("История возвратов временно недоступна") from None
+            if sqlstate in {"55P03", "40001"}:
+                raise ForceMajeureError("Платёж изменяется, повторите операцию") from None
+            raise
+
+    def _find_prior_refund_request(
+        self, payment_id: int, *, automatic_only: bool,
+    ) -> Row[tuple[int, str, Decimal]] | None:
+        query = self.db.query(
+            RefundRequest.id, RefundRequest.status, RefundRequest.refund_amount,
+        ).filter(
+            RefundRequest.payment_id == payment_id,
+            or_(RefundRequest.status.is_(None),
+                RefundRequest.status.not_in(self.REFUND_REQUEST_FAILED_STATUSES)),
+        )
+        if automatic_only:
+            query = query.filter(RefundRequest.is_automatic.is_(True))
+        prior = query.order_by(RefundRequest.id).first()
+        if prior is not None and prior.status not in self.REFUND_REQUEST_ACTIVE_STATUSES:
+            raise ForceMajeureError("Состояние возврата требует сверки")
+        return prior
+
+    def _lock_payment_refund_budget(self, payment_id: int, visit_id: int | None, amount: Decimal) -> Payment:
+        # Use the same row lock as the cashier. NO KEY UPDATE is compatible
+        # with the refund claim's foreign-key lock. Keep it until commit.
+        payment_query = (
+            self.db.query(Payment)
+            .options(load_only(Payment.id, Payment.status, Payment.visit_id, Payment.amount,
+                               Payment.refunded_amount, Payment.currency, Payment.method, Payment.client_request_id),
+                     lazyload(Payment.payment_visits))
+            .filter(Payment.id == payment_id)
+            .populate_existing()
+        )
+        if self.db.get_bind().dialect.name == "postgresql":
+            self.db.execute(text("SET LOCAL lock_timeout='2s'"))
+            payment_query = payment_query.with_for_update(key_share=True)
+        try:
+            with self.db.connection().begin_nested():
+                payment = payment_query.first()
+        except DBAPIError as exc:
+            sqlstate = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+            if sqlstate in {"55P03", "40001"}:
+                raise ForceMajeureError("Платёж изменяется, повторите операцию") from None
+            raise
+        refund = payment.refunded_amount if payment is not None else None
+        refunded = refund if refund is not None else Decimal("0")
+        if (payment is None or payment.status != "paid" or refunded < 0 or not 0 < amount <= payment.amount - refunded
+                or (visit_id is not None and payment.visit_id != visit_id)):
+            raise ForceMajeureError("Доступная сумма возврата или состояние платежа требуют сверки")
+        return payment
 
     def _add_to_deposit(
+        self,
+        patient_id: int,
+        amount: float,
+        reason: str,
+        payment_id: int,
+        visit_id: int | None,
+        performed_by_id: int,
+    ) -> dict[str, Any]:
+        """Credit one refund atomically even when its caller handles errors."""
+        try:
+            with self.db.begin_nested():
+                return self._add_to_deposit_checked(
+                    patient_id=patient_id, amount=amount, reason=reason,
+                    payment_id=payment_id, visit_id=visit_id, performed_by_id=performed_by_id,
+                )
+        except DBAPIError as exc:
+            sqlstate = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+            if sqlstate == "55P03":
+                raise ForceMajeureError("Платёж изменяется, повторите операцию") from None
+            if sqlstate == "23514":
+                raise ForceMajeureError("Доказательство возврата требует сверки") from None
+            if sqlstate == "42501":
+                raise ForceMajeureError("Проведение возврата временно недоступно") from None
+            raise
+
+    def _add_to_deposit_checked(
         self,
         patient_id: int,
         amount: float,
@@ -982,12 +1101,16 @@ class ForceMajeureService:
         Право на возврат атомарно занимается в ``payment_refund_claims``
         (миграция 0088) ДО первого денежного изменения.
         """
-        from decimal import Decimal
-
         amount_decimal = Decimal(str(amount))
+        postgres = self.db.get_bind().dialect.name == "postgresql"
+        self._require_refund_history()
+        if not postgres:
+            # Keep the visit's subject and the currency check in one SQLite
+            # write transaction, including metadata-only test schemas.
+            self.db.execute(text("UPDATE visits SET id=id WHERE 0"))
 
         existing_credit = (
-            self.db.query(DepositTransaction)
+            self.db.query(DepositTransaction.deposit_id, DepositTransaction.amount)
             .filter(
                 DepositTransaction.payment_id == payment_id,
                 DepositTransaction.transaction_type
@@ -1010,15 +1133,7 @@ class ForceMajeureService:
         # создана до 0088 или напрямую, как в тестах). 3808 round 5:
         # учитываются только ЖИВЫЕ заявки — отклонённая/отменённая заявка
         # денег не вернула и повторному возврату не мешает.
-        prior_request = (
-            self.db.query(RefundRequest)
-            .filter(
-                RefundRequest.payment_id == payment_id,
-                RefundRequest.is_automatic.is_(True),
-                RefundRequest.status.in_(self.REFUND_REQUEST_ACTIVE_STATUSES),
-            )
-            .first()
-        )
+        prior_request = self._find_prior_refund_request(payment_id, automatic_only=False)
         if prior_request is not None:
             return {
                 "type": "deposit",
@@ -1028,6 +1143,32 @@ class ForceMajeureService:
                 "prior_request_id": prior_request.id,
             }
 
+        payment = self._lock_payment_refund_budget(payment_id, visit_id, amount_decimal)
+        if payment.currency != "UZS" or payment.amount != amount_decimal:
+            raise ForceMajeureError("Валюта или состояние платежа требуют сверки")
+        original_deposit_id = None
+        if payment.method == "deposit":
+            debits = (
+                self.db.query(DepositTransaction)
+                .filter_by(payment_id=payment.id, transaction_type=DepositTransactionType.DEBIT.value)
+                .limit(2)
+                .all()
+            )
+            if len(debits) != 1:
+                raise ForceMajeureError("Исходное списание с депозита требует сверки")
+            debit = debits[0]
+            if (debit.visit_id != payment.visit_id or debit.amount != amount_decimal
+                or debit.command_currency != payment.currency or not debit.command_is_active
+                or not debit.command_fingerprint or debit.client_request_id is None
+                or str(debit.client_request_id) != payment.client_request_id):
+                raise ForceMajeureError("Исходное списание с депозита требует сверки")
+            original_deposit_id = debit.deposit_id
+        if not postgres:
+            if self.db.query(Visit.patient_id).filter(Visit.id == payment.visit_id).scalar() != patient_id:
+                raise ForceMajeureError("Пациент возврата требует сверки")
+            allocations = self.db.query(PaymentVisit.visit_id, PaymentVisit.amount).filter_by(payment_id=payment.id).all()
+            if allocations and allocations != [(payment.visit_id, amount_decimal)]:
+                raise ForceMajeureError("Распределение платежа требует сверки")
         claim_id = self._claim_payment_refund(
             payment_id, self.REFUND_CHANNEL_DEPOSIT, reason=reason
         )
@@ -1049,8 +1190,11 @@ class ForceMajeureService:
             self.db.query(PatientDeposit)
             .filter(PatientDeposit.patient_id == patient_id)
             .with_for_update()
+            .populate_existing()
             .first()
         )
+        if original_deposit_id is not None and (deposit is None or deposit.id != original_deposit_id):
+            raise ForceMajeureError("Исходный депозит требует сверки")
 
         if deposit is None:
             # Конкурентное СОЗДАНИЕ: unique(patient_id) в БД есть, но
@@ -1065,7 +1209,8 @@ class ForceMajeureService:
                     result = self.db.execute(
                         insert(PatientDeposit).values(
                             patient_id=patient_id,
-                            balance=amount_decimal,
+                            balance=Decimal("0.00") if postgres else amount_decimal,
+                            currency="UZS",
                         )
                     )
                 deposit_id = int(result.inserted_primary_key[0])
@@ -1076,17 +1221,26 @@ class ForceMajeureService:
                     self.db.query(PatientDeposit)
                     .filter(PatientDeposit.patient_id == patient_id)
                     .with_for_update()
+                    .populate_existing()
                     .one()
                 )
-                deposit.balance += amount_decimal
+                if deposit.currency != "UZS":
+                    raise ForceMajeureError("Валюта депозита требует сверки")
+                if not postgres:
+                    deposit.balance += amount_decimal
             else:
                 deposit = self.db.get(PatientDeposit, deposit_id)
         else:
-            deposit.balance += amount_decimal
+            if deposit.currency != "UZS":
+                raise ForceMajeureError("Валюта депозита требует сверки")
+            if not postgres:
+                deposit.balance += amount_decimal
 
         self.db.flush()
 
-        # Создаём транзакцию
+        # PostgreSQL credits the balance while inserting the evidence and
+        # binds the existing claim before that INSERT can succeed.
+        expected_balance = deposit.balance + amount_decimal if postgres else deposit.balance
         transaction = DepositTransaction(
             deposit_id=deposit.id,
             transaction_type=DepositTransactionType.CREDIT.value,
@@ -1094,21 +1248,28 @@ class ForceMajeureService:
             balance_after=deposit.balance,
             description=f"Возврат (форс-мажор): {reason}",
             payment_id=payment_id,
-            visit_id=visit_id,
+            visit_id=payment.visit_id,
             performed_by=performed_by_id,
+            refund_currency_snapshot=payment.currency,
         )
         self.db.add(transaction)
         self.db.flush()  # нужен id транзакции для аудита claim-а
 
-        # Аудит единого claim-а: какая строка осуществила возврат
         claim_row = self.db.get(PaymentRefundClaim, claim_id)
-        claim_row.deposit_transaction_id = transaction.id
+        if postgres:
+            self.db.refresh(transaction, ["balance_after"])
+            if claim_row is None or (claim_row.deposit_transaction_id != transaction.id
+                                     or transaction.balance_after != expected_balance):
+                raise ForceMajeureError("Доказательство возврата требует сверки")
+            self.db.expire(deposit, ["balance", "updated_at"])
+        else:
+            claim_row.deposit_transaction_id = transaction.id
 
         return {
             "type": "deposit",
             "deposit_id": deposit.id,
             "amount": float(amount_decimal),
-            "new_balance": float(deposit.balance),
+            "new_balance": float(transaction.balance_after),
             "refund_claim_id": claim_id,
         }
 
@@ -1121,6 +1282,7 @@ class ForceMajeureService:
         reason: str,
         refund_type: RefundType,
         is_automatic: bool = False,
+        performed_by_id: int | None = None,
     ) -> dict[str, Any]:
         """Создать заявку на возврат
 
@@ -1146,19 +1308,11 @@ class ForceMajeureService:
         заявка (например, с исправленными реквизитами) создаётся
         свободно, а её claim займёт освободившийся слот платежа.
         """
-        from decimal import Decimal
-
         amount_decimal = Decimal(str(amount))
 
-        existing_request = (
-            self.db.query(RefundRequest)
-            .filter(
-                RefundRequest.payment_id == payment_id,
-                RefundRequest.is_automatic.is_(True),
-                RefundRequest.status.in_(self.REFUND_REQUEST_ACTIVE_STATUSES),
-            )
-            .first()
-        )
+        if is_automatic:
+            self._require_refund_history()
+        existing_request = self._find_prior_refund_request(payment_id, automatic_only=not is_automatic)
         if existing_request is not None:
             return {
                 "type": "refund_request",
@@ -1170,12 +1324,13 @@ class ForceMajeureService:
                 "prior_channel": self.REFUND_CHANNEL_REFUND_REQUEST,
             }
 
-        claim_id: int | None = None
+        currency_snapshot = None
+        original_amount = amount_decimal
         if is_automatic:
             # 3808 round 4: кросс-канальная проверка — платёж уже
             # зачислен на депозит (строка могла быть создана до 0088).
             prior_credit = (
-                self.db.query(DepositTransaction)
+                self.db.query(DepositTransaction.id)
                 .filter(
                     DepositTransaction.payment_id == payment_id,
                     DepositTransaction.transaction_type
@@ -1192,31 +1347,49 @@ class ForceMajeureService:
                     "prior_deposit_transaction_id": prior_credit.id,
                 }
 
-            claim_id = self._claim_payment_refund(
-                payment_id, self.REFUND_CHANNEL_REFUND_REQUEST, reason=reason
+            payment = self._lock_payment_refund_budget(payment_id, visit_id, amount_decimal)
+            if payment.method == "deposit":
+                raise ForceMajeureError("Оплата с депозита возвращается на исходный депозит")
+            if refund_type == RefundType.BANK_TRANSFER:
+                currency = payment.currency
+                if not (isinstance(currency, str) and len(currency) == 3 and currency.isascii()
+                        and currency.isalpha() and currency.isupper()):
+                    raise ForceMajeureError("Валюта банковского возврата требует сверки")
+                if self.db.query(Visit.patient_id).filter(Visit.id == payment.visit_id).scalar() != patient_id:
+                    raise ForceMajeureError("Пациент банковского возврата требует сверки")
+                currency_snapshot = currency
+                original_amount = payment.amount
+
+        # Publish the claim and its evidence together, even when a caller
+        # continues after an individual refund fails.
+        with self.db.begin_nested():
+            claim_id: int | None = None
+            if is_automatic:
+                claim_id = self._claim_payment_refund(
+                    payment_id, self.REFUND_CHANNEL_REFUND_REQUEST, reason=reason
+                )
+                if isinstance(claim_id, dict):
+                    return {"type": "refund_request", **claim_id}
+            refund_request = RefundRequest(
+                patient_id=patient_id,
+                payment_id=payment_id,
+                visit_id=visit_id,
+                original_amount=original_amount,
+                refund_amount=amount_decimal,
+                commission_amount=Decimal("0"),
+                payment_currency_snapshot=currency_snapshot,
+                refund_type=refund_type.value,
+                status=RefundRequestStatus.PENDING.value,
+                reason=reason,
+                is_automatic=is_automatic,
             )
-            if isinstance(claim_id, dict):
-                return {"type": "refund_request", **claim_id}
-
-        refund_request = RefundRequest(
-            patient_id=patient_id,
-            payment_id=payment_id,
-            visit_id=visit_id,
-            original_amount=amount_decimal,
-            refund_amount=amount_decimal,
-            commission_amount=Decimal("0"),
-            refund_type=refund_type.value,
-            status=RefundRequestStatus.PENDING.value,
-            reason=reason,
-            is_automatic=is_automatic,
-        )
-        self.db.add(refund_request)
-        self.db.flush()
-
-        # Аудит единого claim-а: какая заявка осуществила возврат
-        if claim_id is not None:
-            claim_row = self.db.get(PaymentRefundClaim, claim_id)
-            claim_row.refund_request_id = refund_request.id
+            self.db.add(refund_request)
+            self.db.flush()
+            if claim_id is not None:
+                claim_row = self.db.get(PaymentRefundClaim, claim_id)
+                claim_row.refund_request_id = refund_request.id
+            if is_automatic:
+                record_refund_request_creation(self.db, refund_request, actor_user_id=performed_by_id)
 
         return {
             "type": "refund_request",

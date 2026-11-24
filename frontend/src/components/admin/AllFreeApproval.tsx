@@ -26,8 +26,9 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
 import { getErrorMessage } from '../../utils/type-guards';
+import AllFreeInvitationReview, { type InvitationReview } from './AllFreeInvitationReview';
 
 const ALL_FREE_ACTION_CAN_FIELD: Record<string, string> = {
   approve: 'can_approve',
@@ -86,6 +87,8 @@ const AllFreeApproval = () => {
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [invitationReview, setInvitationReview] = useState<InvitationReview | null>(null);
+  const [isReviewing, setIsReviewing] = useState(false);
 
   // ✅ Отдельная функция для загрузки всех заявок для статистики
   const loadAllRequestsForStats = useCallback(async () => {
@@ -105,7 +108,6 @@ const AllFreeApproval = () => {
     try {
       const response = await api.get(`/admin/all-free-requests?status_filter=${statusFilter}&limit=100`);
       const data = response.data;
-      logger.log('[AllFreeApproval] Получено заявок:', data.length, data);
       setAllFreeRequests(Array.isArray(data) ? data : []);
     } catch (error) {
       logger.error('[AllFreeApproval] Ошибка при загрузке заявок All Free:', error);
@@ -134,7 +136,12 @@ const AllFreeApproval = () => {
 
       // ✅ ИСПРАВЛЕНО: Обновляем все заявки для статистики и список с текущим фильтром
       await loadAllRequestsForStats();
-      loadAllFreeRequests();
+      const newStatus = response.data?.new_status;
+      if (statusFilter === 'pending' && (newStatus === 'approved' || newStatus === 'rejected')) {
+        setStatusFilter(newStatus);
+      } else {
+        void loadAllFreeRequests();
+      }
 
       // Закрываем модальное окно
       setShowApprovalModal(false);
@@ -145,6 +152,22 @@ const AllFreeApproval = () => {
       toast.error(getErrorMessage(error) || t('admin2.af_err_process'));
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const reviewInvitation = async (visitId: string | number) => {
+    setIsReviewing(true);
+    try {
+      const { data } = await api.post<InvitationReview>(`/visits/${visitId}/confirmation-reissue/review`);
+      if (!data?.token || String(data.visit_id) !== String(visitId)) {
+        toast.error(t('admin2.af_invitation_review_error'));
+        return;
+      }
+      setInvitationReview(data);
+    } catch {
+      toast.error(t('admin2.af_invitation_review_error'));
+    } finally {
+      setIsReviewing(false);
     }
   };
 
@@ -482,10 +505,22 @@ const AllFreeApproval = () => {
               }
                   </div>
             }
+                {hasBackendAllFreeAction(request, 'review_invitation') && (
+                  <Button variant="outline" disabled={isReviewing} onClick={() => void reviewInvitation(request.id)}>
+                    {t(isReviewing ? 'admin2.af_loading' : 'admin2.af_invitation_review')}
+                  </Button>
+                )}
               </Card>
           )}
           </div>
         }
+
+        {invitationReview && (
+          <AllFreeInvitationReview review={invitationReview} onClose={() => {
+            setInvitationReview(null);
+            void loadAllFreeRequests();
+          }} />
+        )}
 
         {/* Модальное окно для отклонения */}
         {showApprovalModal && selectedRequest &&

@@ -262,9 +262,9 @@ const PaymentProviderDialog = ({
     });
 
     if (!result?.opened) {
-      logger.warn('Browser popup blocked for payment ticket print', ticket);
+      logger.warn('Browser popup blocked for payment ticket print');
     } else if (!result?.success) {
-      logger.warn('Browser payment ticket print failed (render/print invocation)', ticket);
+      logger.warn('Browser payment ticket print failed (render/print invocation)');
     }
     return Boolean(result?.opened);
   };
@@ -286,7 +286,7 @@ const PaymentProviderDialog = ({
     }));
     const result = await printPanelTicketsBatchInExistingWindow(batchWindow, rows);
     if (!result.success) {
-      logger.warn('Browser batch ticket print failed', result.error);
+      logger.warn('Browser batch ticket print failed');
     }
   };
 

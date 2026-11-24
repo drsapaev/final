@@ -71,6 +71,7 @@ def test_registrar_can_list_linked_cart_invoice_without_bound_provider(
             name="SYNTHETIC-linked cart invoice",
             qty=1,
             price=75_000,
+            currency="UZS",
         )
     )
     invoice = PaymentInvoice(
@@ -137,6 +138,7 @@ def test_cashier_list_does_not_advertise_registrar_invoice_checkout(
             name="SYNTHETIC-cashier role invoice",
             qty=1,
             price=55_000,
+            currency="UZS",
         )
     )
     invoice = PaymentInvoice(

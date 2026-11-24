@@ -66,7 +66,7 @@ class TestVisitConfirmationService:
             assert exc.status_code == 400
             assert "не совпадает" in exc.detail
 
-    def test_confirm_by_telegram_success(self, db_session, test_visit):
+    def test_confirm_by_telegram_success(self, db_session, test_visit, test_service):
         test_visit.confirmation_token = f"unit-tg-{test_visit.id}"
         test_visit.confirmation_channel = "telegram"
         test_visit.confirmation_expires_at = datetime.utcnow() + timedelta(hours=1)
@@ -80,6 +80,10 @@ class TestVisitConfirmationService:
         link.blocked = False
         link.notifications_enabled = True
         link.appointment_reminders = True
+        db_session.add(VisitService(
+            visit_id=test_visit.id, service_id=test_service.id, name=test_service.name,
+            code=test_service.code, qty=1, price=test_service.price, currency="UZS",
+        ))
         db_session.commit()
 
         service = VisitConfirmationService(db_session)

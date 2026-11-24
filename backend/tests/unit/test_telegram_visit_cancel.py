@@ -24,6 +24,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.models.telegram_config import TelegramUser
+from app.models.visit import VisitService
 from app.services.visit_confirmation_service import (
     VisitConfirmationDomainError,
     VisitConfirmationService,
@@ -104,18 +105,24 @@ class TestTelegramVisitCancel:
             # (409) — both must be surfaced, never a fake success
             assert "недействитель" in exc.detail.lower() or "использован" in exc.detail.lower()
 
-    def test_cancel_after_confirm_is_honest_error(self, db_session, test_visit):
+    def test_cancel_after_confirm_is_honest_error(self, db_session, test_visit, test_service):
         """Canceling a visit the patient already confirmed must not
         fabricate a cancellation of a confirmed operational visit."""
         visit = _pending_visit_with_token(db_session, test_visit, "unit-cancel-ok-3")
+        db_session.add(VisitService(
+            visit_id=visit.id, service_id=test_service.id, name=test_service.name,
+            code=test_service.code, qty=1, price=test_service.price, currency="UZS",
+        ))
+        db_session.commit()
         service = VisitConfirmationService(db_session)
         capability = _capability(db_session, visit)
-        service.confirm_by_telegram(
+        confirmation = service.confirm_by_telegram(
             token=capability,
             telegram_user_id="777",
             source_ip="127.0.0.1",
             user_agent="pytest",
         )
+        assert confirmation["success"] is True
 
         db_session.expire_all()
         try:
@@ -123,6 +130,8 @@ class TestTelegramVisitCancel:
             pytest.fail("Expected VisitConfirmationDomainError for cancel-after-confirm")
         except VisitConfirmationDomainError as exc:
             assert 400 <= exc.status_code < 500
+        db_session.refresh(visit)
+        assert visit.status in {"confirmed", "open"}
 
     def test_unknown_token_is_404(self, db_session, test_visit):
         service = VisitConfirmationService(db_session)

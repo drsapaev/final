@@ -5,10 +5,20 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import and_, desc, func, or_
+from sqlalchemy import and_, case, desc, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.notification import NotificationDelivery, NotificationEvent
+
+
+def _legacy_cashier_payment_event():
+    """Old payment snapshots do not carry proof of recipient ownership."""
+    return and_(func.lower(func.trim(NotificationEvent.source_module)) == "cashier",
+                func.lower(func.trim(NotificationEvent.event_type)) == "payment_notification")
+
+
+def _visible_notification_field(column, replacement: str | None):
+    return case((_legacy_cashier_payment_event(), replacement), else_=column)
 
 
 def _not_expired_event_filter():
@@ -113,7 +123,7 @@ class NotificationPlatformRepository:
 
         if department_key:
             query = query.filter(
-                func.lower(NotificationDelivery.department_key) == department_key.lower()
+                func.lower(_visible_notification_field(NotificationDelivery.department_key, None)) == department_key.lower()
             )
 
         if status == "unread":
@@ -128,22 +138,22 @@ class NotificationPlatformRepository:
 
         if event_type:
             query = query.filter(
-                func.lower(NotificationEvent.event_type) == event_type.lower()
+                func.lower(_visible_notification_field(NotificationEvent.event_type, "notification")) == event_type.lower()
             )
 
         if severity:
-            query = query.filter(func.lower(NotificationEvent.severity) == severity.lower())
+            query = query.filter(func.lower(_visible_notification_field(NotificationEvent.severity, "info")) == severity.lower())
 
         if search:
             term = f"%{search.strip()}%"
             query = query.filter(
                 or_(
-                    NotificationEvent.title.ilike(term),
-                    NotificationEvent.message.ilike(term),
-                    NotificationEvent.event_type.ilike(term),
+                    _visible_notification_field(NotificationEvent.title, "Новое уведомление").ilike(term),
+                    _visible_notification_field(NotificationEvent.message, "Откройте личный кабинет для просмотра.").ilike(term),
+                    _visible_notification_field(NotificationEvent.event_type, "notification").ilike(term),
                     NotificationDelivery.channel.ilike(term),
                     NotificationDelivery.role.ilike(term),
-                    NotificationDelivery.department_key.ilike(term),
+                    _visible_notification_field(NotificationDelivery.department_key, None).ilike(term),
                 )
             )
 
@@ -185,7 +195,7 @@ class NotificationPlatformRepository:
 
         if department_key:
             query = query.filter(
-                func.lower(NotificationDelivery.department_key) == department_key.lower()
+                func.lower(_visible_notification_field(NotificationDelivery.department_key, None)) == department_key.lower()
             )
 
         if status == "unread":
@@ -200,22 +210,22 @@ class NotificationPlatformRepository:
 
         if event_type:
             query = query.filter(
-                func.lower(NotificationEvent.event_type) == event_type.lower()
+                func.lower(_visible_notification_field(NotificationEvent.event_type, "notification")) == event_type.lower()
             )
 
         if severity:
-            query = query.filter(func.lower(NotificationEvent.severity) == severity.lower())
+            query = query.filter(func.lower(_visible_notification_field(NotificationEvent.severity, "info")) == severity.lower())
 
         if search:
             term = f"%{search.strip()}%"
             query = query.filter(
                 or_(
-                    NotificationEvent.title.ilike(term),
-                    NotificationEvent.message.ilike(term),
-                    NotificationEvent.event_type.ilike(term),
+                    _visible_notification_field(NotificationEvent.title, "Новое уведомление").ilike(term),
+                    _visible_notification_field(NotificationEvent.message, "Откройте личный кабинет для просмотра.").ilike(term),
+                    _visible_notification_field(NotificationEvent.event_type, "notification").ilike(term),
                     NotificationDelivery.channel.ilike(term),
                     NotificationDelivery.role.ilike(term),
-                    NotificationDelivery.department_key.ilike(term),
+                    _visible_notification_field(NotificationDelivery.department_key, None).ilike(term),
                 )
             )
 
@@ -245,7 +255,7 @@ class NotificationPlatformRepository:
 
         if department_key:
             query = query.filter(
-                func.lower(NotificationDelivery.department_key) == department_key.lower()
+                func.lower(_visible_notification_field(NotificationDelivery.department_key, None)) == department_key.lower()
             )
 
         return int(query.scalar() or 0)
@@ -289,9 +299,10 @@ class NotificationPlatformRepository:
         return {channel or "unknown": int(count) for channel, count in rows}
 
     def count_unread_by_severity(self, *, recipient_id: int) -> dict[str, int]:
+        visible_severity = _visible_notification_field(NotificationEvent.severity, "info").label("visible_severity")
         rows = (
             self.db.query(
-                NotificationEvent.severity,
+                visible_severity,
                 func.count(NotificationDelivery.id).label("count"),
             )
             .join(NotificationDelivery.event)
@@ -301,7 +312,7 @@ class NotificationPlatformRepository:
                 NotificationDelivery.archived_at.is_(None),
                 _not_expired_event_filter(),
             )
-            .group_by(NotificationEvent.severity)
+            .group_by("visible_severity")
             .all()
         )
 
@@ -377,8 +388,8 @@ class NotificationPlatformRepository:
             query = query.filter(func.lower(NotificationDelivery.role) == role.lower())
 
         if department_key:
-            query = query.filter(
-                func.lower(NotificationDelivery.department_key) == department_key.lower()
+            query = query.join(NotificationDelivery.event).filter(
+                func.lower(_visible_notification_field(NotificationDelivery.department_key, None)) == department_key.lower()
             )
 
         deliveries = query.all()

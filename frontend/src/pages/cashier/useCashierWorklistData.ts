@@ -54,20 +54,12 @@ export interface CashierStatsSnapshot {
   [k: string]: unknown;
 }
 
-// P2 (PR 3830 review, comment 4439005298): the CSH-FE-036 fields are
-// intentionally ABSENT from the empty snapshot — before the first
-// successful load (and after a failed one) their values are UNKNOWN, not
-// zero. The legacy gross counters keep the historical zero convention of
-// the whole card.
-const EMPTY_STATS: CashierStatsSnapshot = {
-  total_amount: 0,
-  cash_amount: 0,
-  card_amount: 0,
-  pending_count: 0,
-  pending_amount: 0,
-  paid_count: 0,
-  cancelled_count: 0
-};
+interface CashierStatsLoad {
+  from: string;
+  to: string;
+  snapshot: CashierStatsSnapshot | null;
+  error: string | null;
+}
 
 export interface UseCashierWorklistDataParams {
   /** Debounced search query from the filter layer. */
@@ -111,8 +103,7 @@ export const useCashierWorklistData = ({
   // ✅ УЛУЧШЕНИЕ: Ключ для принудительного обновления данных
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // ✅ УЛУЧШЕНИЕ: Статистика из API
-  const [stats, setStats] = useState<CashierStatsSnapshot>(EMPTY_STATS);
+  const [statsLoad, setStatsLoad] = useState<CashierStatsLoad | null>(null);
 
   // Вычисляем параметры даты для запроса
   const getDateParams = useCallback(() => {
@@ -128,6 +119,8 @@ export const useCashierWorklistData = ({
       };
     }
   }, [dateMode, selectedDate, dateFrom, dateTo]);
+  const { date_from: statsFrom, date_to: statsTo } = getDateParams();
+  const activeStats = statsLoad?.from === statsFrom && statsLoad.to === statsTo ? statsLoad : null;
 
   // Load Data Effect
   // ✅ v2.1: Отдельные loading состояния для каждой секции
@@ -146,42 +139,48 @@ export const useCashierWorklistData = ({
   // rows/snapshots from the last successful load are KEPT so the views can
   // render a stale-data banner instead of a fake «no pending payments» /
   // «empty history» state. Backend stays the SSOT; nothing is invented.
-  const [statsError, setStatsError] = useState<string | null>(null);
   const [pendingError, setPendingError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
   // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка статистики (только при изменении дат)
   useEffect(() => {
     let active = true; // CSH-FE-002: drop responses of superseded/unmounted loads
+    const saveFailure = (error: string) => {
+      setStatsLoad((previous) => ({
+        from: statsFrom,
+        to: statsTo,
+        // Keep a stale snapshot only for a retry of the same period.
+        snapshot: previous?.from === statsFrom && previous.to === statsTo ? previous.snapshot : null,
+        error,
+      }));
+    };
     const loadStats = async () => {
-      const { date_from, date_to } = getDateParams();
-      logger.log('Loading stats with params:', { date_from, date_to });
+      logger.log('Loading stats with params:', { date_from: statsFrom, date_to: statsTo });
 
       try {
         const statsResult = await getStats({
-          date_from: date_from || undefined,
-          date_to: date_to || undefined
+          date_from: statsFrom || undefined,
+          date_to: statsTo || undefined
         });
         if (!active) return; // superseded/unmounted
-        if ((statsResult as { success?: boolean }).success && (statsResult as { data?: Record<string, unknown> }).data) {
-          setStats((statsResult as { data?: Record<string, unknown> }).data as CashierStatsSnapshot);
-          setStatsError(null);
+        if (statsResult.success && statsResult.data) {
+          setStatsLoad({
+            from: statsFrom, to: statsTo,
+            snapshot: statsResult.data as CashierStatsSnapshot, error: null,
+          });
         } else {
-          // CSH-FE-001: keep the previous snapshot (its values stay unknown,
-          // not server-confirmed zeros) and surface the failure.
-          const message = (statsResult as { error?: unknown }).error;
-          setStatsError(typeof message === 'string' && message ? message : '');
+          saveFailure(statsResult.error ?? '');
         }
       } catch (error: unknown) {
         if (!active) return;
         logger.error('Error loading stats:', error);
-        setStatsError(getErrorMessage(error));
+        saveFailure(getErrorMessage(error));
       }
     };
 
     loadStats();
     return () => { active = false; };
-  }, [getDateParams, refreshKey, getStats]);
+  }, [statsFrom, statsTo, refreshKey, getStats]);
 
   // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка pending payments (только при изменении pendingPage)
   useEffect(() => {
@@ -303,11 +302,11 @@ export const useCashierWorklistData = ({
     // server data
     payments,
     appointments,
-    stats,
+    stats: activeStats?.snapshot ?? null,
     // CSH-FE-001: per-section read failures (null = last load succeeded;
     // a string — possibly empty — means the last load FAILED and the rows/
     // snapshot above are the kept previous sample, not fresh data)
-    statsError,
+    statsError: activeStats?.error ?? null,
     pendingError,
     historyError,
     // loading flags

@@ -19,14 +19,15 @@ from threading import Barrier
 
 import psycopg
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from psycopg import sql
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 from app.api.deps import get_current_user, get_db
+from app.core.config import settings
 from app.models.audit import AuditLog
 from app.models.clinic import ClinicSettings, Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -35,6 +36,7 @@ from app.models.user import User
 from app.schemas.registrar_tabs import RegistrarTabsUpdate
 from app.services.registrar_tabs import RegistrarTabsError, RegistrarTabsService
 from tests._pg_admin_guard import is_local_admin_dsn
+from tests.conftest import mint_access_token
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 SETTINGS_KEY = "registrar_tabs_v1"
@@ -443,7 +445,7 @@ def test_parallel_first_save_allows_only_one_expected_version(world, pg_engine):
 
 
 @pytest.fixture
-def api_client(world):
+def api_client(world, pg_engine, monkeypatch):
     from app.api.v1.endpoints import admin_clinic
     from app.api.v1.endpoints.registrar_integration import router
 
@@ -451,10 +453,71 @@ def api_client(world):
     app = FastAPI()
     app.include_router(router, prefix="/api/v1")
     app.include_router(admin_clinic.router, prefix="/api/v1/admin")
-    app.dependency_overrides[get_db] = lambda: session
+    role = f"registrar_tabs_runtime_{uuid.uuid4().hex}"
+    password = uuid.uuid4().hex
+    quote = pg_engine.dialect.identifier_preparer.quote_identifier
+    runtime_name = quote(role)
+    with pg_engine.begin() as connection:
+        create_role = connection.execute(text(
+            "SELECT pg_catalog.format('CREATE ROLE %I LOGIN PASSWORD %L', CAST(:role AS text), CAST(:pw AS text))"
+        ), {"role": role, "pw": password}).scalar_one()
+        connection.exec_driver_sql(create_role)
+        schema_owner = connection.exec_driver_sql(
+            "SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='public'"
+        ).scalar_one()
+        auth_owners = {}
+        for name in ("users", "token_blacklist"):
+            owner, rls = connection.execute(text(
+                "SELECT pg_get_userbyid(relowner), relrowsecurity FROM pg_class WHERE oid=to_regclass(:table)"
+            ), {"table": f"public.{name}"}).one()
+            auth_owners[name] = owner
+            connection.exec_driver_sql(f"GRANT SELECT ON public.{name} TO {runtime_name}")
+            if rls:
+                connection.exec_driver_sql(
+                    f"CREATE POLICY synthetic_tabs_read ON public.{name} FOR SELECT TO {runtime_name} USING (true)"
+                )
+                if name == "users":
+                    connection.exec_driver_sql(
+                        f"CREATE POLICY synthetic_tabs_lock ON public.users FOR UPDATE TO {runtime_name} "
+                        "USING (true) WITH CHECK (false)"
+                    )
+        connection.exec_driver_sql(f"GRANT USAGE ON SCHEMA public TO {runtime_name}")
+        connection.exec_driver_sql(f"GRANT UPDATE (auth_epoch) ON public.users TO {runtime_name}")
+
+    runtime = create_engine(pg_engine.url.set(username=role, password=password), hide_parameters=True)
+    runtime_session = sessionmaker(bind=runtime, autoflush=False)
+    for key, value in {
+        "TRUSTED_DB_SCHEMA": "public",
+        "TRUSTED_DB_SCHEMA_OWNER": schema_owner,
+        "TRUSTED_DB_RUNTIME_ROLE": role,
+        "TRUSTED_DB_OWNER_MEMBERS": (),
+        "TRUSTED_AUTH_TABLE_OWNER": auth_owners["token_blacklist"],
+        "TRUSTED_AUTH_OWNER_MEMBERS": (),
+        "TRUSTED_AUTH_READ_ROLES": (),
+        "TRUSTED_AUTH_WRITE_ROLES": (),
+        "TRUSTED_AUTH_USERS_OWNER": auth_owners["users"],
+        "TRUSTED_AUTH_USERS_OWNER_MEMBERS": (),
+        "TRUSTED_AUTH_USERS_WRITE_ROLES": (),
+    }.items():
+        monkeypatch.setattr(settings, key, value)
+
+    def test_db(request: Request):
+        if request.method in {"POST", "PUT"} and request.url.path.startswith("/api/v1/admin/clinic/settings"):
+            with runtime_session() as db:
+                yield db
+        else:
+            yield session
+
+    app.dependency_overrides[get_db] = test_db
     app.dependency_overrides[get_current_user] = lambda: actor
-    with TestClient(app, raise_server_exceptions=False) as client:
-        yield client, actor
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            yield client, actor
+    finally:
+        runtime.dispose()
+        with pg_engine.begin() as connection:
+            connection.exec_driver_sql(f"DROP OWNED BY {runtime_name}")
+            connection.exec_driver_sql(f"DROP ROLE {runtime_name}")
 
 
 @pytest.mark.integration
@@ -470,8 +533,10 @@ def test_admin_write_rbac_and_generic_settings_guard(api_client, world):
     session.rollback()
     actor.role = "Admin"
     assert client.put("/api/v1/admin/registrar-tabs", json=command).status_code == 200
+    headers = {"Authorization": f"Bearer {mint_access_token(actor)}"}
     create = client.post(
         "/api/v1/admin/clinic/settings",
+        headers=headers,
         json={
             "key": SETTINGS_KEY,
             "category": "clinic",
@@ -483,6 +548,7 @@ def test_admin_write_rbac_and_generic_settings_guard(api_client, world):
     assert (
         client.put(
             "/api/v1/admin/clinic/settings",
+            headers=headers,
             json={"settings": {SETTINGS_KEY: {"version": 1, "tabs": []}}},
         ).status_code
         == 409
@@ -490,6 +556,7 @@ def test_admin_write_rbac_and_generic_settings_guard(api_client, world):
     assert (
         client.put(
             f"/api/v1/admin/clinic/settings/{SETTINGS_KEY}",
+            headers=headers,
             json={"value": {"version": 1, "tabs": []}},
         ).status_code
         == 409

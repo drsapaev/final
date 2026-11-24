@@ -26,6 +26,11 @@ from app.models.user import User
 from app.schemas.appointment import AppointmentHistoryItem
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.services.notifications import notification_sender_service
+from app.services.patient_birth_precision import (
+    lock_patient_audit_actor,
+    lock_patient_for_birth_update,
+    record_reported_birth_date,
+)
 from app.services.patient_validation import PatientValidationService
 
 logger = logging.getLogger(__name__)
@@ -243,6 +248,7 @@ class PatientService:
         before_commit: Callable[[Patient], None] | None = None,
     ) -> Patient:
         """Create a patient, optionally staging related writes before its commit."""
+        birth_date_explicit = "birth_date" in patient_in.model_fields_set
         if patient_in.phone:
             existing_patient = patient_crud.get_patient_by_phone(
                 self.db, phone=patient_in.phone
@@ -370,46 +376,51 @@ class PatientService:
             address=patient_in.address,
         )
 
-        if before_commit is None:
-            patient = patient_crud.create(db=self.db, obj_in=validated_patient)
-        else:
-            patient = patient_crud.create(
-                db=self.db, obj_in=validated_patient, commit=False
-            )
-        self.db.refresh(patient)
-        if not patient.last_name or not patient.last_name.strip():
-            raise HTTPException(
-                status_code=500,
-                detail="Ошибка сохранения: фамилия пациента не была сохранена",
-            )
-        if not patient.first_name or not patient.first_name.strip():
-            raise HTTPException(
-                status_code=500,
-                detail="Ошибка сохранения: имя пациента не было сохранено",
-            )
+        try:
+            lock_patient_audit_actor(self.db, current_user.id)
+            patient = patient_crud.create(db=self.db, obj_in=validated_patient, commit=False)
+            self.db.refresh(patient)
+            if birth_date_explicit:
+                record_reported_birth_date(self.db, patient, expected_date=patient_in.birth_date)
+            if not patient.last_name or not patient.last_name.strip():
+                raise HTTPException(
+                    status_code=500,
+                    detail="Ошибка сохранения: фамилия пациента не была сохранена",
+                )
+            if not patient.first_name or not patient.first_name.strip():
+                raise HTTPException(
+                    status_code=500,
+                    detail="Ошибка сохранения: имя пациента не было сохранено",
+                )
 
-        # Codex round-10 P1: JSON-снапшоты аудита хранят PHI в plaintext —
-        # маскируем каноническим pii_masker (AGENTS.md L390-407).
-        # extract_model_changes возвращает КОРТЕЖ (old, new) — маскируем
-        # ПОСЛЕ распаковки (mask_pii не рекурсирует в tuple).
-        _, new_data = extract_model_changes(None, patient)
-        new_data = mask_pii(new_data)
-        log_critical_change(
-            db=self.db,
-            user_id=current_user.id,
-            action="CREATE",
-            table_name="patients",
-            row_id=patient.id,
-            old_data=None,
-            new_data=new_data,
-            request=request,
-            # Codex round-9 P1: initial-only режим аудита — вместо ФИО
-            # идентифицируем пациента ID (AGENTS.md L390-407).
-            description=f"Создан пациент #{patient.id}",
-        )
-        if before_commit is not None:
-            before_commit(patient)
-        self.db.commit()
+            # Codex round-10 P1: JSON-снапшоты аудита хранят PHI в plaintext —
+            # маскируем каноническим pii_masker (AGENTS.md L390-407).
+            # extract_model_changes возвращает КОРТЕЖ (old, new) — маскируем
+            # ПОСЛЕ распаковки (mask_pii не рекурсирует в tuple).
+            _, new_data = extract_model_changes(None, patient)
+            new_data = mask_pii(new_data)
+            audit = log_critical_change(
+                db=self.db,
+                user_id=current_user.id,
+                action="CREATE",
+                table_name="patients",
+                row_id=patient.id,
+                old_data=None,
+                new_data=new_data,
+                request=request,
+                # Codex round-9 P1: initial-only режим аудита — вместо ФИО
+                # идентифицируем пациента ID (AGENTS.md L390-407).
+                description=f"Создан пациент #{patient.id}",
+            )
+            if audit is None:
+                raise RuntimeError("patient creation audit unavailable")
+            if before_commit is not None:
+                before_commit(patient)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
         # Perf (P0 2026-09-04): the registration fan-out (role-target lookups,
         # profiles, deliveries) costs dozens of remote-DB roundtrips — it ran
         # SYNCHRONOUSLY in the request and made patient creation take 15-30s.
@@ -478,7 +489,11 @@ class PatientService:
         patient_in: PatientUpdate,
         current_user: User,
     ) -> Patient:
-        patient = patient_crud.get(self.db, id=patient_id)
+        lock_patient_audit_actor(self.db, current_user.id)
+        if "birth_date" in patient_in.model_fields_set:
+            patient = lock_patient_for_birth_update(self.db, patient_id)
+        else:
+            patient = patient_crud.get(self.db, id=patient_id)
         if not patient:
             raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
@@ -542,24 +557,35 @@ class PatientService:
                         ),
                     )
 
-        patient = patient_crud.update(db=self.db, db_obj=patient, obj_in=update_payload)
-        self.db.refresh(patient)
+        try:
+            patient = patient_crud.update(
+                db=self.db, db_obj=patient, obj_in=update_payload, commit=False
+            )
+            self.db.refresh(patient)
+            if "birth_date" in update_payload:
+                record_reported_birth_date(self.db, patient, expected_date=update_payload["birth_date"])
 
-        _, new_data = extract_model_changes(None, patient)
-        new_data = mask_pii(new_data)
-        log_critical_change(
-            db=self.db,
-            user_id=current_user.id,
-            action="UPDATE",
-            table_name="patients",
-            row_id=patient.id,
-            old_data=old_data,
-            new_data=new_data,
-            request=request,
-            # Codex round-9 P1: вместо ФИО — ID пациента
-            description=f"Обновлен пациент #{patient.id}",
-        )
-        self.db.commit()
+            _, new_data = extract_model_changes(None, patient)
+            new_data = mask_pii(new_data)
+            audit = log_critical_change(
+                db=self.db,
+                user_id=current_user.id,
+                action="UPDATE",
+                table_name="patients",
+                row_id=patient.id,
+                old_data=old_data,
+                new_data=new_data,
+                request=request,
+                # Codex round-9 P1: вместо ФИО — ID пациента
+                description=f"Обновлен пациент #{patient.id}",
+            )
+            if audit is None:
+                raise RuntimeError("patient update audit unavailable")
+            self.db.commit()
+
+        except Exception:
+            self.db.rollback()
+            raise
 
         return patient
 

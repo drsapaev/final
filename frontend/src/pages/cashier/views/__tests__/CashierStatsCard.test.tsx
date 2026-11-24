@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../../../components/ui/macos', () => ({
   Card: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Button: (props: Record<string, unknown>) => <button {...props} />,
+  AppError: ({ description }: { description?: string }) => <div>{description}</div>,
 }));
 
 import CashierStatsCard from '../CashierStatsCard';
@@ -41,11 +42,12 @@ const tileValue = (captionKey: string): string => {
   return (valueEl?.textContent ?? '').replace(/\u00A0/g, ' ');
 };
 
-const renderCard = (stats: CashierStatsSnapshot) =>
+const renderCard = (stats: CashierStatsSnapshot | null, isHistoryTab = true, statsError?: string) =>
   render(
     <CashierStatsCard
-      isHistoryTab={true}
+      isHistoryTab={isHistoryTab}
       stats={stats}
+      statsError={statsError}
       onRefresh={vi.fn()}
       onExport={vi.fn()}
       onHourlyStats={vi.fn()}
@@ -93,21 +95,17 @@ describe('CashierStatsCard — CSH-FE-036 P2: missing field ≠ zero (4439005298
     expect(tileValue('cashier.net_total')).toBe('93 000 сум');
   });
 
-  it('EMPTY_STATS-shaped snapshot: net tiles «—», legacy zeros stay «0 сум»', () => {
-    // Initial/failed-load snapshot: CSH-FE-036 keys absent → «—»,
-    // legacy counters keep the whole-card zero convention.
-    renderCard({
-      total_amount: 0,
-      cash_amount: 0,
-      card_amount: 0,
-      pending_count: 0,
-      pending_amount: 0,
-      paid_count: 0,
-      cancelled_count: 0,
-    });
-
-    expect(tileValue('cashier.total_period')).toBe('0 сум');
+  it('shows unavailable receipts and counts before the first successful response', () => {
+    renderCard(null, true, 'Статистика требует сверки');
+    expect(screen.getByText('Статистика требует сверки')).toBeVisible();
+    expect(tileValue('cashier.total_period')).toBe('—');
+    expect(tileValue('cashier.status_paid')).toBe('—');
     expect(tileValue('cashier.refunded_total')).toBe('—');
     expect(tileValue('cashier.net_total')).toBe('—');
+  });
+
+  it('shows no pending amount or count before a successful response', () => {
+    renderCard(null, false);
+    expect(tileValue('cashier.pending_payment_badge')).toBe('—');
   });
 });

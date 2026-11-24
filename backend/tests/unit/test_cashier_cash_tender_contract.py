@@ -155,6 +155,8 @@ def fresh_engine():
     os.close(db_fd)
     engine = create_engine(f"sqlite:///{db_path}", echo=False)
     Base.metadata.create_all(bind=engine)
+    from tests.synthetic_reconciliation import install_reconciliation_fence
+    install_reconciliation_fence(engine)
     try:
         yield engine
     finally:
@@ -180,7 +182,8 @@ def _seed_visit(engine) -> tuple[int, int]:
         session.add(user)
         session.add(patient)
         session.flush()
-        visit = Visit(patient_id=patient.id, status="open")
+        # This metadata-only fixture does not run the 0102 epoch trigger.
+        visit = Visit(patient_id=patient.id, status="open", confirmation_context_epoch=1)
         session.add(visit)
         session.flush()
         # Неоплаченная услуга на 100 000 — иначе сервис честно откажет

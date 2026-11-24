@@ -35,6 +35,8 @@ class CanonicalVisitService:
         appointment_id: int,
         *,
         create_if_missing: bool = True,
+        expected_visit_id: int | None = None,
+        require_payment_preflight: bool = False,
     ) -> int:
         appointment = self.repository.get_appointment(appointment_id)
         if not appointment:
@@ -48,6 +50,55 @@ class CanonicalVisitService:
                 409,
                 f"Нельзя резолвить визит для отмененной записи ({appointment.status})",
             )
+
+        # A persisted source is authoritative; the initial read is only a
+        # lock-order hint and must be rechecked after Visit → Encounter →
+        # Appointment locks. Legacy heuristic matches never gain provenance.
+        source_id = getattr(appointment, "source_visit_id", None)
+        # A caller that already owns a Visit lock must never acquire another
+        # Visit based on an appointment hint: cross-linked requests could each
+        # hold the other's Visit. Legacy heuristic pairing also cannot prove
+        # that this payment belongs to the already locked Visit.
+        if expected_visit_id is not None and source_id != expected_visit_id:
+            raise CanonicalVisitResolutionError(409, "Запись не подтверждает указанный визит")
+        if require_payment_preflight:
+            from app.services.all_free_guard import AllFreeGuardError
+            from app.services.encounter_financial_fence import (
+                FinancialFenceError,
+                require_preflighted_payment_visits,
+            )
+
+            if expected_visit_id is None or create_if_missing:
+                raise CanonicalVisitResolutionError(409, "Требуется проверенный визит оплаты")
+            try:
+                require_preflighted_payment_visits(self.repository.db, expected_visit_id)
+            except (FinancialFenceError, AllFreeGuardError) as exc:
+                raise CanonicalVisitResolutionError(409, "Требуется проверенный визит оплаты") from exc
+
+        if source_id is not None:
+            if require_payment_preflight:
+                # The capability already locks every visit and encounter in
+                # the payment. Direct FOR UPDATE would require an extra grant.
+                visit, encounter = self.repository.read_payment_source_context(source_id)
+            else:
+                visit = self.repository.lock_source_visit(source_id)
+                encounter = (self.repository.lock_encounter(visit.encounter_id)
+                             if visit is not None and visit.encounter_id is not None else None)
+            if visit is None:
+                raise CanonicalVisitResolutionError(409, "Исходный визит недоступен")
+            locked = self.repository.lock_appointment(appointment_id)
+            if (locked is None or locked.source_visit_id != source_id or
+                    locked.patient_id != visit.patient_id or
+                    locked.encounter_id != visit.encounter_id or
+                    (visit.encounter_id is not None and
+                     (encounter is None or encounter.patient_id != visit.patient_id))):
+                raise CanonicalVisitResolutionError(409, "Контекст записи изменился")
+            locked_status = normalize_appointment_status(
+                getattr(locked.status, "value", locked.status)
+            )
+            if locked_status in {AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW}:
+                raise CanonicalVisitResolutionError(409, "Запись отменена")
+            return visit.id
 
         candidates = self.repository.list_visits_for_appointment(appointment)
         if len(candidates) > 1:

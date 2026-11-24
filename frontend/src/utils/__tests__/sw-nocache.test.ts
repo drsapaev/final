@@ -77,6 +77,7 @@ const okResponse = () => ({ ok: true, clone() { return this; } });
 describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
   it.each([
     '/api/v1/payments/test',
+    '/api/v1/registrar/invoice/71/status',
     '/api/v1/payments/42/invoice',
     '/api/v1/ai/suggestions',
     '/api/v1/telegram/webhook',
@@ -129,6 +130,7 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
   });
 
   it.each([
+    '/api/v1/registrar/invoice/71/status',
     '/api/v1/auth/me',
     '/api/v1/public-site/services?locale=ru',
   ])('does not replay a pre-existing no-cache response through the outer offline handler: %s', async (path) => {

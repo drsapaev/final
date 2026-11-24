@@ -26,6 +26,7 @@ from typing import Any
 
 from app.core.pii_masker import (
     is_public_site_analytics_ingest_path,
+    is_sensitive_payment_evidence_path,
     is_sensitive_verification_path,
     mask_pii,
 )
@@ -973,7 +974,8 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
     """
     request = event.get("request")
     request_url = request.get("url") if isinstance(request, dict) else None
-    if is_sensitive_verification_path(request_url) or is_sensitive_verification_path(
+    sensitive_payment = is_sensitive_payment_evidence_path(request_url) or is_sensitive_payment_evidence_path(event.get("transaction"))
+    if sensitive_payment or is_sensitive_verification_path(request_url) or is_sensitive_verification_path(
         event.get("transaction")
     ):
         # Verification failures may contain arbitrary SMS text, a six-digit
@@ -993,7 +995,7 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
             )
             if key in event
         }
-        safe["transaction"] = "[REDACTED VERIFICATION]"
+        safe["transaction"] = "[REDACTED PAYMENT EVIDENCE]" if sensitive_payment else "[REDACTED VERIFICATION]"
         if isinstance(request, dict) and request.get("method") in {
             "GET",
             "POST",
@@ -1036,7 +1038,7 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
                 return mask_pii(b)
             data = b.get("data")
             if isinstance(data, dict) and any(
-                is_sensitive_verification_path(data.get(key))
+                is_sensitive_verification_path(data.get(key)) or is_sensitive_payment_evidence_path(data.get(key))
                 for key in ("url", "from", "to")
             ):
                 return {"category": "[REDACTED VERIFICATION]"}

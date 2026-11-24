@@ -54,26 +54,35 @@ class TestProviderWebhookRepository:
         assert saved is not None
         assert saved.transaction_id == "order-77"
 
-    def test_get_payment_by_provider_payment_id_returns_payment(
-        self, db_session, test_visit
+    @pytest.mark.parametrize(
+        ("providers", "expected_index"),
+        [(("payme", "kaspi"), 1), (("payme", None), None), (("kaspi", "kaspi"), None)],
+    )
+    def test_get_provider_payment_for_update_requires_unique_provider_match(
+        self, db_session, test_visit, providers, expected_index
     ):
         repo = ProviderWebhookRepository(db_session)
-        payment = Payment(
-            visit_id=test_visit.id,
-            amount=Decimal("1000.00"),
-            currency="UZS",
-            method="online",
-            status="pending",
-            provider="click",
-            provider_payment_id="provider-order-123",
-        )
-        db_session.add(payment)
+        payments = [
+            Payment(
+                visit_id=test_visit.id,
+                amount=Decimal("1000.00"),
+                currency="KZT",
+                method="online",
+                status="pending",
+                provider=provider,
+                provider_payment_id="SYNTHETIC-PROVIDER-ORDER",
+            )
+            for provider in providers
+        ]
+        db_session.add_all(payments)
         db_session.commit()
 
-        found = repo.get_payment_by_provider_payment_id("provider-order-123")
+        found = repo.get_payment_by_provider_payment_id_for_update(
+            provider="kaspi", provider_payment_id="SYNTHETIC-PROVIDER-ORDER"
+        )
 
-        assert found is not None
-        assert found.id == payment.id
+        expected = None if expected_index is None else payments[expected_index]
+        assert found is expected
 
     def test_create_transaction_persists_record(self, db_session):
         repo = ProviderWebhookRepository(db_session)

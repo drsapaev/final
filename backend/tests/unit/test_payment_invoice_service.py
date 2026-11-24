@@ -42,6 +42,7 @@ def _create_linked_invoice(
             name="SYNTHETIC-invoice service",
             qty=1,
             price=service_amount if service_amount is not None else amount,
+            currency="UZS",
         )
     )
     invoice = PaymentInvoice(

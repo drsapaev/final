@@ -2,26 +2,60 @@ from __future__ import annotations
 
 import hashlib
 import json
+from decimal import ROUND_HALF_EVEN, Context, Decimal, localcontext
 from typing import Any
 
+from fastapi import Request
+from sqlalchemy.exc import DBAPIError
+
+from app.api.trusted_financial_auth import financial_admin, financial_reviewer
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_wizard._helpers import (
     _apply_service_discount,
     _assert_cart_doctor_eligibility,
-    _check_repeat_visit_eligibility,
     _load_registration_discount_settings,
     _resolve_effective_discount_mode,
     _revalidate_cart_doctor_eligibility_locked,
 )  # noqa: F401
+from app.core.roles import normalize_role_value
 from app.crud.clinic import clinic_today
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
+from app.models.all_free_request import AllFreeRequest
 from app.models.online_queue import DailyQueue
+from app.services.all_free_approval import ALL_FREE_DECISION_REQUIRED
+from app.services.all_free_request_service import (
+    AllFreeRequestError,
+    AllFreeRequestService,
+)
+from app.services.doctor_repeat_discount import (
+    RepeatPolicyError,
+    prepare_repeat_discount,
+)
+from app.services.encounter_creation import (
+    EncounterCreationError,
+    create_standalone_encounter,
+    resolve_new_encounter,
+)
+from app.services.encounter_financial_fence import FinancialFenceError
+from app.services.patient_subject_lock import (
+    PatientSubjectLockError,
+    lock_patient_subject,
+    require_patient_subject_visibility,
+)
 from app.services.price_override_approval import (
     PriceOverrideApprovalError,
     PriceOverrideApprovalService,
 )
+from app.services.profile_contact_security import (
+    ProfileBearerInvalid,
+    capture_profile_bearer,
+    check_bearer_expiry,
+)
 from app.services.registrar_doctor_eligibility import service_routes_to_resource_queue
-from app.services.registrar_edit_delta_service import partial_removal_targets
+from app.services.registrar_edit_delta_service import (
+    partial_removal_targets,
+    require_edit_delta_discount_mode,
+)
 from app.services.registrar_wizard_queue_assignment_service import (
     DuplicateCartResourceQueueVisitsError,
 )
@@ -32,43 +66,21 @@ def create_cart_appointments(
     cart_data: CartRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
+    http_request: Request = None,
 ):
     """
     Создание корзины визитов с единым платежом
     Поддерживает: повторные/льготные визиты, All Free, динамические цены, очереди по queue_tag
     """
     effective_discount_mode = _resolve_effective_discount_mode(cart_data)
+    if str(effective_discount_mode).strip().casefold() == "benefit":
+        raise HTTPException(status_code=409, detail="Для льготы требуется подтверждение администратора")
 
-    # Codex R3 #3095 (P1): revalidate the CONFIRMED quote before any write.
-    # An administrator may change a service price or a discount setting after
-    # the registrar confirmed the preview; without this check /registrar/cart
-    # silently created an invoice for a DIFFERENT amount. The token binds the
-    # save command to the exact pricing the registrar confirmed; a mismatch
-    # is a hard 409 — the registrar must re-confirm, not be over/undercharged.
-    validated_settings: dict[str, Any] | None = None
-    if cart_data.quote_token:
-        flat_items = [
-            CartQuoteItemRequest(
-                service_id=s.service_id,
-                quantity=s.quantity,
-                custom_price=s.custom_price,
-            )
-            for visit_req in cart_data.visits
-            for s in visit_req.services
-        ]
-        # Codex R6 #3095 (P2): price the save from the validated values —
-        # the snapshot returned here is the LOCKED settings state the
-        # confirmed quote was computed from; a concurrent admin INSERT of a
-        # previously-missing settings row cannot flip the invoice after the
-        # token passed.
-        validated_settings = _assert_quote_token_matches(
-            db,
-            items=flat_items,
-            discount_mode=cart_data.discount_mode,
-            all_free=cart_data.all_free,
-            pricing_mode="cart",
-            quote_token=cart_data.quote_token,
-        )
+    all_free_service = (
+        AllFreeRequestService(db) if effective_discount_mode == "all_free" else None
+    )
+    all_free_bearer = None
+    auto_approve = False
 
     logger.info(
         "REGISTRATION: Получен запрос на создание корзины. Patient ID: %s, Визитов: %d, Discount mode: %s, Effective discount mode: %s, All free: %s, Payment method: %s",
@@ -81,17 +93,26 @@ def create_cart_appointments(
     )
 
     try:
-        # Валидация пациента
-        # (Предполагаем, что пациент уже существует, так как он выбран в мастере)
+        if all_free_service is not None:
+            if http_request is None:
+                raise ProfileBearerInvalid("Bearer session unavailable")
+            require_patient_subject_visibility(db)
+            all_free_bearer = capture_profile_bearer(http_request, current_user)
+            actor, auto_approve = all_free_service.lock_staging_inputs(all_free_bearer)
+            require_roles("Admin", "Registrar")(current_user=actor, db=db)
+
+        if db.get_bind().dialect.name == "sqlite":
+            # SQLite SELECT and FOR UPDATE do not reserve a writer. Reserve
+            # before any catalog/doctor read for every cart mode, otherwise
+            # a concurrent change can commit after quote validation.
+            try:
+                if not lock_patient_subject(db, cart_data.patient_id):
+                    raise HTTPException(status_code=404, detail="Пациент не найден")
+            except PatientSubjectLockError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=exc.detail) from None
 
         # Получаем настройки очереди
         queue_settings = crud_clinic.get_queue_settings(db)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
-        # Codex R6 #3095 (P2): when a quote token was validated, the settings
-        # snapshot it produced IS the pricing truth for this save — do not
-        # re-read (an unlocked reload would see settings rows inserted by the
-        # admin endpoint after revalidation, which FOR UPDATE cannot lock).
-        registration_settings = validated_settings or _load_registration_discount_settings(db)
-
         # RQ-05.a (server-side doctor eligibility): requires_doctor=true
         # услуги не должны сохраняться без врача, с неактивным врачом или
         # врачом чужой специальности (E-023: на пути корзины проверки НЕ
@@ -100,6 +121,12 @@ def create_cart_appointments(
         # специальности зеркалирует фронтовый filterDoctorsForService
         # (SSOT: DOCTOR_QUEUE_SPECIALTY_VARIANTS).
         _assert_cart_doctor_eligibility(db, cart_data.visits)
+        requested_ids = sorted({item.service_id for visit in cart_data.visits for item in visit.services})
+        routing_before = {
+            service.id: (service.queue_tag, service.department_key, service.requires_doctor,
+                         service.is_consultation, service.doctor_id)
+            for service in db.query(Service).filter(Service.id.in_(requested_ids)).all()
+        }
 
         # QD-2E review P1 (cart/GQL lock ordering): every (day, tag) claim
         # scope of the cart is taken BEFORE the first cart write. The
@@ -137,10 +164,145 @@ def create_cart_appointments(
         # UPDATE either blocks (revalidated snapshot stays valid) or is
         # already visible here (cart rejected before any write).
         _revalidate_cart_doctor_eligibility_locked(db, cart_data.visits)
+        if all_free_service is not None and db.get_bind().dialect.name != "sqlite":
+            if not lock_patient_subject(db, cart_data.patient_id):
+                raise HTTPException(status_code=404, detail="Пациент не найден")
+
+        # Lock historical evidence before catalog rows, like the doctor
+        # scheduling path. A preview never authorizes a repeat price.
+        repeat_snapshots: dict[int, Any] = {}
+        if effective_discount_mode == "repeat":
+            try:
+                if db.get_bind().dialect.name != "sqlite" and not lock_patient_subject(db, cart_data.patient_id):
+                    raise HTTPException(status_code=404, detail="Пациент не найден")
+                # SQLite's FOR SHARE is a no-op; reread the doctor linkage
+                # after reserving its writer through the Patient capability.
+                _revalidate_cart_doctor_eligibility_locked(db, cart_data.visits)
+                clinic_date = crud_clinic.clinic_today(db)
+                for index, requested in enumerate(cart_data.visits):
+                    if requested.doctor_id is None:
+                        continue
+                    doctor = db.query(Doctor).filter(Doctor.id == requested.doctor_id).populate_existing().first()
+                    repeat_snapshots[index] = prepare_repeat_discount(
+                        db, patient_id=cart_data.patient_id,
+                        doctor_id=doctor.id if doctor else None,
+                        doctor_user_id=doctor.user_id if doctor else None,
+                        target_date=requested.visit_date, clinic_today=clinic_date,
+                    )
+            except PatientSubjectLockError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=exc.detail) from None
+            except RepeatPolicyError as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from None
+
+        # Lock settings and catalog in a deterministic order before quote
+        # revalidation. NOWAIT prevents holding historical Visit locks while
+        # waiting for a catalog writer that may itself need those visits.
+        initial_settings = _load_registration_discount_settings(db, lock_rows=True)
+        services = (
+            db.query(Service).filter(Service.id.in_(requested_ids)).order_by(Service.id)
+            .with_for_update(nowait=True).populate_existing().all()
+        ) if requested_ids else []
+        validated_settings = _assert_quote_token_matches(
+            db,
+            items=[CartQuoteItemRequest(service_id=item.service_id, quantity=item.quantity,
+                                        custom_price=item.custom_price)
+                   for visit in cart_data.visits for item in visit.services],
+            discount_mode=cart_data.discount_mode, all_free=cart_data.all_free,
+            pricing_mode="cart", quote_token=cart_data.quote_token,
+            locked_settings=initial_settings,
+        ) if cart_data.quote_token else None
+        registration_settings = validated_settings or initial_settings
+        service_map = {service.id: service for service in services}
+        if not requested_ids or len(service_map) != len(requested_ids):
+            raise HTTPException(status_code=404, detail="Некоторые услуги недоступны")
+        if any(routing_before.get(service.id) != (
+                service.queue_tag, service.department_key, service.requires_doctor,
+                service.is_consultation, service.doctor_id) for service in services):
+            raise HTTPException(status_code=409, detail="Маршрутизация услуги изменилась, повторите оформление")
+        _assert_cart_doctor_eligibility(db, cart_data.visits)
+
+        currencies: dict[int, str] = {}
+        for service in services:
+            currency = service.currency
+            if (not service.active or service.price is None or not Decimal(str(service.price)).is_finite()
+                    or Decimal(str(service.price)) < 0 or not isinstance(currency, str)
+                    or len(currency) != 3 or not currency.isascii() or not currency.isalpha()
+                    or currency != currency.upper()):
+                raise HTTPException(status_code=409, detail="Цена или валюта услуги недоступна")
+            currencies[service.id] = currency
+        if len(set(currencies.values())) != 1:
+            raise HTTPException(status_code=409, detail="Услуги с разными валютами нельзя объединить в один счёт")
+        invoice_currency = next(iter(currencies.values()))
+        for index, requested in enumerate(cart_data.visits):
+            if any(item.custom_price is not None and item.custom_price != service_map[item.service_id].price
+                   for item in requested.services):
+                # Until the transactional approval producer is wired, never
+                # turn an unreviewed caller price into an approved invoice.
+                raise HTTPException(status_code=409, detail="Изменение цены требует согласования")
+            if effective_discount_mode != "repeat":
+                continue
+            consultation_ids = [item.service_id for item in requested.services
+                                if service_map[item.service_id].is_consultation]
+            if consultation_ids:
+                snapshot = repeat_snapshots.get(index)
+                if snapshot is None:
+                    raise HTTPException(status_code=409, detail="Повторный визит требует назначенного врача")
+                try:
+                    snapshot.require_eligible(db, service_map, consultation_ids)
+                except RepeatPolicyError as exc:
+                    raise HTTPException(status_code=409, detail=str(exc)) from None
+                if snapshot.percentage != Decimal(str(registration_settings["repeat_visit_discount"])):
+                    raise HTTPException(status_code=409, detail="Настройки повторного визита изменились")
+
+        # Reject values that the persisted Numeric(12,2) or int32 quantities
+        # cannot represent before creating an encounter or any visit.
+        prepared_prices: dict[int, list[Decimal]] = {}
+        prepared_amounts: dict[int, Decimal] = {}
+        maximum_amount = Decimal("9999999999.99")
+        with localcontext(Context(prec=40, rounding=ROUND_HALF_EVEN)):
+            invoice_amount = Decimal("0")
+            for index, requested in enumerate(cart_data.visits):
+                amounts: list[Decimal] = []
+                visit_total = Decimal("0")
+                for item in requested.services:
+                    if item.quantity > 2147483647:
+                        raise HTTPException(status_code=422, detail="Количество услуги превышает допустимое значение")
+                    service = service_map[item.service_id]
+                    base_price = Decimal(str(item.custom_price if item.custom_price is not None else service.price))
+                    snapshot = repeat_snapshots.get(index)
+                    if all_free_service is not None:
+                        # Persist the ordinary price before applying any approved reduction.
+                        price = base_price
+                    elif snapshot is not None:
+                        price = snapshot.price(base_price, service.is_consultation)
+                    else:
+                        price = _apply_service_discount(
+                            base_price, effective_discount_mode, registration_settings,
+                            service.is_consultation,
+                        )
+                    visit_total += price * item.quantity
+                    amounts.append(price)
+                if visit_total > maximum_amount:
+                    raise HTTPException(status_code=422, detail="Стоимость визита превышает допустимое значение")
+                invoice_amount += visit_total
+                prepared_prices[index], prepared_amounts[index] = amounts, visit_total
+            if invoice_amount > maximum_amount:
+                raise HTTPException(status_code=422, detail="Стоимость оформления превышает допустимое значение")
+
+        # A registration is one encounter, independently of visit dates or
+        # doctors. The marker prevents joining an already committed group.
+        cart_transaction = db.get_transaction()
+        try:
+            encounter = (
+                create_standalone_encounter(db, patient_id=cart_data.patient_id)
+                if cart_data.visits else None
+            )
+        except EncounterCreationError as exc:
+            raise HTTPException(status_code=404, detail="Пациент не найден") from exc
 
         created_visits = []
         created_visit_amounts: dict[int, Decimal] = {}
-        total_invoice_amount = Decimal('0')
+        total_invoice_amount = invoice_amount
 
         # Создаём визиты
         from time import sleep
@@ -153,28 +315,9 @@ def create_cart_appointments(
                 visit_req.department,
                 len(visit_req.services),
             )
-            # Проверяем право на повторный визит
-            if effective_discount_mode == "repeat" and visit_req.doctor_id:
-                service_ids = [s.service_id for s in visit_req.services]
-                repeat_visit_days = int(registration_settings["repeat_visit_days"])
-                if not _check_repeat_visit_eligibility(
-                    db,
-                    cart_data.patient_id,
-                    visit_req.doctor_id,
-                    service_ids,
-                    days_window=repeat_visit_days,
-                ):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Повторный визит недоступен: нет консультации у этого врача за последние {repeat_visit_days} дней",
-                    )
-
-            # [OK] ИСПРАВЛЕНО: Регистратор всегда создаёт подтверждённые записи
-            # Фича-флаг "confirmation_before_queue" применяется только для онлайн-записей (телеграм/PWA)
-            # Записи от регистратора сразу попадают в очередь
-            visit_status = "confirmed"
-            confirmed_at = datetime.now(UTC)
-            confirmed_by = f"registrar_{current_user.id}"
+            visit_status = "pending_confirmation" if all_free_service else "confirmed"
+            confirmed_at = None if all_free_service else datetime.now(UTC)
+            confirmed_by = None if all_free_service else f"registrar_{current_user.id}"
 
             # [OK] ИСПРАВЛЕНО: Добавляем микрозадержку для разных created_at
             # Это гарантирует, что визиты одного пациента будут иметь разные временные метки
@@ -183,31 +326,10 @@ def create_cart_appointments(
 
             # Подготавливаем услуги для передачи в create_visit
             services_data = []
-            visit_amount = Decimal("0")
-            for service_item in visit_req.services:
-                service = (
-                    db.query(Service)
-                    .filter(Service.id == service_item.service_id)
-                    .first()
-                )
-                if not service:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Услуга с ID {service_item.service_id} не найдена",
-                    )
-
-                base_price = (
-                    service_item.custom_price
-                    if service_item.custom_price is not None
-                    else service.price or Decimal("0")
-                )
-                item_price = _apply_service_discount(
-                    Decimal(str(base_price)),
-                    effective_discount_mode,
-                    registration_settings,
-                    service.is_consultation,
-                )
-                visit_amount += item_price * Decimal(service_item.quantity)
+            visit_amount = prepared_amounts[idx]
+            for service_index, service_item in enumerate(visit_req.services):
+                service = service_map[service_item.service_id]
+                item_price = prepared_prices[idx][service_index]
 
                 services_data.append(
                     {
@@ -216,7 +338,7 @@ def create_cart_appointments(
                         "code": service.service_code or get_service_code(service.id, db),
                         "name": service.name,
                         "qty": service_item.quantity,
-                        "price": float(item_price),
+                        "price": item_price,
                     }
                 )
 
@@ -226,6 +348,7 @@ def create_cart_appointments(
             visit = create_visit(
                 db=db,
                 patient_id=cart_data.patient_id,
+                encounter_id=encounter.id if encounter is not None else None,
                 doctor_id=visit_req.doctor_id,
                 visit_date=visit_req.visit_date,
                 visit_time=visit_req.visit_time,
@@ -233,13 +356,9 @@ def create_cart_appointments(
                 notes=visit_req.notes,
                 discount_mode=effective_discount_mode,
                 services=services_data,
+                trusted_currency_by_service={item.service_id: currencies[item.service_id] for item in visit_req.services},
                 status=visit_status,
-                approval_status=(
-                    "approved"
-                    if effective_discount_mode != "all_free"
-                    or registration_settings["all_free_auto_approve"]
-                    else "pending"
-                ),
+                approval_status="pending" if all_free_service else "approved",
                 confirmed_at=confirmed_at,
                 confirmed_by=confirmed_by,
                 auto_status=False,  # Статус уже установлен выше
@@ -256,7 +375,23 @@ def create_cart_appointments(
 
             created_visits.append(visit)
             created_visit_amounts[visit.id] = visit_amount
-            total_invoice_amount += visit_amount
+
+        all_free_requests = []
+        if all_free_service is not None:
+            # The complete membership and service lines must be visible before
+            # freezing their generations. Stage before adding invoice links.
+            db.flush()
+            for visit in created_visits:
+                db.refresh(visit)
+                free_request = all_free_service.stage_request(
+                    visit_id=visit.id,
+                    expected_epoch=visit.confirmation_context_epoch,
+                    bearer=all_free_bearer,
+                    require_financial_group=True,
+                )
+                if free_request.baseline_total != created_visit_amounts[visit.id]:
+                    raise AllFreeRequestError(409, "Обычные цены заявки требуют сверки")
+                all_free_requests.append(free_request)
             logger.info(
                 "REGISTRATION: Визит %d создан успешно для пациента %d",
                 visit.id,
@@ -265,10 +400,15 @@ def create_cart_appointments(
 
         # Создаём единый invoice
         logger.info("REGISTRATION: Создаём инвойс на сумму %s", total_invoice_amount)
+        if encounter is not None:
+            # Read the generation after all Visit membership triggers ran.
+            db.refresh(encounter, attribute_names=["generation"])
         invoice = PaymentInvoice(
             patient_id=cart_data.patient_id,
+            registrar_encounter_id_snapshot=encounter.id if encounter is not None else None,
+            registrar_encounter_generation_snapshot=encounter.generation if encounter is not None else None,
             total_amount=total_invoice_amount,
-            currency="UZS",
+            currency=invoice_currency,
             status="pending",
             payment_method=cart_data.payment_method,
             notes=cart_data.notes,
@@ -285,6 +425,22 @@ def create_cart_appointments(
             )
             db.add(invoice_visit)
 
+        if all_free_service is not None and auto_approve:
+            db.flush()
+            for free_request in all_free_requests:
+                all_free_service._apply_unpublished_decision(
+                    request_id=free_request.id,
+                    action="approve",
+                    bearer=all_free_bearer,
+                    decision_kind="policy",
+                )
+            total_invoice_amount = invoice.total_amount
+            confirmed_at = datetime.now(UTC)
+            for visit in created_visits:
+                visit.status = "confirmed"
+                visit.confirmed_at = confirmed_at
+                visit.confirmed_by = f"registrar_{current_user.id}"
+
         # Assign queue entries for confirmed same-day visits via extracted seam.
         queue_numbers = {}
         # ``today`` was computed BEFORE the pre-lock above — the same
@@ -298,6 +454,25 @@ def create_cart_appointments(
             current_user=current_user,
         )
 
+        if db.get_transaction() is not cart_transaction:
+            raise RuntimeError("Cart transaction ended during queue assignment")
+        if encounter is not None:
+            current_encounter = resolve_new_encounter(
+                db, patient_id=cart_data.patient_id, encounter_id=encounter.id
+            )
+            if (invoice.registrar_encounter_id_snapshot, invoice.registrar_encounter_generation_snapshot) != (
+                current_encounter.id, current_encounter.generation,
+            ):
+                raise FinancialFenceError("Состав оформления изменился")
+            if db.get_bind().dialect.name == "sqlite":
+                # PostgreSQL validates these links again with a deferred constraint trigger.
+                links = (db.query(PaymentInvoiceVisit.visit_id).filter(PaymentInvoiceVisit.invoice_id == invoice.id)
+                         .order_by(PaymentInvoiceVisit.visit_id).all())
+                if [link.visit_id for link in links] != sorted(visit.id for visit in created_visits):
+                    raise FinancialFenceError("Состав счёта изменился")
+
+        if all_free_bearer is not None:
+            check_bearer_expiry(all_free_bearer)
         db.commit()
         logger.info("REGISTRATION: Транзакция зафиксирована в базе данных")
 
@@ -374,6 +549,11 @@ def create_cart_appointments(
                         }
                     )
 
+                confirmation_available = (
+                    visit.status == "pending_confirmation"
+                    and visit.approval_status != "pending"
+                    and bool(visit.confirmation_token)
+                )
                 created_visits_info.append(
                     {
                         "visit_id": visit.id,
@@ -382,13 +562,12 @@ def create_cart_appointments(
                         "visit_date": visit.visit_date.isoformat(),
                         "visit_time": visit.visit_time,
                         "status": visit.status,
+                        "approval_status": visit.approval_status,
                         "department": visit.department,
                         "services": services_info,
-                        "confirmation_required": visit.status == "pending_confirmation",
+                        "confirmation_required": confirmation_available,
                         "confirmation_token": (
-                            visit.confirmation_token
-                            if visit.status == "pending_confirmation"
-                            else None
+                            visit.confirmation_token if confirmation_available else None
                         ),
                     }
                 )
@@ -401,7 +580,9 @@ def create_cart_appointments(
             # Визиты уже сохранены, поэтому не откатываем транзакцию
 
         # Определяем сообщение в зависимости от результата
-        if queue_numbers:
+        if all_free_service is not None and not auto_approve:
+            message = ALL_FREE_DECISION_REQUIRED
+        elif queue_numbers:
             message = f"Корзина создана успешно. Присвоено номеров в очередях: {sum(len(assignments) for assignments in queue_numbers.values())}"
         else:
             message = "Визиты созданы. Номера в очередях будут присвоены в день визита."
@@ -432,6 +613,15 @@ def create_cart_appointments(
         # путь ошибки обязан откатить частичные данные корзины.
         db.rollback()
         raise
+    except (AllFreeRequestError, PatientSubjectLockError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+    except FinancialFenceError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except ProfileBearerInvalid:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Сессия недоступна") from None
     except DuplicateCartResourceQueueVisitsError as exc:
         db.rollback()
         raise HTTPException(
@@ -449,6 +639,13 @@ def create_cart_appointments(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
         ) from exc
+    except DBAPIError as exc:
+        db.rollback()
+        code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+        sqlite_code = getattr(exc.orig, "sqlite_errorcode", None)
+        if code in {"55P03", "40P01", "40001"} or (sqlite_code is not None and sqlite_code & 0xff in {5, 6}):
+            raise HTTPException(status_code=409, detail="Оформление занято, повторите запрос") from None
+        raise HTTPException(status_code=500, detail="Ошибка создания корзины") from None
     except Exception as e:
         logger.exception(
             "REGISTRATION: cart creation failed",
@@ -464,7 +661,7 @@ def create_cart_appointments(
 # ===================== УПРАВЛЕНИЕ ИЗМЕНЕНИЯМИ ЦЕН =====================
 
 
-def _quote_token(items: list[CartQuoteItemResponse], total_amount: Decimal, approval_status: str, quote_req: CartQuoteRequest) -> str:
+def _quote_token(items: list[CartQuoteItemResponse], total_amount: Decimal, approval_status: str, quote_req: CartQuoteRequest, currency: str | None) -> str:
     """Canonical binding token of a computed quote (Codex R3 #3095 P1).
 
     sha256 over the ORDER-INSENSITIVE multiset of priced items (same items in
@@ -499,6 +696,7 @@ def _quote_token(items: list[CartQuoteItemResponse], total_amount: Decimal, appr
         "approval_status": approval_status,
         "items": canonical_items,
         "total_amount": str(total_amount),
+        "currency": currency,
     }
     if any(item.quantity == 0 for item in quote_req.items):
         payload["partial_removals"] = sorted(
@@ -651,9 +849,11 @@ def _edit_delta_quote_context(
                     ),
                 )
         return requested_qty, None
+    delta = requested_qty - existing_qty
+    if delta:
+        edit_service.require_editable_visit_prices(entry)
     if not payloads:
         return requested_qty, None
-    delta = requested_qty - existing_qty
     if delta < 0:
         # Codex R12 PR 3118 (P2): гвард НЕ-редактируемого состояния зеркалится
         # в квоту ДО выпуска токена. Оплаченный/processing счёт,
@@ -671,16 +871,13 @@ def _edit_delta_quote_context(
         # потреблённых слоёв (цена единицы слоя × единицы), ровно то, что
         # спишет команда. При многослойном потреблении единой цены за единицу
         # нет — возвращаем ГОТОВУЮ сумму (amount_override), а не единичную
-        # цену (см. вызов в _quote_core). Fallback строк без цены (легаси) —
-        # каталог/ноль при all_free, как в команде.
-        fallback_unit_price = (
-            Decimal("0") if all_free else Decimal(str(service.price or 0))
-        )
+        # цену (см. вызов в _quote_core). Для старых строк без сохранённой
+        # цены используем цену каталога, как в команде.
         consumption = edit_service._plan_lifo_consumption(
             entry=entry,
             payloads=payloads,
             units_to_remove=-delta,
-            fallback_unit_price=fallback_unit_price,
+            fallback_unit_price=Decimal(str(service.price or 0)),
         )
         decrease_amount = -sum(
             (charge * Decimal(units) for _, units, charge in consumption), Decimal("0")
@@ -710,12 +907,16 @@ def _quote_core(
     Отсутствие цены у услуги — это НЕ 0: endpoint отвечает 409 с указанием
     услуги, чтобы регистратор увидел проблему до сохранения.
     """
+    effective_discount_mode = _resolve_effective_discount_mode(quote_req)
+    if quote_req.pricing_mode == "edit_delta":
+        require_edit_delta_discount_mode(effective_discount_mode, all_free=quote_req.all_free)
+    elif str(effective_discount_mode).strip().casefold() == "benefit":
+        raise HTTPException(status_code=409, detail="Для льготы требуется подтверждение администратора")
     # Codex R13 #3095 (P2): canonicalize duplicate service rows for the
     # full-update pricing mode. Pricing in this mode depends ONLY on
-    # (service_id, quantity) — catalog rules (repeat/benefit consultation → 0,
-    # all_free → 0), no custom_price / specialist input — so the same service
-    # listed twice (e.g. quantities 1 and 2) and one merged row (quantity 3)
-    # are the SAME priced command. full_update_online_entry merges duplicate
+    # (service_id, quantity) and catalog pricing. Two rows for the same
+    # service with quantities 1 and 2 price like one row with quantity 3.
+    # full_update_online_entry merges duplicate
     # rows before token revalidation and mutation; if the quote priced the
     # unmerged rows, the confirmed token could never match the merged save —
     # or, before that fix, the registrar confirmed three units while the
@@ -735,7 +936,7 @@ def _quote_core(
                 _first_by_service[sid].model_copy(update={"quantity": qty})
                 for sid, qty in _qty_by_service.items()
             ]
-    effective_discount_mode = _resolve_effective_discount_mode(quote_req)
+    qr_all_free = quote_req.pricing_mode == "full_update" and effective_discount_mode == "all_free"
     # Codex R6 #3095 (P2): the save-time revalidation passes ITS OWN locked
     # settings snapshot in — quote and save are then priced from the exact
     # same values even for settings rows that do not exist yet (FOR UPDATE
@@ -745,15 +946,8 @@ def _quote_core(
     if registration_settings is None:
         registration_settings = _load_registration_discount_settings(db, lock_rows=lock_pricing_rows)
 
-    # Codex R2 #3095 (P2): approval_status обязан отражать контракт
-    # ВЫБРАННОЙ команды сохранения. RegistrarEditDeltaService._create_visit
-    # всегда пишет approval_status="approved" и никогда не читает
-    # all_free_auto_approve — предупреждение «требуется согласование» в
-    # edit_delta-квоте вводило в заблуждение.
-    # Codex R3 #3095 (P2): full-update ОБРАТНО пишет approval_status="pending"
-    # для all_free (_full_update_handle_all_free_visit: и существующий
-    # неоплаченный визит, и новый визит) — квота обязана предупреждать о
-    # согласовании в этом случае, а не рапортовать «approved».
+    # Ordinary edit-delta items are approved at the catalogue price.
+    # QR All Free deliberately retains a pending decision and its baseline.
     if quote_req.pricing_mode == "edit_delta":
         approval_status = "approved"
     elif quote_req.pricing_mode == "full_update":
@@ -770,7 +964,10 @@ def _quote_core(
         approval_status = "approved"
 
     total_amount = Decimal("0")
+    quote_currency: str | None = None
     items: list[CartQuoteItemResponse] = []
+    if qr_all_free and not quote_req.items:
+        raise HTTPException(status_code=409, detail="Визит не содержит услуг")
 
     # Codex R9 #3095 (P2): the save path acquires ALL service row locks in ONE
     # deterministic (sorted id) order BEFORE calculating items. When only the
@@ -793,9 +990,22 @@ def _quote_core(
                 .filter(Service.id.in_(_lock_ids))
                 .order_by(Service.id)
                 .with_for_update()
+                .populate_existing()
                 .all()
             ):
                 service_row_map[int(_svc.id)] = _svc
+
+    # Edit saves already hold the patient/Visit locks. Complete their queue
+    # snapshot only after catalog locks, before version checks or routing.
+    edit_context = db.info.get("registrar_edit_lock_context")
+    if (lock_pricing_rows and quote_req.pricing_mode == "edit_delta" and
+            edit_context is not None and edit_context.transaction is db.get_transaction() and
+            edit_context.nested_transaction is db.get_nested_transaction()):
+        if edit_context.patient_id != quote_req.patient_id:
+            raise HTTPException(status_code=409, detail="Контекст пациента изменился")
+        RegistrarEditDeltaService(db).lock_queue_context(
+            [item_req.service_id for item_req in quote_req.items], catalog_prelocked=True
+        )
 
     # Lock the complete version set after catalog locks, before quote routing
     # locks individual entries. Otherwise two edits to different entries can
@@ -866,37 +1076,40 @@ def _quote_core(
                 detail=f"Услуга с ID {item_req.service_id} не найдена",
             )
 
-        # Codex R2 #3095 (P2): отклоняем отсутствие цены только когда НЕТ
-        # ни одной эффективной цены. custom_price (врачебная переопределённая
-        # цена) входит в контракт cart-пути сохранения — create_cart_
-        # appointments использует её ПЕРЕД каталог-ценой, поэтому квота не
-        # имеет права блокировать этот вызов. Для edit_delta/full_update
-        # custom_price в контракте маршрута не участвует — там отсутствие
-        # каталог-цены остаётся проблемой (это НЕ 0).
-        if quote_req.pricing_mode == "cart":
-            if service.price is None and item_req.custom_price is None:
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Для услуги «{service.name}» не указана цена",
-                )
+        if quote_req.pricing_mode == "cart" or qr_all_free:
+            currency = service.currency
+            if service.price is None:
+                raise HTTPException(status_code=409, detail=f"Для услуги «{service.name}» не указана цена")
+            if (not service.active or not Decimal(str(service.price)).is_finite()
+                    or Decimal(str(service.price)) < 0 or not isinstance(currency, str)
+                    or len(currency) != 3 or not currency.isascii() or not currency.isalpha()
+                    or currency != currency.upper()):
+                raise HTTPException(status_code=409, detail="Цена или валюта услуги недоступна")
+            if quote_currency is not None and quote_currency != currency:
+                raise HTTPException(status_code=409, detail="Услуги с разными валютами нельзя объединить в один счёт")
+            quote_currency = currency
+            if item_req.quantity > 2147483647:
+                raise HTTPException(status_code=422, detail="Количество услуги превышает допустимое значение")
+            if (
+                quote_req.pricing_mode == "cart" and item_req.custom_price is not None
+                and item_req.custom_price != service.price
+            ):
+                raise HTTPException(status_code=409, detail="Изменение цены требует согласования")
         elif service.price is None:
             raise HTTPException(
                 status_code=409,
                 detail=f"Для услуги «{service.name}» не указана цена",
             )
 
-        # Codex R1 #3095 (P1): mode 'edit_delta' повторяет ценообразование
-        # RegistrarEditDeltaService один-в-один: только all_free→0,
-        # custom_price и repeat/benefit скидки НЕ применяются. Это гарантирует,
-        # что подтверждённая в edit-режиме сумма совпадает с тем, что
-        # edit-delta реально выставит в invoice.
+        # Edit-delta uses the same catalogue prices and stored layers as
+        # the invoice mutation in RegistrarEditDeltaService.
         # Codex R12 PR 3118 (P1): amount_override снижения (готовая знаковая
         # сумма LIFO-слоёв) — только в edit_delta; остальные режимы не имеют
         # слоёв и считаются unit × qty.
         decrease_amount: Decimal | None = None
         if quote_req.pricing_mode == "edit_delta":
             base_price = Decimal(str(service.price))
-            unit_final = Decimal("0") if effective_discount_mode == "all_free" else base_price
+            unit_final = base_price
             discount_percent = 0
             # Codex R10 #3095 (P2): the command's routing gate mirrors into
             # the quote for BOTH context paths — without the edit context the
@@ -963,14 +1176,9 @@ def _quote_core(
                 _edit_delta_covered.get(_covered_key, 0) + billable_qty
             )
         elif quote_req.pricing_mode == "full_update":
-            # Codex R2 #3095 (P1): зеркало _full_update_create_single_
-            # independent_entry: консультация при repeat/benefit → 0,
-            # all_free → 0, остальное — каталог-цена × количество.
+            # QR All Free retains the ordinary price until an admin approves it.
             base_price = Decimal(str(service.price))
-            if effective_discount_mode == "all_free":
-                unit_final = Decimal("0")
-                discount_percent = 100
-            elif service.is_consultation and effective_discount_mode in ("repeat", "benefit"):
+            if service.is_consultation and effective_discount_mode in ("repeat", "benefit"):
                 unit_final = Decimal("0")
                 discount_percent = 100
             else:
@@ -1010,22 +1218,19 @@ def _quote_core(
         # the other modes price the full requested quantity.
         priced_qty = billable_qty if quote_req.pricing_mode == "edit_delta" else item_req.quantity
 
-        if decrease_amount is not None:
-            # Codex R12 PR 3118 (P1): снижение — готовая знаковая сумма слоёв.
-            final_price = decrease_amount.quantize(Decimal("0.01"))
-        else:
-            final_price = (unit_final * Decimal(priced_qty)).quantize(
-                Decimal("0.01")
-            )
-        if quote_req.pricing_mode == "full_update":
-            # Codex R3 #3095 (P2): the full-update command stores
-            # int(item_price) (unit × quantity) in BOTH the service payload
-            # and total_amount (_full_update_create_single_independent_entry),
-            # so a valid catalog price like 10.99 × 3 is saved as 32, while
-            # the quote showed 32.97. Mirror the command's exact conversion:
-            # the confirmed amount and the saved amount must be identical.
-            final_price = Decimal(int(unit_final * Decimal(item_req.quantity)))
-        total_amount += final_price
+        with localcontext(Context(prec=40, rounding=ROUND_HALF_EVEN)):
+            if decrease_amount is not None:
+                final_price = decrease_amount.quantize(Decimal("0.01"))
+            else:
+                final_price = (unit_final * Decimal(priced_qty)).quantize(Decimal("0.01"))
+            if quote_req.pricing_mode == "full_update" and not qr_all_free:
+                final_price = Decimal(int(unit_final * Decimal(item_req.quantity)))
+            total_amount += final_price
+        # The queue projection still has a signed integer amount column.
+        if qr_all_free and total_amount >= Decimal("2147483648"):
+            raise HTTPException(status_code=422, detail="Стоимость оформления превышает допустимое значение")
+        if quote_req.pricing_mode == "cart" and total_amount > Decimal("9999999999.99"):
+            raise HTTPException(status_code=422, detail="Стоимость оформления превышает допустимое значение")
 
         items.append(
             CartQuoteItemResponse(
@@ -1041,12 +1246,21 @@ def _quote_core(
     return CartQuoteResponse(
         items=items,
         total_amount=total_amount,
+        currency=quote_currency,
         approval_status=approval_status,
-        quote_token=_quote_token(items, total_amount, approval_status, quote_req),
+        quote_token=_quote_token(items, total_amount, approval_status, quote_req, quote_currency),
     )
 
 
-@router.post("/registrar/cart/quote", response_model=CartQuoteResponse)
+_CART_CONFLICT_RESPONSE = {
+    "description": "Условия расчёта требуют проверки или согласования",
+    "content": {"application/json": {"schema": {
+        "type": "object", "properties": {"detail": {"type": "string"}}, "required": ["detail"],
+    }}},
+}
+
+
+@router.post("/registrar/cart/quote", response_model=CartQuoteResponse, responses={409: _CART_CONFLICT_RESPONSE})
 def quote_cart_prices(
     quote_req: CartQuoteRequest,
     db: Session = Depends(get_db),
@@ -1069,6 +1283,7 @@ def _assert_quote_token_matches(
     target_date: date | None = None,
     preferred_entry_ids: list[int] | None = None,
     expected_entry_updated_at: dict[int, str] | None = None,
+    locked_settings: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Save-command revalidation shared by /registrar/cart, edit-delta and
     full-update (Codex R4 #3095 P1). Recomputes the quote on the CURRENT
@@ -1090,12 +1305,16 @@ def _assert_quote_token_matches(
     could otherwise flip the invoice to the newly inserted discount while
     the token still validated the old one. With the snapshot the invoice is
     computed from exactly the values the registrar confirmed. Returns None
-    when no token was supplied (legacy no-quote callers keep their own
-    unlocked load).
+    when no token was supplied unless the writer needs locked catalog
+    prices to persist approval evidence for a legacy caller.
     """
-    if not quote_token:
+    qr_all_free = pricing_mode == "full_update" and (all_free or discount_mode == "all_free")
+    if not quote_token and not qr_all_free:
         return None
-    settings_snapshot = _load_registration_discount_settings(db, lock_rows=True)
+    settings_snapshot = locked_settings
+    if settings_snapshot is None:
+        # QR All Free always requires an administrator decision and uses the catalog.
+        settings_snapshot = {} if qr_all_free else _load_registration_discount_settings(db, lock_rows=True)
     fresh_quote = _quote_core(
         db,
         CartQuoteRequest(
@@ -1111,7 +1330,7 @@ def _assert_quote_token_matches(
         registration_settings=settings_snapshot,
         expected_entry_updated_at=expected_entry_updated_at,
     )
-    if fresh_quote.quote_token != quote_token:
+    if quote_token and fresh_quote.quote_token != quote_token:
         logger.warning(
             "REGISTRATION: stale quote token — pricing changed since confirmation; "
             "current total: %s",
@@ -1121,56 +1340,59 @@ def _assert_quote_token_matches(
             status_code=409,
             detail=(
                 "Цены или скидки изменились после подтверждения — подтвердите новую сумму. "
-                f"Текущая сумма корзины: {fresh_quote.total_amount} сум"
+                f"Текущая сумма корзины: {fresh_quote.total_amount} {fresh_quote.currency or ''}".rstrip()
             ),
         )
     return settings_snapshot
 
 
-@router.post("/registrar/cart/edit-delta", response_model=EditDeltaResponse)
+@router.post("/registrar/cart/edit-delta", response_model=EditDeltaResponse, responses={409: _CART_CONFLICT_RESPONSE})
 def apply_registrar_cart_edit_delta(
     request: EditDeltaRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
-    # Codex R4 #3095 (P1): bind the confirmed edit quote to the command —
-    # revalidate BEFORE any mutation (the edit-delta pricing rules are
-    # mirrored by the quote's edit_delta mode; custom_price is not part of
-    # the edit-delta contract).
-    _assert_quote_token_matches(
-        db,
-        items=[
-            # Codex R13 #3095 (P2): mirror the specialist the QUOTE was
-            # computed with. The billable quantity is routing-dependent: for
-            # a service with no default doctor and no active same-day queue
-            # the quote succeeds with the browser-selected specialist, while
-            # a specialist-less revalidation hits the R11 gate
-            # ("specialist_id is required" 400) BEFORE the mutation can use
-            # request.services[*].specialist_id — the save rejected the very
-            # command the registrar had just confirmed.
-            CartQuoteItemRequest(
-                service_id=s.service_id,
-                quantity=s.quantity,
-                specialist_id=s.specialist_id,
-                # Codex R8 #3115 (P1): зеркало per-item маршрутизации
-                queue_entry_id=s.queue_entry_id,
-            )
-            for s in request.services
-        ],
-        discount_mode=request.discount_mode,
-        all_free=request.all_free,
-        pricing_mode="edit_delta",
-        quote_token=request.quote_token,
-        # Codex R6 #3095 (P2): revalidate under the SAME edit context the
-        # quote was computed with — the billable quantity is a
-        # routing-dependent delta.
-        patient_id=request.patient_id,
-        target_date=request.target_date,
-        preferred_entry_ids=request.existing_queue_entry_ids,
-        expected_entry_updated_at=request.expected_entry_updated_at,
-    )
+    require_edit_delta_discount_mode(request.discount_mode, all_free=request.all_free)
     try:
-        result = RegistrarEditDeltaService(db).apply(
+        # Codex R4 #3095 (P1): bind the confirmed edit quote to the command —
+        # revalidate BEFORE any mutation (the edit-delta pricing rules are
+        # mirrored by the quote's edit_delta mode; custom_price is not part of
+        # the edit-delta contract).
+        edit_service = RegistrarEditDeltaService(db)
+        edit_service.lock_edit_context(request.patient_id, current_user, lock_queues=False)
+        _assert_quote_token_matches(
+            db,
+            items=[
+                # Codex R13 #3095 (P2): mirror the specialist the QUOTE was
+                # computed with. The billable quantity is routing-dependent: for
+                # a service with no default doctor and no active same-day queue
+                # the quote succeeds with the browser-selected specialist, while
+                # a specialist-less revalidation hits the R11 gate
+                # ("specialist_id is required" 400) BEFORE the mutation can use
+                # request.services[*].specialist_id — the save rejected the very
+                # command the registrar had just confirmed.
+                CartQuoteItemRequest(
+                    service_id=s.service_id,
+                    quantity=s.quantity,
+                    specialist_id=s.specialist_id,
+                    # Codex R8 #3115 (P1): зеркало per-item маршрутизации
+                    queue_entry_id=s.queue_entry_id,
+                )
+                for s in request.services
+            ],
+            discount_mode=request.discount_mode,
+            all_free=request.all_free,
+            pricing_mode="edit_delta",
+            quote_token=request.quote_token,
+            # Codex R6 #3095 (P2): revalidate under the SAME edit context the
+            # quote was computed with — the billable quantity is a
+            # routing-dependent delta.
+            patient_id=request.patient_id,
+            target_date=request.target_date,
+            preferred_entry_ids=request.existing_queue_entry_ids,
+            expected_entry_updated_at=request.expected_entry_updated_at,
+        )
+        result = edit_service.apply(
             patient_id=request.patient_id,
             services=[
                 RegistrarEditDeltaItem(
@@ -1185,12 +1407,7 @@ def apply_registrar_cart_edit_delta(
             target_date=request.target_date,
             payment_method=request.payment_method,
             discount_mode=request.discount_mode,
-            # Codex R7 #3095 (P1): команда получает тот же РЕЗОЛВНУТЫЙ режим,
-            # что использовала квота (_resolve_effective_discount_mode):
-            # агрегированная запись несёт discount_mode="all_free" без булева
-            # флага — голый all_free=False заставил бы команду выставить
-            # каталожные цены поверх токена, подтверждённого как All Free.
-            all_free=_resolve_effective_discount_mode(request) == "all_free",
+            all_free=request.all_free,
             patient_data=(
                 request.patient_data.model_dump(exclude_none=True)
                 if request.patient_data
@@ -1201,6 +1418,19 @@ def apply_registrar_cart_edit_delta(
             current_user=current_user,
         )
         return EditDeltaResponse(**result)
+    except DBAPIError as exc:
+        db.rollback()
+        sqlstate = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+        if sqlstate == "40P01":
+            raise HTTPException(
+                status_code=409,
+                detail="Параллельное изменение записи. Повторите операцию.",
+            ) from exc
+        logger.exception("REGISTRATION: edit delta database error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка обновления записи",
+        ) from exc
     except ValueError as exc:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(exc))
@@ -1263,7 +1493,7 @@ def _price_override_available_actions(override_status: str) -> list[str]:
 def get_pending_price_overrides(
     response: Response,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    current_user: User = Depends(financial_reviewer),
     status_filter: str | None = Query(
         default="pending", pattern="^(pending|approved|rejected|all)$"
     ),
@@ -1289,7 +1519,7 @@ def get_pending_price_overrides(
         query = (
             db.query(DoctorPriceOverride)
             .join(Service, DoctorPriceOverride.service_id == Service.id)
-            .join(Doctor, DoctorPriceOverride.doctor_id == Doctor.id)
+            .outerjoin(Doctor, DoctorPriceOverride.doctor_id == Doctor.id)
         )
 
         if status_filter != "all":
@@ -1324,8 +1554,8 @@ def get_pending_price_overrides(
                     visit_id=override.visit_id,
                     service_id=override.service_id,
                     service_name=override.service.name,
-                    doctor_name=f"Врач #{override.doctor.id}",  # Здесь нужно получить имя врача
-                    doctor_specialty=override.doctor.specialty,
+                    doctor_name=f"Врач #{override.doctor.id}" if override.doctor else "Не назначен",
+                    doctor_specialty=(override.doctor.specialty or "") if override.doctor else "",
                     patient_name=patient_name,
                     original_price=override.original_price,
                     new_price=override.new_price,
@@ -1360,26 +1590,22 @@ def get_pending_price_overrides(
 )
 def approve_price_override(
     approval_data: PriceOverrideApprovalRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    current_user: User = Depends(financial_reviewer),
 ) -> dict[str, Any]:
-    """
-    Одобрить или отклонить изменение цены врачом
-
-    REGPRICE-BE-001/002/003/005 (audit #3892, group 16): the registrar route
-    now delegates to the canonical PriceOverrideApprovalService — the SAME
-    implementation the dental PUT route uses — so both independently exposed
-    routes converge on one outcome: locked decision (409 for the loser of a
-    concurrent race), chargeable ``VisitService.price`` update PLUS the
-    ``Visit.doctor_price_override`` JSON mirror in one commit, stale-intent
-    validation and a mandatory non-blank rejection reason.
-    """
+    """Рассмотреть изменение цены и обновить черновой счёт при одобрении."""
     try:
+        try:
+            bearer = capture_profile_bearer(request, current_user)
+        except ProfileBearerInvalid:
+            raise HTTPException(status_code=401, detail="Сессия недействительна") from None
         override = PriceOverrideApprovalService(db).process(
             override_id=approval_data.override_id,
             action=approval_data.action,
             rejection_reason=approval_data.rejection_reason,
             approver_id=current_user.id,
+            bearer=bearer,
         )
     except PriceOverrideApprovalError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
@@ -1425,9 +1651,11 @@ class AllFreeVisitResponse(BaseModel):
     can_reject: bool
 
 
-def _all_free_available_actions(approval_status: str) -> list[str]:
+def _all_free_available_actions(approval_status: str, *, can_review_invitation: bool = False) -> list[str]:
     if approval_status == "pending":
         return ["approve", "reject"]
+    if can_review_invitation and approval_status in {"approved", "rejected"}:
+        return ["review_invitation"]
     return []
 
 
@@ -1437,7 +1665,7 @@ def _all_free_available_actions(approval_status: str) -> list[str]:
 )
 def get_all_free_requests(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: User = Depends(financial_admin),
     status_filter: str | None = Query(
         default="pending", pattern="^(pending|approved|rejected|all)$"
     ),
@@ -1447,28 +1675,52 @@ def get_all_free_requests(
     Получить список заявок All Free для одобрения администратором
     """
     try:
-        query = db.query(Visit).filter(Visit.discount_mode == "all_free")
+        baseline_amount = (
+            db.query(AllFreeRequest.baseline_total)
+            .filter(
+                AllFreeRequest.visit_id == Visit.id,
+                AllFreeRequest.visit_id_snapshot == Visit.id,
+                AllFreeRequest.patient_id == Visit.patient_id,
+                AllFreeRequest.patient_id_snapshot == Visit.patient_id,
+                AllFreeRequest.encounter_id == Visit.encounter_id,
+                AllFreeRequest.encounter_id_snapshot == Visit.encounter_id,
+                AllFreeRequest.status == Visit.approval_status,
+            )
+            .order_by(AllFreeRequest.id.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
+        query = db.query(Visit, baseline_amount).filter(Visit.discount_mode == "all_free")
 
         if status_filter != "all":
             query = query.filter(Visit.approval_status == status_filter)
 
         visits = query.order_by(Visit.created_at.desc()).limit(limit).all()
 
+        # The review command reloads and verifies the signed, locked context.
+        invitation_reviewer = current_user.is_superuser or normalize_role_value(current_user.role) == "admin"
         result = []
-        for visit in visits:
-            available_actions = _all_free_available_actions(visit.approval_status)
+        for visit, saved_amount in visits:
+            available_actions = _all_free_available_actions(
+                visit.approval_status,
+                can_review_invitation=bool(
+                    invitation_reviewer and visit.status == "pending_confirmation"
+                    and visit.confirmation_token is None and saved_amount is not None
+                ),
+            )
             # Получаем услуги визита
             visit_services = (
                 db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
             )
             service_names = []
-            total_original_amount = Decimal('0')
+            total_original_amount = saved_amount if saved_amount is not None else Decimal('0')
 
             for vs in visit_services:
                 service = db.query(Service).filter(Service.id == vs.service_id).first()
                 if service:
                     service_names.append(service.name)
-                    total_original_amount += (service.price or Decimal('0')) * vs.qty
+                    if saved_amount is None:
+                        total_original_amount += (service.price or Decimal('0')) * vs.qty
 
             # Получаем данные врача
             doctor_name = None
@@ -1567,7 +1819,8 @@ def get_all_free_requests(
 def approve_all_free_request(
     approval_data: AllFreeApprovalRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: User = Depends(financial_admin),
+    http_request: Request = None,
 ) -> dict[str, Any]:
     """
     Одобрить или отклонить заявку All Free администратором
@@ -1592,21 +1845,29 @@ def approve_all_free_request(
                 detail=f"Заявка уже обработана (статус: {visit.approval_status})",
             )
 
-        # Обновляем статус
-        if approval_data.action == "approve":
-            visit.approval_status = "approved"
+        if http_request is None:
+            raise ProfileBearerInvalid("Bearer session unavailable")
+        bearer = capture_profile_bearer(http_request, current_user)
+        request_id = (
+            db.query(AllFreeRequest.id)
+            .filter(
+                AllFreeRequest.visit_id == visit.id,
+                AllFreeRequest.status == "pending",
+            )
+            .scalar()
+        )
+        if request_id is None:
+            raise HTTPException(status_code=409, detail="Обычные цены заявки требуют сверки")
+        decision = AllFreeRequestService(db)._apply_unpublished_decision(
+            request_id=request_id, action=approval_data.action, bearer=bearer,
+        )
+        if decision.status == "approved":
             message = "Заявка All Free одобрена"
-
-        elif approval_data.action == "reject":
-            visit.approval_status = "rejected"
-            # Можно добавить поле для причины отклонения в модель Visit
-            if approval_data.rejection_reason:
-                visit.notes = (
-                    visit.notes or ""
-                ) + f"\nОтклонено: {approval_data.rejection_reason}"
-
+        else:
             message = "Заявка All Free отклонена"
-
+            if approval_data.rejection_reason:
+                visit.notes = (visit.notes or "") + f"\nОтклонено: {approval_data.rejection_reason}"
+        check_bearer_expiry(bearer)
         db.commit()
         db.refresh(visit)
 
@@ -1615,6 +1876,7 @@ def approve_all_free_request(
                 notification_sender_service.send_all_free_decision_notification(
                     db=db,
                     visit=visit,
+                    request_id=decision.request_id,
                     actor_user=current_user,
                     rejection_reason=approval_data.rejection_reason,
                 )
@@ -1634,11 +1896,21 @@ def approve_all_free_request(
             "success": True,
             "message": message,
             "visit_id": visit.id,
-            "new_status": visit.approval_status,
+            "new_status": decision.status,
         }
 
     except HTTPException:
+        db.rollback()
         raise
+    except AllFreeRequestError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+    except FinancialFenceError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except ProfileBearerInvalid:
+        db.rollback()
+        raise HTTPException(status_code=401, detail="Сессия недоступна") from None
     except Exception:
         db.rollback()
         raise HTTPException(

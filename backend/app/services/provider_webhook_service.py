@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.db.transactions import transaction as transaction_ctx
 from app.models.audit import AuditLog
+from app.models.payment import Payment
+from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
 from app.repositories.provider_webhook_repository import ProviderWebhookRepository
 from app.services.payment_provider_manager_factory import get_payment_manager
 from app.services.payment_state_checks import (
@@ -21,17 +23,16 @@ from app.services.payment_state_checks import (
 
 logger = logging.getLogger(__name__)
 
-# FOLLOWUP-12: AuditLog action constant for persisting the pre-cancel state
-# of a Payme PaymentTransaction. Used to recover `was_completed` on retry
-# (CancelTransaction response state must be idempotent per ADR-0019).
+# Secondary audit event for operators reviewing a successful Payme cancellation.
 PAYME_TX_PRE_CANCEL_STATE_ACTION = "PAYME_TX_PRE_CANCEL_STATE"
-
-# FOLLOWUP-12: terminal PaymentTransaction statuses. If current_tx_status
-# is in this set AND no AuditLog pre_cancel_status record exists, the first
-# cancel already committed but its AuditLog INSERT failed — we cannot
-# recover the true pre-cancel state and must not persist the terminal
-# status (Codex P2 review on PR #2684).
-_TERMINAL_TX_STATUSES = frozenset({"refunded", "cancelled", "void"})
+_PAYME_METHODS = frozenset({
+    "CheckPerformTransaction",
+    "CreateTransaction",
+    "PerformTransaction",
+    "CancelTransaction",
+    "CheckTransaction",
+    "GetStatement",
+})
 
 
 class ProviderWebhookService:
@@ -44,11 +45,6 @@ class ProviderWebhookService:
     ):
         self.db = db
         self.repository = repository or ProviderWebhookRepository(db)
-        # FOLLOWUP-12: per-request flag set by _apply_existing_payme_
-        # transaction_state during CancelTransaction. Read by the caller
-        # (process_payme_webhook) to compute the JSON-RPC response `state`.
-        # Reset to None at the start of each webhook invocation.
-        self._last_cancel_was_completed: bool | None = None
 
     def _update_payment_status(self, payment_id: int, new_status: str, commit: bool = False):
         """Update payment status via canonical BillingService.
@@ -107,6 +103,46 @@ class ProviderWebhookService:
         provider_amount = (getattr(result, "provider_data", None) or {}).get("amount")
         return self._amounts_match(getattr(payment, "amount", None), provider_amount)
 
+    @staticmethod
+    def _click_payment_matches_order(payment: Any, order_id: Any) -> bool:
+        return (
+            payment is not None
+            and isinstance(order_id, str)
+            and payment.provider == "click"
+            and payment.currency == "UZS"
+            and payment.provider_payment_id == order_id
+        )
+
+    def _click_replay_response(
+        self,
+        transaction: PaymentTransaction,
+        payment: Payment | None,
+        webhook_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        order_id = webhook_data.get("merchant_trans_id", "unknown")
+        if not self._click_payment_matches_order(payment, order_id):
+            return {"error": -1, "error_note": "Payment order mismatch"}
+        if not self._amounts_match(transaction.amount, webhook_data.get("amount")):
+            return {"error": -1, "error_note": "Payment amount mismatch"}
+        recorded_fields = getattr(transaction, "provider_data", None) or {}
+        if any(
+            key in recorded_fields and recorded_fields[key] != webhook_data.get(key)
+            for key in ("action", "error")
+        ):
+            return {"error": -1, "error_note": "Payment phase mismatch"}
+        logger.info("Click webhook: Transaction already processed (idempotent)")
+        error = 0 if transaction.status == "completed" else -1
+        return {
+            "click_trans_id": webhook_data.get("click_trans_id"),
+            "merchant_trans_id": order_id,
+            "merchant_prepare_id": transaction.webhook_id or 0,
+            "error": error,
+            "error_note": "Already processed" if error == 0 else "Payment processing error",
+            "payment_id": transaction.payment_id,
+            "payment_status": None,
+            "payment_provider": "click",
+        }
+
     def _payme_params_amount_matches_payment(
         self,
         payment: Any,
@@ -131,25 +167,9 @@ class ProviderWebhookService:
         )
 
     def process_click_webhook(self, webhook_data: dict[str, Any]) -> dict[str, Any]:
-        """Webhook для Click платежной системы.
-
-        P2-3 Finding C fix (PR #2730): This method now uses
-        transaction_ctx to ensure data is committed — same pattern
-        as Payme and Kaspi. Previously, all changes were flush()-only
-        with no commit(), causing data loss when the production session
-        closed (get_db does NOT auto-commit).
-        """
+        """Acknowledge recorded Click results and hold new legacy callbacks."""
         try:
-            # PAY-REAUDIT-28 P1-2: PII-safe logging — только идентификаторы,
-            # не весь payload (webhook_data содержит order_id с payment_id).
-            logger.info(
-                "Click webhook received",
-                extra={
-                    "click_trans_id": webhook_data.get("click_trans_id"),
-                    "merchant_trans_id": webhook_data.get("merchant_trans_id"),
-                    "action": webhook_data.get("action"),
-                },
-            )
+            logger.info("Click webhook received")
 
             manager = get_payment_manager()
             signature = webhook_data.get("sign_string")
@@ -176,192 +196,198 @@ class ProviderWebhookService:
             )
 
             if existing_transaction:
-                logger.info(
-                    "Click webhook: Transaction %s already processed (idempotent)",
-                    click_trans_id,
+                payment_id = existing_transaction.payment_id
+                payment = (
+                    self.repository.get_payment_by_id(payment_id)
+                    if payment_id is not None
+                    else None
                 )
-                return {
-                    "click_trans_id": click_trans_id,
-                    "merchant_trans_id": transaction_id,
-                    "merchant_prepare_id": existing_transaction.webhook_id or 0,
-                    "error": 0,
-                    "error_note": "Already processed",
-                    "payment_id": getattr(existing_transaction, "payment_id", None),
-                    "payment_status": None,
-                    "payment_provider": "click",
-                }
+                return self._click_replay_response(existing_transaction, payment, webhook_data)
 
-            # P2-3 Finding C fix (PR #2730): persist PaymentWebhook record
-            # in a SEPARATE transaction BEFORE entering the business
-            # transaction_ctx. This ensures the webhook receipt survives
-            # even if the business transaction rolls back (e.g., ValueError
-            # from BillingService when terminal→paid is rejected).
-            #
-            # Previously, create_webhook was INSIDE transaction_ctx, so a
-            # downstream ValueError caused rollback → PaymentWebhook record
-            # was lost → no audit trail of the rejected webhook.
-            #
-            # create_webhook only does add+flush (no side effects on other
-            # tables), so committing it separately is safe.
-            webhook_id = f"click_{uuid.uuid4().hex[:8]}"
+            # The legacy signature does not authenticate merchant_trans_id.
+            # Record the receipt independently of any payment or settlement.
             webhook = self.repository.create_webhook(
                 provider="click",
-                webhook_id=webhook_id,
+                webhook_id=f"click_{uuid.uuid4().hex[:8]}",
                 transaction_id=transaction_id,
                 amount=webhook_data.get("amount", 0),
                 currency="UZS",
                 raw_data=webhook_data,
                 signature=signature,
+                status="failed",
             )
-            # P2-3 Finding C: commit the webhook record in a separate transaction.
-            # In production, this persists the webhook even if the business
-            # transaction rolls back. In unit tests with mock sessions, we
-            # wrap in try/except because mock objects may not be mappable.
-            try:
-                self.db.commit()
-                self.db.refresh(webhook)
-            except Exception:
-                # Unit tests with mock sessions may not support commit/refresh.
-                # In production, this always succeeds.
-                self.db.rollback()
-
-            with transaction_ctx(self.db):
-                result = manager.process_webhook("click", webhook_data)
-
-                if result.success:
-                    webhook.status = "processed"
-                    webhook.processed_at = datetime.now(UTC)
-
-                    payment = None
-                    mapped_status = None
-                    if result.payment_id:
-                        payment_id_from_order = self._extract_payment_id_from_order(
-                            result.payment_id
-                        )
-                        if payment_id_from_order:
-                            # FOLLOWUP-10: lock Payment row before mutation.
-                            # Prevents TOCTOU race against concurrent
-                            # PaymentCancelService.cancel_payment() (which
-                            # acquires SELECT Payment ... FOR UPDATE via
-                            # billing_service.update_payment_status).
-                            payment = self.repository.get_payment_by_id_for_update(
-                                payment_id_from_order
-                            )
-
-                    if payment:
-                        if not self._result_amount_matches_payment(payment, result):
-                            webhook.status = "failed"
-                            webhook.error_message = "provider_amount_mismatch"
-                            return {
-                                "click_trans_id": webhook_data.get("click_trans_id"),
-                                "merchant_trans_id": webhook_data.get(
-                                    "merchant_trans_id"
-                                ),
-                                "merchant_prepare_id": webhook.id,
-                                "error": -1,
-                                "error_note": "Payment amount mismatch",
-                                "payment_id": payment.id,
-                                "payment_status": None,
-                                "payment_provider": "click",
-                            }
-                        # Issue #06 Phase 4b B2: Replaced direct payment.status =
-                        # mapped_status with billing_service.update_payment_status()
-                        # to enforce payment state machine validation.
-                        #
-                        # The lock is already acquired above via
-                        # get_payment_by_id_for_update(). update_payment_status()
-                        # will re-acquire it (idempotent within same transaction)
-                        # and validate the transition via ALLOWED_PAYMENT_TRANSITIONS.
-                        #
-                        # commit=False because this is inside a larger webhook
-                        # transaction (PaymentTransaction + webhook record +
-                        # visit projection all committed together by the caller).
-                        mapped_status = self._map_provider_status_to_payment_status(result.status)
-                        payment = self._update_payment_status(
-                            payment_id=payment.id,
-                            new_status=mapped_status,
-                            commit=False,
-                        )
-                        if payment.status == "paid" and not payment.paid_at:
-                            payment.paid_at = datetime.now(UTC)
-
-                        payment.provider_data = {
-                            **(payment.provider_data or {}),
-                            **result.provider_data,
-                        }
-
-                        webhook.payment_id = payment.id
-                        webhook.visit_id = payment.visit_id
-
-                        self.repository.create_transaction(
-                            transaction_id=webhook_data.get("click_trans_id", webhook_id),
-                            provider="click",
-                            amount=webhook_data.get("amount", 0),
-                            currency="UZS",
-                            status=result.status,
-                            payment_id=payment.id,
-                            webhook_id=webhook.id,
-                            visit_id=payment.visit_id,
-                            provider_data=result.provider_data,
-                        )
-
-                    error = 0 if result.status == "completed" else -1
-                    return {
-                        "click_trans_id": webhook_data.get("click_trans_id"),
-                        "merchant_trans_id": webhook_data.get("merchant_trans_id"),
-                        "merchant_prepare_id": webhook.id,
-                        "error": error,
-                        "error_note": "" if error == 0 else "Payment processing error",
-                        "payment_id": payment.id if payment else None,
-                        "payment_status": mapped_status,
-                        "payment_provider": "click",
-                    }
-
-                webhook.status = "failed"
-                webhook.error_message = result.error_message
-                webhook.processed_at = datetime.now(UTC)
-
-                failed_payment = None
-                if result.payment_id:
-                    payment_id_from_order = self._extract_payment_id_from_order(result.payment_id)
-                    if payment_id_from_order:
-                        failed_payment = self.repository.get_payment_by_id(payment_id_from_order)
-                if failed_payment:
-                    # Issue #06 Phase 4b B2: use canonical update_payment_status
-                    failed_payment = self._update_payment_status(
-                        payment_id=failed_payment.id,
-                        new_status="failed",
-                        commit=False,
-                    )
-                    failed_payment.provider_data = {
-                        **(failed_payment.provider_data or {}),
-                        "webhook_error": result.error_message,
-                    }
-
-                return {
-                    "click_trans_id": webhook_data.get("click_trans_id"),
-                    "merchant_trans_id": webhook_data.get("merchant_trans_id"),
-                    "merchant_prepare_id": webhook.id,
-                    "error": -1,
-                    "error_note": result.error_message or "Processing error",
-                    "payment_id": failed_payment.id if failed_payment else None,
-                    "payment_status": "failed" if failed_payment else None,
-                    "payment_provider": "click",
-                }
+            webhook.processed_at = datetime.now(UTC)
+            webhook.error_message = "provider_reconciliation_required"
+            self.db.commit()
+            return {"error": -1, "error_note": "Payment reconciliation required"}
 
         except Exception as exc:
-            logger.error("Click webhook error: %s", exc)
-            return {"error": -1, "error_note": f"Internal server error: {exc}"}
+            self.db.rollback()
+            logger.error("Click webhook error type=%s", type(exc).__name__)
+            return {"error": -1, "error_note": "Internal server error"}
+
+    @staticmethod
+    def _payme_order_unavailable(request_id: Any) -> dict[str, Any]:
+        return {
+            "error": {
+                "code": -31050,
+                "message": {
+                    "ru": "Заказ недоступен",
+                    "uz": "Buyurtma mavjud emas",
+                    "en": "Order unavailable",
+                },
+                "data": "order_id",
+            },
+            "id": request_id,
+        }
+
+    @staticmethod
+    def _payme_transaction_unavailable(request_id: Any) -> dict[str, Any]:
+        return {"error": {"code": -31003, "message": "Transaction not found"}, "id": request_id}
+
+    @staticmethod
+    def _payme_amount_mismatch(request_id: Any, payment_id: int) -> dict[str, Any]:
+        return {
+            "error": {"code": -31001, "message": "Payment amount mismatch"},
+            "id": request_id,
+            "payment_id": payment_id,
+            "payment_status": None,
+            "payment_provider": "payme",
+        }
+
+    @staticmethod
+    def _payme_timestamp(value: datetime) -> int:
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        return int(value.timestamp() * 1000)
+
+    @classmethod
+    def _payme_create_response(
+        cls, receipt: PaymentWebhook, *, request_id: Any, payment_id: int, payment_status: str | None = None
+    ) -> dict[str, Any]:
+        return {
+            "result": {
+                "create_time": cls._payme_timestamp(receipt.created_at),
+                "transaction": receipt.id,
+                "state": 1,
+            },
+            "id": request_id,
+            "payment_id": payment_id,
+            "payment_status": payment_status,
+            "payment_provider": "payme",
+        }
+
+    def _replay_payme_creation(
+        self,
+        transaction: PaymentTransaction | None,
+        *,
+        payment: Payment,
+        params: dict[str, Any],
+        request_id: Any,
+    ) -> dict[str, Any]:
+        if (
+            transaction is None
+            or transaction.payment_id != payment.id
+            or transaction.visit_id not in (None, payment.visit_id)
+        ):
+            return self._payme_transaction_unavailable(request_id)
+        if not self._payme_params_amount_matches_payment(payment, params, transaction):
+            return self._payme_amount_mismatch(request_id, payment.id)
+
+        receipt = self._get_payme_creation_receipt(transaction, payment)
+        if receipt is not None:
+            return self._payme_create_response(
+                receipt, request_id=request_id, payment_id=payment.id
+            )
+
+        return {
+            "error": {"code": -32400, "message": "Creation receipt requires reconciliation"},
+            "id": request_id,
+        }
+
+    def _get_payme_creation_receipt(
+        self, transaction: PaymentTransaction, payment: Payment
+    ) -> PaymentWebhook | None:
+        if transaction.webhook_id is None or not payment.provider_payment_id:
+            return None
+        receipt = self.repository.get_processed_webhook(
+            webhook_id=transaction.webhook_id,
+            provider="payme",
+            transaction_id=payment.provider_payment_id,
+        )
+        if receipt is not None and self._payme_creation_params(receipt, transaction, payment) is not None:
+            return receipt
+        return None
+
+    @staticmethod
+    def _payme_creation_params(
+        receipt: PaymentWebhook, transaction: PaymentTransaction, payment: Payment
+    ) -> dict[str, Any] | None:
+        if not isinstance(receipt.raw_data, dict):
+            return None
+        original_params = receipt.raw_data.get("params")
+        account = original_params.get("account") if isinstance(original_params, dict) else None
+        if (
+            receipt.raw_data.get("method") == "CreateTransaction"
+            and isinstance(account, dict)
+            and account.get("order_id") == payment.provider_payment_id
+            and original_params.get("id") == transaction.transaction_id
+            and receipt.amount == transaction.amount
+            and receipt.currency == transaction.currency == "UZS"
+        ):
+            return original_params
+        return None
+
+    @staticmethod
+    def _is_payme_time(value: Any) -> bool:
+        return type(value) is int and 0 < value <= 9_999_999_999_999
+
+    def _get_payme_statement(self, params: dict[str, Any], request_id: Any) -> dict[str, Any]:
+        start, end = params.get("from"), params.get("to")
+        if not self._is_payme_time(start) or not self._is_payme_time(end) or start > end:
+            return {
+                "error": {"code": -32602, "message": "Invalid statement period"},
+                "id": request_id,
+            }
+
+        reconciliation = {
+            "error": {"code": -32400, "message": "Statement requires reconciliation"},
+            "id": request_id,
+        }
+        transactions = []
+        seen_payments = set()
+        for transaction, payment, receipt, payme_time in self.repository.iter_payme_statement(start=start, end=end):
+            if transaction is None or payment is None or receipt is None or payme_time is None:
+                return reconciliation
+            original = self._payme_creation_params(receipt, transaction, payment)
+            if (
+                original is None
+                or not payment.provider_payment_id
+                or receipt.transaction_id != payment.provider_payment_id
+                or transaction.visit_id not in (None, payment.visit_id)
+                or payment.id in seen_payments
+                or not self._payme_bound_amount_matches(payment, transaction, {})
+                or type(original.get("amount")) is not int
+                or original["amount"] != transaction.amount
+            ):
+                return reconciliation
+            lifecycle = self._payme_lifecycle_result(transaction, payment, receipt)
+            if lifecycle is None:
+                return reconciliation
+            seen_payments.add(payment.id)
+            transactions.append({
+                "id": transaction.transaction_id,
+                "time": payme_time,
+                "amount": transaction.amount,
+                "account": {"order_id": payment.provider_payment_id},
+                **lifecycle,
+            })
+        return {"id": request_id, "result": {"transactions": transactions}}
 
     def process_payme_webhook(
         self, webhook_data: dict[str, Any], auth_header: str | None
     ) -> dict[str, Any]:
         """Webhook для Payme платежной системы (JSON-RPC)."""
-        # FOLLOWUP-12: reset per-request flag. Set by _apply_existing_payme_
-        # transaction_state during CancelTransaction; read below to compute
-        # the JSON-RPC response `state` (-2 if Tx was completed before
-        # cancel, -1 otherwise). Idempotent across retries via AuditLog.
-        self._last_cancel_was_completed = None
         request_id = webhook_data.get("id")
         try:
             # PAY-REAUDIT-28 P1-2: PII-safe logging
@@ -402,8 +428,15 @@ class ProviderWebhookService:
                     "id": request_id,
                 }
 
-            account = params.get("account", {})
-            order_id = account.get("order_id", "unknown")
+            if not isinstance(method, str) or method not in _PAYME_METHODS:
+                return {"error": {"code": -32601, "message": "Method not found"}, "id": request_id}
+            if not isinstance(params, dict):
+                return {"error": {"code": -32602, "message": "Invalid method parameters"}, "id": request_id}
+            if method == "GetStatement":
+                return self._get_payme_statement(params, request_id)
+
+            account = params.get("account")
+            order_id = account.get("order_id") if isinstance(account, dict) else None
             payme_transaction_id = params.get("id")
 
             existing_transaction = None
@@ -418,71 +451,76 @@ class ProviderWebhookService:
                     "Payme webhook: Transaction %s already processed (idempotent)",
                     payme_transaction_id,
                 )
-                if method == "CheckPerformTransaction":
-                    return {"result": {"allow": True}, "id": request_id}
-                payment_id = getattr(existing_transaction, "payment_id", None)
                 payment_status = None
-                if method in {"PerformTransaction", "CancelTransaction"}:
-                    with transaction_ctx(self.db):
-                        payment_status = self._apply_existing_payme_transaction_state(
-                            existing_transaction,
-                            method=method,
-                            params=params,
+                with transaction_ctx(self.db):
+                    # Use the cashier cancellation lock order: payment, then transaction.
+                    payment_id = existing_transaction.payment_id
+                    payment = (
+                        self.repository.get_payment_by_id_for_update(payment_id, provider="payme")
+                        if payment_id is not None
+                        else None
+                    )
+                    if payment is None or not payment.provider_payment_id:
+                        return self._payme_transaction_unavailable(request_id)
+                    if "account" in params and order_id != payment.provider_payment_id:
+                        return self._payme_order_unavailable(request_id)
+
+                    existing_transaction = self.repository.get_existing_transaction(
+                        transaction_id=payme_transaction_id, provider="payme", for_update=True
+                    )
+                    if method == "CreateTransaction":
+                        return self._replay_payme_creation(
+                            existing_transaction, payment=payment, params=params, request_id=request_id
                         )
-                        payment_id = getattr(existing_transaction, "payment_id", None)
-                if payment_status == "amount_mismatch":
-                    return {
-                        "error": {
-                            "code": -31001,
-                            "message": "Payment amount mismatch",
-                        },
-                        "id": request_id,
-                        "payment_id": payment_id,
-                        "payment_status": None,
-                        "payment_provider": "payme",
-                    }
-                if method == "CreateTransaction":
-                    return {
-                        "result": {
-                            "create_time": int(datetime.now(UTC).timestamp() * 1000),
-                            "transaction": existing_transaction.id,
-                            "state": 1,
-                        },
-                        "id": request_id,
-                        "payment_id": payment_id,
-                        "payment_status": payment_status,
-                        "payment_provider": "payme",
-                    }
-                if method == "PerformTransaction":
-                    return {
-                        "result": {
-                            "perform_time": int(datetime.now(UTC).timestamp() * 1000),
-                            "transaction": existing_transaction.id,
-                            "state": 2,
-                        },
-                        "id": request_id,
-                        "payment_id": payment_id,
-                        "payment_status": payment_status,
-                        "payment_provider": "payme",
-                    }
-                if method == "CancelTransaction":
-                    # FOLLOWUP-12: response state must reflect the Tx status
-                    # BEFORE the first cancel was applied (per Payme spec:
-                    # state -1 = cancelled from state 1, state -2 = cancelled
-                    # from state 2). Recovered from AuditLog on retry, derived
-                    # from current_tx_status on first call. See ADR-0019.
-                    was_completed = self._last_cancel_was_completed or False
-                    return {
-                        "result": {
-                            "cancel_time": int(datetime.now(UTC).timestamp() * 1000),
-                            "transaction": existing_transaction.id,
-                            "state": -2 if was_completed else -1,
-                        },
-                        "id": request_id,
-                        "payment_id": payment_id,
-                        "payment_status": payment_status,
-                        "payment_provider": "payme",
-                    }
+                    if (
+                        existing_transaction is None
+                        or existing_transaction.payment_id != payment.id
+                        or existing_transaction.visit_id not in (None, payment.visit_id)
+                    ):
+                        return self._payme_transaction_unavailable(request_id)
+
+                    if method == "CheckPerformTransaction":
+                        if not self._payme_params_amount_matches_payment(payment, params, existing_transaction):
+                            return self._payme_amount_mismatch(request_id, payment.id)
+                        if payment.status != "pending":
+                            return self._payme_order_unavailable(request_id)
+                        return {"result": {"allow": True}, "id": request_id}
+                    if method == "CheckTransaction":
+                        return self._check_payme_transaction(
+                            existing_transaction, payment=payment, params=params, request_id=request_id
+                        )
+                    if method == "CancelTransaction":
+                        return self._process_payme_cancellation(
+                            existing_transaction, payment=payment, params=params, request_id=request_id
+                        )
+                    if method == "PerformTransaction":
+                        payment_status = self._apply_payme_perform(
+                            existing_transaction, payment=payment, params=params
+                        )
+                        if payment_status == "amount_mismatch":
+                            return self._payme_amount_mismatch(request_id, payment_id)
+                        if payment_status == "paid" and payment.paid_at is None:
+                            return {
+                                "error": {"code": -32400, "message": "Completion time requires reconciliation"},
+                                "id": request_id,
+                            }
+                        if payment_status != "paid" or existing_transaction.status != "completed":
+                            return {
+                                "error": {"code": -31008, "message": "Payment cannot be completed"},
+                                "id": request_id,
+                            }
+                        receipt = self._get_payme_creation_receipt(existing_transaction, payment)
+                        return {
+                            "result": {
+                                "perform_time": self._payme_timestamp(payment.paid_at),
+                                "transaction": receipt.id if receipt is not None else existing_transaction.id,
+                                "state": 2,
+                            },
+                            "id": request_id,
+                            "payment_id": payment_id,
+                            "payment_status": payment_status,
+                            "payment_provider": "payme",
+                        }
                 return {
                     "result": {},
                     "id": request_id,
@@ -491,138 +529,114 @@ class ProviderWebhookService:
                     "payment_provider": "payme",
                 }
 
+            if method in {"PerformTransaction", "CancelTransaction", "CheckTransaction"}:
+                return self._payme_transaction_unavailable(request_id)
+            if method in {"CheckPerformTransaction", "CreateTransaction"} and not (
+                isinstance(order_id, str) and order_id
+            ):
+                return self._payme_order_unavailable(request_id)
+            if method == "CreateTransaction" and not (
+                isinstance(payme_transaction_id, str) and payme_transaction_id
+            ):
+                return {"error": {"code": -32602, "message": "Invalid transaction ID"}, "id": request_id}
+
+            if method == "CreateTransaction":
+                if not self._is_payme_time(params.get("time")):
+                    return {"error": {"code": -32602, "message": "Invalid transaction time"}, "id": request_id}
+                amount = params.get("amount")
+                # Both payment evidence rows store the provider amount as a PostgreSQL Integer.
+                if type(amount) is not int or not 0 < amount <= 2_147_483_647:
+                    return {"error": {"code": -32602, "message": "Invalid transaction amount"}, "id": request_id}
+
             with transaction_ctx(self.db):
+                result = manager.process_webhook("payme", webhook_data)
+                payment = None
+                if isinstance(order_id, str) and order_id and order_id == result.payment_id:
+                    payment = self.repository.get_payment_by_provider_payment_id_for_update(
+                        provider="payme", provider_payment_id=order_id
+                    )
+
+                if method == "CreateTransaction" and result.success and payment is not None:
+                    # The initial read may have preceded a concurrent creation.
+                    existing_transaction = self.repository.get_existing_transaction(
+                        transaction_id=payme_transaction_id, provider="payme", for_update=True
+                    )
+                    if existing_transaction is not None:
+                        return self._replay_payme_creation(
+                            existing_transaction, payment=payment, params=params, request_id=request_id
+                        )
+                    if payment.status != "pending":
+                        return {
+                            "error": {"code": -31008, "message": "Order is already reserved or closed"},
+                            "id": request_id,
+                        }
+
                 webhook_id = f"payme_{uuid.uuid4().hex[:8]}"
                 webhook = self.repository.create_webhook(
                     provider="payme",
                     webhook_id=webhook_id,
-                    transaction_id=order_id,
+                    transaction_id=order_id or "unknown",
                     amount=params.get("amount", 0),
                     currency="UZS",
                     raw_data=webhook_data,
                 )
 
-                result = manager.process_webhook("payme", webhook_data)
-
                 if result.success:
-                    webhook.status = "processed"
                     webhook.processed_at = datetime.now(UTC)
+                    if payment is None:
+                        webhook.status = "failed"
+                        webhook.error_message = "provider_payment_binding_unavailable"
+                        return self._payme_order_unavailable(request_id)
 
-                    payment = None
-                    mapped_status = None
-                    if result.payment_id:
-                        payment_id_from_order = self._extract_payment_id_from_order(
-                            result.payment_id
-                        )
-                        if payment_id_from_order:
-                            # FOLLOWUP-10: lock Payment row before mutation.
-                            # Prevents TOCTOU race against concurrent
-                            # PaymentCancelService.cancel_payment() (which
-                            # acquires SELECT Payment ... FOR UPDATE via
-                            # billing_service.update_payment_status).
-                            payment = self.repository.get_payment_by_id_for_update(
-                                payment_id_from_order
-                            )
-
-                    if payment:
-                        if not self._result_amount_matches_payment(payment, result):
-                            webhook.status = "failed"
-                            webhook.error_message = "provider_amount_mismatch"
-                            return {
-                                "error": {
-                                    "code": -31001,
-                                    "message": "Payment amount mismatch",
-                                },
-                                "id": request_id,
-                                "payment_id": payment.id,
-                                "payment_status": None,
-                                "payment_provider": "payme",
-                            }
-                        # Issue #06 Phase 4b B2: Replaced direct payment.status =
-                        # mapped_status with billing_service.update_payment_status()
-                        # to enforce payment state machine validation.
-                        #
-                        # The lock is already acquired above via
-                        # get_payment_by_id_for_update(). update_payment_status()
-                        # will re-acquire it (idempotent within same transaction)
-                        # and validate the transition via ALLOWED_PAYMENT_TRANSITIONS.
-                        #
-                        # commit=False because this is inside a larger webhook
-                        # transaction (PaymentTransaction + webhook record +
-                        # visit projection all committed together by the caller).
-                        mapped_status = self._map_provider_status_to_payment_status(result.status)
-                        payment = self._update_payment_status(
-                            payment_id=payment.id,
-                            new_status=mapped_status,
-                            commit=False,
-                        )
-                        if payment.status == "paid" and not payment.paid_at:
-                            payment.paid_at = datetime.now(UTC)
-
-                        payment.provider_data = {
-                            **(payment.provider_data or {}),
-                            **result.provider_data,
-                        }
-
-                        webhook.payment_id = payment.id
-                        webhook.visit_id = payment.visit_id
-
-                        self.repository.create_transaction(
-                            transaction_id=params.get("id", webhook_id),
-                            provider="payme",
-                            amount=params.get("amount", 0),
-                            currency="UZS",
-                            status=result.status,
-                            payment_id=payment.id,
-                            webhook_id=webhook.id,
-                            visit_id=payment.visit_id,
-                            provider_data=result.provider_data,
-                        )
-
+                    if not self._result_amount_matches_payment(payment, result):
+                        webhook.status = "failed"
+                        webhook.error_message = "provider_amount_mismatch"
+                        return self._payme_amount_mismatch(request_id, payment.id)
                     if method == "CheckPerformTransaction":
-                        return {
-                            "result": {"allow": True},
-                            "id": request_id,
-                            "payment_id": payment.id if payment else None,
-                            "payment_status": mapped_status,
-                            "payment_provider": "payme",
-                        }
+                        if payment.status != "pending":
+                            webhook.status = "failed"
+                            webhook.error_message = "provider_payment_not_pending"
+                            return self._payme_order_unavailable(request_id)
+                        webhook.status = "processed"
+                        return {"result": {"allow": True}, "id": request_id}
+
+                    webhook.status = "processed"
+                    mapped_status = self._map_provider_status_to_payment_status(result.status)
+                    payment = self._update_payment_status(
+                        payment_id=payment.id,
+                        new_status=mapped_status,
+                        commit=False,
+                    )
+                    if payment.status == "paid" and not payment.paid_at:
+                        payment.paid_at = datetime.now(UTC)
+
+                    payment.provider_data = {
+                        **(payment.provider_data or {}),
+                        **result.provider_data,
+                    }
+
+                    webhook.payment_id = payment.id
+                    webhook.visit_id = payment.visit_id
+
+                    self.repository.create_transaction(
+                        transaction_id=params.get("id", webhook_id),
+                        provider="payme",
+                        amount=params.get("amount", 0),
+                        currency="UZS",
+                        status=result.status,
+                        payment_id=payment.id,
+                        webhook_id=webhook.id,
+                        visit_id=payment.visit_id,
+                        provider_data=result.provider_data,
+                    )
+
                     if method == "CreateTransaction":
-                        return {
-                            "result": {
-                                "create_time": int(datetime.now(UTC).timestamp() * 1000),
-                                "transaction": webhook.id,
-                                "state": 1,
-                            },
-                            "id": request_id,
-                            "payment_id": payment.id if payment else None,
-                            "payment_status": mapped_status,
-                            "payment_provider": "payme",
-                        }
-                    if method == "PerformTransaction":
-                        return {
-                            "result": {
-                                "perform_time": int(datetime.now(UTC).timestamp() * 1000),
-                                "transaction": webhook.id,
-                                "state": 2,
-                            },
-                            "id": request_id,
-                            "payment_id": payment.id if payment else None,
-                            "payment_status": mapped_status,
-                            "payment_provider": "payme",
-                        }
-                    if method == "CancelTransaction":
-                        return {
-                            "result": {
-                                "cancel_time": int(datetime.now(UTC).timestamp() * 1000),
-                                "transaction": webhook.id,
-                                "state": -1,
-                            },
-                            "id": request_id,
-                            "payment_id": payment.id if payment else None,
-                            "payment_status": mapped_status,
-                            "payment_provider": "payme",
-                        }
+                        return self._payme_create_response(
+                            webhook,
+                            request_id=request_id,
+                            payment_id=payment.id,
+                            payment_status=mapped_status,
+                        )
                     return {
                         "result": {},
                         "id": request_id,
@@ -635,11 +649,7 @@ class ProviderWebhookService:
                 webhook.error_message = result.error_message
                 webhook.processed_at = datetime.now(UTC)
 
-                failed_payment = None
-                if result.payment_id:
-                    payment_id_from_order = self._extract_payment_id_from_order(result.payment_id)
-                    if payment_id_from_order:
-                        failed_payment = self.repository.get_payment_by_id(payment_id_from_order)
+                failed_payment = payment
                 if failed_payment:
                     # Issue #06 Phase 4b B2: use canonical update_payment_status
                     failed_payment = self._update_payment_status(
@@ -664,9 +674,9 @@ class ProviderWebhookService:
                 }
 
         except Exception as exc:
-            logger.error("Payme webhook error: %s", exc)
+            logger.error("Payme webhook error type=%s", type(exc).__name__)
             return {
-                "error": {"code": -32603, "message": f"Internal server error: {exc}"},
+                "error": {"code": -32603, "message": "Internal server error"},
                 "id": request_id,
             }
 
@@ -697,390 +707,273 @@ class ProviderWebhookService:
         """Delegate to shared payment_state_checks module."""
         return can_transition_transaction_status(current_status, target_status)
 
-    def _apply_existing_payme_transaction_state(
+    def _apply_payme_perform(
         self,
-        transaction: Any,
+        transaction: PaymentTransaction,
+        *,
+        payment: Payment,
+        params: dict[str, Any],
+    ) -> str:
+        method = "PerformTransaction"
+        provider_status = "completed"
+        payment_status = "paid"
+        payment_id = payment.id
+        if not self._payme_params_amount_matches_payment(payment, params, transaction):
+            return "amount_mismatch"
+
+        current_tx_status = transaction.status
+        current_payment_status = payment.status
+        payment_blocked = not self._can_transition_payment_status(current_payment_status, payment_status)
+        transaction_blocked = not self._can_transition_transaction_status(
+            current_tx_status, provider_status
+        )
+        if payment_blocked:
+            logger.warning(
+                "Payme webhook: ignored invalid payment transition "
+                "current=%s target=%s payment_id=%s method=%s",
+                current_payment_status,
+                payment_status,
+                payment_id,
+                method,
+            )
+            if current_tx_status != provider_status:
+                logger.warning(
+                    "Payme webhook: blocked transaction transition because "
+                    "linked payment is terminal or incompatible "
+                    "tx_current=%s tx_target=%s payment_status=%s "
+                    "transaction_id=%s method=%s (Payme duplicate-webhook protector)",
+                    current_tx_status,
+                    provider_status,
+                    current_payment_status,
+                    transaction.id,
+                    method,
+                )
+        elif transaction_blocked:
+            logger.warning(
+                "Payme webhook: ignored invalid transaction transition "
+                "current=%s target=%s transaction_id=%s method=%s",
+                current_tx_status, provider_status, transaction.id, method,
+            )
+
+        if current_payment_status == "paid" and payment.paid_at is None:
+            # An existing completed payment without a timestamp needs reconciliation.
+            return current_payment_status
+
+        if not (payment_blocked or transaction_blocked):
+            # BillingService owns the first paid_at and validates the full payment transition.
+            if current_payment_status != payment_status:
+                payment = self._update_payment_status(
+                    payment_id=payment_id, new_status=payment_status, commit=False
+                )
+            transaction.status = provider_status
+
+        self._store_payme_callback(transaction, payment, method=method, params=params)
+        return payment.status
+
+    @staticmethod
+    def _store_payme_callback(
+        transaction: PaymentTransaction,
+        payment: Payment,
         *,
         method: str,
         params: dict[str, Any],
-    ) -> str | None:
-        if method == "PerformTransaction":
-            provider_status = "completed"
-        elif method == "CancelTransaction":
-            provider_status = "cancelled" if params.get("reason") == 1 else "refunded"
-        else:
-            return None
-
-        payment_status = self._map_provider_status_to_payment_status(provider_status)
-        payment_id = getattr(transaction, "payment_id", None)
-
-        # Phase 1: amount-mismatch check (unlocked read — no status mutation).
-        if payment_id:
-            payment = self.repository.get_payment_by_id(payment_id)
-            if payment:
-                if not self._payme_params_amount_matches_payment(
-                    payment,
-                    params,
-                    transaction,
-                ):
-                    return "amount_mismatch"
-
-        # FOLLOWUP-12: persist pre-cancel state for idempotent CancelTransaction
-        # response. Per ADR-0019, the response `state` (-1 vs -2) must reflect
-        # the Tx status BEFORE the first cancel was applied. On retry, the
-        # current `transaction.status` has already mutated (e.g. completed →
-        # refunded), so we cannot derive `was_completed` from it. We persist
-        # `pre_cancel_status` in AuditLog (immutable via DB trigger, migration
-        # 0044) on the first call and recover it on retry.
-        #
-        # IMPORTANT: this call MUST happen BEFORE Phase 2 (Payment mutation)
-        # so that if _persist_pre_cancel_state does a full db.rollback() on
-        # AuditLog INSERT failure (Strategy 2), it does NOT discard the
-        # Phase 2 payment.status / payment.provider_data mutation. At this
-        # point, nothing has been mutated in this transaction_ctx yet (the
-        # Phase 1 amount check is a SELECT, not a mutation).
-        #
-        # Scope: Payme CancelTransaction only. PerformTransaction does not
-        # need this (response state is always 2). Click/Kaspi are not touched.
-        #
-        # Atomicity: AuditLog INSERT is inside the same transaction_ctx as
-        # the Tx.status mutation (caller's `with transaction_ctx(self.db):`
-        # at process_payme_webhook line 322). If the mutation rolls back,
-        # the AuditLog INSERT rolls back too — no phantom audit records.
-        # Verified via backend/app/db/transactions.py:32-39 (commit/rollback
-        # on context exit) and session.py:153-155 (autocommit=False).
-        #
-        # Failure mode (Strategy 2 per ADR-0019 lines 152-154): if AuditLog
-        # INSERT or SELECT fails, fall back to mutable-state derivation.
-        # Idempotency degrades silently for that Tx, but webhook availability
-        # is preserved. logger.warning (NOT logger.exception) to avoid
-        # Sentry recursion (see backend/app/core/sentry.py:243-249).
-        #
-        # Constraint: at most 1 SELECT + 1 INSERT per webhook call. The
-        # SELECT runs before the mutation to recover prior pre_cancel_status;
-        # the INSERT runs only if no prior record exists (first call).
-        current_tx_status = getattr(transaction, "status", None)
-        if method == "CancelTransaction":
-            self._last_cancel_was_completed = self._resolve_was_completed(
-                transaction, current_tx_status
-            )
-        else:
-            # PerformTransaction: response state is always 2, no pre-cancel
-            # state needed. Flag stays None (caller ignores it).
-            self._last_cancel_was_completed = None
-
-        # Phase 2: lock the payment row for the status-mutation phase.
-        # This prevents TOCTOU: a cashier cancellation can commit a
-        # terminal status between our unlocked read above and the write
-        # below. By acquiring FOR UPDATE here, we serialize with any
-        # concurrent billing_service.update_payment_status() call (which
-        # also uses with_for_update per PAY-REAUDIT-28 P0-7).
-        effective_payment_status = payment_status
-        payment_terminal = False
-        if payment_id:
-            payment = self.repository.get_payment_by_id_for_update(payment_id)
-            if payment:
-                current_payment_status = getattr(payment, "status", None)
-                if current_payment_status and not self._can_transition_payment_status(
-                    current_payment_status, payment_status
-                ):
-                    logger.warning(
-                        "Payme webhook: ignored invalid payment transition "
-                        "current=%s target=%s payment_id=%s method=%s",
-                        current_payment_status,
-                        payment_status,
-                        payment_id,
-                        method,
-                    )
-                    effective_payment_status = current_payment_status
-                    payment_terminal = True
-                else:
-                    # Issue #06 Phase 4b B2: use canonical update_payment_status
-                    # instead of direct payment.status = payment_status.
-                    payment = self._update_payment_status(
-                        payment_id=payment.id,
-                        new_status=payment_status,
-                        commit=False,
-                    )
-                # provider_data is ALWAYS updated — preserves audit trail
-                # of last webhook payload regardless of status transition.
-                payment.provider_data = {
-                    **(payment.provider_data or {}),
-                    "method": method,
-                    "transaction_id": params.get("id"),
-                    "params": params,
-                }
-
-        # Phase 3: guard transaction.status.
-        # provider_data is ALWAYS updated to preserve the audit trail.
-        #
-        # DEFENSIVE CONSISTENCY CHECK (Payme only): if the linked payment
-        # is in a terminal state (refunded/cancelled/void), block the
-        # transaction transition too — even if the transaction's own
-        # state-machine would allow it (e.g. processing → completed).
-        #
-        # Historical context: this guard was introduced in PR #2657 to
-        # compensate for PaymentCancelService.cancel_payment() updating
-        # only Payment.status, leaving PaymentTransaction in a non-
-        # terminal state. FOLLOWUP-8 (PR #2670, merged) fixed the
-        # cancel path: Payment and PaymentTransaction are now updated
-        # atomically inside transaction_ctx with FOR UPDATE locks.
-        #
-        # Scope: this method (_apply_existing_payme_transaction_state)
-        # is invoked ONLY from process_payme_webhook(). Click and Kaspi
-        # webhook handlers (process_click_webhook / process_kaspi_webhook)
-        # do NOT route through this guard. The remaining Payme-specific
-        # invariant this guard protects: a duplicate PerformTransaction
-        # webhook arriving on an already-cancelled Payme Tx must not
-        # reopen it.
-        #
-        # FOLLOWUP-10 (not yet implemented) tracks a separate race in
-        # Click/Kaspi webhook insert paths — that race is NOT caught by
-        # this guard and must be fixed in the Click/Kaspi handlers
-        # directly. Do not rely on this guard for Click/Kaspi coverage.
-        #
-        # DO NOT REMOVE this guard until FOLLOWUP-10 lands AND a separate
-        # audit confirms no Payme duplicate-PerformTransaction scenario
-        # remains.
-        current_tx_status = getattr(transaction, "status", None)
-        tx_blocked_by_payment = (
-            payment_terminal
-            and current_tx_status
-            and current_tx_status != provider_status
-        )
-
-        # NOTE: _resolve_was_completed (FOLLOWUP-12 AuditLog persist) was
-        # already called above, BEFORE Phase 2, to avoid rolling back
-        # payment.status / payment.provider_data mutations on AuditLog
-        # failure. Do not re-call it here.
-
-        if current_tx_status and (
-            not self._can_transition_transaction_status(
-                current_tx_status, provider_status
-            )
-            or tx_blocked_by_payment
-        ):
-            if tx_blocked_by_payment:
-                logger.warning(
-                    "Payme webhook: blocked transaction transition because "
-                    "linked payment is terminal "
-                    "tx_current=%s tx_target=%s payment_status=%s "
-                    "transaction_id=%s method=%s "
-                    "(defensive guard — Payme duplicate-webhook protector)",
-                    current_tx_status,
-                    provider_status,
-                    effective_payment_status,
-                    getattr(transaction, "id", None),
-                    method,
-                )
-            else:
-                logger.warning(
-                    "Payme webhook: ignored invalid transaction transition "
-                    "current=%s target=%s transaction_id=%s method=%s",
-                    current_tx_status,
-                    provider_status,
-                    getattr(transaction, "id", None),
-                    method,
-                )
-        else:
-            transaction.status = provider_status
-
+    ) -> None:
         transaction.provider_data = {
             **(transaction.provider_data or {}),
             "method": method,
             "transaction_id": params.get("id"),
             "params": params,
         }
+        payment.provider_data = {
+            **(payment.provider_data or {}),
+            **transaction.provider_data,
+        }
 
-        # Update payment.provider_data with the final transaction
-        # provider_data (merge). This is done here (after transaction
-        # provider_data is finalized) rather than in Phase 2 so the
-        # payment always gets the complete payload.
-        if payment_id and payment:
-            payment.provider_data = {
-                **(payment.provider_data or {}),
-                **(transaction.provider_data or {}),
+    @staticmethod
+    def _payme_cancel_response(
+        receipt: dict[str, Any], *, request_id: Any, payment_id: int, payment_status: str | None = None
+    ) -> dict[str, Any]:
+        return {
+            "result": {key: receipt[key] for key in ("cancel_time", "transaction", "state")},
+            "id": request_id,
+            "payment_id": payment_id,
+            "payment_status": payment_status,
+            "payment_provider": "payme",
+        }
+
+    def _payme_bound_amount_matches(
+        self, payment: Payment, transaction: PaymentTransaction, params: dict[str, Any]
+    ) -> bool:
+        return (
+            payment.currency == transaction.currency == "UZS"
+            and transaction.amount > 0
+            and self._amounts_match(payment.amount, Decimal(transaction.amount) / 100)
+            and (
+                params.get("amount") is None
+                or self._payme_params_amount_matches_payment(payment, params, transaction)
+            )
+        )
+
+    @staticmethod
+    def _payme_state(transaction: PaymentTransaction, payment: Payment) -> int | None:
+        if transaction.status == "completed" and payment.status in {"paid", "completed"}:
+            return 2
+        if transaction.status in {"pending", "processing"} and payment.status in {"pending", "processing", "failed"}:
+            return 1
+        if transaction.status == payment.status:
+            return {"cancelled": -1, "refunded": -2}.get(transaction.status)
+        return None
+
+    @staticmethod
+    def _get_payme_cancellation_receipt(
+        transaction: PaymentTransaction, payment: Payment, state: int | None
+    ) -> dict[str, Any] | None:
+        receipt = transaction.payme_cancel_receipt
+        if (
+            isinstance(receipt, dict)
+            and state in {-1, -2}
+            and type(receipt.get("payment_id")) is int
+            and receipt["payment_id"] == payment.id
+            and receipt.get("amount_minor") == transaction.amount
+            and receipt.get("currency") == transaction.currency
+            and type(receipt.get("state")) is int
+            and receipt["state"] == state
+            and type(receipt.get("transaction")) is int
+            and receipt["transaction"] > 0
+            and type(receipt.get("cancel_time")) is int
+            and receipt["cancel_time"] > 0
+            and (receipt.get("reason") is None or type(receipt["reason"]) is int)
+        ):
+            return receipt
+        return None
+
+    def _check_payme_transaction(
+        self,
+        transaction: PaymentTransaction,
+        *,
+        payment: Payment,
+        params: dict[str, Any],
+        request_id: Any,
+    ) -> dict[str, Any]:
+        if not self._payme_bound_amount_matches(payment, transaction, params):
+            return self._payme_amount_mismatch(request_id, payment.id)
+
+        creation = self._get_payme_creation_receipt(transaction, payment)
+        if creation is not None:
+            result = self._payme_lifecycle_result(transaction, payment, creation)
+            if result is not None:
+                return {"id": request_id, "result": result}
+        return {
+            "error": {"code": -32400, "message": "Transaction history requires reconciliation"},
+            "id": request_id,
+        }
+
+    def _payme_lifecycle_result(
+        self, transaction: PaymentTransaction, payment: Payment, creation: PaymentWebhook
+    ) -> dict[str, Any] | None:
+        state = self._payme_state(transaction, payment)
+        if state is None:
+            return None
+
+        cancellation = None
+        if state < 0:
+            cancellation = self._get_payme_cancellation_receipt(transaction, payment, state)
+            if cancellation is None or cancellation["transaction"] != creation.id:
+                return None
+
+        perform_time = 0
+        if state in {2, -2}:
+            if payment.paid_at is None:
+                return None
+            perform_time = self._payme_timestamp(payment.paid_at)
+
+        return {
+            "transaction": str(creation.id),
+            "create_time": self._payme_timestamp(creation.created_at),
+            "perform_time": perform_time,
+            "cancel_time": cancellation["cancel_time"] if cancellation else 0,
+            "state": state,
+            "reason": cancellation.get("reason") if cancellation else None,
+        }
+
+    def _process_payme_cancellation(
+        self,
+        transaction: PaymentTransaction,
+        *,
+        payment: Payment,
+        params: dict[str, Any],
+        request_id: Any,
+    ) -> dict[str, Any]:
+        if not self._payme_bound_amount_matches(payment, transaction, params):
+            return self._payme_amount_mismatch(request_id, payment.id)
+
+        state = self._payme_state(transaction, payment)
+        if transaction.payme_cancel_receipt is not None or transaction.status in {"cancelled", "refunded"}:
+            receipt = self._get_payme_cancellation_receipt(transaction, payment, state)
+            if receipt is not None:
+                return self._payme_cancel_response(
+                    receipt, request_id=request_id, payment_id=payment.id
+                )
+            return {
+                "error": {"code": -32400, "message": "Cancellation receipt requires reconciliation"},
+                "id": request_id,
             }
 
-        return effective_payment_status
+        if state not in {1, 2}:
+            return {
+                "error": {"code": -31007, "message": "Payment cannot be cancelled"},
+                "id": request_id,
+            }
 
-    def _resolve_was_completed(
-        self, transaction: Any, current_tx_status: str | None
-    ) -> bool:
-        """FOLLOWUP-12: determine whether the Tx was in 'completed' state
-        before the first CancelTransaction was applied.
+        target_status = "refunded" if state == 2 else "cancelled"
+        creation = self._get_payme_creation_receipt(transaction, payment)
+        self._persist_pre_cancel_state(transaction.id, transaction.status)
+        payment = self._update_payment_status(
+            payment_id=payment.id, new_status=target_status, commit=False
+        )
+        reason = params.get("reason")
+        callback_params = {"id": transaction.transaction_id}
+        if type(reason) is int:
+            callback_params["reason"] = reason
 
-        On the first CancelTransaction call, `current_tx_status` is the
-        true pre-cancel state (e.g. 'completed' or 'processing'). We
-        persist it in AuditLog so that on retry — when `current_tx_status`
-        has already mutated to 'refunded' or 'cancelled' — we can recover
-        the original value and return the correct JSON-RPC `state`.
-
-        Returns True if the Tx was in 'completed' state before cancel,
-        False otherwise. On AuditLog failure (Strategy 2 per ADR-0019),
-        falls back to deriving from `current_tx_status` and logs a
-        structured warning.
-
-        Constraint: at most 1 SELECT + 1 INSERT per call.
-
-        Terminal-status guard (Codex P2 review on PR #2684): if
-        `current_tx_status` is already terminal (refunded/cancelled/void)
-        AND no AuditLog record exists, this means the first cancel
-        already committed but its AuditLog INSERT failed. In this case
-        we CANNOT recover the true pre-cancel state — it is lost. We
-        return False (conservative — response state=-1) and DO NOT
-        persist the terminal status, because doing so would record an
-        immutable-but-wrong `pre_cancel_status` that blocks all future
-        recovery. This is the unavoidable degradation of Strategy 2:
-        when the first AuditLog write fails, idempotency for that Tx
-        is lost, but we do not make it worse by persisting wrong data.
-        """
-        tx_id = getattr(transaction, "id", None)
-
-        # Step 1: try to recover pre_cancel_status from AuditLog (retry case).
-        recovered_pre_cancel = self._get_pre_cancel_state_from_audit_log(tx_id)
-        if recovered_pre_cancel is not None:
-            # Retry: AuditLog record exists from a prior CancelTransaction.
-            return recovered_pre_cancel == "completed"
-
-        # Step 2: first call (or prior AuditLog write failed).
-        #
-        # Terminal-status guard: if current_tx_status is already terminal,
-        # the first cancel already committed but its AuditLog INSERT
-        # failed. We cannot recover the true pre-cancel state — persist
-        # the terminal status would record wrong data that blocks future
-        # recovery. Return False (conservative) and do not persist.
-        if current_tx_status in _TERMINAL_TX_STATUSES:
-            logger.warning(
-                "Payme webhook: Tx is already in terminal state %s but no "
-                "AuditLog pre_cancel_status record exists — first cancel's "
-                "AuditLog INSERT must have failed. Cannot recover true "
-                "pre-cancel state; returning was_completed=False (state=-1). "
-                "Idempotency for this Tx is degraded (Strategy 2). "
-                "transaction_id=%s",
-                current_tx_status,
-                tx_id,
-            )
-            return False
-
-        # Step 3: genuine first call — current_tx_status is a non-terminal
-        # state (processing/completed). Derive was_completed and persist
-        # for future retries.
-        was_completed = current_tx_status == "completed"
-
-        # Persist pre_cancel_status. On failure, fall back to mutable-state
-        # derivation (Strategy 2). The webhook response is still sent;
-        # idempotency degrades silently for this Tx if a retry arrives.
-        # The try/except here is a safety net: _persist_pre_cancel_state
-        # already catches exceptions internally, but this outer catch
-        # ensures that any unexpected error from the helper does not
-        # abort the webhook.
-        try:
-            self._persist_pre_cancel_state(tx_id, current_tx_status)
-        except Exception as exc:
-            logger.warning(
-                "Payme webhook: AuditLog persist failed — falling back to "
-                "mutable-state derivation. Idempotency may degrade on retry. "
-                "transaction_id=%s pre_cancel_status=%s error_type=%s",
-                tx_id,
-                current_tx_status,
-                type(exc).__name__,
-            )
-
-        return was_completed
-
-    def _get_pre_cancel_state_from_audit_log(
-        self, tx_id: int | None
-    ) -> str | None:
-        """Recover the latest pre_cancel_status from AuditLog for the given Tx.
-
-        Returns None if no record exists (first call) or on query failure
-        (Strategy 2 fallback). At most 1 SELECT per call.
-        """
-        if tx_id is None:
-            return None
-        try:
-            row = (
-                self.db.query(AuditLog)
-                .filter(
-                    AuditLog.action == PAYME_TX_PRE_CANCEL_STATE_ACTION,
-                    AuditLog.entity_type == "payment_transaction",
-                    AuditLog.entity_id == tx_id,
-                )
-                .order_by(AuditLog.created_at.desc())
-                .first()
-            )
-            if row is None or not row.payload:
-                return None
-            return row.payload.get("pre_cancel_status")
-        except Exception as exc:
-            # Strategy 2: do not abort the webhook. Fall back to mutable-state
-            # derivation. logger.warning (NOT logger.exception) to avoid
-            # Sentry recursion (see sentry.py:243-249).
-            logger.warning(
-                "Payme webhook: AuditLog SELECT failed — falling back to "
-                "mutable-state derivation. Idempotency may degrade on retry. "
-                "transaction_id=%s error_type=%s",
-                tx_id,
-                type(exc).__name__,
-            )
-            return None
+        receipt = {
+            "payment_id": payment.id,
+            "amount_minor": transaction.amount,
+            "currency": transaction.currency,
+            "transaction": creation.id if creation is not None else transaction.id,
+            "state": -state,
+            "cancel_time": self._payme_timestamp(datetime.now(UTC)),
+            "reason": callback_params.get("reason"),
+        }
+        transaction.status = target_status
+        transaction.payme_cancel_receipt = receipt
+        self._store_payme_callback(
+            transaction, payment, method="CancelTransaction", params=callback_params
+        )
+        return self._payme_cancel_response(
+            receipt, request_id=request_id, payment_id=payment.id, payment_status=target_status
+        )
 
     def _persist_pre_cancel_state(
         self, tx_id: int | None, pre_cancel_status: str | None
     ) -> None:
-        """Persist pre_cancel_status in AuditLog for future retry recovery.
-
-        Uses inline `db.add(AuditLog(...)); db.flush()` (NOT
-        `audit_service.log_audit_event()`, which does its own `db.commit()`
-        and would break atomicity — see Finding 5 in RFC #2679).
-
-        On failure (Strategy 2 per ADR-0019 lines 152-154):
-        - rollback the current transaction (clears the failed AuditLog INSERT
-          and any pending state from the same transaction_ctx)
-        - log a structured warning
-        - return without raising
-
-        The caller (`_resolve_was_completed`) has already computed
-        `was_completed` before calling this method. After rollback, the
-        caller's `transaction_ctx` will commit a fresh transaction with
-        only the Tx.status mutation (which is set in-memory after this
-        method returns). The AuditLog record is lost for this Tx —
-        idempotency degrades silently, but webhook availability is
-        preserved.
-
-        Note: a full rollback (not SAVEPOINT) is used because the test
-        fixture's `db_session` already wraps each test in a SAVEPOINT,
-        and nested SAVEPOINTs on SQLite cause `no such savepoint` errors
-        during teardown. A full rollback is safe here because nothing
-        has been mutated in this transaction_ctx before this method is
-        called (the Payment FOR UPDATE lock is a SELECT, not a mutation;
-        the Tx.status mutation happens AFTER this method returns).
-        """
+        """Append cancel pre-state atomically while retaining the financial row locks."""
         if tx_id is None:
             return
         try:
-            entry = AuditLog(
-                action=PAYME_TX_PRE_CANCEL_STATE_ACTION,
-                entity_type="payment_transaction",
-                entity_id=tx_id,
-                payload={"pre_cancel_status": pre_cancel_status},
-                actor_type="system",
-                outcome="success",
-            )
-            self.db.add(entry)
-            self.db.flush()  # NOT commit — caller controls transaction_ctx
+            with self.db.begin_nested():
+                self.db.add(AuditLog(
+                    action=PAYME_TX_PRE_CANCEL_STATE_ACTION,
+                    entity_type="payment_transaction",
+                    entity_id=tx_id,
+                    payload={"pre_cancel_status": pre_cancel_status},
+                    actor_type="system",
+                    outcome="success",
+                ))
+                self.db.flush()
         except Exception as exc:
-            # Strategy 2: rollback to clear the failed INSERT, then log.
-            # The outer transaction_ctx will start a fresh transaction on
-            # the next operation (Tx.status mutation + commit).
-            try:
-                self.db.rollback()
-            except Exception:
-                pass  # rollback itself failed — nothing more we can do
             logger.warning(
-                "Payme webhook: AuditLog INSERT failed — falling back to "
-                "mutable-state derivation. Idempotency may degrade on retry. "
+                "Payme webhook: secondary cancellation AuditLog INSERT failed. "
                 "transaction_id=%s pre_cancel_status=%s error_type=%s",
                 tx_id,
                 pre_cancel_status,
@@ -1155,23 +1048,20 @@ class ProviderWebhookService:
                 )
 
                 result = manager.process_webhook("kaspi", webhook_data)
+                payment = None
+                if result.payment_id:
+                    payment = self.repository.get_payment_by_provider_payment_id_for_update(
+                        provider="kaspi", provider_payment_id=result.payment_id
+                    )
 
                 if result.success:
                     webhook.status = "processed"
                     webhook.processed_at = datetime.now(UTC)
+                    if result.payment_id and payment is None:
+                        webhook.status = "failed"
+                        webhook.error_message = "provider_payment_binding_unavailable"
 
-                    payment = None
                     mapped_status = None
-                    if result.payment_id:
-                        # FOLLOWUP-10: lock Payment row before mutation.
-                        # Prevents TOCTOU race against concurrent
-                        # PaymentCancelService.cancel_payment() (which
-                        # acquires SELECT Payment ... FOR UPDATE via
-                        # billing_service.update_payment_status).
-                        payment = self.repository.get_payment_by_provider_payment_id_for_update(
-                            result.payment_id
-                        )
-
                     if payment:
                         if not self._result_amount_matches_payment(payment, result):
                             webhook.status = "failed"
@@ -1188,7 +1078,7 @@ class ProviderWebhookService:
                         # to enforce payment state machine validation.
                         #
                         # The lock is already acquired above via
-                        # get_payment_by_id_for_update(). update_payment_status()
+                        # the repository. update_payment_status()
                         # will re-acquire it (idempotent within same transaction)
                         # and validate the transition via ALLOWED_PAYMENT_TRANSITIONS.
                         #
@@ -1236,26 +1126,22 @@ class ProviderWebhookService:
                 webhook.error_message = result.error_message
                 webhook.processed_at = datetime.now(UTC)
 
-                failed_payment = None
-                if result.payment_id:
-                    failed_payment = self.repository.get_payment_by_provider_payment_id(result.payment_id)
-                if failed_payment:
-                    # Issue #06 Phase 4b B2: use canonical update_payment_status
-                    failed_payment = self._update_payment_status(
-                        payment_id=failed_payment.id,
+                if payment:
+                    payment = self._update_payment_status(
+                        payment_id=payment.id,
                         new_status="failed",
                         commit=False,
                     )
-                    failed_payment.provider_data = {
-                        **(failed_payment.provider_data or {}),
+                    payment.provider_data = {
+                        **(payment.provider_data or {}),
                         "webhook_error": result.error_message,
                     }
 
                 return {
                     "status": "error",
                     "message": result.error_message or "Processing error",
-                    "payment_id": failed_payment.id if failed_payment else None,
-                    "payment_status": "failed" if failed_payment else None,
+                    "payment_id": payment.id if payment else None,
+                    "payment_status": "failed" if payment else None,
                     "payment_provider": "kaspi",
                 }
         except Exception:

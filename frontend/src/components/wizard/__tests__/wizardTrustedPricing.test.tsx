@@ -170,7 +170,7 @@ describe('Fix D: trusted pricing contract', () => {
     const backend = readBackendCartSource();
     expect(backend).toContain('def quote_cart_prices(');
     // SSOT: те же настройки и тот же хелпер скидок, что и при сохранении
-    expect(backend).toContain('_load_registration_discount_settings(db)');
+    expect(backend).toContain('_load_registration_discount_settings(db, lock_rows=lock_pricing_rows)');
     expect(backend).toContain('_apply_service_discount(');
     // Отсутствие цены — не 0
     expect(backend).toContain('не указана цена');
@@ -255,7 +255,18 @@ describe('Fix D Codex R2: quote contract follows the actual command route', () =
     // approval_status="pending" и для нового, и для неоплаченного визита)
     expect(backend).toContain('if quote_req.pricing_mode == "edit_delta":');
     expect(backend).toContain('"pending" if effective_discount_mode == "all_free" else "approved"');
-    // cart-режим: custom_price спасает от 409 при пустом каталог-прайсе
-    expect(backend).toContain('if service.price is None and item_req.custom_price is None:');
+  });
+
+  it('requires a catalogue price for cart and pending QR All Free quotes', () => {
+    const backend = readBackendCartSource();
+    const start = backend.indexOf('if quote_req.pricing_mode == "cart" or qr_all_free:');
+    const end = backend.indexOf('elif service.price is None:', start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const cartPricing = backend.slice(start, end);
+    expect(cartPricing).toContain('if service.price is None:');
+    expect(cartPricing).toContain('не указана цена');
+    expect(cartPricing).toContain('item_req.custom_price != service.price');
+    expect(cartPricing).toContain('Изменение цены требует согласования');
   });
 });

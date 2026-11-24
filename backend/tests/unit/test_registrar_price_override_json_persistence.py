@@ -24,16 +24,17 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.api.v1.endpoints.registrar_wizard._cart import (
-    PriceOverrideApprovalRequest,
-    approve_price_override,
-)
 from app.db import base  # noqa: F401 — регистрация всех моделей
 from app.db.base_class import Base
 from app.models.doctor_price_override import DoctorPriceOverride
+from app.models.encounter import Encounter
 from app.models.patient import Patient
+from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.services.price_override_approval import PriceOverrideApprovalService
+from app.services.profile_contact_security import ProfileBearerContext
+from tests.synthetic_reconciliation import install_reconciliation_fence
 
 
 @pytest.fixture()
@@ -44,6 +45,7 @@ def fresh_engine():
     engine = create_engine(f"sqlite:///{db_path}", echo=False)
     Base.metadata.create_all(bind=engine)
     try:
+        install_reconciliation_fence(engine)
         yield engine
     finally:
         engine.dispose()
@@ -53,7 +55,7 @@ def fresh_engine():
             pass
 
 
-def _seed(engine) -> tuple[int, int, int]:
+def _seed(engine, *, existing_mirror=True) -> tuple[int, int, int]:
     """Визит с УЖЕ сохранённым override услуги A + pending override B."""
     SessionLocal = sessionmaker(bind=engine)
     with SessionLocal() as session:
@@ -62,17 +64,22 @@ def _seed(engine) -> tuple[int, int, int]:
             email="regxc@example.com",
             full_name="Registrar XC",
             hashed_password="not-a-real-hash",
-            role="Registrar",
+            role="Admin",
             is_active=True,
         )
         patient = Patient(last_name="XC", first_name="Patient")
-        session.add(user)
-        session.add(patient)
+        service_b = Service(id=202, code="SYNTHETIC-B", name="Synthetic service B", price=Decimal("200000.00"))
+        session.add_all([user, patient, service_b])
+        session.flush()
+        encounter = Encounter(patient_id=patient.id, provenance="new")
+        session.add(encounter)
         session.flush()
 
         visit = Visit(
             patient_id=patient.id,
+            encounter_id=encounter.id,
             status="open",
+            confirmation_context_epoch=43,
             # Услуга A уже согласована ранее и ПЕРСИСТЕЙБЛЬНО хранится.
             doctor_price_override={
                 "101": {
@@ -81,7 +88,7 @@ def _seed(engine) -> tuple[int, int, int]:
                     "override_id": 9001,
                     "approved_at": "2026-11-01T09:00:00+00:00",
                 }
-            },
+            } if existing_mirror else None,
         )
         session.add(visit)
         session.flush()
@@ -89,22 +96,32 @@ def _seed(engine) -> tuple[int, int, int]:
         # REGPRICE-BE-001 (audit 3892, group 16): the canonical approval
         # fail-closes when the chargeable VisitService row is missing — the
         # JSON-persistence contract under test needs the attached row.
-        session.add(
-            VisitService(
-                visit_id=visit.id,
-                service_id=202,
-                code="202",
-                name="XC service B",
-                qty=1,
-                price=Decimal("200000.00"),
-            )
+        line_b = VisitService(
+            visit_id=visit.id,
+            service_id=service_b.id,
+            code="202",
+            name="XC service B",
+            qty=1,
+            price=Decimal("200000.00"),
+            currency="UZS",
         )
+        session.add(line_b)
         session.flush()
 
         override_b = DoctorPriceOverride(
             visit_id=visit.id,
             service_id=202,
+            target_scope="visit_service",
+            target_visit_service_id=line_b.id,
+            visit_context_epoch=visit.confirmation_context_epoch,
+            price_context_generation=visit.price_context_generation,
+            price_line_generation=line_b.price_line_generation,
+            requester_type="admin",
+            requester_user_id=user.id,
+            requester_user_id_snapshot=user.id,
+            requester_auth_epoch=user.auth_epoch,
             original_price=Decimal("200000.00"),
+            visit_price_before=line_b.price,
             new_price=Decimal("250000.00"),
             reason="REG-XC-001 second approval persistence",
             status="pending",
@@ -115,21 +132,23 @@ def _seed(engine) -> tuple[int, int, int]:
         return user.id, visit.id, override_b.id
 
 
+def _approve(engine, actor_id, override_id) -> None:
+    with sessionmaker(bind=engine)() as session:
+        actor = session.get(User, actor_id)
+        assert actor is not None
+        result = PriceOverrideApprovalService(session).process(
+            override_id=override_id,
+            action="approve",
+            rejection_reason=None,
+            approver_id=actor_id,
+            bearer=ProfileBearerContext(actor_id, actor.auth_epoch, None, None, None),
+        )
+        assert result.status == "approved"
+
+
 def test_second_price_override_persists_visit_json(fresh_engine) -> None:
     user_id, visit_id, override_b_id = _seed(fresh_engine)
-
-    approve_session = sessionmaker(bind=fresh_engine)()
-    try:
-        approver = approve_session.get(User, user_id)
-        result = approve_price_override(
-            PriceOverrideApprovalRequest(override_id=override_b_id, action="approve"),
-            db=approve_session,
-            current_user=approver,
-        )
-        assert result["success"] is True
-        assert result["new_status"] == "approved"
-    finally:
-        approve_session.close()
+    _approve(fresh_engine, user_id, override_b_id)
 
     # НОВАЯ сессия: 2xx и approved у override — НЕ доказательство, что JSON
     # визита сохранён. Проверяем именно перечитыванием из БД.
@@ -156,127 +175,18 @@ def test_second_price_override_persists_visit_json(fresh_engine) -> None:
 
 
 def test_first_price_override_still_persists_from_empty_json(fresh_engine) -> None:
-    """Регресс-обёртка прежнего рабочего пути: первое согласование (JSON
-    пуст) обязано сохраняться и после перехода на присваивание нового
-    словаря."""
-    SessionLocal = sessionmaker(bind=fresh_engine)
-    with SessionLocal() as session:
-        user = User(
-            username="reg_xc_first",
-            email="regxc1@example.com",
-            full_name="Registrar XC1",
-            hashed_password="not-a-real-hash",
-            role="Registrar",
-            is_active=True,
-        )
-        patient = Patient(last_name="XC", first_name="First")
-        session.add(user)
-        session.add(patient)
-        session.flush()
-        visit = Visit(patient_id=patient.id, status="open", doctor_price_override=None)
-        session.add(visit)
-        session.flush()
-        session.add(
-            VisitService(
-                visit_id=visit.id,
-                service_id=303,
-                code="303",
-                name="XC service 303",
-                qty=1,
-                price=Decimal("50000.00"),
-            )
-        )
-        session.flush()
-        override = DoctorPriceOverride(
-            visit_id=visit.id,
-            service_id=303,
-            original_price=Decimal("50000.00"),
-            new_price=Decimal("60000.00"),
-            reason="REG-XC-001 first approval regression",
-            status="pending",
-        )
-        session.add(override)
-        session.commit()
-        user_id, visit_id, override_id = user.id, visit.id, override.id
-
-    approve_session = SessionLocal()
-    try:
-        result = approve_price_override(
-            PriceOverrideApprovalRequest(override_id=override_id, action="approve"),
-            db=approve_session,
-            current_user=approve_session.get(User, user_id),
-        )
-        assert result["success"] is True
-    finally:
-        approve_session.close()
-
-    verify_session = SessionLocal()
-    try:
-        stored = verify_session.get(Visit, visit_id).doctor_price_override or {}
-        assert stored.get("303", {}).get("new_price") == 60000.0
-    finally:
-        verify_session.close()
+    user_id, visit_id, override_id = _seed(fresh_engine, existing_mirror=False)
+    _approve(fresh_engine, user_id, override_id)
+    with sessionmaker(bind=fresh_engine)() as session:
+        stored = session.get(Visit, visit_id).doctor_price_override
+        assert stored["202"]["new_price"] == 250000.0
 
 
 def test_approved_at_is_set_on_override_row(fresh_engine) -> None:
-    """Побочная проверка контракта: строка override получает approved_*."""
-    SessionLocal = sessionmaker(bind=fresh_engine)
-    with SessionLocal() as session:
-        user = User(
-            username="reg_xc_ts",
-            email="regxc2@example.com",
-            full_name="Registrar XC2",
-            hashed_password="not-a-real-hash",
-            role="Registrar",
-            is_active=True,
-        )
-        patient = Patient(last_name="XC", first_name="Ts")
-        session.add(user)
-        session.add(patient)
-        session.flush()
-        visit = Visit(patient_id=patient.id, status="open")
-        session.add(visit)
-        session.flush()
-        session.add(
-            VisitService(
-                visit_id=visit.id,
-                service_id=404,
-                code="404",
-                name="XC service 404",
-                qty=1,
-                price=Decimal("10000.00"),
-            )
-        )
-        session.flush()
-        override = DoctorPriceOverride(
-            visit_id=visit.id,
-            service_id=404,
-            original_price=Decimal("10000.00"),
-            new_price=Decimal("12000.00"),
-            reason="REG-XC-001 approved_at contract",
-            status="pending",
-        )
-        session.add(override)
-        session.commit()
-        user_id, override_id = user.id, override.id
-
-    approve_session = SessionLocal()
-    try:
-        approve_price_override(
-            PriceOverrideApprovalRequest(override_id=override_id, action="approve"),
-            db=approve_session,
-            current_user=approve_session.get(User, user_id),
-        )
-    finally:
-        approve_session.close()
-
-    verify_session = SessionLocal()
-    try:
-        row = verify_session.get(DoctorPriceOverride, override_id)
+    user_id, _, override_id = _seed(fresh_engine, existing_mirror=False)
+    _approve(fresh_engine, user_id, override_id)
+    with sessionmaker(bind=fresh_engine)() as session:
+        row = session.get(DoctorPriceOverride, override_id)
         assert row.status == "approved"
         assert row.approved_by == user_id
-        # SQLite хранит naive-datetime: проверяем наличие, без сравнения
-        # offset-aware «сейчас» (TypeErrors на naive vs aware).
         assert row.approved_at is not None
-    finally:
-        verify_session.close()

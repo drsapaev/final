@@ -317,6 +317,49 @@ def test_registrar_batch_cancel_rejects_queue_entry_for_other_patient(
 
 @pytest.mark.integration
 @pytest.mark.queue
+@pytest.mark.parametrize(("stored_mode", "approval", "requested_mode", "status"), (
+    ("none", "none", "percent_10", 200),
+    ("none", "none", " ALL_FREE ", 409),
+    ("none", "none", "benefit", 409),
+    ("all_free", "pending", "none", 409),
+    ("all_free", "approved", "none", 409),
+    ("all_free", "rejected", "none", 409),
+))
+def test_registrar_batch_preserves_discount_decisions_before_changes(
+    client, db_session, registrar_auth_headers, test_patient, test_doctor,
+    stored_mode, approval, requested_mode, status,
+):
+    entry = _create_existing_entry(
+        db_session, patient_id=test_patient.id, doctor_id=test_doctor.id, number=40, queue_tag="cardiology",
+    )
+    visit = _create_visit_with_id(
+        db_session, visit_id=900000 + entry.id, patient_id=test_patient.id, doctor_id=test_doctor.id,
+    )
+    visit.discount_mode = stored_mode
+    visit.approval_status = approval
+    db_session.commit()
+
+    response = client.patch(
+        f"/api/v1/registrar/batch/patients/{test_patient.id}/entries/{visit.visit_date}",
+        headers=registrar_auth_headers,
+        json={
+            "entries": [{"id": entry.id, "entry_type": "online_queue", "action": "update", "status": "called"}],
+            "common_updates": {"discount_mode": requested_mode, "notes": "SYNTHETIC-Routine edit"},
+        },
+    )
+    assert response.status_code == status, response.text
+    db_session.refresh(entry)
+    db_session.refresh(visit)
+    assert visit.approval_status == approval
+    if status == 200:
+        assert (entry.status, visit.discount_mode, visit.notes) == ("called", requested_mode, "SYNTHETIC-Routine edit")
+    else:
+        assert "согласован" in response.json()["detail"]
+        assert (entry.status, visit.discount_mode, visit.notes) == ("waiting", stored_mode, None)
+
+
+@pytest.mark.integration
+@pytest.mark.queue
 def test_registrar_batch_update_rejects_visit_for_other_patient(
     client,
     db_session,

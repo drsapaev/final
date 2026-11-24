@@ -8,7 +8,7 @@ import secrets
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     DotEnvSettingsSource,
@@ -55,6 +55,35 @@ class Settings(BaseSettings):
     # --- DB ---
     # Uses absolute path to prevent multiple copies when running from different directories
     DATABASE_URL: str = _DEFAULT_DATABASE_URL
+    # Explicit PostgreSQL runtime anchor used before authentication reads.
+    # Owner members are an independently reviewed JSON array in the environment.
+    TRUSTED_DB_SCHEMA: str | None = None
+    TRUSTED_DB_SCHEMA_OWNER: str | None = None
+    TRUSTED_DB_RUNTIME_ROLE: str | None = None
+    TRUSTED_DB_OWNER_MEMBERS: tuple[str, ...] = ()
+    TRUSTED_AUTH_TABLE_OWNER: str | None = None
+    TRUSTED_AUTH_OWNER_MEMBERS: tuple[str, ...] = ()
+    TRUSTED_AUTH_READ_ROLES: tuple[str, ...] = ()
+    TRUSTED_AUTH_WRITE_ROLES: tuple[str, ...] = ()
+    TRUSTED_AUTH_USERS_OWNER: str | None = None
+    TRUSTED_AUTH_USERS_OWNER_MEMBERS: tuple[str, ...] = ()
+    TRUSTED_AUTH_USERS_WRITE_ROLES: tuple[str, ...] = ()
+    # Explicit visibility boundary for patient notification consent tables.
+    NOTIFY_PREFERENCES_DB_OWNER: str | None = None
+    NOTIFY_PREFERENCES_DB_OWNER_MEMBERS: tuple[str, ...] = ()
+    NOTIFY_PREFERENCES_DB_READ_ROLES: tuple[str, ...] = ()
+    NOTIFY_PREFERENCES_DB_WRITE_ROLES: tuple[str, ...] = ()
+
+    # Dedicated secrets for doctor-price request fingerprints. They never
+    # fall back to the JWT key; the producer fails closed if not configured.
+    DOCTOR_PRICE_HMAC_KEYS: SecretStr | None = Field(default=None, repr=False)
+    DOCTOR_PRICE_HMAC_ACTIVE_VERSION: int | None = None
+    DOCTOR_PRICE_DB_SCHEMA: str | None = None
+    DOCTOR_PRICE_DB_SCHEMA_OWNER: str | None = None
+    DOCTOR_PRICE_DB_RUNTIME_ROLE: str | None = None
+    INVITATION_DB_SCHEMA: str | None = None
+    INVITATION_DB_SCHEMA_OWNER: str | None = None
+    INVITATION_DB_TABLE_OWNER: str | None = None
 
     # --- Auth / JWT ---
     # SECURITY WARNING: В продакшене ОБЯЗАТЕЛЬНО установите SECRET_KEY через переменную окружения!
@@ -137,6 +166,8 @@ class Settings(BaseSettings):
     #   - Туннель (ngrok): "https://abc123.ngrok.io"
     # Установите через переменную окружения: FRONTEND_URL=https://your-domain.com
     FRONTEND_URL: str = Field(default="http://192.168.1.9:5173")
+    # Explicit opt-in for HTTP localhost review links in dev/test only.
+    ALLOW_INSECURE_LOCAL_TELEGRAM_REVIEW: bool = False
 
     # TGCONFIRM-BE-001 (audit #3892, group 20): the patient Telegram confirm
     # callback calls THIS backend's confirmation API over HTTP. The code
@@ -200,7 +231,14 @@ class Settings(BaseSettings):
     CLICK_SERVICE_ID: str | None = Field(default=None, description="Click service id")
     CLICK_MERCHANT_ID: str | None = Field(default=None, description="Click merchant id")
     CLICK_SECRET_KEY: str | None = Field(default=None, description="Click secret key")
+    CLICK_WEBHOOK_CREDENTIALS: SecretStr | None = Field(default=None, repr=False)
     CLICK_BASE_URL: str = Field(default="https://api.click.uz/v2")
+    CLICK_RECEIPT_KEYS: SecretStr | None = Field(default=None, repr=False)
+    CLICK_RECEIPT_ACTIVE_VERSION: str | None = None
+    CLICK_RECEIPT_DB_SCHEMA: str | None = None
+    CLICK_RECEIPT_DB_SCHEMA_OWNER: str | None = None
+    CLICK_MERCHANT_USER_ID: str | None = None
+    CLICK_MERCHANT_API_SECRET: SecretStr | None = Field(default=None, repr=False)
 
     PAYME_ENABLED: bool = Field(default=False, description="Enable PayMe payments")
     PAYME_MERCHANT_ID: str | None = Field(default=None, description="PayMe merchant id")

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import log_critical_change
 from app.crud.visit import create_visit as crud_create_visit
 from app.models.visit import Visit
+from app.services.encounter_creation import create_standalone_encounter
 
 
 class VisitsApiRepository:
@@ -25,6 +26,12 @@ class VisitsApiRepository:
 
     def commit(self) -> None:
         self.db.commit()
+
+    def rollback(self) -> None:
+        self.db.rollback()
+
+    def create_standalone_encounter_id(self, patient_id: int) -> int:
+        return create_standalone_encounter(self.db, patient_id=patient_id).id
 
     def refresh(self, obj) -> None:
         self.db.refresh(obj)
@@ -70,6 +77,7 @@ class VisitsApiRepository:
         notes: str | None,
         source: str | None = None,
     ):
+        encounter_id = self.create_standalone_encounter_id(patient_id)
         return crud_create_visit(
             db=self.db,
             patient_id=patient_id,
@@ -81,6 +89,9 @@ class VisitsApiRepository:
             auto_status=False,
             notify=False,
             log=True,
+            encounter_id=encounter_id,
+            # The caller writes the audit record and owns the shared commit.
+            commit=False,
         )
 
     def log_critical_change(

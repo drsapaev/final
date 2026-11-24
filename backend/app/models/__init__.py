@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from . import discount_benefits as _discount_benefits  # noqa: F401
 from .activation import Activation
 from .activation_rate_budget import ActivationRateBudget
 from .ai_chat import AIChatFeedback, AIChatMessage, AIChatSession
@@ -22,6 +23,9 @@ from .authentication import (
 )
 from .cardio_blood_test import CardioBloodTest
 from .cardio_ecg_record import CardioECGRecord
+from .click_callback_receipt import ClickCallbackReceipt, ClickReceiptKeyVersion
+from .click_prepare import ClickIssuedAttempt, ClickPrepare, ClickReceiptReconciliationLink
+from .click_reconciliation_review import ClickReconciliationReview
 from .clinic import (
     Backup,
     BackupStatus,
@@ -99,6 +103,14 @@ from .emr_v2 import (
     EMRRevision,
 )
 from .emr_version import EMRVersion
+from .encounter import Encounter
+from .encounter_benefit_ledger import (
+    EncounterBenefitAllocation,
+    EncounterBenefitApplication,
+    EncounterBenefitEvent,
+    EncounterBenefitQuotaAnchor,
+    EncounterBenefitVisitSnapshot,
+)
 from .family_relation import FamilyRelation, RelationType
 from .feature_flags import FeatureFlag, FeatureFlagHistory
 from .file_system import (
@@ -160,7 +172,14 @@ from .patient_relationship import (  # M4-P1-3: context roles
 from .payment import Payment, PaymentClientRequest
 from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from .payment_webhook import PaymentProvider, PaymentTransaction, PaymentWebhook
+from .provider_reconciliation import ProviderReconciliationConflict, ProviderReconciliationEvent
 from .print_config import PrinterConfig, PrintJob, PrintTemplate
+from .doctor_price_intent import DoctorPriceHmacKeyVersion, DoctorPriceIntent, DoctorPriceIntentKey, DoctorPriceIntentLine
+from .provider_attempt import (
+    ProviderActiveVisitReservation,
+    ProviderAttempt,
+    ProviderAttemptVisit,
+)
 from .public_booking_request import (
     PublicBookingRequest,
     PublicBookingRequestEvent,
@@ -347,6 +366,12 @@ __all__ = [
     "TelegramPatientFormSubmission",
     "PatientOnboardingRequest",
     "DoctorPriceOverride",
+    "Encounter",
+    "EncounterBenefitAllocation",
+    "EncounterBenefitApplication",
+    "EncounterBenefitEvent",
+    "EncounterBenefitQuotaAnchor",
+    "EncounterBenefitVisitSnapshot",
     "DoctorPhraseHistory",
     "DoctorTreatmentTemplate",
     "DoctorTreatmentTemplateBase",
@@ -354,6 +379,15 @@ __all__ = [
     "DoctorTreatmentTemplatesListResponse",
     "PaymentInvoice",
     "PaymentInvoiceVisit",
+    "ProviderActiveVisitReservation",
+    "DoctorPriceHmacKeyVersion",
+    "DoctorPriceIntent",
+    "DoctorPriceIntentKey",
+    "DoctorPriceIntentLine",
+    "ProviderReconciliationConflict",
+    "ProviderReconciliationEvent",
+    "ProviderAttempt",
+    "ProviderAttemptVisit",
     "PublicBookingRequest",
     "PublicBookingRequestEvent",
     "PublicBookingRequestNotificationOutbox",
@@ -395,4 +429,21 @@ __all__ = [
     "AIPromptTemplate",
     "AIProvider",
     "AIUsageLog",
+    "VisitInvitationDelivery",
+    "VisitInvitationIssuerAuth",
+    "VisitInvitationPriceApprovalAuth",
+    "VisitInvitationApprovalRecovery",
+    "ClickCallbackReceipt",
+    "ClickReceiptKeyVersion",
+    "ClickIssuedAttempt",
+    "ClickPrepare",
+    "ClickReconciliationReview",
+    "ClickReceiptReconciliationLink",
 ]
+
+from .visit_invitation_delivery import (
+    VisitInvitationApprovalRecovery,
+    VisitInvitationDelivery,
+    VisitInvitationIssuerAuth,
+    VisitInvitationPriceApprovalAuth,
+)

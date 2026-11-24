@@ -151,7 +151,7 @@ def test_canonical_patient_user_token_remains_accepted(client, db_session):
 
 
 @pytest.fixture
-def patient_scoped_identity(db_session):
+def patient_scoped_identity(db_session, patient_ownership_epochs):
     from app.models.patient import Patient
     from app.models.user import User
 
@@ -169,7 +169,9 @@ def patient_scoped_identity(db_session):
     )
     db_session.add(patient)
     db_session.commit()
-    token = _token(user.id, {"scope": "patient_portal", "patient_id": patient.id})
+    token = create_access_token(
+        {"sub": str(user.id), "scope": "patient_portal", "patient_id": patient.id}
+    )
     return user, patient, token
 
 

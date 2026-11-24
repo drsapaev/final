@@ -8,6 +8,7 @@
 - Own-data тесты (Patient видит только свои данные)
 """
 from datetime import date
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,7 +23,7 @@ from app.models.patient import Patient
 from app.models.patient_access_audit import PatientAccessAuditLog
 from app.models.payment import Payment
 from app.models.user import User
-from app.models.visit import Visit
+from app.models.visit import Visit, VisitService
 
 
 class _NoCloseSessionProxy:
@@ -278,15 +279,29 @@ class TestPositiveRBAC:
             }
         ]
 
-    def test_cashier_can_init_payment(self, client: TestClient, cashier_token: str, test_patient_for_rbac: Patient, db_session: Session):
+    def test_cashier_can_init_payment(
+        self, client: TestClient, cashier_token: str, test_patient_for_rbac: Patient,
+        db_session: Session, monkeypatch,
+    ):
         """Cashier может инициализировать платёж"""
-        # Создаём визит
-        from app.models.visit import Visit
+        manager = Mock()
+        manager.get_providers_for_currency.return_value = ["click"]
+        manager.create_payment.return_value = Mock(
+            success=True, payment_id="SYNTHETIC-CLICK", payment_url="https://example.test/payment",
+            provider_data={"synthetic": True}, status="pending",
+        )
+        monkeypatch.setattr("app.api.v1.endpoints.payments.get_payment_manager", lambda: manager)
         visit = Visit(
             patient_id=test_patient_for_rbac.id,
             status="open",
+            confirmation_context_epoch=1,
         )
         db_session.add(visit)
+        db_session.flush()
+        db_session.add(VisitService(
+            visit_id=visit.id, service_id=1, name="SYNTHETIC SERVICE",
+            qty=1, price=100000, currency="UZS",
+        ))
         db_session.commit()
         db_session.refresh(visit)
 
@@ -300,7 +315,9 @@ class TestPositiveRBAC:
             },
             headers={"Authorization": f"Bearer {cashier_token}"},
         )
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
+        assert response.json()["success"] is True
+        manager.create_payment.assert_called_once()
 
     def test_cashier_can_list_payments(self, client: TestClient, cashier_token: str):
         """Cashier может просматривать список платежей"""

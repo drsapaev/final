@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
+from sqlalchemy import event
+
 from app.models.derma_examination import DermaExamination
 from app.models.derma_history import DermaHistoryEntry
 from app.models.derma_procedure import DermaProcedure
@@ -482,6 +484,28 @@ class TestAfterFlushJointState:
     flush'ы Visit + EMRRecord — пути, где листенер обязан видеть
     согласованное состояние обоих источников.
     """
+
+    def test_approval_flush_does_not_read_emr(self, db_session, test_patient, test_doctor, admin_user):
+        visit = _add_visit(db_session, patient=test_patient, doctor=test_doctor)
+        _add_emr(
+            db_session, visit=visit, data=_derma_emr_data(), created_by=admin_user.id,
+        )
+        clinical_reads = []
+
+        def record_select(conn, cursor, statement, parameters, context, executemany):
+            normalized = statement.lstrip().lower()
+            if normalized.startswith("select") and "emr_records" in normalized:
+                clinical_reads.append(True)
+
+        connection = db_session.connection()
+        event.listen(connection, "before_cursor_execute", record_select)
+        try:
+            visit.approval_status = "approved"
+            db_session.flush()
+        finally:
+            event.remove(connection, "before_cursor_execute", record_select)
+
+        assert not clinical_reads
 
     def test_joint_create_visit_and_emr_single_flush(
         self, db_session, test_patient, test_doctor, admin_user

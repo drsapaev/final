@@ -16,10 +16,22 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import event
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.sql.dml import Insert
+from tests.conftest import mint_access_token
 
+from app.models.audit import AuditLog
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.payment import Payment
-from app.models.refund_deposit import DepositTransaction, PatientDeposit
+from app.models.refund_deposit import (
+    DepositTransaction,
+    PatientDeposit,
+    PaymentRefundClaim,
+    RefundRequest,
+)
+from app.models.user import User
+from app.models.user_profile import UserAuditLog
 from app.models.visit import Visit
 
 PREVIEW_PATH = "/api/v1/force-majeure/pending-entries"
@@ -469,3 +481,328 @@ class TestForceMajeureEndpoints:
             db_session.query(DailyQueue).filter(DailyQueue.day == tomorrow).count()
             == 0
         )
+
+
+FINANCIAL_PREFIX = "/api/v1/force-majeure"
+DEPOSIT_COMMAND = {
+    "patient_id": 1,
+    "amount": "2.00",
+    "client_request_id": "00000000-0000-4000-8000-000000000001",
+}
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("method", "path", "role", "superuser", "body"),
+    [
+        pytest.param("GET", "/refund-requests", "Cashier", False, None, id="refund-list"),
+        pytest.param("GET", "/refund-requests/1", "Cashier", False, None, id="refund-detail"),
+        pytest.param(
+            "POST", "/refund-requests/1/process", "Cashier", False,
+            {"action": "reject", "rejection_reason": "SYNTHETIC"},
+            id="refund-decision",
+        ),
+        pytest.param("GET", "/deposits", "Cashier", False, None, id="deposit-list"),
+        pytest.param("GET", "/deposits/patient/1", "Registrar", False, None, id="patient-deposit"),
+        pytest.param("GET", "/deposits/1/transactions", "Cashier", False, None, id="deposit-history"),
+        pytest.param("POST", "/deposits/add", "Cashier", False, DEPOSIT_COMMAND, id="deposit-credit"),
+        pytest.param("POST", "/deposits/use", "Cashier", False, DEPOSIT_COMMAND, id="deposit-debit"),
+        pytest.param(
+            "POST", "/cancel-with-refund", "Registrar", False,
+            {"specialist_id": 1, "reason": "SYNTHETIC", "send_notifications": False},
+            id="queue-refund",
+        ),
+        pytest.param("GET", "/deposits", "Admin", True, None, id="superuser"),
+    ],
+)
+def test_financial_route_refuses_an_inactive_account(
+    client, db_session, method, path, role, superuser, body,
+):
+    actor = User(
+        username="SYNTHETIC-force-finance",
+        hashed_password="!",
+        role=role,
+        is_active=True,
+        is_superuser=superuser,
+    )
+    db_session.add(actor)
+    db_session.commit()
+    headers = {"Authorization": f"Bearer {mint_access_token(actor)}"}
+
+    actor.is_active = False
+    db_session.commit()
+
+    response = client.request(method, f"{FINANCIAL_PREFIX}{path}", json=body, headers=headers)
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Пользователь деактивирован"
+    [denial] = db_session.query(UserAuditLog).filter_by(user_id=actor.id, action="ACCESS_DENIED").all()
+    assert denial.new_values["denial_reason"] == "user_deactivated"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(("role", "status"), [("Cashier", 200), ("Registrar", 403)])
+def test_active_refund_reader_respects_existing_roles(client, db_session, role, status):
+    actor = User(username="SYNTHETIC-refund-reader", hashed_password="!", role=role, is_active=True)
+    db_session.add(actor)
+    db_session.commit()
+    headers = {"Authorization": f"Bearer {mint_access_token(actor)}"}
+
+    response = client.get(f"{FINANCIAL_PREFIX}/refund-requests", headers=headers)
+
+    assert response.status_code == status
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("audit_available", [True, False], ids=["audit-available", "audit-denied"])
+def test_bank_refund_creation_and_audit_share_the_queue_transaction(
+    client, db_session, test_doctor, test_patient, admin_user, admin_auth_headers,
+    monkeypatch, audit_available,
+):
+    queue, (entry,), (payment,) = _seed_bound_queue(db_session, test_doctor, test_patient, entries=1)
+    body = {
+        "specialist_id": test_doctor.id,
+        "entry_ids": [entry.id],
+        "target_date": str(queue.day),
+        "refund_type": "bank_transfer",
+        "reason": "SYNTHETIC PRIVATE REASON",
+        "send_notifications": False,
+    }
+    if not audit_available:
+        def unavailable(*args, **kwargs):
+            raise SQLAlchemyError("SYNTHETIC PRIVATE AUDIT FAILURE")
+
+        monkeypatch.setattr("app.services.force_majeure_service.record_refund_request_creation", unavailable)
+
+    response = client.post(CANCEL_PATH, headers=admin_auth_headers, json=body)
+
+    assert response.status_code == 200
+    assert "SYNTHETIC PRIVATE AUDIT FAILURE" not in response.text
+    assert response.json()["cancelled"] == int(audit_available)
+    assert response.json()["failed"] == int(not audit_available)
+    db_session.expire_all()
+    assert entry.status == ("cancelled" if audit_available else "waiting")
+    assert payment.status == "paid" and payment.refunded_amount is None
+    requests = db_session.query(RefundRequest).filter_by(payment_id=payment.id).all()
+    claims = db_session.query(PaymentRefundClaim).filter_by(payment_id=payment.id).all()
+    events = db_session.query(AuditLog).filter_by(event_type="REFUND_REQUEST_CREATED")
+    assert len(requests) == len(claims) == events.count() == int(audit_available)
+    if audit_available:
+        [request] = requests
+        [claim] = claims
+        assert claim.refund_request_id == request.id
+        event = events.one()
+        assert event.entity_id == request.id and event.actor_user_id == admin_user.id
+        assert event.payload == {
+            "payment_id": payment.id,
+            "new_status": "pending",
+            "refund_amount": "101.00",
+            "currency": "UZS",
+        }
+
+        duplicate = client.post(CANCEL_PATH, headers=admin_auth_headers, json=body)
+        assert duplicate.status_code == 200 and duplicate.json()["cancelled"] == 0
+        assert events.count() == 1
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("channel", ["deposit", "bank_transfer"])
+@pytest.mark.parametrize("evidence", ["split", "manual_refund"])
+def test_force_refund_preserves_ambiguous_or_already_reserved_funds(
+    client, db_session, test_doctor, test_patient, admin_auth_headers, channel, evidence,
+):
+    queue, (entry,), (payment,) = _seed_bound_queue(db_session, test_doctor, test_patient, entries=1)
+    if evidence == "split":
+        db_session.add(Payment(
+            visit_id=payment.visit_id, amount=Decimal("20.00"), currency="UZS",
+            method="card", status="paid",
+        ))
+    else:
+        db_session.add(RefundRequest(
+            patient_id=test_patient.id, payment_id=payment.id, visit_id=payment.visit_id,
+            original_amount=payment.amount, refund_amount=Decimal("15.00"),
+            status="pending", refund_type="bank_transfer", is_automatic=False,
+        ))
+    db_session.commit()
+
+    response = client.post(CANCEL_PATH, headers=admin_auth_headers, json={
+        "specialist_id": test_doctor.id, "entry_ids": [entry.id], "target_date": str(queue.day),
+        "refund_type": channel, "reason": "SYNTHETIC", "send_notifications": False,
+    })
+
+    assert response.status_code == 200
+    body = response.json()
+    is_split = evidence == "split"
+    assert body["cancelled"] == int(not is_split)
+    assert body["failed"] == int(is_split)
+    if is_split:
+        assert body["errors"] == [{"entry_id": entry.id, "error": "Платежи визита требуют сверки"}]
+    else:
+        assert body["refund_requests_existing"] == 1
+    db_session.expire_all()
+    assert entry.status == ("waiting" if is_split else "cancelled")
+    assert payment.status == "paid" and payment.refunded_amount is None
+    assert db_session.query(PaymentRefundClaim).filter_by(payment_id=payment.id).count() == 0
+    assert db_session.query(DepositTransaction).filter_by(payment_id=payment.id).count() == 0
+    assert db_session.query(RefundRequest).filter_by(payment_id=payment.id).count() == int(not is_split)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("action", ["deposit", "bank_transfer", "reject"])
+def test_refund_claim_requires_evidence_from_the_same_payment(
+    client, db_session, test_doctor, test_patient, admin_auth_headers, action,
+):
+    queue, (entry, _), (payment, other_payment) = _seed_bound_queue(db_session, test_doctor, test_patient)
+    request_status = "pending" if action == "reject" else "rejected"
+    request = RefundRequest(
+        patient_id=test_patient.id, payment_id=other_payment.id, visit_id=other_payment.visit_id,
+        original_amount=other_payment.amount, refund_amount=other_payment.amount,
+        status=request_status, refund_type="bank_transfer", is_automatic=True,
+    )
+    db_session.add(request)
+    db_session.flush()
+    claim = PaymentRefundClaim(
+        payment_id=payment.id, channel="refund_request", refund_request_id=request.id,
+    )
+    db_session.add(claim)
+    db_session.commit()
+    claim_id = claim.id
+
+    if action == "reject":
+        response = client.post(
+            f"{FINANCIAL_PREFIX}/refund-requests/{request.id}/process",
+            headers=admin_auth_headers,
+            json={"action": action, "rejection_reason": "SYNTHETIC"},
+        )
+        assert response.status_code == 409
+        assert response.json()["detail"] == "Резерв возврата требует сверки"
+    else:
+        response = client.post(CANCEL_PATH, headers=admin_auth_headers, json={
+            "specialist_id": test_doctor.id, "entry_ids": [entry.id], "target_date": str(queue.day),
+            "refund_type": action, "reason": "SYNTHETIC", "send_notifications": False,
+        })
+        assert response.status_code == 200
+        result = response.json()
+        assert result["cancelled"] == 0 and result["failed"] == 1
+        assert result["errors"] == [{"entry_id": entry.id, "error": "Резерв возврата требует сверки"}]
+
+    db_session.expire_all()
+    assert entry.status == "waiting"
+    assert payment.status == "paid" and payment.refunded_amount is None
+    assert request.status == request_status and request.processed_by is None
+    assert request.payment_id == other_payment.id
+    [stored_claim] = db_session.query(PaymentRefundClaim).all()
+    assert (stored_claim.id, stored_claim.payment_id, stored_claim.refund_request_id) == (
+        claim_id, payment.id, request.id,
+    )
+    assert db_session.query(RefundRequest).count() == 1
+    assert db_session.query(DepositTransaction).count() == 0
+    assert db_session.query(AuditLog).filter_by(entity_type="refund_request").count() == 0
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("channel", ["deposit", "bank_transfer"])
+@pytest.mark.parametrize("evidence", ["missing-credit", "foreign-credit", "debit", "missing-bank-request", "own-credit"])
+def test_cancel_recognizes_only_a_verified_prior_refund(
+    client, db_session, test_doctor, test_patient, admin_auth_headers, channel, evidence,
+):
+    queue, (entry, _), (payment, other_payment) = _seed_bound_queue(db_session, test_doctor, test_patient)
+    deposit = PatientDeposit(patient_id=test_patient.id, balance=Decimal("25.00"), currency="UZS")
+    db_session.add(deposit)
+    db_session.flush()
+
+    transaction_id = None
+    if evidence in {"foreign-credit", "debit", "own-credit"}:
+        recorded_payment = other_payment if evidence == "foreign-credit" else payment
+        transaction = DepositTransaction(
+            deposit_id=deposit.id, payment_id=recorded_payment.id, visit_id=recorded_payment.visit_id,
+            transaction_type="debit" if evidence == "debit" else "credit",
+            amount=Decimal("25.00"), balance_after=deposit.balance, description="SYNTHETIC",
+        )
+        db_session.add(transaction)
+        db_session.flush()
+        transaction_id = transaction.id
+
+    claim = PaymentRefundClaim(
+        payment_id=payment.id,
+        channel="refund_request" if evidence == "missing-bank-request" else "deposit",
+        deposit_transaction_id=transaction_id,
+    )
+    db_session.add(claim)
+    db_session.commit()
+    claim_id = claim.id
+
+    response = client.post(CANCEL_PATH, headers=admin_auth_headers, json={
+        "specialist_id": test_doctor.id, "entry_ids": [entry.id], "target_date": str(queue.day),
+        "refund_type": channel, "reason": "SYNTHETIC", "send_notifications": False,
+    })
+
+    assert response.status_code == 200
+    result = response.json()
+    already_credited = evidence == "own-credit"
+    assert result["cancelled"] == int(already_credited)
+    assert result["failed"] == int(not already_credited)
+    assert result["deposit_credits_existing"] == int(already_credited)
+    assert result["refund_requests_existing"] == 0
+    if not already_credited:
+        assert result["errors"] == [{"entry_id": entry.id, "error": "Резерв возврата требует сверки"}]
+
+    db_session.expire_all()
+    assert entry.status == ("cancelled" if already_credited else "waiting")
+    assert payment.status == "paid" and payment.refunded_amount is None
+    assert deposit.balance == Decimal("25.00")
+    [preserved] = db_session.query(PaymentRefundClaim).all()
+    assert (preserved.id, preserved.payment_id, preserved.deposit_transaction_id) == (claim_id, payment.id, transaction_id)
+    assert db_session.query(DepositTransaction).count() == int(transaction_id is not None)
+    assert db_session.query(RefundRequest).count() == 0
+    assert db_session.query(AuditLog).filter_by(entity_type="refund_request").count() == 0
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("channel", ["deposit", "bank_transfer"])
+def test_refund_claim_write_failure_keeps_queue_entry_retryable(
+    client, db_session, test_doctor, test_patient, admin_auth_headers, channel,
+):
+    queue, (entry,), (payment,) = _seed_bound_queue(db_session, test_doctor, test_patient, entries=1)
+    body = {
+        "specialist_id": test_doctor.id, "entry_ids": [entry.id],
+        "target_date": str(queue.day), "refund_type": channel,
+        "reason": "SYNTHETIC", "send_notifications": False,
+    }
+    engine = db_session.get_bind()
+
+    def fail_claim_insert(_conn, statement, _multiparams, _params, _options):
+        if isinstance(statement, Insert) and statement.table.name == "payment_refund_claims":
+            raise IntegrityError("synthetic claim insert", (), RuntimeError("synthetic storage failure"))
+
+    event.listen(engine, "before_execute", fail_claim_insert)
+    try:
+        response = client.post(CANCEL_PATH, headers=admin_auth_headers, json=body)
+    finally:
+        event.remove(engine, "before_execute", fail_claim_insert)
+
+    assert response.status_code == 200, response.text
+    failed = response.json()
+    assert failed["cancelled"] == 0 and failed["failed"] == 1
+    assert failed["errors"] == [{"entry_id": entry.id, "error": "Резерв возврата требует сверки"}]
+    assert failed["refund_requests_existing"] == failed["deposit_credits_existing"] == 0
+    db_session.expire_all()
+    assert entry.status == "waiting"
+    for model in (PaymentRefundClaim, RefundRequest, DepositTransaction):
+        assert db_session.query(model.id).filter_by(payment_id=payment.id).count() == 0
+    assert db_session.query(AuditLog.id).filter_by(event_type="REFUND_REQUEST_CREATED").count() == 0
+
+    retry = client.post(CANCEL_PATH, headers=admin_auth_headers, json=body)
+    assert retry.status_code == 200 and retry.json()["cancelled"] == 1, retry.text
+    db_session.expire_all()
+    assert entry.status == "cancelled"
+    claim = db_session.query(PaymentRefundClaim).filter_by(payment_id=payment.id).one()
+    if channel == "deposit":
+        credit = db_session.query(DepositTransaction).filter_by(payment_id=payment.id).one()
+        assert claim.deposit_transaction_id == credit.id
+    else:
+        request = db_session.query(RefundRequest).filter_by(payment_id=payment.id).one()
+        assert claim.refund_request_id == request.id
+        assert db_session.query(AuditLog.id).filter_by(
+            entity_type="refund_request", entity_id=request.id, event_type="REFUND_REQUEST_CREATED",
+        ).count() == 1

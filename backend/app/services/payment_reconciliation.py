@@ -19,6 +19,7 @@ from app.services.payment_providers.manager import PaymentProviderManager
 logger = logging.getLogger(__name__)
 
 SUPPORTED_RECONCILIATION_PROVIDERS = ("click", "payme", "kaspi")
+RECONCILIATION_UNAVAILABLE = "Payment reconciliation is temporarily unavailable"
 
 
 def _as_aware_utc(value: datetime) -> datetime:
@@ -72,13 +73,17 @@ class PaymentReconciliationService:
 
             # Get provider statement (if available)
             provider = self.payment_manager.get_provider(provider_name)
-            provider_statement = None
+            provider_transactions = None
 
-            if provider and hasattr(provider, 'get_statement'):
+            get_statement = getattr(provider, "get_statement", None)
+            if callable(get_statement):
                 try:
-                    provider_statement = provider.get_statement(start_date, end_date)
-                except Exception as e:
-                    logger.warning(f"Could not get provider statement: {e}")
+                    statement = get_statement(start_date, end_date)
+                except Exception as exc:
+                    logger.warning("Could not get provider statement (%s)", type(exc).__name__)
+                else:
+                    if isinstance(statement, dict) and isinstance(statement.get("transactions"), list):
+                        provider_transactions = statement["transactions"]
 
             # Compare internal vs provider records
             discrepancies = []
@@ -92,11 +97,13 @@ class PaymentReconciliationService:
             }
 
             # If we have provider statement, compare
-            if provider_statement:
+            if provider_transactions is not None:
                 provider_by_id = {
                     t.get("transaction_id") or t.get("id"): t
-                    for t in provider_statement.get("transactions", [])
+                    for t in provider_transactions
                 }
+                if None in provider_by_id or len(provider_by_id) != len(provider_transactions):
+                    raise ValueError("Invalid provider transaction identifiers")
 
                 # Find matches and discrepancies
                 for trans_id, internal_trans in internal_by_id.items():
@@ -104,7 +111,7 @@ class PaymentReconciliationService:
 
                     if provider_trans:
                         # Compare amounts
-                        provider_amount = provider_trans.get("amount", 0)
+                        provider_amount = provider_trans["amount"]
                         internal_amount = internal_trans.amount
 
                         if provider_amount != internal_amount:
@@ -139,11 +146,12 @@ class PaymentReconciliationService:
 
             # Calculate totals
             total_internal = sum(t.amount for t in internal_transactions)
-            total_provider = 0
-            if provider_statement:
-                total_provider = sum(
-                    t.get("amount", 0) for t in provider_statement.get("transactions", [])
-                )
+            total_provider = (
+                sum(t["amount"] for t in provider_transactions)
+                if provider_transactions is not None
+                else None
+            )
+            statement_available = provider_transactions is not None
 
             return {
                 "provider": provider_name,
@@ -151,14 +159,15 @@ class PaymentReconciliationService:
                     "start": start_date.isoformat(),
                     "end": end_date.isoformat(),
                 },
+                "statement_available": statement_available,
                 "summary": {
                     "total_internal": total_internal,
                     "total_provider": total_provider,
-                    "difference": total_provider - total_internal,
-                    "matched_count": len(matched),
-                    "discrepancy_count": len(discrepancies),
-                    "missing_in_provider_count": len(missing_in_provider),
-                    "missing_internal_count": len(missing_internal),
+                    "difference": total_provider - total_internal if total_provider is not None else None,
+                    "matched_count": len(matched) if statement_available else None,
+                    "discrepancy_count": len(discrepancies) if statement_available else None,
+                    "missing_in_provider_count": len(missing_in_provider) if statement_available else None,
+                    "missing_internal_count": len(missing_internal) if statement_available else None,
                 },
                 "discrepancies": discrepancies,
                 "missing_in_provider": missing_in_provider,
@@ -166,11 +175,12 @@ class PaymentReconciliationService:
                 "reconciled_at": datetime.now(UTC).isoformat(),
             }
 
-        except Exception as e:
-            logger.error(f"Error reconciling provider {provider_name}: {e}")
+        except Exception as exc:
+            logger.error("Payment reconciliation failed (%s)", type(exc).__name__)
             return {
                 "provider": provider_name,
-                "error": str(e),
+                "statement_available": False,
+                "error": RECONCILIATION_UNAVAILABLE,
                 "reconciled_at": datetime.now(UTC).isoformat(),
             }
 
@@ -188,12 +198,14 @@ class PaymentReconciliationService:
         for provider in SUPPORTED_RECONCILIATION_PROVIDERS:
             results[provider] = self.reconcile_provider(provider, start_date, end_date)
 
-        # Calculate overall summary
-        total_discrepancies = sum(
-            r.get("summary", {}).get("discrepancy_count", 0) for r in results.values()
-        )
-        total_difference = sum(
-            r.get("summary", {}).get("difference", 0) for r in results.values()
+        compared = [report["summary"] for report in results.values() if report.get("statement_available")]
+        comparison_complete = len(compared) == len(results)
+        has_discrepancies = any(
+            summary["discrepancy_count"]
+            or summary["difference"]
+            or summary["missing_in_provider_count"]
+            or summary["missing_internal_count"]
+            for summary in compared
         )
 
         return {
@@ -203,9 +215,16 @@ class PaymentReconciliationService:
             },
             "providers": results,
             "overall_summary": {
-                "total_discrepancies": total_discrepancies,
-                "total_difference": total_difference,
-                "has_discrepancies": total_discrepancies > 0 or total_difference != 0,
+                "comparison_complete": comparison_complete,
+                "total_discrepancies": (
+                    sum(summary["discrepancy_count"] for summary in compared)
+                    if comparison_complete else None
+                ),
+                "total_difference": (
+                    sum(summary["difference"] for summary in compared)
+                    if comparison_complete else None
+                ),
+                "has_discrepancies": has_discrepancies if comparison_complete or has_discrepancies else None,
             },
             "reconciled_at": datetime.now(UTC).isoformat(),
         }
@@ -223,39 +242,35 @@ class PaymentReconciliationService:
         Returns:
             List of potentially missing payments
         """
-        try:
-            cutoff_date = datetime.now(UTC) - timedelta(days=days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days)
+        return self._find_missing_payments(provider_name, cutoff_date=cutoff_date)
 
-            # Find payments that were initiated but never completed
-            pending_payments = self.repository.list_pending_payments_for_provider(
+    def _find_missing_payments(
+        self, provider_name: str, *, cutoff_date: datetime, end_at: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        pending_payments = self.repository.list_pending_payments_for_provider(
+            provider_name=provider_name,
+            cutoff_date=cutoff_date,
+            end_at=end_at,
+        )
+
+        now = datetime.now(UTC)
+        missing = []
+        for payment in pending_payments:
+            transaction = self.repository.get_completed_transaction_for_payment(
+                payment_id=payment.id,
                 provider_name=provider_name,
-                cutoff_date=cutoff_date,
             )
-
-            missing = []
-            for payment in pending_payments:
-                # Check if there's a corresponding transaction
-                transaction = self.repository.get_completed_transaction_for_payment(
-                    payment_id=payment.id,
-                    provider_name=provider_name,
-                )
-
-                if not transaction:
-                    # Payment was initiated but never completed
-                    missing.append({
-                        "payment_id": payment.id,
-                        "amount": payment.amount,
-                        "currency": payment.currency,
-                        "created_at": payment.created_at.isoformat(),
-                        "status": payment.status,
-                        "days_pending": (datetime.now(UTC) - _as_aware_utc(payment.created_at)).days,
-                    })
-
-            return missing
-
-        except Exception as e:
-            logger.error(f"Error detecting missing payments: {e}")
-            return []
+            if not transaction:
+                missing.append({
+                    "payment_id": payment.id,
+                    "amount": payment.amount,
+                    "currency": payment.currency,
+                    "created_at": payment.created_at.isoformat(),
+                    "status": payment.status,
+                    "days_pending": (now - _as_aware_utc(payment.created_at)).days,
+                })
+        return missing
 
     def generate_reconciliation_report(
         self, start_date: date, end_date: date, format: str = "json"
@@ -273,12 +288,11 @@ class PaymentReconciliationService:
         """
         reconciliation = self.reconcile_all_providers(start_date, end_date)
 
-        # Add missing payments detection
+        # Apply the report's UTC date boundaries to the missing-payment section.
+        start_at = datetime.combine(start_date, datetime.min.time(), tzinfo=UTC)
+        end_at = datetime.combine(end_date, datetime.max.time(), tzinfo=UTC)
         for provider in SUPPORTED_RECONCILIATION_PROVIDERS:
-            missing = self.detect_missing_payments(
-                provider,
-                days=(end_date - start_date).days,
-            )
+            missing = self._find_missing_payments(provider, cutoff_date=start_at, end_at=end_at)
             if provider in reconciliation.get("providers", {}):
                 reconciliation["providers"][provider]["missing_payments"] = missing
 
@@ -304,7 +318,14 @@ class PaymentReconciliationService:
                 alerts.append({
                     "severity": "error",
                     "provider": provider_name,
-                    "message": f"Reconciliation error: {provider_data['error']}",
+                    "message": RECONCILIATION_UNAVAILABLE,
+                })
+                continue
+            if provider_data.get("statement_available") is False:
+                alerts.append({
+                    "severity": "warning",
+                    "provider": provider_name,
+                    "message": "Provider statement unavailable",
                 })
                 continue
 

@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from hashlib import sha256
+from json import dumps
+from types import SimpleNamespace
 from typing import Any
+from uuid import UUID
 
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.pii_masker import mask_card_number
 from app.crud.clinic import clinic_today
 from app.crud.queue_resource_routing import (
     resolve_registry_tag_queue_for_specialist,
@@ -21,11 +27,22 @@ from app.models.refund_deposit import (
     RefundRequestStatus,
     RefundType,
 )
-from app.repositories.force_majeure_api_repository import ForceMajeureApiRepository
+from app.repositories.force_majeure_api_repository import (
+    ForceMajeureApiRepository,
+    RefundClaimEvidenceError,
+)
+from app.services.all_free_approval import (
+    ALL_FREE_DECISION_REQUIRED,
+    awaits_all_free_decision,
+)
 from app.services.force_majeure_service import (
     ForceMajeureError,
     get_force_majeure_service,
 )
+from app.services.money_input import MAX_MONEY, MoneyInputError, parse_money
+from app.services.payment_invariant_service import PaymentInvariantService
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -408,6 +425,7 @@ class ForceMajeureApiService:
         if not req:
             raise ForceMajeureApiDomainError(404, "Заявка на возврат не найдена")
 
+        previous_status = req.status
         action = process_request.action.lower()
         if action == "approve":
             if req.status != RefundRequestStatus.PENDING.value:
@@ -415,7 +433,11 @@ class ForceMajeureApiService:
                     400,
                     "Можно одобрить только заявки со статусом pending",
                 )
-            req.status = RefundRequestStatus.APPROVED.value
+            # The historical request does not bind its original currency or
+            # settlement evidence. A current Payment currency is insufficient
+            # to establish what the operator is approving.
+            self.repository.rollback()
+            raise ForceMajeureApiDomainError(409, "Для подтверждения возврата требуется сверка валюты")
         elif action == "reject":
             if req.status not in [
                 RefundRequestStatus.PENDING.value,
@@ -425,49 +447,65 @@ class ForceMajeureApiService:
                     400,
                     "Нельзя отклонить заявку с текущим статусом",
                 )
+            if not self._refund_request_available_actions(req.status, req.refund_type):
+                # A legacy approval can precede an external transfer whose
+                # completion was never recorded. Preserve its payment claim.
+                self.repository.rollback()
+                raise ForceMajeureApiDomainError(409, "Для отклонения одобренного возврата требуется сверка выплаты")
             if not process_request.rejection_reason:
                 raise ForceMajeureApiDomainError(400, "Укажите причину отклонения")
             req.status = RefundRequestStatus.REJECTED.value
             req.rejection_reason = process_request.rejection_reason
-            # 3808 review round 5 (P1 claim lifecycle): reject — терминальный
-            # НЕ-платящий статус: деньги пациенту не ушли, поэтому единый
-            # claim платежа освобождается В ЭТОЙ ЖЕ транзакции (commit ниже),
-            # и повторный возврат — исправленная заявка или депозит —
-            # становится возможен. Удаляется только claim этой заявки;
-            # claim более поздней заявки не затрагивается. Ленивое
-            # самоисцеление в ForceMajeureService._claim_payment_refund
-            # покрывает пути отклонения в обход этого метода.
-            self.repository.release_refund_claim_for_request(req.id)
         elif action == "complete":
             if req.status != RefundRequestStatus.APPROVED.value:
                 raise ForceMajeureApiDomainError(
                     400,
                     "Можно завершить только одобренные заявки",
                 )
-            req.status = RefundRequestStatus.COMPLETED.value
+            # Completion may record money already sent externally. Preserve
+            # the request for the audited reconciliation path, never guess.
+            self.repository.rollback()
+            raise ForceMajeureApiDomainError(409, "Для завершения возврата требуется сверка валюты")
         else:
-            raise ForceMajeureApiDomainError(400, f"Неизвестное действие: {action}")
+            raise ForceMajeureApiDomainError(400, "Неизвестное действие")
 
         req.processed_by = current_user.id
         req.processed_at = datetime.now(UTC)
-        if process_request.bank_card_number:
-            req.bank_card_number = process_request.bank_card_number
         if process_request.manager_notes:
             req.manager_notes = process_request.manager_notes
 
-        self.repository.commit()
+        try:
+            if action == "reject":
+                self.repository.release_refund_claim_for_request(req.id, payment_id=req.payment_id)
+            self.repository.record_refund_request_transition(
+                req,
+                previous_status=previous_status,
+                actor_role=getattr(current_user, "role", None),
+            )
+            self.repository.commit()
+        except RefundClaimEvidenceError:
+            self.repository.rollback()
+            raise ForceMajeureApiDomainError(409, "Резерв возврата требует сверки") from None
+        except SQLAlchemyError as exc:
+            self.repository.rollback()
+            logger.warning(
+                "refund_request.transition_storage_failed",
+                extra={"refund_request_id": request_id, "error_type": type(exc).__name__},
+            )
+            raise ForceMajeureApiDomainError(503, "Обработка заявки на возврат временно недоступна") from None
+
         self.repository.refresh(req)
         payload = self._serialize_refund_request(req)
         payload["processed_by_name"] = current_user.full_name
         return payload
 
     @staticmethod
-    def _refund_request_available_actions(status: str | None) -> list[str]:
+    def _refund_request_available_actions(status: str | None, refund_type: str | None) -> list[str]:
         normalized_status = (status or "").strip().lower()
         if normalized_status == RefundRequestStatus.PENDING.value:
-            return ["approve", "reject"]
-        if normalized_status == RefundRequestStatus.APPROVED.value:
-            return ["reject", "complete"]
+            return ["reject"]
+        if normalized_status == RefundRequestStatus.APPROVED.value and refund_type == RefundType.DEPOSIT.value:
+            return ["reject"]
         return []
 
     def get_deposits(
@@ -518,91 +556,162 @@ class ForceMajeureApiService:
         ]
 
     def add_to_deposit(self, *, request, current_user_id: int) -> dict[str, Any]:
-        amount = Decimal(str(request.amount))
-        # 3808 review round 13 (residual P1 deposit balance race): ЕДИНЫЙ
-        # механизм конкурентной безопасности для ВСЕХ трёх операций с
-        # балансом (форс-мажорный возврат / ручное пополнение / списание
-        # в оплату) — строка депозита берётся FOR UPDATE до read-modify-write,
-        # конкурентное создание — в connection-level savepoint с перечитыванием
-        # строки победителя (раньше: необученный INSERT ломал всю операцию
-        # poisoned-сессией -> 500, а ``+=`` поверх неблокированного чтения
-        # терял параллельное зачисление). SQLite (unit) игнорирует FOR UPDATE.
-        deposit, created = self.repository.get_or_create_patient_deposit_for_update(
-            patient_id=request.patient_id,
-            initial_balance=amount,
-        )
-        if not created:
-            deposit.balance += amount
-
-        self.repository.flush()
-
-        transaction = DepositTransaction(
-            deposit_id=deposit.id,
-            transaction_type=DepositTransactionType.CREDIT.value,
-            amount=amount,
-            balance_after=deposit.balance,
-            description=request.description or "Пополнение депозита",
-            performed_by=current_user_id,
-        )
-        self.repository.add(transaction)
-        self.repository.commit()
-        self.repository.refresh(deposit)
-        return self._serialize_deposit(deposit)
+        return self._apply_manual_deposit(request, current_user_id, DepositTransactionType.CREDIT)
 
     def use_deposit_for_payment(self, *, request, current_user_id: int) -> dict[str, Any]:
-        amount = Decimal(str(request.amount))
-        # 3808 review round 13 (residual P1 deposit balance race): строка
-        # берётся FOR UPDATE ДО проверок и списания. Прежний разомкнутый
-        # check-then-act (``balance < amount`` на неблокированном чтении,
-        # затем ``-=``) проигрывал гонку параллельному форс-мажорному
-        # зачислению: проверка проходила по устаревшему балансу, списание
-        # перезаписывало чужое зачисление (или наоборот — зачисление
-        # затирало списание, а ``balance_after`` debit-строки расходился с
-        # фактическим балансом). Теперь списание сериализуется с
-        # зачислением на самой строке депозита.
-        deposit = self.repository.get_patient_deposit_for_update(
-            patient_id=request.patient_id
-        )
-        if not deposit:
+        return self._apply_manual_deposit(request, current_user_id, DepositTransactionType.DEBIT)
+
+    def _apply_manual_deposit(
+        self, request, current_user_id: int, kind: DepositTransactionType,
+    ) -> dict[str, Any]:
+        try:
+            amount = parse_money(request.amount)
+        except MoneyInputError as exc:
+            raise ForceMajeureApiDomainError(422, "Некорректная сумма операции") from exc
+        if amount <= 0:
+            raise ForceMajeureApiDomainError(422, "Сумма операции должна быть больше нуля")
+
+        request_id = getattr(request, "client_request_id", None)
+        if not isinstance(request_id, UUID):
+            raise ForceMajeureApiDomainError(422, "Укажите UUID депозитной операции")
+        credit = kind == DepositTransactionType.CREDIT
+        visit_id = None if credit else request.visit_id
+        description = request.description or ("Пополнение депозита" if credit else "Оплата визита с депозита")
+        fingerprint = sha256(dumps(
+            [kind.value, current_user_id, request.patient_id, visit_id, str(amount), description],
+            separators=(",", ":"),
+        ).encode()).hexdigest()
+
+        def replay() -> dict[str, Any] | None:
+            receipt = self.repository.find_manual_deposit_receipt(request_id)
+            if receipt is None:
+                return None
+            if (
+                receipt.performed_by != current_user_id
+                or receipt.command_fingerprint != fingerprint
+                or receipt.deposit.patient_id != request.patient_id
+                or receipt.command_currency is None
+                or receipt.command_is_active is None
+            ):
+                raise ForceMajeureApiDomainError(409, "Параметры депозитной операции не совпадают")
+            payload = self._serialize_deposit(receipt.deposit)
+            payload.update(
+                balance=float(receipt.balance_after),
+                currency=receipt.command_currency,
+                is_active=receipt.command_is_active,
+            )
+            return payload
+
+        stored = replay()
+        if stored is not None:
+            return stored
+
+        payment_service = None
+        if visit_id is not None:
+            visit = self.repository.get_visit(visit_id, lock=False)
+            if not visit:
+                raise ForceMajeureApiDomainError(404, "Visit not found")
+            if visit.patient_id != request.patient_id:
+                raise ForceMajeureApiDomainError(400, "Visit does not belong to deposit patient")
+            if awaits_all_free_decision(visit):
+                raise ForceMajeureApiDomainError(409, ALL_FREE_DECISION_REQUIRED)
+            payment_service = PaymentInvariantService(self.repository.db)
+            payment_service.preflight_payment_groups([visit_id])
+            visit = self.repository.get_visit(visit_id)
+            if visit is None or visit.patient_id != request.patient_id:
+                raise ForceMajeureApiDomainError(409, "Привязка визита изменилась")
+            if awaits_all_free_decision(visit):
+                raise ForceMajeureApiDomainError(409, ALL_FREE_DECISION_REQUIRED)
+
+        # Lock the visit group before the balance. A new deposit starts at zero
+        # so this command and its journal row own the entire balance change.
+        if credit:
+            deposit, _ = self.repository.get_or_create_patient_deposit_for_update(
+                patient_id=request.patient_id, initial_balance=Decimal("0.00"),
+            )
+        else:
+            deposit = self.repository.get_patient_deposit_for_update(patient_id=request.patient_id)
+        if deposit is None:
             raise ForceMajeureApiDomainError(404, "Депозит пациента не найден")
-        if deposit.balance < amount:
+
+        stored = replay()
+        if stored is not None:
+            return stored
+        if visit_id is not None and self.repository.visit_has_unpaired_deposit_debit(visit_id):
+            raise ForceMajeureApiDomainError(409, "Историческое списание с депозита требует сверки")
+        if not credit and deposit.balance < amount:
             raise ForceMajeureApiDomainError(
                 400,
                 f"Недостаточно средств на депозите. Баланс: {deposit.balance}, запрошено: {amount}",
             )
-        if not deposit.is_active:
+        if not credit and not deposit.is_active:
             raise ForceMajeureApiDomainError(400, "Депозит деактивирован")
 
-        if request.visit_id is not None:
-            visit = self.repository.get_visit(request.visit_id)
-            if not visit:
-                raise ForceMajeureApiDomainError(404, "Visit not found")
-            if visit.patient_id != request.patient_id:
-                raise ForceMajeureApiDomainError(
-                    400,
-                    "Visit does not belong to deposit patient",
+        balance_after = deposit.balance + (amount if credit else -amount)
+        if not 0 <= balance_after <= MAX_MONEY:
+            raise ForceMajeureApiDomainError(409, "Баланс депозита требует сверки")
+        try:
+            payment_id = None
+            if payment_service is not None:
+                if deposit.currency != "UZS":
+                    raise ForceMajeureApiDomainError(409, "Валюта депозитной оплаты требует сверки")
+                # A deposit is a local tender. A pending external intent
+                # still needs reconciliation before accepting any funds.
+                payment_service.assert_no_unresolved_payment_intent(visit_id)
+                payment = payment_service.create_payment_for_visit(
+                    visit_id=visit_id,
+                    amount=amount,
+                    method="deposit",
+                    note=None,
+                    current_user=SimpleNamespace(id=current_user_id),
+                    currency=deposit.currency,
+                    allow_overpayment=False,
+                    client_request_id=str(request_id),
+                    commit=False,
                 )
-
-        deposit.balance -= amount
-        self.repository.flush()
-
-        transaction = DepositTransaction(
-            deposit_id=deposit.id,
-            transaction_type=DepositTransactionType.DEBIT.value,
-            amount=amount,
-            balance_after=deposit.balance,
-            description=request.description or "Оплата визита с депозита",
-            visit_id=request.visit_id,
-            performed_by=current_user_id,
-        )
-        self.repository.add(transaction)
-        self.repository.commit()
-        self.repository.refresh(deposit)
-        return self._serialize_deposit(deposit)
+                payment_id = payment.id
+            native_debit = payment_id is not None and self.repository.db.get_bind().dialect.name == "postgresql"
+            if not native_debit:
+                deposit.balance = balance_after
+                self.repository.flush()
+                payload = self._serialize_deposit(deposit)
+            self.repository.add(DepositTransaction(
+                deposit_id=deposit.id,
+                transaction_type=kind.value,
+                amount=amount,
+                balance_after=balance_after,
+                description=description,
+                visit_id=visit_id,
+                payment_id=payment_id,
+                performed_by=current_user_id,
+                client_request_id=request_id,
+                command_fingerprint=fingerprint,
+                command_currency=deposit.currency,
+                command_is_active=deposit.is_active,
+            ))
+            if native_debit:
+                self.repository.flush()
+                self.repository.refresh(deposit)
+                if deposit.balance != balance_after:
+                    raise ForceMajeureApiDomainError(409, "Проведение оплаты с депозита временно недоступно")
+                payload = self._serialize_deposit(deposit)
+            self.repository.commit()
+        except IntegrityError:
+            # Different deposits do not share a row lock. The unique key
+            # decides a race and the loser's balance change is rolled back.
+            self.repository.rollback()
+            stored = replay()
+            if stored is None:
+                raise
+            return stored
+        except Exception:
+            self.repository.rollback()
+            raise
+        return payload
 
     def _serialize_refund_request(self, req) -> dict[str, Any]:
         processed_by_name = req.processor.full_name if req.processor else None
-        available_actions = self._refund_request_available_actions(req.status)
+        available_actions = self._refund_request_available_actions(req.status, req.refund_type)
         return {
             "id": req.id,
             "patient_id": req.patient_id,
@@ -615,7 +724,7 @@ class ForceMajeureApiService:
             "status": req.status,
             "reason": req.reason,
             "is_automatic": req.is_automatic,
-            "bank_card_number": req.bank_card_number,
+            "bank_card_number": mask_card_number(req.bank_card_number),
             "created_at": req.created_at,
             "processed_at": req.processed_at,
             "processed_by_name": processed_by_name,

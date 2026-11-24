@@ -20,17 +20,21 @@ PostgreSQL отдельно НЕ проверялись и здесь не за�
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.registrar_wizard import _cart as cart_module
+from app.crud.clinic import clinic_today
+from app.models.all_free_request import AllFreeRequest
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
 from app.models.visit import Visit
 from tests.conftest import mint_access_token
+from tests.integration.doctor_schedule_fixtures import mock_invitations  # noqa: F401
 
 pytestmark = [pytest.mark.integration]
 
@@ -358,6 +362,75 @@ def test_idempotency_key_survives_token_refresh_same_user(
 
     _, invoices, _ = _counts(db_session, test_patient.id)
     assert invoices == 1, "дрейф namespace после refresh создал вторую корзину"
+
+
+@pytest.mark.parametrize("change", ["inactive_patient", "changed_invoice", "changed_link"])
+def test_idempotency_will_not_replay_a_cart_with_stale_evidence(
+    client, db_session, admin_user, test_patient, change,
+):
+    service = Service(
+        code=f"SYNTHETIC-REPLAY-{change}", name="Synthetic cart service", price=100,
+        duration_minutes=30, active=True, requires_doctor=False, is_consultation=False,
+    )
+    db_session.add(service)
+    db_session.commit()
+    payload = _cart_payload(patient_id=test_patient.id, visits=[_visit(service.id)])
+    headers = _auth_headers(admin_user) | {"Idempotency-Key": f"synthetic-cart-proof-{change}"}
+    path = "/api/v1/registrar/cart"
+
+    first = client.post(path, headers=headers, json=payload)
+    assert first.status_code == 200, first.text
+    invoice_id = first.json()["invoice_id"]
+    if change == "inactive_patient":
+        test_patient.is_deleted = True
+    elif change == "changed_invoice":
+        db_session.get(PaymentInvoice, invoice_id).total_amount += Decimal("1.00")
+    else:
+        db_session.query(PaymentInvoiceVisit).filter_by(invoice_id=invoice_id).delete()
+    db_session.commit()
+    counts = _counts(db_session, test_patient.id)
+
+    replay = client.post(path, headers=headers, json=payload)
+    assert replay.status_code == 409, replay.text
+    assert replay.json()["code"] == "idempotency_reconciliation_required"
+    assert "invoice_id" not in replay.json()
+    assert _counts(db_session, test_patient.id) == counts
+
+
+def test_idempotency_replays_the_registrar_pending_all_free_request(
+    client, db_session, registrar_auth_headers, admin_auth_headers,
+    test_patient, test_doctor, test_service, mock_invitations,
+):
+    appointment = _visit(test_service.id, doctor_id=test_doctor.id)
+    appointment.update(
+        department="cardiology", visit_time="13:20",
+        visit_date=(clinic_today(db_session) + timedelta(days=1)).isoformat(),
+    )
+    payload = _cart_payload(patient_id=test_patient.id, visits=[appointment])
+    payload.update(discount_mode="all_free", all_free=True)
+    headers = registrar_auth_headers | {"Idempotency-Key": "synthetic-all-free-cart-replay"}
+    path = "/api/v1/registrar/cart"
+    first = client.post(path, headers=headers, json=payload)
+    assert first.status_code == 200, first.text
+    [visit_id] = first.json()["visit_ids"]
+    application = db_session.query(AllFreeRequest).filter_by(visit_id=visit_id).one()
+    assert application.status == "pending"
+    counts = _counts(db_session, test_patient.id)
+
+    replay = client.post(path, headers=headers, json=payload)
+    assert replay.status_code == 200, replay.text
+    assert replay.json() == first.json()
+    assert _counts(db_session, test_patient.id) == counts
+
+    decision = client.post(
+        "/api/v1/admin/all-free-approve", headers=admin_auth_headers,
+        json={"visit_id": visit_id, "action": "reject", "rejection_reason": "Synthetic decision"},
+    )
+    assert decision.status_code == 200, decision.text
+    stale = client.post(path, headers=headers, json=payload)
+    assert stale.status_code == 409
+    assert stale.json()["code"] == "idempotency_reconciliation_required"
+    assert _counts(db_session, test_patient.id) == counts
 
 
 def test_idempotency_new_key_creates_new_operation(

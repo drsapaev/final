@@ -219,7 +219,11 @@ async def test_visit_view_checks_actor_and_then_shows_explicit_actions(monkeypat
     calls = []
     def preview(token, actor):
         calls.append((token, actor))
-        return {"text": "Время: 14:30", "action_token": "ta_synthetic"}
+        return {
+            "text": "Время: 14:30",
+            "view_url": "https://clinic.example.test/visit/synthetic",
+            "action_token": "ta_synthetic",
+        }
     monkeypatch.setattr(bot_module, "_run_visit_preview", preview)
     wrong_actor = callback("view_visit:tv_synthetic", actor=999)
     await ClinicTelegramBot().handle_callback(wrong_actor)
@@ -231,7 +235,8 @@ async def test_visit_view_checks_actor_and_then_shows_explicit_actions(monkeypat
     kwargs = event.message.answer.await_args.kwargs
     assert "14:30" in kwargs["text"]
     assert kwargs["parse_mode"] is None
-    buttons = kwargs["reply_markup"].inline_keyboard[0]
+    link_buttons, buttons = kwargs["reply_markup"].inline_keyboard
+    assert link_buttons[0].url == "https://clinic.example.test/visit/synthetic"
     assert [button.callback_data for button in buttons] == ["confirm_visit:ta_synthetic", "cancel_visit:ta_synthetic"]
 
 

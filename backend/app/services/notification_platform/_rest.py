@@ -4,10 +4,18 @@ Split from notification_platform_service.py.
 """
 from __future__ import annotations
 
+from app.repositories.notification_platform_repository import (
+    _visible_notification_field,
+)
 from app.services.notification_platform._base import *  # noqa: F401, F403
 from app.services.notification_platform._base import (
     NotificationPlatformServiceMixinBase,
 )
+
+
+def _is_legacy_cashier_payment(event: NotificationEvent) -> bool:
+    return (str(event.source_module or "").strip().lower() == "cashier"
+            and str(event.event_type or "").strip().lower() == "payment_notification")
 
 
 class RestMixin(NotificationPlatformServiceMixinBase):
@@ -43,19 +51,19 @@ class RestMixin(NotificationPlatformServiceMixinBase):
         envelope = self.serialize_delivery(delivery)
         payload = {
             "type": transport_type,
-            "event_type": event.event_type,
-            "notification_type": event.event_type,
+            "event_type": envelope["event_type"],
+            "notification_type": envelope["notification_type"],
             "delivery_id": delivery.delivery_id,
             "event_id": event.event_id,
             "sequence_id": delivery.sequence_id,
             "recipient_id": delivery.recipient_id,
             "recipient_type": delivery.recipient_type,
             "role": delivery.role,
-            "department_key": delivery.department_key,
+            "department_key": envelope["department_key"],
             "channel": delivery.channel,
             "expires_at": event.expires_at.isoformat() if event.expires_at else None,
-            "title": event.title,
-            "message": event.message,
+            "title": envelope["title"],
+            "message": envelope["message"],
             "status": delivery.delivery_status,
             "delivery_status": delivery.delivery_status,
             "is_read": delivery.read_at is not None,
@@ -70,7 +78,7 @@ class RestMixin(NotificationPlatformServiceMixinBase):
             extra={
                 "user_id": user_id,
                 "delivery_id": delivery.delivery_id,
-                "event_type": event.event_type,
+                "event_type": envelope["event_type"],
             },
         )
         await self.ws_manager.send_json(payload, user_id)
@@ -78,7 +86,7 @@ class RestMixin(NotificationPlatformServiceMixinBase):
 
     def serialize_delivery(self, delivery: NotificationDelivery) -> dict[str, Any]:
         event = delivery.event
-        return {
+        result = {
             "id": delivery.delivery_id,
             "delivery_id": delivery.delivery_id,
             "event_id": event.event_id,
@@ -117,10 +125,26 @@ class RestMixin(NotificationPlatformServiceMixinBase):
             if delivery.archived_at
             else None,
         }
+        if _is_legacy_cashier_payment(event):
+            # These historical records never captured a subject ownership
+            # generation. Keep the inbox entry, but do not expose the stored
+            # payment snapshot after a patient changes linked account.
+            title, message = "Новое уведомление", "Откройте личный кабинет для просмотра."
+            result.update(notification_type="notification", event_type="notification",
+                          title=title, message=message, severity="info", priority="normal",
+                          department_key=None,
+                          correlation_id=None, dedup_key=f"legacy:{delivery.delivery_id}",
+                          deep_link="/patient", payload_snapshot={"title": title, "message": message, "metadata": {}})
+        return result
 
 
     def serialize_stats_item(self, delivery: NotificationDelivery) -> dict[str, Any]:
         event = delivery.event
+        if _is_legacy_cashier_payment(event):
+            return {"id": delivery.delivery_id, "notification_type": "notification",
+                    "status": delivery.delivery_status, "message": "Откройте личный кабинет для просмотра.",
+                    "created_at": delivery.created_at, "role": delivery.role,
+                    "channel": delivery.channel, "severity": "info"}
         return {
             "id": delivery.delivery_id,
             "notification_type": event.event_type,
@@ -280,14 +304,15 @@ class RestMixin(NotificationPlatformServiceMixinBase):
         )
         by_channel = {channel or "unknown": int(count) for channel, count in by_channel_rows}
 
+        visible_event_type = _visible_notification_field(NotificationEvent.event_type, "notification").label("visible_event_type")
         by_type_rows = (
             self.db.query(
-                NotificationEvent.event_type,
+                visible_event_type,
                 func.count(NotificationDelivery.id).label("count"),
             )
             .join(NotificationDelivery.event)
             .filter(NotificationDelivery.created_at >= since)
-            .group_by(NotificationEvent.event_type)
+            .group_by("visible_event_type")
             .all()
         )
         by_type = {event_type or "unknown": int(count) for event_type, count in by_type_rows}
@@ -334,7 +359,9 @@ class RestMixin(NotificationPlatformServiceMixinBase):
         deep_link: str | None = None,
         expires_at: datetime | None = None,
         transport_type: str = NotificationPlatformServiceMixinBase.TRANSPORT_NOTIFICATION,
-    ) -> NotificationDelivery:
+        subject_after_commit=None,
+        subject_before_send=None,
+    ) -> NotificationDelivery | None:
         panel_role = self.resolve_panel_role_for_user(user)
         normalized_event_type = self.normalize_event_type(event_type)
         snapshot = payload_snapshot or self._build_payload_snapshot(
@@ -372,6 +399,13 @@ class RestMixin(NotificationPlatformServiceMixinBase):
             payload_snapshot=snapshot,
         )
         self.repository.commit()
+        # Subject-bound callers must revalidate after this internal commit;
+        # transaction-local schema/auth checks do not survive it. No external
+        # broadcast occurs when that proof has become unavailable.
+        if subject_after_commit is not None and not subject_after_commit():
+            return None
+        if subject_before_send is not None and not subject_before_send():
+            return None
         await self._broadcast_delivery_with_policy(
             user=user,
             delivery=delivery,
@@ -516,8 +550,6 @@ class RestMixin(NotificationPlatformServiceMixinBase):
             "[Notifications] mark_all_read",
             extra={
                 "user_id": current_user.id,
-                "role": normalized_role,
-                "department_key": normalized_department,
                 "count": count,
             },
         )

@@ -1,7 +1,8 @@
-/** Privacy boundary for short-lived authentication proofs and SMS text. */
+/** Privacy boundary for verification proofs, SMS text and inbox references. */
 
 const VERIFICATION_PATH = /(?:^|\/)(?:phone-verification|2fa)(?:\/|$)|(?:^|\/)password-reset\/verify-phone(?:\/|$)|(?:^|\/)patient-access\/(?:verify-otp|activate\/confirm)(?:\/|$)/i;
 const NAMED_PROOF_ASSIGNMENT = /(?:^|[\s{,('"?&])["']?(?:verification[\s_-]?code|otp[\s_-]?code|totp[\s_-]?code|backup[\s_-]?code|otp|totp)["']?\s*[:=]/i;
+const INVITATION_REFERENCE = /\/(?:api\/v1\/)?notifications\/visit-invitation-(?:tasks|recoveries)\/|(?:^|[?&#])invitation(?:_recovery)?=/i;
 
 /** Only recognize complete route segments; an unrelated `code` may be ICD. */
 export function isSensitiveVerificationUrl(value: unknown): boolean {
@@ -22,6 +23,7 @@ export function redactVerificationString(value: string): string {
     return '[REDACTED VERIFICATION]';
   }
   const decoded = value.replace(/%([0-9a-f]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+  if (INVITATION_REFERENCE.test(decoded)) return '[REDACTED INVITATION]';
   return NAMED_PROOF_ASSIGNMENT.test(value) || NAMED_PROOF_ASSIGNMENT.test(decoded)
     ? '[REDACTED VERIFICATION]'
     : value;

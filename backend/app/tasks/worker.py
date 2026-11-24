@@ -40,6 +40,10 @@ logger = logging.getLogger(__name__)
 # the worst dispatch: arq's job_timeout is 300s, so a 10-minute TTL can
 # only expire for a DEAD worker, never for a live one still awaiting the
 # provider.
+from app.tasks.invitation_delivery import (  # noqa: E402
+    deliver_visit_invitation,
+    run_visit_invitation_sweep,
+)
 from app.tasks.lease import LEASE_TTL  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -954,6 +958,8 @@ class WorkerSettings:
         generate_scheduled_report,
         run_lab_follow_up_reminders,
         run_visit_reminder_sweep,
+        deliver_visit_invitation,
+        run_visit_invitation_sweep,
     ]
 
     on_startup = startup
@@ -974,6 +980,7 @@ class WorkerSettings:
     # path ever called enqueue_reminder and patients never got reminders.
     cron_jobs = [
         cron(run_data_retention, hour=3, minute=0),  # Daily 03:00 UTC
+        cron(run_visit_invitation_sweep, minute=set(range(60))),
         # Hourly, so the purge follows the Tashkent day rollover independently of worker TZ.
         cron(run_public_site_analytics_retention, minute=0),
         cron(
@@ -999,4 +1006,6 @@ __all__ = [
     "generate_scheduled_report",
     "run_lab_follow_up_reminders",
     "run_visit_reminder_sweep",
+    "deliver_visit_invitation",
+    "run_visit_invitation_sweep",
 ]

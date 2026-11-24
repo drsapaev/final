@@ -68,11 +68,37 @@ class AppointmentFlowApiService:
         # Built lazily per request actor if not injected explicitly.
         self.iam_facade = iam_facade
 
-    def resolve_appointment_from_visit(self, *, appointment_id: int, emr_data):
-        visit = self.repository.get_visit(appointment_id)
+    def resolve_appointment_from_visit(self, *, appointment_id: int, emr_data, prepare_visit=None):
+        # Identity locks precede Visit, matching the consultation completion
+        # order. The unlocked Visit read is only a hint and is rechecked below.
+        authorize_visit = None
+        if prepare_visit is not None:
+            hint = self.repository.get_visit(appointment_id)
+            if hint is None:
+                raise AppointmentFlowApiDomainError(404, "Запись не найдена")
+            authorize_visit = prepare_visit(hint)
+        # Visit serializes all source-derived creations.
+        visit = self.repository.get_locked_visit(appointment_id)
         if not visit:
             raise AppointmentFlowApiDomainError(404, "Запись не найдена")
+        if authorize_visit is not None:
+            authorize_visit(visit)
+        if not self.repository.lock_visit_encounter(visit):
+            raise AppointmentFlowApiDomainError(409, "Контекст оформления изменился")
 
+        linked = self.repository.get_source_appointments(visit.id)
+        if len(linked) > 1:
+            raise AppointmentFlowApiDomainError(409, "Найдено несколько записей для визита")
+        if linked:
+            appointment = linked[0]
+            if (appointment.patient_id != visit.patient_id or
+                    appointment.encounter_id != visit.encounter_id):
+                raise AppointmentFlowApiDomainError(409, "Контекст записи изменился")
+            emr_data.appointment_id = appointment.id
+            return appointment, visit
+
+        # Legacy matching remains available for clinical compatibility, but
+        # it does not establish source or encounter provenance.
         existing_appointment = self.repository.get_existing_appointment_for_visit(visit)
         if existing_appointment:
             emr_data.appointment_id = existing_appointment.id

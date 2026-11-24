@@ -127,7 +127,8 @@ export const useRegistrarWizard = ({
       editMode: wasEditMode,
       success: wizardDataObj.success === true,
     });
-    const postWizardPaymentRow = (!wasEditMode || Number(wizardDataObj.total_amount ?? 0) > 0)
+    const postWizardPaymentRow = (!wasEditMode || Number(wizardDataObj.total_amount ?? 0) > 0) &&
+      wizardDataObj.payment_dialog_deferred !== true
       ? buildPostWizardPaymentRow(wizardDataObj)
       : null;
 

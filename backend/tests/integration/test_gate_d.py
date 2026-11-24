@@ -64,13 +64,16 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-gate-d-runtime-tests-32
 os.environ.setdefault("ENV", "test")
 os.environ.setdefault("ALLOW_SQLITE_DATABASE_URL", "0")
 
-from app.models.payment import Payment  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
+
+from app.models.payment import Payment, PaymentVisit  # noqa: E402
 from app.models.patient import Patient  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.models.visit import Visit  # noqa: E402
-from fastapi import HTTPException  # noqa: E402
 from app.services.payment_invariant_service import PaymentInvariantService  # noqa: E402
 from app.services.visit_lifecycle_service import VisitLifecycleService  # noqa: E402
+from tests.integration.test_registrar_partial_payments import payment_engines  # noqa: E402, F401
+from tests.integration.test_staff_confirmation_guard_pg import guarded_pg  # noqa: E402, F401
 
 pytestmark = pytest.mark.gate_d
 
@@ -918,314 +921,228 @@ def test_d6b_refund_failure_rollback(db_session, new_session_factory, test_user)
     db_session.commit()
 
 
-def test_d6c_telegram_refund_serializes_on_visit_lock(
-    db_session, new_session_factory, test_user
-):
+def test_d6c_telegram_refund_serializes_on_visit_lock(guarded_pg, monkeypatch):
     """D6c: protected Telegram refunds join the canonical visit lock order."""
     from sqlalchemy.exc import OperationalError
+    from sqlalchemy.orm import Session
 
     from app.services.telegram_staff_action_adapter_service import (
         TelegramStaffActionAdapterService,
     )
+    from tests.integration.test_cashier_daily_currency import _daily_pg_app
 
-    visit = create_test_visit(db_session, status="in_progress")
-    payment = Payment(
-        visit_id=visit.id,
-        amount=Decimal("10000"),
-        currency="UZS",
-        method="cash",
-        status="paid",
-        paid_at=datetime.now(UTC),
-        created_at=datetime.now(UTC),
-    )
-    db_session.add(payment)
-    db_session.commit()
-    payment_id = payment.id
-    visit_id = visit.id
-    actor_user_id = test_user.id
+    owner, runtime, ids, _, _, schema, role, _ = _daily_pg_app(guarded_pg, monkeypatch)
+    quote = owner.dialect.identifier_preparer.quote_identifier
+    qs, qr = quote(schema), quote(role)
+    with owner.begin() as conn:
+        conn.exec_driver_sql(f"GRANT SELECT ON {qs}.payments, {qs}.payment_visits TO {qr}")
+        conn.exec_driver_sql(f"GRANT UPDATE (refunded_amount,refund_reason,refunded_at,refunded_by,updated_at) "
+                             f"ON {qs}.payments TO {qr}")
+        conn.exec_driver_sql(f"GRANT INSERT, SELECT (id) ON {qs}.audit_logs TO {qr}")
+        conn.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {qs}.audit_logs_id_seq TO {qr}")
 
-    PaymentInvariantService(db_session).lock_visit_for_payment_change(visit_id)
+    with Session(owner) as holder:
+        payment = holder.query(Payment).filter_by(visit_id=ids["visit"], status="paid").one()
+        payment_id = payment.id
+        PaymentInvariantService(holder).lock_visit_for_payment_change(ids["visit"])
+        with Session(runtime) as blocked:
+            blocked.execute(text("SET LOCAL lock_timeout = '800ms'"))
+            with pytest.raises(OperationalError) as exc_info:
+                TelegramStaffActionAdapterService(blocked).staff_refund_payment(
+                    payment_id=payment_id, amount="1.25", actor_user_id=ids["stage"],
+                )
+            assert exc_info.value.orig.sqlstate == "55P03"
+        assert payment.status == "paid" and payment.refunded_amount is None
 
-    blocked = new_session_factory()
-    try:
-        blocked.execute(text("SET LOCAL lock_timeout = '800ms'"))
-        with pytest.raises(OperationalError):
-            TelegramStaffActionAdapterService(blocked).staff_refund_payment(
-                payment_id=payment_id,
-                amount=Decimal("5000"),
-                actor_user_id=actor_user_id,
-                commit=True,
-            )
-    finally:
-        blocked.rollback()
-        blocked.close()
-
-    fresh = new_session_factory()
-    try:
-        unchanged = fresh.query(Payment).filter(Payment.id == payment_id).one()
-        assert unchanged.status == "paid"
-        assert unchanged.refunded_amount in {None, Decimal("0")}
-    finally:
-        fresh.close()
-
-    db_session.rollback()
-    after_lock = new_session_factory()
-    try:
+    with Session(runtime) as after_lock:
         result = TelegramStaffActionAdapterService(after_lock).staff_refund_payment(
-            payment_id=payment_id,
-            amount=Decimal("5000"),
-            actor_user_id=actor_user_id,
-            commit=True,
+            payment_id=payment_id, amount="1.25", actor_user_id=ids["stage"],
         )
-        assert result["refunded_amount"] == Decimal("5000")
-    finally:
-        after_lock.close()
+        assert result["refunded_amount"] == Decimal("1.25")
+    with Session(owner) as db:
+        assert db.get(Payment, payment_id).refunded_amount == Decimal("1.25")
 
-    cleanup = new_session_factory()
-    try:
-        cleanup.execute(
-            text("DELETE FROM payments WHERE id = :pid"), {"pid": payment_id}
+
+
+@pytest.fixture
+def pending_cashier_payment(payment_engines):
+    admin, runtime = payment_engines
+    quote = admin.dialect.identifier_preparer.quote_identifier
+    schema, role = map(quote, (admin.dialect.default_schema_name, runtime.url.username))
+    with admin.begin() as conn:
+        conn.exec_driver_sql(
+            f"GRANT UPDATE (paid_at, updated_at, note, provider_transaction_id) ON {schema}.payments TO {role}"
         )
-        cleanup.execute(text("DELETE FROM visits WHERE id = :vid"), {"vid": visit_id})
-        cleanup.commit()
-    finally:
-        cleanup.close()
+        conn.exec_driver_sql(f"GRANT SELECT ON {schema}.clinic_settings TO {role}")
+        conn.exec_driver_sql(f"GRANT SELECT, UPDATE (id) ON {schema}.payment_transactions TO {role}")
+        conn.exec_driver_sql(
+            f"CREATE POLICY cashier_transaction_select ON {schema}.payment_transactions FOR SELECT TO {role} USING (true)"
+        )
+        conn.exec_driver_sql(
+            f"CREATE POLICY cashier_transaction_lock ON {schema}.payment_transactions FOR UPDATE TO {role} "
+            "USING (true) WITH CHECK (false)"
+        )
+        conn.exec_driver_sql(f"GRANT INSERT ON {schema}.audit_logs TO {role}")
+        conn.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {schema}.audit_logs_id_seq TO {role}")
+        conn.exec_driver_sql(f"ALTER TABLE {schema}.audit_logs ENABLE ROW LEVEL SECURITY")
+        conn.exec_driver_sql(
+            f"CREATE POLICY cashier_cancellation_audit ON {schema}.audit_logs FOR INSERT TO {role} "
+            "WITH CHECK (action = 'payment_cancelled' AND event_type = 'PAYMENT_CANCELLED')"
+        )
+    seed_session = sessionmaker(bind=admin, expire_on_commit=False)
+    with seed_session.begin() as seed:
+        visit = create_test_visit(seed, status="waiting")
+        payment = Payment(
+            visit_id=visit.id, amount=Decimal("10000"), currency="UZS", method="cash", status="pending",
+        )
+        seed.add(payment)
+        seed.flush()
+    return seed_session, sessionmaker(bind=runtime), visit.id, payment.id
 
 
-
-# --- D6d: cashier confirmation lock order ----------------------------
-
-def test_d6d_cashier_confirm_serializes_on_visit_lock(
-    db_session, new_session_factory, test_user, monkeypatch
-):
-    """D6d: manual cashier confirmation joins the canonical visit lock order."""
-    from sqlalchemy.exc import OperationalError
-
+def test_d6d_cashier_confirm_serializes_on_visit_lock(pending_cashier_payment, monkeypatch):
+    """D6d: manual confirmation refuses a busy visit and succeeds after retry."""
     from app.api.v1.endpoints.cashier import _payments as cashier_payments
 
-    async def _skip_notification(**_kwargs):
+    async def no_notification(**_kwargs):
         return None
 
-    monkeypatch.setattr(
-        cashier_payments,
-        "_emit_payment_notification",
-        _skip_notification,
-    )
+    monkeypatch.setattr(cashier_payments, "_emit_payment_notification", no_notification)
+    owner_session, runtime_session, visit_id, payment_id = pending_cashier_payment
 
-    visit = create_test_visit(db_session, status="waiting")
-    payment = Payment(
-        visit_id=visit.id,
-        amount=Decimal("10000"),
-        currency="UZS",
-        method="cash",
-        status="pending",
-        created_at=datetime.now(UTC),
-    )
-    db_session.add(payment)
-    db_session.commit()
-    payment_id = payment.id
-    visit_id = visit.id
-
-    PaymentInvariantService(db_session).lock_visit_for_payment_change(visit_id)
-
-    blocked = new_session_factory()
-    try:
-        blocked.execute(text("SET LOCAL lock_timeout = '800ms'"))
-        with pytest.raises(OperationalError):
-            asyncio.run(
-                cashier_payments.confirm_payment(
-                    payment_id=payment_id,
-                    db=blocked,
-                    current_user=test_user,
-                )
-            )
-    finally:
-        blocked.rollback()
-        blocked.close()
-
-    fresh = new_session_factory()
-    try:
-        unchanged = fresh.query(Payment).filter(Payment.id == payment_id).one()
-        assert unchanged.status == "pending"
-    finally:
-        fresh.close()
-
-    db_session.rollback()
-    after_lock = new_session_factory()
-    try:
-        result = asyncio.run(
-            cashier_payments.confirm_payment(
-                payment_id=payment_id,
-                db=after_lock,
-                current_user=test_user,
-            )
-        )
+    with runtime_session() as holder, runtime_session() as contender:
+        PaymentInvariantService(holder).lock_visit_for_payment_change(visit_id)
+        with pytest.raises(HTTPException) as busy:
+            asyncio.run(cashier_payments.confirm_payment(payment_id=payment_id, db=contender, current_user=None))
+        assert busy.value.status_code == 409
+        assert busy.value.detail == "Обращение занято, повторите оплату"
+        assert not contender.in_transaction()
+        with owner_session() as check:
+            assert check.get(Payment, payment_id).status == "pending"
+        holder.rollback()
+        result = asyncio.run(cashier_payments.confirm_payment(payment_id=payment_id, db=contender, current_user=None))
         assert result["status"] == "paid"
-    finally:
-        after_lock.close()
-
-    cleanup = new_session_factory()
-    try:
-        persisted = cleanup.query(Payment).filter(Payment.id == payment_id).one()
-        assert persisted.status == "paid"
-        cleanup.execute(
-            text("DELETE FROM payments WHERE id = :pid"), {"pid": payment_id}
-        )
-        cleanup.execute(text("DELETE FROM visits WHERE id = :vid"), {"vid": visit_id})
-        cleanup.commit()
-    finally:
-        cleanup.close()
+    with owner_session() as check:
+        assert check.get(Payment, payment_id).status == "paid"
 
 
-# --- D6e: cashier confirm/cancel cross-path lock order ----------------
-
-def test_d6e_cashier_confirm_and_cancel_share_visit_first_lock_order(
-    db_session, new_session_factory, monkeypatch
-):
-    """D6e: both actions wait on Visit; the lock winner sets the final state."""
+def test_d6e_cashier_confirm_and_cancel_share_visit_first_lock_order(pending_cashier_payment, monkeypatch):
+    """D6e: both paths respect a linked visit lock and only one transition wins."""
     from app.api.v1.endpoints.cashier import _payments as cashier_payments
 
-    async def _skip_notification(**_kwargs):
+    async def no_notification(**_kwargs):
         return None
 
-    monkeypatch.setattr(
-        cashier_payments,
-        "_emit_payment_notification",
-        _skip_notification,
-    )
+    monkeypatch.setattr(cashier_payments, "_emit_payment_notification", no_notification)
+    owner_session, runtime_session, visit_id, payment_id = pending_cashier_payment
+    with owner_session.begin() as seed:
+        primary = seed.get(Visit, visit_id)
+        linked = create_test_visit(seed, patient=seed.get(Patient, primary.patient_id))
+        seed.add_all([
+            PaymentVisit(payment_id=payment_id, visit_id=visit_id, amount=Decimal("5000")),
+            PaymentVisit(payment_id=payment_id, visit_id=linked.id, amount=Decimal("5000")),
+        ])
+        linked_id = linked.id
 
-    visit = create_test_visit(db_session, status="waiting")
-    payment = Payment(
-        visit_id=visit.id,
-        amount=Decimal("10000"),
-        currency="UZS",
-        method="cash",
-        status="pending",
-        created_at=datetime.now(UTC),
-    )
-    db_session.add(payment)
-    db_session.commit()
-    payment_id = payment.id
-    visit_id = visit.id
+    def run_action(action: str, barrier=None):
+        with runtime_session() as db:
+            if barrier is not None:
+                barrier.wait(timeout=5)
+            try:
+                if action == "confirm":
+                    result = asyncio.run(cashier_payments.confirm_payment(
+                        payment_id=payment_id, db=db, current_user=None,
+                    ))
+                else:
+                    result = asyncio.run(cashier_payments.cancel_payment(
+                        payment_id=payment_id, db=db, current_user=None,
+                        cancel_data=cashier_payments.CancelPaymentRequest(reason="SYNTHETIC"),
+                    ))
+                return "success", result
+            except HTTPException as exc:
+                return exc.status_code, exc.detail
 
-    PaymentInvariantService(db_session).lock_visit_for_payment_change(visit_id)
+    with runtime_session() as holder:
+        PaymentInvariantService(holder).lock_visit_for_payment_change(linked_id)
+        for action in ("confirm", "cancel"):
+            assert run_action(action) == (409, "Обращение занято, повторите оплату")
+        with owner_session() as probe:
+            payment = probe.query(Payment).filter_by(id=payment_id).with_for_update(nowait=True).one()
+            assert payment.status == "pending"
 
-    start = threading.Barrier(3)
-    confirm_name = f"gate_d_d6e_confirm_{payment_id}"
-    cancel_name = f"gate_d_d6e_cancel_{payment_id}"
-
-    def run_action(action: str, application_name: str):
-        session = new_session_factory()
-        try:
-            session.execute(
-                text("SELECT set_config('application_name', :name, true)"),
-                {"name": application_name},
-            )
-            session.execute(text("SET LOCAL lock_timeout = '5s'"))
-            start.wait(timeout=5)
-            if action == "confirm":
-                result = asyncio.run(
-                    cashier_payments.confirm_payment(
-                        payment_id=payment_id,
-                        db=session,
-                        current_user=None,
-                    )
-                )
-            else:
-                result = asyncio.run(
-                    cashier_payments.cancel_payment(
-                        payment_id=payment_id,
-                        cancel_data=cashier_payments.CancelPaymentRequest(
-                            reason="Gate D concurrent cancellation"
-                        ),
-                        db=session,
-                        current_user=None,
-                    )
-                )
-            return "success", result
-        except HTTPException as exc:
-            session.rollback()
-            return "http_error", exc.status_code
-        except Exception as exc:  # pragma: no cover - asserted below with detail
-            session.rollback()
-            return "unexpected_error", f"{type(exc).__name__}: {exc}"
-        finally:
-            session.close()
-
+    start = threading.Barrier(2)
     with ThreadPoolExecutor(max_workers=2) as executor:
-        confirm_future = executor.submit(run_action, "confirm", confirm_name)
-        cancel_future = executor.submit(run_action, "cancel", cancel_name)
-        start.wait(timeout=5)
+        confirm = executor.submit(run_action, "confirm", start)
+        cancel = executor.submit(run_action, "cancel", start)
+        confirmation, cancellation = confirm.result(timeout=10), cancel.result(timeout=10)
+    outcomes = [confirmation, cancellation]
+    assert sum(item[0] == "success" for item in outcomes) == 1, outcomes
+    assert all(item[0] in {"success", 400, 409} for item in outcomes), outcomes
+    with owner_session() as check:
+        status = "paid" if confirmation[0] == "success" else "cancelled"
+        assert check.get(Payment, payment_id).status == status
 
-        deadline = time.monotonic() + 4
-        waiting_on_lock: set[str] = set()
-        while time.monotonic() < deadline:
-            rows = db_session.execute(
-                text(
-                    "SELECT application_name, wait_event_type "
-                    "FROM pg_stat_activity "
-                    "WHERE application_name IN (:confirm_name, :cancel_name)"
-                ),
-                {
-                    "confirm_name": confirm_name,
-                    "cancel_name": cancel_name,
-                },
-            ).all()
-            waiting_on_lock = {
-                row.application_name
-                for row in rows
-                if row.wait_event_type == "Lock"
-            }
-            if waiting_on_lock == {confirm_name, cancel_name}:
-                break
-            time.sleep(0.05)
 
-        assert waiting_on_lock == {confirm_name, cancel_name}
+@pytest.mark.parametrize("allow_audit", [True, False])
+def test_cashier_cancellation_requires_atomic_audit(pending_cashier_payment, allow_audit):
+    from sqlalchemy import select
 
-        probe = new_session_factory()
-        try:
-            locked_payment = (
-                probe.query(Payment)
-                .filter(Payment.id == payment_id)
-                .with_for_update(nowait=True)
-                .one()
-            )
-            assert locked_payment.status == "pending"
-        finally:
-            probe.rollback()
-            probe.close()
+    from app.models.audit import AuditLog
+    from app.services.payment_cancel_service import (
+        PaymentCancelDomainError,
+        PaymentCancelService,
+    )
 
-        db_session.rollback()
-        confirm_outcome = confirm_future.result(timeout=10)
-        cancel_outcome = cancel_future.result(timeout=10)
-        outcomes = [confirm_outcome, cancel_outcome]
-
-    assert all(outcome[0] != "unexpected_error" for outcome in outcomes), outcomes
-    assert ("http_error", 500) not in outcomes
-    assert sum(outcome[0] == "success" for outcome in outcomes) == 1
-    expected_status = "paid" if confirm_outcome[0] == "success" else "cancelled"
-    if expected_status == "paid":
-        assert cancel_outcome[0] == "http_error"
-    else:
-        assert confirm_outcome[0] == "http_error"
-
-    cleanup = new_session_factory()
-    try:
-        persisted = cleanup.query(Payment).filter(Payment.id == payment_id).one()
-        assert persisted.status == expected_status
-        cleanup.execute(
-            text("DELETE FROM payments WHERE id = :pid"), {"pid": payment_id}
+    owner_session, runtime_session, _, payment_id = pending_cashier_payment
+    runtime_name = runtime_session.kw["bind"].url.username
+    with owner_session.begin() as seed:
+        actor = User(
+            username="SYNTHETIC-cancellation-auditor",
+            hashed_password="unused-synthetic",
+            role="Cashier",
         )
-        cleanup.execute(text("DELETE FROM visits WHERE id = :vid"), {"vid": visit_id})
-        cleanup.commit()
-    finally:
-        cleanup.close()
+        seed.add(actor)
+        seed.flush()
+        if not allow_audit:
+            quote = seed.get_bind().dialect.identifier_preparer.quote_identifier
+            schema = quote(seed.get_bind().dialect.default_schema_name)
+            seed.connection().exec_driver_sql(
+                f"REVOKE INSERT ON {schema}.audit_logs FROM {quote(runtime_name)}"
+            )
+
+    with runtime_session() as db:
+        assert not db.scalar(text("SELECT has_table_privilege('audit_logs', 'SELECT')"))
+        assert not db.scalar(text("SELECT has_table_privilege('audit_logs', 'UPDATE,DELETE')"))
+        service = PaymentCancelService(db, payment_manager=None)
+        if allow_audit:
+            assert service.cancel_payment(payment_id=payment_id, actor=actor)["status"] == "cancelled"
+            with pytest.raises(PaymentCancelDomainError) as duplicate:
+                service.cancel_payment(payment_id=payment_id, actor=actor)
+            assert duplicate.value.status_code == 400
+        else:
+            with pytest.raises(PaymentCancelDomainError) as unavailable:
+                service.cancel_payment(payment_id=payment_id, actor=actor)
+            assert unavailable.value.status_code == 503
+
+    with owner_session() as check:
+        expected = "cancelled" if allow_audit else "pending"
+        assert check.get(Payment, payment_id).status == expected
+        receipts = check.scalars(select(AuditLog).filter_by(
+            event_type="PAYMENT_CANCELLED", entity_id=payment_id,
+        )).all()
+        if allow_audit:
+            receipt, = receipts
+            assert receipt.actor_user_id == actor.id
+            assert receipt.actor_role == "Cashier"
+            assert receipt.payload == {"previous_status": "pending", "new_status": "cancelled"}
+        else:
+            assert receipts == []
 
 
 # --- Codex R10 PR 3118: edit-delta decrease guard serialization -------
 
 def test_edit_delta_decrease_guard_serializes_with_payment_creation(
-    db_engine, db_session, new_session_factory
+    payment_engines,
 ):
     """Codex R10 PR 3118 (P1 :467): снижение количества сериализуется с
     созданием платежа.
@@ -1242,8 +1159,7 @@ def test_edit_delta_decrease_guard_serializes_with_payment_creation(
 
     Runtime-протокол (реальный PostgreSQL, независимые сессии):
       1. Сессия A исполняет фиксированный гвард — блокировка Visit УДЕРЖИВАЕТСЯ.
-      2. Сессия B (касса/провайдер) пытается create_pending_payment внутри
-         «окна» (lock_timeout 800ms) — ОБЯЗАНА упереться в блокировку A.
+      2. Сессия B пытается создать платёж и получает конфликт блокировки.
       3. Позитивный контроль: после завершения транзакции A создание платежа
          проходит — блокировка была именно транзакционной, не артефактом.
 
@@ -1253,16 +1169,15 @@ def test_edit_delta_decrease_guard_serializes_with_payment_creation(
     from datetime import datetime as _dt
     from types import SimpleNamespace
 
-    from sqlalchemy.exc import OperationalError
-    from sqlalchemy import text as _text
-    from app.models.payment_invoice import PaymentInvoice
+    from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+    from app.models.service import Service as _Service
     from app.models.visit import VisitService
     from app.services.payment_invariant_service import PaymentInvariantService
     from app.services.registrar_edit_delta_service import RegistrarEditDeltaService
-    from app.models.service import Service as _Service
 
     # ── Setup (committed, independent session) ──
-    setup_session = sessionmaker(bind=db_engine)()
+    admin, runtime = payment_engines
+    setup_session = sessionmaker(bind=admin)()
     try:
         patient = Patient(
             last_name="Guard", first_name="Serialize",
@@ -1287,7 +1202,7 @@ def test_edit_delta_decrease_guard_serializes_with_payment_creation(
         setup_session.add(
             VisitService(
                 visit_id=visit.id, service_id=service.id,
-                name=service.name, price=100, qty=3,
+                name=service.name, price=100, qty=3, currency="UZS",
             )
         )
         invoice = PaymentInvoice(
@@ -1296,7 +1211,6 @@ def test_edit_delta_decrease_guard_serializes_with_payment_creation(
         )
         setup_session.add(invoice)
         setup_session.flush()
-        from app.models.payment_invoice import PaymentInvoiceVisit
         setup_session.add(
             PaymentInvoiceVisit(
                 invoice_id=invoice.id, visit_id=visit.id, visit_amount=300,
@@ -1304,80 +1218,30 @@ def test_edit_delta_decrease_guard_serializes_with_payment_creation(
         )
         setup_session.commit()
         visit_id = visit.id
-        invoice_id = invoice.id
     finally:
         setup_session.close()
 
-    # ── Session A: FIXED guard holds the Visit row lock ──
     entry_stub = SimpleNamespace(visit_id=visit_id)
-    RegistrarEditDeltaService(db_session)._assert_decrease_allowed(entry=entry_stub)
-
-    # ── Session B: payment creation attempts to interleave into the window ──
-    session_b = new_session_factory()
-    interleave_blocked = True
-    try:
-        session_b.execute(_text("SET LOCAL lock_timeout = '800ms'"))
-        try:
-            PaymentInvariantService(session_b).create_pending_payment(
-                visit_id=visit_id,
-                amount=Decimal("300"),
-                currency="UZS",
-                method="online",
-                provider="click",
-                note="gate-d-r3118-window",
-                current_user=SimpleNamespace(id=None),
-            )
-            interleave_blocked = False  # платёж проскочил в открытое окно
-        except OperationalError:
-            interleave_blocked = True   # сериализация удержана
-    finally:
-        session_b.rollback()
-        session_b.close()
-
-    assert interleave_blocked, (
-        "create_pending_payment успешно исполнился ВНУТРИ открытой транзакции "
-        "edit-delta — гвард снижения не удерживает Visit FOR UPDATE"
-    )
-
-    # ── Позитивный контроль: после завершения транзакции A платёж проходит ──
-    db_session.rollback()
-    session_c = new_session_factory()
-    try:
-        payment = PaymentInvariantService(session_c).create_pending_payment(
-            visit_id=visit_id,
-            amount=Decimal("300"),
-            currency="UZS",
-            method="online",
-            provider="click",
-            note="gate-d-r3118-after-commit",
-            current_user=SimpleNamespace(id=None),
-        )
-        session_c.commit()
+    runtime_session = sessionmaker(bind=runtime)
+    payment_request = {
+        "visit_id": visit_id, "amount": Decimal("300"), "currency": "UZS", "method": "online",
+        "provider": "click", "note": "SYNTHETIC", "current_user": SimpleNamespace(id=None),
+    }
+    with runtime_session() as holder, runtime_session() as contender:
+        RegistrarEditDeltaService(holder)._assert_decrease_allowed(entry=entry_stub)
+        with pytest.raises(HTTPException) as busy:
+            PaymentInvariantService(contender).create_pending_payment(**payment_request)
+        assert busy.value.status_code == 409
+        assert busy.value.detail == "Обращение занято, повторите оплату"
+        assert not contender.in_transaction()
+        holder.rollback()
+        payment = PaymentInvariantService(contender).create_pending_payment(**payment_request)
+        contender.commit()
         payment_id = payment.id
-    finally:
-        session_c.close()
 
-    fresh = new_session_factory()
-    try:
-        db_payment = fresh.query(Payment).filter(Payment.id == payment_id).first()
-        assert db_payment is not None and db_payment.status == "pending"
-    finally:
-        fresh.close()
-
-    # Cleanup
-    cleanup = sessionmaker(bind=db_engine)()
-    try:
-        cleanup.execute(
-            _text("DELETE FROM payment_invoice_visits WHERE invoice_id = :iid"),
-            {"iid": invoice_id},
-        )
-        cleanup.execute(_text("DELETE FROM payment_invoices WHERE id = :iid"), {"iid": invoice_id})
-        cleanup.execute(_text("DELETE FROM payments WHERE visit_id = :vid"), {"vid": visit_id})
-        cleanup.execute(_text("DELETE FROM visit_services WHERE visit_id = :vid"), {"vid": visit_id})
-        cleanup.execute(_text("DELETE FROM visits WHERE id = :vid"), {"vid": visit_id})
-        cleanup.commit()
-    finally:
-        cleanup.close()
+    with sessionmaker(bind=admin)() as check:
+        db_payment = check.query(Payment).filter_by(visit_id=visit_id).one()
+        assert db_payment.id == payment_id and db_payment.status == "pending"
 
 
 # ─── Test runner entry point ──────────────────────────────────────────

@@ -5,12 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
+from app.core.roles import normalize_role_value
 from app.repositories.derma_api_repository import DermaApiRepository
+from app.services.money_input import MoneyInputError, parse_money
 from app.services.price_override_approval import (
     PENDING_DUPLICATE_DETAIL,
 )
+from app.services.profile_contact_security import ProfileBearerInvalid
 
 
 @dataclass
@@ -30,83 +34,94 @@ class DermaApiService:
         self.repository = repository or DermaApiRepository(db)
 
     def _visit_belongs_to_doctor(self, *, visit, doctor, user_id: int) -> bool:
-        visit_doctor_id = getattr(visit, "doctor_id", None)
-        if visit_doctor_id == getattr(doctor, "id", None):
-            return True
+        # User.id is not evidence that the assigned Doctor performed the visit.
+        doctor_id = getattr(doctor, "id", None)
+        return type(doctor_id) is int and doctor_id > 0 and getattr(visit, "doctor_id", None) == doctor_id
 
-        get_doctor = getattr(self.repository, "get_doctor", None)
-        assigned_doctor = get_doctor(user_id) if get_doctor else None
-        # Some legacy visit writers stored User.id in doctor_id. Allow that only
-        # when the value does not target another real Doctor row.
-        return assigned_doctor is None and visit_doctor_id == user_id
-
-    def create_price_override(self, *, override_data, user_id: int):
-        visit = self.repository.get_visit(override_data.visit_id)
+    def _prepare_override(self, *, override_data, user_id, bearer):
+        # Keep the locks through insertion/commit: User -> Doctor -> Visit -> Service.
+        if bearer.user_id != user_id or bearer.patient_id is not None:
+            raise ProfileBearerInvalid("Bearer session unavailable")
+        self.repository.reserve_request_writer()
+        user = self.repository.lock_request_user(bearer)
+        if not user.is_active or (not user.is_superuser and normalize_role_value(user.role) not in {"admin", "doctor", "derma", "dermatology", "dermatologist"}):
+            raise DermaApiDomainError(403, "Access denied")
+        doctor = self.repository.lock_request_doctor(user_id)
+        if not doctor or not doctor.active or doctor.user_id != user_id:
+            raise DermaApiDomainError(403, "Access denied")
+        if doctor.specialty not in {"dermatology", "cosmetology"}:
+            raise DermaApiDomainError(403, "Access denied")
+        visit = self.repository.lock_request_visit(override_data.visit_id)
         if not visit:
             raise DermaApiDomainError(404, "Визит не найден")
-
-        service = self.repository.get_service(override_data.service_id)
-        if not service:
-            raise DermaApiDomainError(404, "Услуга не найдена")
-        if not service.allow_doctor_price_override:
-            raise DermaApiDomainError(
-                400,
-                "Данная услуга не разрешает изменение цены врачом",
-            )
-
-        # DERMAPRICE-BE-001 (audit #3892, group 15): the requested service
-        # must be ATTACHED to the selected visit (VisitService is the real
-        # visit↔service association). Without this check a request for an
-        # unattached catalogue service entered the pending-review workflow
-        # and the shared approval then marked it approved while silently
-        # skipping the price update — a false-positive financial workflow.
-        visit_service = self.repository.get_visit_service(
-            visit_id=override_data.visit_id,
-            service_id=override_data.service_id,
-        )
-        if visit_service is None:
-            raise DermaApiDomainError(
-                409,
-                "Услуга не привязана к выбранному визиту",
-            )
-
-        # REGPRICE-BE-003 (audit #3892, group 16): two sequential pending
-        # overrides for the same visit/service can be approved in reverse
-        # order — each approval validated against the SAME captured
-        # before-price, silently overwriting the newer intent. Creation is
-        # refused while one intent is still awaiting review. The probe goes
-        # through the repository (service layer stays session-free).
-        if self.repository.has_pending_override(
-            visit_id=override_data.visit_id,
-            service_id=override_data.service_id,
-        ):
-            raise DermaApiDomainError(409, PENDING_DUPLICATE_DETAIL)
-
-        doctor = self.repository.get_doctor_by_user_id(user_id)
-        if not doctor:
-            raise DermaApiDomainError(404, "Врач не найден")
-        if doctor.specialty not in ["dermatology", "cosmetology"]:
-            raise DermaApiDomainError(
-                403,
-                "Только дерматолог-косметолог может изменять цены процедур",
-            )
-
         if not self._visit_belongs_to_doctor(visit=visit, doctor=doctor, user_id=user_id):
             raise DermaApiDomainError(403, "Access denied")
+        service = self.repository.lock_request_service(override_data.service_id)
+        if not service:
+            raise DermaApiDomainError(404, "Услуга не найдена")
+        if not service.active or not service.allow_doctor_price_override:
+            raise DermaApiDomainError(400, "Данная услуга не разрешает изменение цены врачом")
+        if not visit.confirmation_context_epoch or visit.confirmation_context_epoch < 1 or not doctor.repeat_owner_generation or doctor.repeat_owner_generation < 1:
+            raise DermaApiDomainError(409, "Контекст визита недоступен")
+        try:
+            price = parse_money(override_data.new_price)
+        except MoneyInputError:
+            raise DermaApiDomainError(422, "Некорректная денежная сумма") from None
+        rows = self.repository.request_visit_services(visit.id, service.id)
+        target_id = getattr(override_data, "target_visit_service_id", None)
+        if target_id is None and len(rows) != 1:
+            raise DermaApiDomainError(409, "Укажите конкретную услугу визита")
+        target = next((row for row in rows if row.id == target_id), None) if target_id else rows[0]
+        if target is None:
+            raise DermaApiDomainError(409, "Услуга не привязана к выбранному визиту")
+        if self.repository.has_pending_override(visit_id=visit.id, service_id=service.id, target_id=target.id):
+            raise DermaApiDomainError(409, PENDING_DUPLICATE_DETAIL)
+        target = self.repository.protect_target_fk(visit.id, service.id, target.id)
+        if target is None:
+            raise DermaApiDomainError(409, "Услуга изменяется, повторите запрос")
+        if (type(visit.price_context_generation) is not int or visit.price_context_generation < 1
+                or type(target.price_line_generation) is not int or target.price_line_generation < 1
+                or type(doctor.price_owner_generation) is not int or doctor.price_owner_generation < 1
+                or type(user.auth_epoch) is not int or user.auth_epoch < 0):
+            raise DermaApiDomainError(409, "Контекст визита недоступен")
+        try:
+            parse_money(target.price)
+        except MoneyInputError:
+            raise DermaApiDomainError(409, "Цена услуги визита недоступна") from None
+        return user, doctor, visit, service, target, price
 
-        return self.repository.create_price_override(
-            visit_id=override_data.visit_id,
-            doctor_id=doctor.id,
-            service_id=override_data.service_id,
-            original_price=service.price or Decimal("0"),
-            new_price=override_data.new_price,
-            reason=override_data.reason,
-            details=override_data.details,
-            # DERMAPRICE-BE-002: capture the visit's ACTUAL price for the
-            # truthful before-reference; original_price keeps its immutable
-            # catalogue-reference semantics.
-            visit_price_before=visit_service.price,
-        )
+    def create_price_override(self, *, override_data, user_id: int, bearer):
+        try:
+            user, doctor, visit, service, visit_service, price = self._prepare_override(
+                override_data=override_data, user_id=user_id, bearer=bearer,
+            )
+            return self.repository.create_price_override(
+                visit_id=visit.id, doctor_id=doctor.id, service_id=service.id,
+                original_price=service.price or Decimal("0"), new_price=price,
+                reason=override_data.reason, details=override_data.details,
+                visit_price_before=visit_service.price,
+                target_visit_service_id=visit_service.id,
+                visit_context_epoch=visit.confirmation_context_epoch,
+                doctor_owner_user_id=user.id,
+                doctor_owner_generation=doctor.repeat_owner_generation,
+                price_context_generation=visit.price_context_generation,
+                price_line_generation=visit_service.price_line_generation,
+                price_owner_generation=doctor.price_owner_generation,
+                requester_user_id=user.id, requester_auth_epoch=user.auth_epoch,
+                context=bearer,
+            )
+        except ProfileBearerInvalid:
+            self.repository.rollback()
+            raise DermaApiDomainError(401, "Сессия недействительна") from None
+        except DBAPIError as exc:
+            self.repository.rollback()
+            sqlite_code = getattr(exc.orig, "sqlite_errorcode", 0) or 0
+            if getattr(exc.orig, "sqlstate", None) == "55P03" or sqlite_code & 255 in (5, 6):
+                raise DermaApiDomainError(409, "Услуга изменяется, повторите запрос") from None
+            raise
+        except Exception:
+            self.repository.rollback()
+            raise
 
     def get_price_overrides(
         self,

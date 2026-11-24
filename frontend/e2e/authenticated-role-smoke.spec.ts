@@ -89,7 +89,7 @@ const AUTHENTICATED_ADMIN_ACTION_QA_ROUTES: AdminActionQaRoute[] = [
     key: 'admin-doctors',
     path: '/admin/doctors',
     routeId: 'admin-doctors',
-    primaryActionText: /Р”РѕР±Р°РІРёС‚СЊ РІСЂР°С‡Р°|Добавить врача|Add doctor/i,
+    primaryActionText: /Привязать существующего пользователя|Link existing user/i,
     openedFormHeading: /Р”РѕР±Р°РІРёС‚СЊ РІСЂР°С‡Р°|Добавить врача|Add doctor/i,
   },
   {
@@ -153,9 +153,13 @@ async function expectNoHorizontalOverflow(
   ).toBe(true);
 }
 
-async function expectRouteSpecificEvidence(page: Page, route: RoleQaRoute & { summaryLabel?: string }) {
-  if (route.summaryLabel) {
+async function expectRouteSpecificEvidence(page: Page, route: RoleQaRoute | SpecialtyQaRoute) {
+  if ('summaryLabel' in route && route.summaryLabel) {
     await expect(page.getByRole('list', { name: route.summaryLabel })).toBeVisible();
+  }
+  if ('legacyQueueHeading' in route && route.legacyQueueHeading) {
+    await expect(page).toHaveURL((url) => url.searchParams.get('tab') === 'queue');
+    await expect(page.getByRole('heading', { name: route.legacyQueueHeading })).toBeVisible();
   }
 }
 

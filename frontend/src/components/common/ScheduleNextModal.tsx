@@ -1,8 +1,10 @@
 import { api } from '../../api/client';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
+import { extractApiMessage, getErrorStatus } from '../../utils/error-utils';
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
+import { cartIdempotencyGuard, createIdempotencyKey } from '../wizard/wizardUtils';
 import { useTranslation } from '../../i18n/useTranslation';
 import {
   Calendar,
@@ -75,6 +77,8 @@ const ScheduleNextModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  // Retain uncertain operation keys if the form switches to another patient.
+  const attempts = useRef(new Map<string, { key: string; payload: string | null; pending: boolean }>());
 
   // DERMSCHED-FE-003: server-side patient search + the identity of the
   // currently selected patient (see loadPatients and the select below).
@@ -84,7 +88,7 @@ const ScheduleNextModal = ({
   // The parent can keep this component mounted across patients and opens.
   // Associate late save feedback and its timer with the committed dialog.
   const hostPatientId = String(patient?.patient_id ?? patient?.id ?? '');
-  const sessionRef = useRef<symbol | null>(null);
+  const sessionRef = useRef<{ completed: boolean } | null>(null);
   const successTimerRef = useRef<number | null>(null);
 
   const invalidateSession = () => {
@@ -97,12 +101,12 @@ const ScheduleNextModal = ({
 
   useLayoutEffect(() => {
     if (!isOpen) return;
-    sessionRef.current = Symbol();
+    sessionRef.current = { completed: false };
     setLoading(false);
     setError('');
     setSuccess('');
     return invalidateSession;
-  }, [isOpen, hostPatientId]);
+  }, [isOpen, hostPatientId, formData.patient_id]);
 
   const handleClose = () => {
     if (!onClose) return;
@@ -246,7 +250,11 @@ const ScheduleNextModal = ({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const session = sessionRef.current;
-    if (session === null) return;
+    if (!session || session.completed) return;
+    const patientId = formData.patient_id;
+    const previousAttempt = attempts.current.get(patientId);
+    if (previousAttempt?.pending) return;
+    let pendingAttempt: typeof previousAttempt;
     setLoading(true);
     setError('');
     setSuccess('');
@@ -254,23 +262,47 @@ const ScheduleNextModal = ({
     try {
       // Валидация
       if (!formData.patient_id) {
-        throw new Error(t('misc.snm_err_select_patient'));
+        setError(t('misc.snm_err_select_patient'));
+        return;
       }
       if (!formData.visit_date) {
-        throw new Error(t('misc.snm_err_select_visit_date'));
+        setError(t('misc.snm_err_select_visit_date'));
+        return;
       }
       if (formData.services.some((s) => !s.service_id)) {
-        throw new Error(t('misc.snm_err_select_all_services'));
+        setError(t('misc.snm_err_select_all_services'));
+        return;
       }
+
+      const attempt = cartIdempotencyGuard({
+        existingKey: previousAttempt?.key ?? null,
+        existingPayload: previousAttempt?.payload ?? null,
+        payload: JSON.stringify(formData),
+        newKey: previousAttempt?.key ?? createIdempotencyKey(),
+      });
+      if (attempt.action === 'block' || !attempt.key) {
+        setError(t('misc.aw_cart_retry_payload_changed'));
+        return;
+      }
+      pendingAttempt = { key: attempt.key, payload: attempt.payload, pending: true };
+      attempts.current.set(patientId, pendingAttempt);
 
       // DERMSCHED-FE-001 (audit 3892): submit through the shared
       // authenticated client — absolute `/api/v1/doctor/visits/
       // schedule-next` path, interceptors own auth/refresh/CSRF.
-      const response = await api.post('/doctor/visits/schedule-next', formData);
+      const response = await api.post('/doctor/visits/schedule-next', formData, {
+        headers: { 'Idempotency-Key': attempt.key },
+      });
       const result = response.data as {
         visit_id?: number | string;
         confirmation?: { token?: string; channel?: string };
       };
+      if (!result?.visit_id) {
+        if (sessionRef.current === session) setError(t('misc.snm_err_create_visit'));
+        return;
+      }
+      session.completed = true;
+      attempts.current.delete(patientId);
       const normalizedFormData = {
         ...formData,
         patient_id: formData.patient_id ? Number(formData.patient_id) : null,
@@ -311,10 +343,16 @@ const ScheduleNextModal = ({
         handleClose();
       }, 2000);
     } catch (err) {
-      if (sessionRef.current !== session) return;
-      const errorData = (err as { response?: { data?: { detail?: string } } })?.response?.data;
-      setError(String(errorData?.detail || t('misc.snm_err_create_visit')));
+      const status = getErrorStatus(err);
+      // A denial of a replay cannot determine the result of the original request.
+      if (!previousAttempt && pendingAttempt && status !== null && [400, 401, 403, 404, 422].includes(status)) {
+        attempts.current.delete(patientId);
+      }
+      if (sessionRef.current === session) {
+        setError(extractApiMessage(err) ?? t('misc.snm_err_create_visit'));
+      }
     } finally {
+      if (pendingAttempt) pendingAttempt.pending = false;
       if (sessionRef.current === session) setLoading(false);
     }
   };
@@ -694,7 +732,6 @@ const ScheduleNextModal = ({
               
               <option value="none">{t('misc.snm_visit_type_paid')}</option>
               <option value="repeat">{t('misc.snm_visit_type_repeat')}</option>
-              <option value="benefit">{t('misc.snm_visit_type_benefit')}</option>
             </select>
           </div>
 
@@ -733,7 +770,7 @@ const ScheduleNextModal = ({
             <button
               type="submit"
               style={primaryButtonStyle}
-              disabled={loading}>
+              disabled={loading || Boolean(success)}>
               
               {loading ? t('misc.snm_btn_creating') : t('misc.snm_btn_schedule')}
             </button>

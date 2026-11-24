@@ -65,6 +65,17 @@ describe('redactCredentialQueryParams (owner round-12 P1)', () => {
 });
 
 describe('scrubPIIFromObject (owner round-12 P1 — URL-valued telemetry fields)', () => {
+  it('redacts protected invitation references in browser URLs and request paths', () => {
+    const handle = 'synthetic-inbox-reference';
+    const scrubbed = scrubPIIFromObject({
+      request: { url: `/api/v1/notifications/visit-invitation-tasks/${handle}` },
+      breadcrumbs: [{ data: { to: `/registrar?dept=cardio&%69nvitation=${handle}` } }],
+      extra: { referrer: `/admin?invitation_recovery=${handle}` },
+    });
+    expect(JSON.stringify(scrubbed)).not.toContain(handle);
+    expect(redactCredentialQueryParams('/registrar?dept=cardio')).toBe('/registrar?dept=cardio');
+  });
+
   it('redacts OTP and arbitrary SMS text in contextual verification requests', () => {
     const canary = `synthetic-otp-${Math.random().toString(36).slice(2)}`;
     const event = {

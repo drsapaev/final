@@ -71,8 +71,11 @@ class PaymentProviderManager:
         return self.providers.get(provider_name.lower())
 
     def get_available_providers(self) -> list[str]:
-        """Получение списка доступных провайдеров"""
-        return list(self.providers.keys())
+        """Получение списка провайдеров для новой оплаты."""
+        return [
+            name for name, provider in self.providers.items()
+            if getattr(provider, "supports_payment_creation", True)
+        ]
 
     def supports_registrar_invoice_payment(self, provider_name: str) -> bool:
         """Whether a configured provider can reconcile registrar invoices."""
@@ -276,7 +279,8 @@ class PaymentProviderManager:
         """
         info = {}
 
-        for name, provider in self.providers.items():
+        for name in self.get_available_providers():
+            provider = self.providers[name]
             info[name] = {
                 "name": name,
                 "class": provider.__class__.__name__,

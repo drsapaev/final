@@ -5,7 +5,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.analytics_simple_api_service import AnalyticsSimpleApiService
+from app.services.analytics_simple_api_service import (
+    AnalyticsSimpleApiService,
+    AnalyticsSimpleDomainError,
+)
 
 
 @pytest.mark.unit
@@ -63,3 +66,36 @@ class TestAnalyticsSimpleApiService:
 
         assert result["period_days"] == 10
         assert result["trends"] == [{"date": today.isoformat(), "appointments": 8}]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("operation", "repository_method", "kwargs"),
+    [
+        ("get_quick_stats", "count_patients", {}),
+        ("get_dashboard_data", "count_patients", {}),
+        ("get_trends_analytics", "list_appointment_trends", {"days": 10}),
+    ],
+)
+def test_analytics_failures_keep_repository_details_private(
+    operation,
+    repository_method,
+    kwargs,
+    caplog,
+):
+    marker = "SYNTHETIC_REPOSITORY_FAILURE_DETAILS"
+
+    def fail(*args, **kwargs):
+        raise RuntimeError(marker)
+
+    repository = SimpleNamespace(**{repository_method: fail})
+    service = AnalyticsSimpleApiService(db=None, repository=repository)
+
+    with pytest.raises(AnalyticsSimpleDomainError) as error:
+        getattr(service, operation)(**kwargs)
+
+    assert error.value.status_code == 500
+    assert error.value.detail == "Internal server error"
+    assert error.value.__suppress_context__ is True
+    assert marker not in caplog.text
+    assert "error_type=RuntimeError" in caplog.text

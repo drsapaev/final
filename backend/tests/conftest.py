@@ -109,6 +109,8 @@ def test_db():
     # app.db.base уже импортирует все модели через app.models.__init__
     # Создаем все таблицы
     Base.metadata.create_all(bind=engine)
+    from tests.synthetic_reconciliation import install_reconciliation_fence
+    install_reconciliation_fence(engine)
 
     # Проверяем, что таблицы созданы (для отладки)
     from sqlalchemy import inspect
@@ -183,6 +185,24 @@ def db_session(test_db):
 def db(db_session):
     """Алиас для db_session для совместимости старых тестов."""
     return db_session
+
+
+@pytest.fixture
+def patient_ownership_epochs(db_session):
+    """Install migration-backed ownership generations for keyed patient APIs."""
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    from tests.integration.test_encounter_migration_pg import _migration
+
+    connection = db_session.connection()
+    assert connection.dialect.name == "sqlite"
+    # The metadata fixture already owns the column. Rebuild it with the
+    # real migration inside this test's SQLite transaction and savepoint.
+    connection.exec_driver_sql("UPDATE patients SET id=id WHERE 0")
+    with Operations.context(MigrationContext.configure(connection)) as operations:
+        operations.drop_column("patients", "notification_owner_generation")
+        _migration("0113_subject_ownership.py").upgrade()
 
 
 @pytest.fixture(scope="function")
@@ -364,6 +384,8 @@ def test_visit(db_session, test_patient, test_doctor):
         visit_date=clinic_today(db_session),
         visit_time="10:00",
         status="pending_confirmation",
+        # create_all-based tests skip 0102, which sets a positive epoch.
+        confirmation_context_epoch=1,
         discount_mode="none",
         department="cardiology",
         confirmation_token="test-token-123",

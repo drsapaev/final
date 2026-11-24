@@ -1549,3 +1549,92 @@ def test_pin21_batch_audit_rows_share_single_commit_transaction(
     assert audit_row.comment == "Batch update: single-commit boundary pin"
     assert "price" in (audit_row.changes or {})
     assert not sa_inspect(audit_row).pending
+
+
+@pytest.mark.parametrize("operation", ("create", "update", "deactivate"))
+def test_single_service_writer_commits_audit_atomically(operation: str) -> None:
+    import os
+    from decimal import Decimal
+
+    from sqlalchemy import select, text
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models.service_audit import ServiceAuditLog
+    from tests._pg_admin_guard import is_local_admin_dsn
+
+    if not is_local_admin_dsn(os.environ.get("DATABASE_URL", "")):
+        pytest.skip("requires a disposable local PostgreSQL database")
+    engine, admin_engine, schema = _pg_engine_factory()
+    if engine is None:
+        pytest.skip("requires PostgreSQL (CI or disposable clinic_test db)")
+
+    synthetic_name = "Synthetic catalogue audit"
+    try:
+        _pg_seed_and_metadata(engine)
+        with Session(engine) as db:
+            actor_id = _make_user(db, username="synthetic_catalog_actor").id
+            service_id = None
+            if operation != "create":
+                service_id = _make_service(db, name=synthetic_name, queue_tag=None).id
+
+        def mutate(db: Session) -> int:
+            writer = ServicesApiService(db)
+            if operation == "create":
+                return writer.create_service(
+                    service_data={"name": synthetic_name, "price": Decimal("123.456")},
+                    user_id=actor_id,
+                ).id
+            assert service_id is not None
+            if operation == "update":
+                return writer.update_service(
+                    service_id=service_id,
+                    service_data={"price": Decimal("123.456")},
+                    user_id=actor_id,
+                ).id
+            return writer.delete_service(service_id=service_id, user_id=actor_id)["service_id"]
+
+        with engine.begin() as connection:
+            connection.execute(text(
+                "ALTER TABLE service_audit_logs ADD CONSTRAINT synthetic_audit_reject "
+                "CHECK (false) NOT VALID"
+            ))
+        with Session(engine) as db:
+            with pytest.raises(IntegrityError, match="synthetic_audit_reject"):
+                mutate(db)
+            assert not db.in_transaction()
+
+        with Session(engine) as observer:
+            service = observer.scalar(select(Service).where(Service.name == synthetic_name))
+            if operation == "create":
+                assert service is None
+            else:
+                assert service is not None
+                assert service.price == 0
+                assert service.active
+            assert observer.scalars(select(ServiceAuditLog)).all() == []
+
+        with engine.begin() as connection:
+            connection.execute(text(
+                "ALTER TABLE service_audit_logs DROP CONSTRAINT synthetic_audit_reject"
+            ))
+        with Session(engine) as db:
+            committed_id = mutate(db)
+        with Session(engine) as observer:
+            service = observer.get(Service, committed_id)
+            audit = observer.scalars(
+                select(ServiceAuditLog).where(ServiceAuditLog.service_id == committed_id)
+            ).one()
+            assert service is not None
+            assert audit.action == operation
+            assert audit.user_id == actor_id
+            if operation == "deactivate":
+                assert not service.active
+                assert audit.changes["active"] == {"old": True, "new": False}
+                assert audit.new_values["price"] == 0.0
+            else:
+                assert service.price == Decimal("123.46")
+                assert audit.new_values["price"] == float(service.price)
+                if operation == "update":
+                    assert audit.old_values["price"] == 0.0
+    finally:
+        _pg_cleanup(admin_engine, engine, schema)

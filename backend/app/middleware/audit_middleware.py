@@ -17,6 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.pii_masker import (
     is_public_site_analytics_ingest_path,
+    is_sensitive_payment_evidence_path,
     is_sensitive_verification_path,
     mask_pii,
 )
@@ -91,7 +92,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # Mask PII in query string — phones/emails are common in ?param=...
         # (e.g., /mobile/patients/lookup?phone=+998901234567)
         query_string = ""
-        if request.url.query and is_sensitive_verification_path(path):
+        if request.url.query and (is_sensitive_verification_path(path) or is_sensitive_payment_evidence_path(path)):
             # Legacy clients can still submit phone numbers, OTPs or arbitrary
             # custom SMS text in query params, including on a 405 response.
             query_string = "?[REDACTED]"

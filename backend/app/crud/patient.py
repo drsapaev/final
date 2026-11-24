@@ -11,6 +11,10 @@ from app.crud.base import CRUDBase
 from app.models.patient import Patient
 from app.models.user import User
 from app.schemas.patient import PatientCreate, PatientUpdate
+from app.services.patient_birth_precision import (
+    lock_patient_for_birth_update,
+    record_reported_birth_date,
+)
 
 
 class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
@@ -629,20 +633,29 @@ def update_patient(
     from ``update_data``. Returns the refreshed Patient or ``None`` if not
     found. Fields that don't exist on the model are silently skipped.
     """
-    patient_obj = (
-        db.query(Patient)
-        .filter(Patient.id == patient_id, Patient.is_deleted.is_(False))
-        .first()
-    )
+    if "birth_date" in update_data:
+        patient_obj = lock_patient_for_birth_update(db, patient_id)
+    else:
+        patient_obj = (
+            db.query(Patient)
+            .filter(Patient.id == patient_id, Patient.is_deleted.is_(False))
+            .first()
+        )
     if not patient_obj:
         return None
 
-    for field, value in update_data.items():
-        if hasattr(patient_obj, field):
-            setattr(patient_obj, field, value)
+    try:
+        for field, value in update_data.items():
+            if field not in {"birth_date_precision", "birth_date_generation"} and hasattr(patient_obj, field):
+                setattr(patient_obj, field, value)
 
-    db.commit()
-    db.refresh(patient_obj)
+        if "birth_date" in update_data:
+            record_reported_birth_date(db, patient_obj, expected_date=update_data["birth_date"])
+        db.commit()
+        db.refresh(patient_obj)
+    except Exception:
+        db.rollback()
+        raise
     return patient_obj
 
 

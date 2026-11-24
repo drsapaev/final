@@ -2,16 +2,31 @@
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.models.enums import PaymentStatus
 from app.models.patient import Patient
+from app.models.payment import Payment
 from app.models.visit import Visit
 from app.repositories.payment_read_repository import PaymentReadRepository
 from app.services.billing_service import BillingService
+from app.services.payment_providers.base import PaymentResult
+from app.services.payment_providers.base import PaymentStatus as ProviderStatus
+from app.services.payment_providers.click import (
+    click_transaction_reference,
+    matches_click_status_evidence,
+)
+from app.services.payment_state_checks import is_valid_payment_transition
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -24,18 +39,26 @@ class PaymentReadService:
     """Provides payment status and visit payment listing queries."""
 
     def __init__(self, db, payment_manager=None):  # type: ignore[no-untyped-def]
+        self.db = db
         self.repository = PaymentReadRepository(db)
         self.billing_service = BillingService(db)
         self.payment_manager = payment_manager
 
     @staticmethod
     def _format_amount(value: Any) -> str:
-        if value is None:
-            return "0"
         try:
-            return f"{value:,.0f}".replace(",", " ")
-        except Exception:
-            return f"{float(value):,.0f}".replace(",", " ")
+            amount = Decimal(str(value))
+            if not amount.is_finite() or amount != amount.quantize(Decimal("0.01")):
+                raise ValueError("Invalid receipt amount")
+        except (InvalidOperation, TypeError, ValueError):
+            raise PaymentReadDomainError(status_code=409, detail="Сумма платежа требует сверки") from None
+        return f"{amount:,.2f}".replace(",", " ")
+
+    @staticmethod
+    def _receipt_currency(value: Any) -> str:
+        if isinstance(value, str) and len(value) == 3 and value.isascii() and value.isalpha() and value.isupper():
+            return value
+        return "валюта не указана"
 
     @staticmethod
     def _format_payment_method(method: str | None) -> str:
@@ -164,37 +187,114 @@ class PaymentReadService:
 
         return "Helvetica", "Helvetica-Bold"
 
-    def get_payment_status(self, *, payment_id: int) -> dict[str, Any]:
+    def _persist_provider_status(
+        self,
+        payment: Payment,
+        *,
+        new_status: str,
+        metadata: dict[str, Any],
+        provider_transaction_id: str | None,
+    ) -> dict[str, Any]:
+        payment_id = payment.id
+        previous_status = payment.status
+        try:
+            payment = self.billing_service.update_payment_status(
+                payment_id=payment_id, new_status=new_status, meta=metadata, commit=False,
+            )
+            if provider_transaction_id is not None:
+                payment.provider_transaction_id = provider_transaction_id
+            self.repository.record_provider_transition(payment, previous_status=previous_status)
+            # Keep the response in the authorized snapshot before commit expires the ORM row.
+            status_payload = self._payment_status_payload(payment)
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            logger.error("Could not save provider status transition for payment_id=%s", payment_id)
+            raise PaymentReadDomainError(
+                status_code=503, detail="Обновление статуса платежа временно недоступно",
+            ) from None
+        return status_payload
+
+    @staticmethod
+    def _check_click_payment_evidence(
+        result: PaymentResult, payment: Payment, order_id: str,
+    ) -> tuple[bool, str | None]:
+        if not matches_click_status_evidence(
+            result, order_id=order_id, amount=payment.amount, currency=payment.currency,
+        ):
+            return False, None
+        if result.status != ProviderStatus.COMPLETED:
+            return True, None
+        reference = click_transaction_reference(result.provider_data)
+        if reference is None or payment.provider_transaction_id not in (None, reference):
+            return False, None
+        return True, reference
+
+    def get_payment_status(
+        self,
+        *,
+        payment_id: int,
+        recheck_access: Callable[[Payment], None] | None = None,
+        end_read_transaction: Callable[[], None] | None = None,
+    ) -> dict[str, Any]:
         payment = self.repository.get_payment(payment_id)
         if not payment:
             raise PaymentReadDomainError(status_code=404, detail="Платеж не найден")
 
-        provider_payment_id = payment.provider_payment_id or ""
-        is_test_provider_payment = provider_payment_id.startswith("test_")
+        provider = payment.provider
+        order_id = payment.provider_payment_id
+        recorded_status = payment.status
 
         if (
             self.payment_manager
-            and payment.provider
-            and payment.provider_payment_id
-            and payment.status
-            in [PaymentStatus.PENDING.value, PaymentStatus.PROCESSING.value]
-            and not is_test_provider_payment
+            and provider
+            and order_id
+            and recorded_status in (PaymentStatus.PENDING.value, PaymentStatus.PROCESSING.value)
+            and not order_id.startswith("test_")
         ):
-            result = self.payment_manager.check_payment_status(
-                payment.provider, payment.provider_payment_id
+            visit_id = payment.visit_id
+            recorded_payment_terms = (payment.amount, payment.currency, payment.updated_at)
+            if end_read_transaction is not None:
+                end_read_transaction()
+            result = self.payment_manager.check_payment_status(provider, order_id)
+            is_click = provider.lower() == "click"
+            reported_status = result.status.lower() if isinstance(result.status, str) else ""
+            if is_click and reported_status == ProviderStatus.COMPLETED:
+                reported_status = PaymentStatus.PAID.value
+
+            can_transition = (
+                result.success
+                and reported_status != recorded_status
+                and is_valid_payment_transition(recorded_status, reported_status)
             )
+            payment = self.repository.get_payment(payment_id, for_update=can_transition, refresh=True)
+            if payment is None or payment.visit_id != visit_id:
+                raise PaymentReadDomainError(status_code=404, detail="Платеж не найден")
+            if recheck_access is not None:
+                recheck_access(payment)
 
-            if result.success and result.status and result.status != payment.status:
+            if (
+                can_transition
+                and payment.status == recorded_status
+                and payment.provider == provider
+                and payment.provider_payment_id == order_id
+                and (payment.amount, payment.currency, payment.updated_at) == recorded_payment_terms
+            ):
+                reference = None
+                if is_click:
+                    matches, reference = self._check_click_payment_evidence(result, payment, order_id)
+                    if not matches:
+                        return self._payment_status_payload(payment)
                 meta = {**(payment.provider_data or {}), **(result.provider_data or {})}
-                self.billing_service.update_payment_status(
-                    payment_id=payment.id, new_status=result.status, meta=meta
+                return self._persist_provider_status(
+                    payment, new_status=reported_status, metadata=meta,
+                    provider_transaction_id=reference,
                 )
-                payment = self.repository.get_payment(payment_id)
-                if not payment:
-                    raise PaymentReadDomainError(
-                        status_code=500, detail="Платеж не найден после обновления статуса"
-                    )
 
+        return self._payment_status_payload(payment)
+
+    @staticmethod
+    def _payment_status_payload(payment: Payment) -> dict[str, Any]:
         return {
             "payment_id": payment.id,
             "status": payment.status,
@@ -323,7 +423,7 @@ class PaymentReadService:
             f"Визит ID: {context['visit'].id if context['visit'] else context['payment'].visit_id or 'N/A'}",
             "",
             "ПЛАТЕЖНАЯ ИНФОРМАЦИЯ:",
-            f"Сумма: {context['amount_display']} {context['payment'].currency or 'UZS'}",
+            f"Сумма: {context['amount_display']} {self._receipt_currency(context['payment'].currency)}",
             f"Способ оплаты: {context['method_display']}",
             f"Статус: {context['status_display']}",
         ]
@@ -332,7 +432,7 @@ class PaymentReadService:
             lines.extend(
                 [
                     "",
-                    f"Возврат: {context['refund_amount_display']} UZS",
+                    f"Возврат: {context['refund_amount_display']} {self._receipt_currency(context['payment'].currency)}",
                 ]
             )
         if context["payment"].refund_reason:
@@ -362,7 +462,7 @@ class PaymentReadService:
 
 Номер платежа: {payment.id}
 Дата: {context["paid_at_display"]}
-Сумма: {context["amount_display"]} {payment.currency}
+Сумма: {context["amount_display"]} {self._receipt_currency(payment.currency)}
 Провайдер: {provider}
 Статус: {context["status_display"]}
 

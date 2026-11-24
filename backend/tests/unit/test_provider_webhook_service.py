@@ -1,16 +1,129 @@
 from __future__ import annotations
 
+import logging
+from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
+from sqlalchemy import event
 
+from app.models.payment import Payment
+from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
+
+from app.services.payment_providers.click import ClickProvider
 from app.services.provider_webhook_service import ProviderWebhookService
+
+
+@pytest.fixture
+def click_provider():
+    return ClickProvider({
+        "service_id": "synthetic-service",
+        "merchant_id": "synthetic-merchant",
+        "secret_key": "synthetic-config",
+    })
+
+
+@pytest.mark.parametrize(
+    ("signature", "reason"),
+    [(None, "Missing signature"), ("SYNTHETIC_RECEIVED", "Signature mismatch")],
+)
+def test_click_signature_diagnostics_omit_callback_and_signatures(
+    click_provider, monkeypatch, caplog, signature, reason,
+):
+    payload = {"error_note": "SYNTHETIC_CALLBACK"}
+    monkeypatch.setattr(
+        click_provider, "_generate_webhook_signature", Mock(return_value="SYNTHETIC_EXPECTED")
+    )
+
+    assert not click_provider.validate_webhook_signature(payload, signature)
+    assert reason in caplog.text
+    assert "SYNTHETIC_CALLBACK" not in caplog.text
+    assert "SYNTHETIC_EXPECTED" not in caplog.text
+    assert "SYNTHETIC_RECEIVED" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("failure", "error_message", "logged_reason"),
+    [
+        (None, "Неверная подпись webhook", "Неверная подпись"),
+        (RuntimeError("SYNTHETIC_EXCEPTION_DETAIL"), "Внутренняя ошибка", "Internal error type=RuntimeError"),
+    ],
+)
+def test_click_adapter_errors_omit_callback_and_exception_details(
+    click_provider, monkeypatch, caplog, failure, error_message, logged_reason,
+):
+    payload = {"error_note": "SYNTHETIC_CALLBACK", "sign_string": "SYNTHETIC_RECEIVED"}
+    monkeypatch.setattr(
+        click_provider, "_generate_webhook_signature",
+        Mock(return_value="SYNTHETIC_EXPECTED", side_effect=failure),
+    )
+
+    result = click_provider.process_webhook(payload)
+
+    assert not result.success
+    assert result.error_message == error_message
+    assert logged_reason in caplog.text
+    assert "SYNTHETIC_" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("action", "error", "status"),
+    [(0, 0, "processing"), (1, 0, "completed"), (1, -1, "failed")],
+)
+def test_click_adapter_logs_callback_status_without_payment_fields(
+    click_provider, monkeypatch, caplog, action, error, status,
+):
+    payload = {
+        "click_trans_id": "SYNTHETIC-TRANSACTION",
+        "merchant_trans_id": "SYNTHETIC-ORDER",
+        "amount": 182753,
+        "action": action,
+        "error": error,
+        "sign_string": "synthetic-signature",
+    }
+    monkeypatch.setattr(
+        click_provider,
+        "_generate_webhook_signature",
+        Mock(return_value=payload["sign_string"]),
+    )
+    caplog.set_level(logging.INFO, logger="app.services.payment_providers.base")
+
+    result = click_provider.process_webhook(payload)
+
+    assert result.success
+    assert result.status == status
+    assert result.payment_id == payload["merchant_trans_id"]
+    assert result.provider_data["click_trans_id"] == payload["click_trans_id"]
+    assert result.provider_data["amount"] == "1827.53"
+    assert any("process_webhook" in message and status in message for message in caplog.messages)
+    assert payload["click_trans_id"] not in caplog.text
+    assert payload["merchant_trans_id"] not in caplog.text
+    assert result.provider_data["amount"] not in caplog.text
 
 
 @pytest.mark.unit
 class TestProviderWebhookService:
+    def test_webhook_error_responses_and_logs_omit_internal_details(self, client, caplog):
+        private_detail = "SYNTHETIC-DRIVER-DIAGNOSTIC"
+        with patch(
+            "app.services.provider_webhook_service.get_payment_manager",
+            side_effect=RuntimeError(private_detail),
+        ):
+            click = client.post("/api/v1/payments/webhook/click", json={})
+            payme = client.post("/api/v1/payments/webhook/payme", json={"id": "synthetic-rpc"})
+
+        assert click.status_code == payme.status_code == 200
+        assert click.json() == {"error": -1, "error_note": "Internal server error"}
+        assert payme.json() == {
+            "error": {"code": -32603, "message": "Internal server error"},
+            "id": "synthetic-rpc",
+        }
+        assert private_detail not in caplog.text
+        assert "Click webhook error type=RuntimeError" in caplog.text
+        assert "Payme webhook error type=RuntimeError" in caplog.text
+
     def test_click_webhook_requires_signature(self, db_session):
         service = ProviderWebhookService(db_session)
         try:
@@ -28,6 +141,56 @@ class TestProviderWebhookService:
 
         assert result["error"] == -1
         assert result["error_note"] == "Missing signature"
+
+    @pytest.mark.parametrize("valid_signature", [False, True])
+    def test_click_callback_service_logs_omit_request_fields(self, caplog, valid_signature):
+        payload = {
+            "click_trans_id": "SYNTHETIC-TRANSACTION",
+            "merchant_trans_id": "SYNTHETIC-ORDER",
+            "amount": 182753,
+            "action": 1,
+            "sign_string": "synthetic-signature",
+        }
+        db = Mock()
+        repository = Mock()
+        repository.get_existing_transaction.return_value = SimpleNamespace(
+            payment_id=44, amount=Decimal("182753"), webhook_id=33, status="completed",
+        )
+        repository.get_payment_by_id.return_value = SimpleNamespace(
+            provider="click", currency="UZS", provider_payment_id=payload["merchant_trans_id"],
+        )
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = valid_signature
+        service = ProviderWebhookService(db, repository=repository)
+        caplog.set_level(logging.INFO, logger=ProviderWebhookService.__module__)
+
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            result = service.process_click_webhook(payload)
+
+        if valid_signature:
+            assert result["error"] == 0
+            assert result["error_note"] == "Already processed"
+            assert result["click_trans_id"] == payload["click_trans_id"]
+            assert result["merchant_trans_id"] == payload["merchant_trans_id"]
+            assert result["merchant_prepare_id"] == 33
+            assert result["payment_status"] is None
+            repository.create_webhook.assert_not_called()
+            repository.get_payment_by_id_for_update.assert_not_called()
+            repository.create_transaction.assert_not_called()
+            db.commit.assert_not_called()
+            assert "already processed" in caplog.text
+        else:
+            assert result == {"error": -1, "error_note": "Invalid signature"}
+            repository.get_existing_transaction.assert_not_called()
+            assert "Invalid signature" in caplog.text
+        repository.create_webhook.assert_not_called()
+        repository.create_transaction.assert_not_called()
+        db.commit.assert_not_called()
+        assert "Click webhook received" in caplog.text
+        assert payload["click_trans_id"] not in caplog.text
+        assert payload["merchant_trans_id"] not in caplog.text
+        request_fields = {"click_trans_id", "merchant_trans_id", "action"}
+        assert all(request_fields.isdisjoint(vars(record)) for record in caplog.records)
 
     def test_payme_webhook_requires_auth_header(self, db_session):
         service = ProviderWebhookService(db_session)
@@ -52,12 +215,15 @@ class TestProviderWebhookService:
         transaction = SimpleNamespace(
             id=77,
             payment_id=44,
+            visit_id=55,
             webhook_id=33,
             status="processing",
             provider_data={"method": "CreateTransaction"},
         )
         payment = SimpleNamespace(
             id=44,
+            visit_id=55,
+            provider_payment_id="clinic_44_1700000000",
             amount=Decimal("1000"),
             status="processing",
             paid_at=None,
@@ -67,6 +233,7 @@ class TestProviderWebhookService:
             get_existing_transaction=Mock(return_value=transaction),
             get_payment_by_id=Mock(return_value=payment),
             get_payment_by_id_for_update=Mock(return_value=payment),
+            get_processed_webhook=Mock(return_value=None),
         )
         manager = SimpleNamespace(
             get_provider=Mock(
@@ -116,12 +283,15 @@ class TestProviderWebhookService:
         transaction = SimpleNamespace(
             id=77,
             payment_id=44,
+            visit_id=55,
             webhook_id=33,
             status="processing",
             provider_data={"method": "CreateTransaction"},
         )
         payment = SimpleNamespace(
             id=44,
+            visit_id=55,
+            provider_payment_id="clinic_44_1700000000",
             amount=Decimal("1000"),
             status="processing",
             paid_at=None,
@@ -173,149 +343,246 @@ class TestProviderWebhookService:
         assert payment.status == "processing"
         assert payment.paid_at is None
 
-    def test_click_webhook_rejects_amount_mismatch_without_marking_payment_paid(
-        self, db_session
-    ):
-        webhook = SimpleNamespace(id=33, status="pending", processed_at=None)
+    @pytest.mark.parametrize("method", ["CheckPerformTransaction", "CreateTransaction"])
+    @pytest.mark.parametrize("bound", [True, False])
+    def test_payme_requires_issued_order(self, db_session, method, bound):
+        from datetime import UTC, datetime
+
+        order = "SYNTHETIC-PAYME-ORDER"
         payment = SimpleNamespace(
-            id=44,
-            amount=Decimal("1000"),
-            status="pending",
-            paid_at=None,
-            provider_data={},
-            visit_id=55,
+            id=44, visit_id=55, amount=Decimal("1000.00"), status="pending", provider_data={},
         )
-        repository = SimpleNamespace(
-            get_existing_transaction=Mock(return_value=None),
-            create_webhook=Mock(return_value=webhook),
-            get_payment_by_id=Mock(return_value=payment),
-            get_payment_by_id_for_update=Mock(return_value=payment),
-            create_transaction=Mock(),
-        )
-        manager = SimpleNamespace(
-            get_provider=Mock(
-                return_value=SimpleNamespace(
-                    validate_webhook_signature=Mock(return_value=True)
-                )
-            ),
-            process_webhook=Mock(
-                return_value=SimpleNamespace(
-                    success=True,
-                    payment_id="clinic_44_1700000000",
-                    status="completed",
-                    provider_data={"amount": Decimal("1")},
-                )
-            ),
+        webhook = SimpleNamespace(id=33, status="pending", created_at=datetime(2030, 1, 1, tzinfo=UTC))
+        repository = Mock()
+        repository.get_existing_transaction.return_value = None
+        repository.get_payment_by_provider_payment_id_for_update.return_value = payment if bound else None
+        repository.create_webhook.return_value = webhook
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
+        manager.process_webhook.return_value = SimpleNamespace(
+            success=True,
+            payment_id=order,
+            status="pending" if method == "CheckPerformTransaction" else "processing",
+            provider_data={"amount": "1000.00"},
         )
         service = ProviderWebhookService(db_session, repository=repository)
-        try:
-            def _mock_update_status(payment_id, new_status, commit=False):
-                payment.status = new_status
-                if new_status == "paid" and not getattr(payment, 'paid_at', None):
-                    from datetime import datetime, UTC
-                    payment.paid_at = datetime.now(UTC)
-                return payment
-            service._update_payment_status = Mock(side_effect=_mock_update_status)
-        except NameError:
-            pass  # no payment variable in this test
+        service._update_payment_status = Mock(return_value=payment)
+        params = {"amount": 100000, "account": {"order_id": order}}
+        if method == "CreateTransaction":
+            params.update(id="synthetic-payme-receipt", time=1735689600000)
 
-        with patch(
-            "app.services.provider_webhook_service.get_payment_manager",
-            return_value=manager,
-        ):
-            result = service.process_click_webhook(
-                {
-                    "click_trans_id": "click-1",
-                    "merchant_trans_id": "clinic_44_1700000000",
-                    "amount": 100,
-                    "sign_string": "valid",
-                }
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            response = service.process_payme_webhook(
+                {"id": "synthetic-request", "method": method, "params": params},
+                "Basic synthetic",
             )
 
-        assert result["error"] == -1
-        assert result["error_note"] == "Payment amount mismatch"
-        assert result["payment_id"] == 44
-        assert result["payment_status"] is None
-        assert webhook.status == "failed"
-        assert webhook.error_message == "provider_amount_mismatch"
-        assert payment.status == "pending"
-        assert payment.paid_at is None
+        repository.get_payment_by_provider_payment_id_for_update.assert_called_once_with(
+            provider="payme", provider_payment_id=order
+        )
+        if not bound:
+            assert response["error"]["code"] == -31050
+            assert response["error"]["data"] == "order_id"
+            assert webhook.error_message == "provider_payment_binding_unavailable"
+        elif method == "CheckPerformTransaction":
+            assert response["result"] == {"allow": True}
+        else:
+            assert response["result"]["state"] == 1
+        writes_expected = bound and method == "CreateTransaction"
+        assert service._update_payment_status.called is writes_expected
+        assert repository.create_transaction.called is writes_expected
+
+    @pytest.mark.parametrize(
+        ("state", "code"),
+        [
+            ("orphan", -31003),
+            ("missing_payment", -31003),
+            ("changed_link", -31003),
+            ("changed_visit", -31003),
+            ("changed_order", -31050),
+        ],
+    )
+    def test_payme_replay_requires_current_payment_link(self, db_session, state, code):
+        initial = SimpleNamespace(payment_id=None if state == "orphan" else 44)
+        changed = SimpleNamespace(
+            payment_id=45 if state == "changed_link" else 44,
+            visit_id=56 if state == "changed_visit" else 55,
+        )
+        payment = SimpleNamespace(id=44, visit_id=55, provider_payment_id="SYNTHETIC-ORDER")
+        repository = Mock()
+        repository.get_existing_transaction.side_effect = [initial, changed]
+        repository.get_payment_by_id_for_update.return_value = None if state == "missing_payment" else payment
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
+        service = ProviderWebhookService(db_session, repository=repository)
+        service._update_payment_status = Mock()
+        params = {"id": "synthetic-payme-receipt"}
+        if state == "changed_order":
+            params["account"] = {"order_id": "OTHER-SYNTHETIC-ORDER"}
+
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            response = service.process_payme_webhook(
+                {
+                    "id": "synthetic-replay",
+                    "method": "PerformTransaction",
+                    "params": params,
+                },
+                "Basic synthetic",
+            )
+
+        assert response["error"]["code"] == code
+        service._update_payment_status.assert_not_called()
+        repository.create_transaction.assert_not_called()
+        if state in {"changed_link", "changed_visit"}:
+            repository.get_payment_by_id_for_update.assert_called_once_with(44, provider="payme")
+            repository.get_existing_transaction.assert_called_with(
+                transaction_id="synthetic-payme-receipt", provider="payme", for_update=True
+            )
+
+    def test_payme_perform_requires_existing_transaction(self, db_session):
+        repository = Mock()
+        repository.get_existing_transaction.return_value = None
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
+        service = ProviderWebhookService(db_session, repository=repository)
+
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            response = service.process_payme_webhook(
+                {
+                    "id": "synthetic-perform",
+                    "method": "PerformTransaction",
+                    "params": {"id": "unregistered-synthetic-receipt"},
+                },
+                "Basic synthetic",
+            )
+
+        assert response["error"]["code"] == -31003
+        repository.create_webhook.assert_not_called()
         repository.create_transaction.assert_not_called()
 
-    # --- FOLLOWUP-10: Click/Kaspi/Payme must lock Payment before mutation ---
-
-    def test_click_webhook_locks_payment_before_mutation(self, db_session):
-        """FOLLOWUP-10 regression guard: Click handler must call
-        get_payment_by_id_for_update (not get_payment_by_id) before
-        mutating payment.status. Without the lock, a concurrent cashier
-        cancel could commit a terminal status between our read and
-        write, leaving Payment and PaymentTransaction inconsistent.
-        """
-        webhook = SimpleNamespace(id=33, status="pending", processed_at=None)
-        payment = SimpleNamespace(
-            id=44,
-            amount=Decimal("1000"),
-            status="pending",
-            paid_at=None,
-            provider_data={},
-            visit_id=55,
+    @pytest.mark.parametrize("evidence", ["missing", "mismatched_amount", "wrong_method"])
+    def test_payme_create_replay_requires_matching_creation_evidence(self, db_session, evidence):
+        order = "SYNTHETIC-PAYME-ORDER"
+        reference = "synthetic-payme-create"
+        params = {"id": reference, "amount": 100000, "account": {"order_id": order}}
+        payment = SimpleNamespace(id=44, visit_id=55, provider_payment_id=order, amount=Decimal("1000"))
+        transaction = SimpleNamespace(
+            id=41, payment_id=44, visit_id=55, webhook_id=73,
+            transaction_id=reference, amount=100000, currency="UZS",
         )
-        repository = SimpleNamespace(
-            get_existing_transaction=Mock(return_value=None),
-            create_webhook=Mock(return_value=webhook),
-            get_payment_by_id=Mock(return_value=payment),
-            get_payment_by_id_for_update=Mock(return_value=payment),
-            create_transaction=Mock(),
+        receipt = SimpleNamespace(
+            raw_data={
+                "method": "PerformTransaction" if evidence == "wrong_method" else "CreateTransaction",
+                "params": params,
+            },
+            amount=100001 if evidence == "mismatched_amount" else 100000,
+            currency="UZS",
         )
-        manager = SimpleNamespace(
-            get_provider=Mock(
-                return_value=SimpleNamespace(
-                    validate_webhook_signature=Mock(return_value=True)
-                )
-            ),
-            process_webhook=Mock(
-                return_value=SimpleNamespace(
-                    success=True,
-                    payment_id="clinic_44_1700000000",
-                    status="completed",
-                    provider_data={"amount": Decimal("1000")},
-                )
-            ),
-        )
+        repository = Mock()
+        repository.get_existing_transaction.return_value = transaction
+        repository.get_payment_by_id_for_update.return_value = payment
+        repository.get_processed_webhook.return_value = None if evidence == "missing" else receipt
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
         service = ProviderWebhookService(db_session, repository=repository)
-        try:
-            def _mock_update_status(payment_id, new_status, commit=False):
-                payment.status = new_status
-                if new_status == "paid" and not getattr(payment, 'paid_at', None):
-                    from datetime import datetime, UTC
-                    payment.paid_at = datetime.now(UTC)
-                return payment
-            service._update_payment_status = Mock(side_effect=_mock_update_status)
-        except NameError:
-            pass  # no payment variable in this test
 
-        with patch(
-            "app.services.provider_webhook_service.get_payment_manager",
-            return_value=manager,
-        ):
-            service.process_click_webhook(
-                {
-                    "click_trans_id": "click-1",
-                    "merchant_trans_id": "clinic_44_1700000000",
-                    "amount": 100000,
-                    "sign_string": "valid",
-                }
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            response = service.process_payme_webhook(
+                {"id": "synthetic-create-replay", "method": "CreateTransaction", "params": params},
+                "Basic synthetic",
             )
 
-        # The locked variant must be called; the unlocked one must NOT.
-        repository.get_payment_by_id_for_update.assert_called_once_with(44)
-        repository.get_payment_by_id.assert_not_called()
+        assert response["error"]["code"] == -32400
+        repository.get_processed_webhook.assert_called_once_with(
+            webhook_id=73, provider="payme", transaction_id=order
+        )
+        repository.create_webhook.assert_not_called()
+        repository.create_transaction.assert_not_called()
 
-    def test_kaspi_webhook_locks_payment_before_mutation(self, db_session):
-        """FOLLOWUP-10 regression guard: Kaspi handler must call
-        get_payment_by_provider_payment_id_for_update (not
-        get_payment_by_provider_payment_id) before mutating payment.status.
-        """
+    @pytest.mark.parametrize("action", [0, 1])
+    def test_click_holds_new_legacy_callbacks_without_selecting_a_payment(self, action):
+        db = Mock()
+        webhook = SimpleNamespace(id=33)
+        repository = Mock()
+        repository.get_existing_transaction.return_value = None
+        repository.create_webhook.return_value = webhook
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
+        service = ProviderWebhookService(db, repository=repository)
+        callback = {
+            "click_trans_id": "synthetic-transaction",
+            "merchant_trans_id": "SYNTHETIC-ORDER",
+            "amount": 100000,
+            "action": action,
+            "sign_string": "synthetic-signature",
+        }
+
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            result = service.process_click_webhook(callback)
+
+        assert result == {"error": -1, "error_note": "Payment reconciliation required"}
+        assert webhook.error_message == "provider_reconciliation_required"
+        assert webhook.processed_at is not None
+        assert repository.create_webhook.call_args.kwargs["status"] == "failed"
+        assert repository.create_webhook.call_args.kwargs["raw_data"] == callback
+        db.commit.assert_called_once()
+        manager.process_webhook.assert_not_called()
+        repository.get_payment_by_id.assert_not_called()
+        repository.get_payment_by_id_for_update.assert_not_called()
+        repository.create_transaction.assert_not_called()
+
+    def test_click_webhook_refuses_mutation_if_receipt_commit_fails(self):
+        db = Mock()
+        db.commit.side_effect = RuntimeError("synthetic receipt write error")
+        repository = Mock()
+        repository.get_existing_transaction.return_value = None
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
+        service = ProviderWebhookService(db, repository=repository)
+
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            result = service.process_click_webhook({
+                "click_trans_id": "synthetic-click",
+                "merchant_trans_id": "clinic_44_1700000000",
+                "amount": 100000,
+                "sign_string": "synthetic-signature",
+            })
+
+        assert result == {"error": -1, "error_note": "Internal server error"}
+        repository.create_webhook.assert_called_once()
+        db.rollback.assert_called_once()
+        manager.process_webhook.assert_not_called()
+        repository.get_payment_by_id_for_update.assert_not_called()
+        repository.create_transaction.assert_not_called()
+
+    def test_click_rollback_omits_private_diagnostics(self, caplog):
+        marker = "SYNTHETIC-PRIVATE-FINANCIAL-DIAGNOSTIC"
+        db = Mock()
+        repository = Mock()
+        repository.get_existing_transaction.return_value = None
+        repository.create_webhook.side_effect = RuntimeError(marker)
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
+        service = ProviderWebhookService(db, repository=repository)
+
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            response = service.process_click_webhook({
+                "click_trans_id": "synthetic-click",
+                "merchant_trans_id": "SYNTHETIC-ORDER",
+                "amount": 100000,
+                "sign_string": "synthetic-signature",
+            })
+
+        assert response == {"error": -1, "error_note": "Internal server error"}
+        db.commit.assert_not_called()
+        db.rollback.assert_called_once()
+        assert "Click webhook error type=RuntimeError" in caplog.text
+        assert marker not in caplog.text
+
+    @pytest.mark.parametrize("succeeded", [True, False])
+    @pytest.mark.parametrize("bound", [True, False])
+    def test_kaspi_webhook_requires_locked_provider_binding(self, db_session, succeeded, bound):
+        """Either callback outcome may only mutate the matching locked row."""
         webhook = SimpleNamespace(id=33, status="pending", processed_at=None)
         payment = SimpleNamespace(
             id=44,
@@ -328,9 +595,8 @@ class TestProviderWebhookService:
         repository = SimpleNamespace(
             get_existing_transaction=Mock(return_value=None),
             create_webhook=Mock(return_value=webhook),
-            get_payment_by_provider_payment_id=Mock(return_value=payment),
             get_payment_by_provider_payment_id_for_update=Mock(
-                return_value=payment
+                return_value=payment if bound else None
             ),
             create_transaction=Mock(),
         )
@@ -342,10 +608,11 @@ class TestProviderWebhookService:
             ),
             process_webhook=Mock(
                 return_value=SimpleNamespace(
-                    success=True,
+                    success=succeeded,
                     payment_id="kaspi-pay-123",
                     status="completed",
                     provider_data={"amount": Decimal("1000")},
+                    error_message=None if succeeded else "Synthetic provider error",
                 )
             ),
         )
@@ -365,7 +632,7 @@ class TestProviderWebhookService:
             "app.services.provider_webhook_service.get_payment_manager",
             return_value=manager,
         ):
-            service.process_kaspi_webhook(
+            response = service.process_kaspi_webhook(
                 {
                     "transaction_id": "kaspi-1",
                     "merchant_id": "m1",
@@ -375,11 +642,19 @@ class TestProviderWebhookService:
                 }
             )
 
-        # The locked variant must be called; the unlocked one must NOT.
         repository.get_payment_by_provider_payment_id_for_update.assert_called_once_with(
-            "kaspi-pay-123"
+            provider="kaspi", provider_payment_id="kaspi-pay-123"
         )
-        repository.get_payment_by_provider_payment_id.assert_not_called()
+        assert response["status"] == ("success" if succeeded else "error")
+        assert response["payment_id"] == (payment.id if bound else None)
+        assert repository.create_transaction.called is (bound and succeeded)
+        if bound:
+            assert payment.status == ("paid" if succeeded else "failed")
+        else:
+            service._update_payment_status.assert_not_called()
+            assert webhook.status == "failed"
+            if succeeded:
+                assert webhook.error_message == "provider_payment_binding_unavailable"
 
     def test_extract_payment_id_from_order(self, db_session):
         service = ProviderWebhookService(db_session)
@@ -433,20 +708,29 @@ class TestPaymeTerminalStatePreservation:
         transaction_provider_data=None,
         payment_provider_data=None,
         locked_payment_status=None,
+        paid_at=None,
     ):
         transaction = SimpleNamespace(
             id=77,
             payment_id=44,
+            visit_id=55,
             webhook_id=33,
+            transaction_id="payme-tx-1",
+            amount=100000,
+            currency="UZS",
             status=transaction_status,
+            payme_cancel_receipt=None,
             provider_data=transaction_provider_data
             or {"method": "CreateTransaction"},
         )
         payment = SimpleNamespace(
             id=44,
+            visit_id=55,
+            provider_payment_id="clinic_44_1700000000",
             amount=Decimal("1000"),
+            currency="UZS",
             status=payment_status,
-            paid_at=None,
+            paid_at=paid_at,
             provider_data=payment_provider_data
             or {"order_id": "clinic_44_1700000000"},
         )
@@ -456,9 +740,12 @@ class TestPaymeTerminalStatePreservation:
         # the two reads).
         locked_payment = SimpleNamespace(
             id=44,
+            visit_id=55,
+            provider_payment_id="clinic_44_1700000000",
             amount=Decimal("1000"),
+            currency="UZS",
             status=locked_payment_status or payment_status,
-            paid_at=None,
+            paid_at=paid_at,
             provider_data=payment_provider_data
             or {"order_id": "clinic_44_1700000000"},
         )
@@ -466,6 +753,7 @@ class TestPaymeTerminalStatePreservation:
             get_existing_transaction=Mock(return_value=transaction),
             get_payment_by_id=Mock(return_value=payment),
             get_payment_by_id_for_update=Mock(return_value=locked_payment),
+            get_processed_webhook=Mock(return_value=None),
         )
         manager = SimpleNamespace(
             get_provider=Mock(
@@ -527,7 +815,10 @@ class TestPaymeTerminalStatePreservation:
                 auth_header,
             )
 
-    def _call_cancel(self, service, reason=1, auth_header="Basic valid"):
+    def _call_cancel(self, service, reason=1, auth_header="Basic valid", *, amount=None):
+        params = {"id": "payme-tx-1", "reason": reason}
+        if amount is not None:
+            params["amount"] = amount
         with patch(
             "app.services.provider_webhook_service.get_payment_manager",
             return_value=SimpleNamespace(
@@ -542,11 +833,7 @@ class TestPaymeTerminalStatePreservation:
                 {
                     "id": "request-1",
                     "method": "CancelTransaction",
-                    "params": {
-                        "id": "payme-tx-1",
-                        "amount": 100000,
-                        "reason": reason,
-                    },
+                    "params": params,
                 },
                 auth_header,
             )
@@ -558,27 +845,27 @@ class TestPaymeTerminalStatePreservation:
             db_session, payment_status="refunded"
         )
         result = self._call_perform(service)
-        assert result["result"]["state"] == 2
-        assert payment.status == "refunded"  # NOT overwritten to "paid"
-        assert result["payment_status"] == "refunded"  # response shows truth
+        assert result["error"]["code"] == -31008
+        assert payment.status == "refunded"
+        assert _locked.status == "refunded"
 
     def test_perform_does_not_overwrite_cancelled_payment(self, db_session):
         service, tx, payment, _locked = self._make_service(
             db_session, payment_status="cancelled"
         )
         result = self._call_perform(service)
-        assert result["result"]["state"] == 2
+        assert result["error"]["code"] == -31008
         assert payment.status == "cancelled"
-        assert result["payment_status"] == "cancelled"
+        assert _locked.status == "cancelled"
 
     def test_perform_does_not_overwrite_void_payment(self, db_session):
         service, tx, payment, _locked = self._make_service(
             db_session, payment_status="void"
         )
         result = self._call_perform(service)
-        assert result["result"]["state"] == 2
+        assert result["error"]["code"] == -31008
         assert payment.status == "void"
-        assert result["payment_status"] == "void"
+        assert _locked.status == "void"
 
     # --- failed → paid blocked (not a valid direct transition) ---
 
@@ -587,36 +874,69 @@ class TestPaymeTerminalStatePreservation:
             db_session, payment_status="failed"
         )
         result = self._call_perform(service)
-        assert result["result"]["state"] == 2
+        assert result["error"]["code"] == -31008
         assert payment.status == "failed"
-        assert result["payment_status"] == "failed"
+        assert _locked.status == "failed"
 
     # --- Idempotent same-status: allowed, status not mutated ---
 
-    def test_perform_on_paid_payment_is_idempotent(self, db_session):
-        from datetime import UTC, datetime
-
+    def test_perform_replays_the_first_time_and_original_merchant_receipt(self, db_session):
         original_paid_at = datetime(2025, 1, 1, tzinfo=UTC)
-        service, tx, payment, _locked = self._make_service(
-            db_session,
-            payment_status="paid",
-            payment_provider_data={"order_id": "clinic_44_1700000000"},
-        )
-        payment.paid_at = original_paid_at
-        result = self._call_perform(service)
-        assert result["result"]["state"] == 2
-        assert payment.status == "paid"
-        assert payment.paid_at == original_paid_at  # NOT re-set
-
-    def test_perform_on_completed_transaction_is_idempotent(self, db_session):
-        service, tx, payment, _locked = self._make_service(
+        service, tx, _payment, locked = self._make_service(
             db_session,
             transaction_status="completed",
             payment_status="paid",
+            paid_at=original_paid_at,
+        )
+        tx.transaction_id = "payme-tx-1"
+        tx.amount = 100000
+        tx.currency = "UZS"
+        service.repository.get_processed_webhook.return_value = SimpleNamespace(
+            id=tx.webhook_id,
+            amount=tx.amount,
+            currency=tx.currency,
+            raw_data={
+                "method": "CreateTransaction",
+                "params": {
+                    "id": tx.transaction_id,
+                    "account": {"order_id": locked.provider_payment_id},
+                },
+            },
+        )
+
+        first = self._call_perform(service)
+        retry = self._call_perform(service)
+
+        assert first["result"] == retry["result"] == {
+            "state": 2,
+            "perform_time": int(original_paid_at.timestamp() * 1000),
+            "transaction": tx.webhook_id,
+        }
+        service._update_payment_status.assert_not_called()
+        assert locked.paid_at == original_paid_at
+
+    def test_perform_requires_reconciliation_when_legacy_completion_time_is_missing(self, db_session):
+        service, tx, _payment, locked = self._make_service(
+            db_session, transaction_status="completed", payment_status="paid"
         )
         result = self._call_perform(service)
-        assert result["result"]["state"] == 2
-        assert tx.status == "completed"  # unchanged
+
+        assert result["error"]["code"] == -32400
+        assert locked.paid_at is None
+        assert tx.status == "completed"
+        service._update_payment_status.assert_not_called()
+
+    def test_perform_does_not_charge_payment_if_its_transaction_is_terminal(self, db_session):
+        service, tx, _payment, locked = self._make_service(
+            db_session, transaction_status="cancelled", payment_status="processing"
+        )
+        result = self._call_perform(service)
+
+        assert result["error"]["code"] == -31008
+        assert tx.status == "cancelled"
+        assert locked.status == "processing"
+        assert locked.paid_at is None
+        service._update_payment_status.assert_not_called()
 
     # --- Regression: non-terminal forward transitions still allowed ---
 
@@ -640,24 +960,32 @@ class TestPaymeTerminalStatePreservation:
 
     # --- CancelTransaction: terminal states preserved ---
 
-    def test_cancel_on_refunded_payment_blocked(self, db_session):
-        """refunded → cancelled is not allowed (refunded is terminal)."""
-        service, tx, payment, _locked = self._make_service(
+    def test_cancel_declines_inconsistent_payment_and_transaction(self, db_session):
+        service, transaction, _payment, locked = self._make_service(
             db_session, payment_status="refunded"
         )
-        result = self._call_cancel(service, reason=1)
-        assert result["result"]["state"] == -1
-        assert payment.status == "refunded"  # NOT overwritten to "cancelled"
-        assert result["payment_status"] == "refunded"
 
-    def test_cancel_on_cancelled_payment_idempotent(self, db_session):
-        """cancelled → cancelled is idempotent (same-status)."""
-        service, tx, payment, _locked = self._make_service(
-            db_session, payment_status="cancelled"
+        response = self._call_cancel(service)
+
+        assert response["error"]["code"] == -31007
+        assert transaction.status == "processing"
+        assert locked.status == "refunded"
+        assert transaction.payme_cancel_receipt is None
+        service._update_payment_status.assert_not_called()
+
+    @pytest.mark.parametrize("status", ["cancelled", "refunded"])
+    def test_cancel_requires_reconciliation_of_a_legacy_receipt(self, db_session, status):
+        service, transaction, _payment, locked = self._make_service(
+            db_session, transaction_status=status, payment_status=status
         )
-        result = self._call_cancel(service, reason=1)
-        assert result["result"]["state"] == -1
-        assert payment.status == "cancelled"
+
+        response = self._call_cancel(service)
+
+        assert response["error"]["code"] == -32400
+        assert "result" not in response
+        assert transaction.status == locked.status == status
+        assert transaction.payme_cancel_receipt is None
+        service._update_payment_status.assert_not_called()
 
     # --- Audit trail: provider_data always updated, even when status blocked ---
 
@@ -726,7 +1054,8 @@ class TestPaymeTerminalStatePreservation:
             locked_payment_status="cancelled",  # what FOR UPDATE sees (TOCTOU)
         )
         result = self._call_perform(service)
-        assert result["payment_status"] == "cancelled"
+        assert result["error"]["code"] == -31008
+        assert _locked.status == "cancelled"
 
     def test_toctou_refunded_during_unlocked_read(self, db_session):
         """Unlocked read sees 'processing', locked read sees 'refunded'."""
@@ -737,7 +1066,8 @@ class TestPaymeTerminalStatePreservation:
             locked_payment_status="refunded",
         )
         result = self._call_perform(service)
-        assert result["payment_status"] == "refunded"
+        assert result["error"]["code"] == -31008
+        assert _locked.status == "refunded"
 
     def test_toctou_no_race_normal_path(self, db_session):
         """When there's no race (locked == unlocked), normal forward
@@ -824,305 +1154,347 @@ class TestPaymeTerminalStatePreservation:
         assert tx.provider_data["method"] == "PerformTransaction"
         assert tx.provider_data["transaction_id"] == "payme-tx-1"
 
-    # --- FOLLOWUP-12: pre-cancel state idempotency (ADR-0019) ---
-    #
-    # Payme spec (developer.help.paycom.uz/metody-merchant-api/tipy-dannykh):
-    #   state -1 = "отменена (начальное состояние 1)" — Tx was in state 1
-    #   state -2 = "отменена после завершения (начальное состояние 2)" — Tx was in state 2
-    #
-    # The CancelTransaction response state must reflect the transition that
-    # occurred, based on the Tx status BEFORE the first CancelTransaction.
-    # On retry (commit succeeded, response lost), Tx.status has already
-    # mutated to 'refunded', so we cannot derive was_completed from it.
-    # We persist pre_cancel_status in AuditLog on the first call and recover
-    # it on retry (Option A per RFC #2679, ADR-0019 compliance).
-
-    def test_cancel_first_call_on_completed_tx_returns_state_minus_2(
-        self, db_session
+    @pytest.mark.parametrize(
+        ("tx_status", "payment_status", "reason", "expected_status", "expected_state"),
+        [
+            ("processing", "processing", 4, "cancelled", -1),
+            ("completed", "paid", 1, "refunded", -2),
+        ],
+    )
+    def test_cancel_uses_locked_state_and_replays_the_first_receipt(
+        self, db_session, tx_status, payment_status, reason, expected_status, expected_state,
     ):
-        """First CancelTransaction on a completed Tx must return state=-2.
-
-        Scenario: Tx.status='completed' (Payme state 2).
-        Expected: response state=-2 (state 2 → -2 per spec).
-        AuditLog INSERT persists pre_cancel_status='completed'.
-        """
         from app.models.audit import AuditLog
-        from app.services.provider_webhook_service import (
-            PAYME_TX_PRE_CANCEL_STATE_ACTION,
+        from app.services.provider_webhook_service import PAYME_TX_PRE_CANCEL_STATE_ACTION
+
+        service, transaction, _payment, locked = self._make_service(
+            db_session, transaction_status=tx_status, payment_status=payment_status
         )
 
-        service, tx, payment, _locked = self._make_service(
-            db_session,
-            transaction_status="completed",
-            payment_status="paid",
+        first = self._call_cancel(service, reason=reason)
+        replay = self._call_cancel(service, reason=5)
+        receipt = transaction.payme_cancel_receipt
+
+        assert first["result"] == replay["result"] == {
+            "transaction": transaction.id,
+            "cancel_time": receipt["cancel_time"],
+            "state": expected_state,
+        }
+        assert first["payment_status"] == expected_status
+        assert replay["payment_status"] is None
+        assert receipt["reason"] == reason
+        assert receipt["amount_minor"] == 100000
+        assert receipt["currency"] == "UZS"
+        assert locked.status == transaction.status == expected_status
+        service._update_payment_status.assert_called_once_with(
+            payment_id=locked.id, new_status=expected_status, commit=False
         )
-        result = self._call_cancel(service, reason=2)  # reason != 1 → refunded
+        audit = db_session.query(AuditLog).filter_by(
+            action=PAYME_TX_PRE_CANCEL_STATE_ACTION, entity_id=transaction.id
+        ).one()
+        assert audit.payload == {"pre_cancel_status": tx_status}
 
-        assert result["result"]["state"] == -2
+    @pytest.mark.parametrize(("field", "value"), [
+        ("payment_id", 45),
+        ("amount_minor", 101000),
+        ("currency", "KZT"),
+        ("state", -1),
+        ("cancel_time", None),
+    ])
+    def test_cancel_checks_durable_receipt_before_acknowledging(self, db_session, field, value):
+        service, transaction, _payment, _locked = self._make_service(
+            db_session, transaction_status="refunded", payment_status="refunded"
+        )
+        transaction.payme_cancel_receipt = {
+            "payment_id": 44, "amount_minor": 100000, "currency": "UZS",
+            "state": -2, "cancel_time": 1735689600000, "transaction": 33,
+            field: value,
+        }
 
-        # Verify AuditLog record was persisted with pre_cancel_status
-        audit_entry = (
-            db_session.query(AuditLog)
-            .filter(
-                AuditLog.action == PAYME_TX_PRE_CANCEL_STATE_ACTION,
-                AuditLog.entity_type == "payment_transaction",
-                AuditLog.entity_id == tx.id,
+        response = self._call_cancel(service)
+
+        assert response["error"]["code"] == -32400
+        service._update_payment_status.assert_not_called()
+
+    def test_cancel_checks_original_transaction_amount(self, db_session):
+        service, transaction, _payment, locked = self._make_service(db_session)
+        transaction.amount = 99000
+
+        response = self._call_cancel(service, reason=4, amount=100000)
+
+        assert response["error"]["code"] == -31001
+        assert locked.status == transaction.status == "processing"
+        assert transaction.payme_cancel_receipt is None
+        service._update_payment_status.assert_not_called()
+
+
+    def _check_payme(self, service):
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            return service.process_payme_webhook(
+                {"id": "check-request", "method": "CheckTransaction", "params": {"id": "payme-tx-1"}},
+                "Basic valid",
             )
-            .first()
-        )
-        assert audit_entry is not None
-        assert audit_entry.payload["pre_cancel_status"] == "completed"
 
-    def test_cancel_first_call_on_processing_tx_returns_state_minus_1(
-        self, db_session
+    @pytest.mark.parametrize(
+        ("transaction_status", "payment_status", "state"),
+        [
+            ("processing", "processing", 1),
+            ("completed", "paid", 2),
+            ("cancelled", "cancelled", -1),
+            ("refunded", "refunded", -2),
+        ],
+    )
+    def test_check_transaction_returns_only_the_verified_lifecycle(
+        self, db_session, transaction_status, payment_status, state,
     ):
-        """First CancelTransaction on a processing Tx must return state=-1.
-
-        Scenario: Tx.status='processing' (Payme state 1).
-        Expected: response state=-1 (state 1 → -1 per spec).
-        """
-        service, tx, payment, _locked = self._make_service(
-            db_session,
-            transaction_status="processing",
-            payment_status="processing",
+        created_at = datetime(2025, 1, 1, tzinfo=UTC)
+        paid_at = datetime(2025, 1, 2, tzinfo=UTC) if state in {2, -2} else None
+        cancel_time = 1735862400000 if state < 0 else 0
+        service, transaction, _payment, locked = self._make_service(
+            db_session, transaction_status=transaction_status, payment_status=payment_status, paid_at=paid_at,
         )
-        result = self._call_cancel(service, reason=1)
-        assert result["result"]["state"] == -1
+        service.repository.get_processed_webhook.return_value = SimpleNamespace(
+            id=transaction.webhook_id, amount=transaction.amount, currency="UZS", created_at=created_at,
+            raw_data={
+                "method": "CreateTransaction",
+                "params": {
+                    "id": transaction.transaction_id,
+                    "account": {"order_id": locked.provider_payment_id},
+                },
+            },
+        )
+        if state < 0:
+            transaction.payme_cancel_receipt = {
+                "payment_id": locked.id, "amount_minor": transaction.amount, "currency": "UZS",
+                "state": state, "cancel_time": cancel_time, "transaction": transaction.webhook_id, "reason": 5,
+            }
+        transaction_before = dict(transaction.provider_data)
+        payment_before = dict(locked.provider_data)
 
-    def test_cancel_retry_after_refunded_returns_state_minus_2(
-        self, db_session
-    ):
-        """REGRESSION TEST for ADR-0019 idempotency defect.
+        response = self._check_payme(service)
 
-        Scenario (the real failing case from PR #2675 / FOLLOWUP-9):
-          Step 1: Tx.status='completed' (Payme state 2)
-            → first CancelTransaction (reason=2, refunded)
-            → response state=-2 ✅
-            → Tx.status mutates to 'refunded'
-            → AuditLog INSERT persists pre_cancel_status='completed'
+        assert response == {
+            "id": "check-request",
+            "result": {
+                "create_time": int(created_at.timestamp() * 1000),
+                "perform_time": int(paid_at.timestamp() * 1000) if paid_at else 0,
+                "cancel_time": cancel_time,
+                "transaction": str(transaction.webhook_id),
+                "state": state,
+                "reason": 5 if state < 0 else None,
+            },
+        }
+        assert transaction.provider_data == transaction_before
+        assert locked.provider_data == payment_before
+        service._update_payment_status.assert_not_called()
 
-          Step 2: simulate response lost (network drop, gateway timeout)
-            → no DB change; Payme will retry
-
-          Step 3: same CancelTransaction retried
-            → Tx.status is now 'refunded' (mutated by step 1)
-            → AuditLog recovery returns pre_cancel_status='completed'
-            → was_completed=True → response state=-2 ✅ (NOT -1)
-
-        Without AuditLog recovery, step 3 would compute:
-          was_completed = (Tx.status == 'completed') = False
-          → response state=-1 ❌ (wrong, breaks idempotency)
-
-        This is the test that PR #2675's
-        test_cancel_response_state_idempotent_on_duplicate_cancel FAILED
-        to cover (it tested cancelled → retry, missing the refunded case).
-        """
-        from app.models.audit import AuditLog
-        from app.services.provider_webhook_service import (
-            PAYME_TX_PRE_CANCEL_STATE_ACTION,
+    def test_check_requires_stored_cancellation_evidence_for_legacy_refund(self, db_session):
+        service, transaction, _payment, locked = self._make_service(
+            db_session, transaction_status="refunded", payment_status="refunded",
+            paid_at=datetime(2025, 1, 2, tzinfo=UTC),
+        )
+        service.repository.get_processed_webhook.return_value = SimpleNamespace(
+            id=transaction.webhook_id, amount=transaction.amount, currency="UZS",
+            created_at=datetime(2025, 1, 1, tzinfo=UTC),
+            raw_data={
+                "method": "CreateTransaction",
+                "params": {
+                    "id": transaction.transaction_id,
+                    "account": {"order_id": locked.provider_payment_id},
+                },
+            },
         )
 
-        # Step 1: first CancelTransaction on a completed Tx
-        service, tx, payment, _locked = self._make_service(
-            db_session,
-            transaction_status="completed",
-            payment_status="paid",
-        )
-        result_step1 = self._call_cancel(service, reason=2)
-        assert result_step1["result"]["state"] == -2
+        response = self._check_payme(service)
 
-        # Verify AuditLog record exists (persisted in step 1)
-        audit_entry = (
-            db_session.query(AuditLog)
-            .filter(
-                AuditLog.action == PAYME_TX_PRE_CANCEL_STATE_ACTION,
-                AuditLog.entity_type == "payment_transaction",
-                AuditLog.entity_id == tx.id,
+        assert response["error"]["code"] == -32400
+        assert "result" not in response
+        service._update_payment_status.assert_not_called()
+
+
+class TestPaymeStatement:
+    _start = 1735689600000
+    _end = 1735776000000
+
+    def _call(self, service, method, params, *, authorized=True):
+        manager = Mock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = authorized
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            response = service.process_payme_webhook(
+                {"id": "statement-request", "method": method, "params": params},
+                "Basic synthetic",
             )
-            .first()
+        manager.process_webhook.assert_not_called()
+        return response
+
+    @staticmethod
+    def _create_rows(db, visit_id, external_id, payme_time, *, provider="payme"):
+        order = f"synthetic-order-{external_id}"
+        payment = Payment(
+            visit_id=visit_id, method="online", status="processing",
+            amount=Decimal("12.50"), currency="UZS", provider=provider, provider_payment_id=order,
         )
-        assert audit_entry is not None
-        assert audit_entry.payload["pre_cancel_status"] == "completed"
-
-        # Step 2: simulate Tx.status mutation (already done by step 1 in
-        # production; in this test, _make_service used SimpleNamespace so
-        # we manually update to simulate the post-step-1 state for retry).
-        tx.status = "refunded"
-
-        # Step 3: retry the same CancelTransaction
-        # Re-create service with the mutated tx status to simulate retry
-        service_retry, tx_retry, payment_retry, _locked_retry = self._make_service(
-            db_session,
-            transaction_status="refunded",  # mutated by step 1
-            payment_status="refunded",
+        callback = PaymentWebhook(
+            provider=provider, webhook_id=f"synthetic-hook-{external_id}",
+            transaction_id=order, status="processed", amount=1250, currency="UZS",
+            created_at=datetime(2030, 1, 1, tzinfo=UTC),
+            raw_data={
+                "method": "CreateTransaction",
+                "params": {
+                    "id": external_id, "time": payme_time, "amount": 1250,
+                    "account": {"order_id": order, "unsupported_field": "synthetic-extra"},
+                },
+            },
         )
-        # Ensure same tx.id so AuditLog recovery finds the record
-        tx_retry.id = tx.id
-        result_step3 = self._call_cancel(service_retry, reason=2)
+        db.add_all([payment, callback])
+        db.flush()
+        db.add(PaymentTransaction(
+            provider=provider, transaction_id=external_id, amount=1250, currency="UZS",
+            status="processing", payment_id=payment.id, webhook_id=callback.id, visit_id=visit_id,
+        ))
+        db.flush()
+        return callback
 
-        # KEY ASSERTION: step 3 must return -2, NOT -1, even though
-        # tx_retry.status is 'refunded' (not 'completed'). The AuditLog
-        # record from step 1 provides the correct pre_cancel_status.
-        assert result_step3["result"]["state"] == -2
-        assert result_step1["result"]["state"] == result_step3["result"]["state"]
-
-    def test_cancel_audit_log_failure_falls_back_to_mutable_state(
-        self, db_session, caplog
-    ):
-        """Strategy 2 (ADR-0019): if AuditLog INSERT fails, the webhook
-        must still respond (availability preserved), falling back to
-        mutable-state derivation. Idempotency degrades silently.
-
-        This test patches _persist_pre_cancel_state to raise, simulating
-        AuditLog INSERT failure. The implementation does a full db.rollback()
-        inside _persist_pre_cancel_state to clear the failed INSERT, but
-        this rollback MUST NOT discard the Phase 2 payment.status /
-        payment.provider_data mutation (Codex P2 review on PR #2684).
-        _resolve_was_completed is called BEFORE Phase 2 to ensure this.
-
-        Verifies:
-          1. webhook response is still sent (state computed from Tx.status)
-          2. logger.warning is emitted (NOT logger.exception — Sentry recursion)
-          3. warning contains transaction_id for traceability
-          4. payment.status is still mutated to refunded (Phase 2 not rolled back)
-          5. payment.provider_data is still updated (Phase 2 not rolled back)
-        """
-        import logging
-
-        service, tx, payment, _locked = self._make_service(
-            db_session,
-            transaction_status="completed",
-            payment_status="paid",
-        )
-
-        with caplog.at_level(logging.WARNING):
-            with patch.object(
-                service,
-                "_persist_pre_cancel_state",
-                side_effect=RuntimeError("simulated AuditLog INSERT failure"),
-            ):
-                result = self._call_cancel(service, reason=2)
-
-        # Webhook still responds (availability preserved)
-        assert result["result"]["state"] == -2  # derived from Tx.status='completed'
-
-        # Structured warning was emitted
-        warning_messages = [
-            rec.getMessage()
-            for rec in caplog.records
-            if rec.levelno == logging.WARNING
-            and "AuditLog" in rec.getMessage()
-        ]
-        assert any("transaction_id=77" in msg for msg in warning_messages), (
-            f"Expected warning with transaction_id=77, got: {warning_messages}"
-        )
-
-        # Codex P2: payment.status and payment.provider_data must still be
-        # mutated (Phase 2 must not be rolled back by AuditLog failure).
-        # reason=2 → provider_status='refunded' → payment_status='refunded'.
-        # Note: Phase 2 mutates locked_payment (returned by
-        # get_payment_by_id_for_update), not the unlocked payment object.
-        assert _locked.status == "refunded", (
-            f"Expected locked_payment.status='refunded' (Phase 2 mutation "
-            f"preserved), got '{_locked.status}'. AuditLog rollback incorrectly "
-            "discarded Phase 2 payment mutation."
-        )
-        assert _locked.provider_data.get("method") == "CancelTransaction", (
-            f"Expected locked_payment.provider_data['method']='CancelTransaction', "
-            f"got {_locked.provider_data.get('method')!r}. Phase 2 provider_data "
-            "mutation was lost."
-        )
-
-    def test_cancel_retry_after_failed_audit_log_does_not_persist_terminal_status(
-        self, db_session, caplog
-    ):
-        """REGRESSION TEST for Codex P2 review on PR #2684.
-
-        Scenario (the terminal-status guard):
-          Step 1: Tx.status='completed' (Payme state 2)
-            → first CancelTransaction
-            → _persist_pre_cancel_state called with pre_cancel_status='completed'
-            → AuditLog INSERT succeeds
-            → response state=-2 ✅
-            → Tx.status mutates to 'refunded'
-
-          Step 2: simulate AuditLog INSERT failed on step 1 (rollback
-            removed the AuditLog row, but Tx.status mutation committed
-            in a fresh transaction). Now Tx.status='refunded' and no
-            AuditLog record exists.
-
-          Step 3: retry CancelTransaction
-            → _get_pre_cancel_state_from_audit_log returns None (no record)
-            → current_tx_status='refunded' (terminal)
-            → terminal-status guard kicks in: return was_completed=False
-              WITHOUT persisting 'refunded' as pre_cancel_status
-            → response state=-1 (degraded, but not worse)
-
-          Step 4: another retry
-            → same as step 3 — no AuditLog record, terminal guard,
-              state=-1
-
-        Without the terminal-status guard, step 3 would persist
-        pre_cancel_status='refunded' (wrong), and step 4 would recover
-        it and return state=-1 (also wrong, but now permanently wrong
-        because the AuditLog record is immutable). The guard prevents
-        persisting wrong data.
-
-        This test verifies:
-          1. No AuditLog record is created when current_tx_status is terminal
-          2. Response state=-1 (conservative, degraded idempotency)
-          3. Structured warning is emitted
-        """
-        import logging
-        from app.models.audit import AuditLog
-        from app.services.provider_webhook_service import (
-            PAYME_TX_PRE_CANCEL_STATE_ACTION,
-        )
-
-        # Setup: Tx is already in 'refunded' (terminal) state, no AuditLog
-        # record exists (simulating failed INSERT on first cancel).
-        service, tx, payment, _locked = self._make_service(
-            db_session,
-            transaction_status="refunded",  # terminal — first cancel already happened
-            payment_status="refunded",
-        )
-
-        with caplog.at_level(logging.WARNING):
-            result = self._call_cancel(service, reason=2)
-
-        # Response: state=-1 (degraded, but not persisting wrong data)
-        assert result["result"]["state"] == -1, (
-            f"Expected -1 (terminal-status guard, degraded), "
-            f"got {result['result']['state']}"
-        )
-
-        # KEY ASSERTION: no AuditLog record was created.
-        # The terminal-status guard must NOT persist 'refunded' as
-        # pre_cancel_status — that would be immutable-but-wrong data.
-        audit_entry = (
-            db_session.query(AuditLog)
-            .filter(
-                AuditLog.action == PAYME_TX_PRE_CANCEL_STATE_ACTION,
-                AuditLog.entity_type == "payment_transaction",
-                AuditLog.entity_id == tx.id,
+    def test_statement_uses_original_payme_time_in_one_read(self, db_session, test_visit):
+        latest = self._create_rows(db_session, test_visit.id, "latest", self._end)
+        first = self._create_rows(db_session, test_visit.id, "first", self._start)
+        self._create_rows(db_session, test_visit.id, "outside", self._end + 1)
+        self._create_rows(db_session, test_visit.id, "different-provider", self._start, provider="kaspi")
+        db_session.add_all([
+            PaymentWebhook(
+                provider="payme", webhook_id=f"synthetic-non-create-{status}",
+                transaction_id="synthetic-order-unaccepted", status=status, amount=1250, currency="UZS",
+                raw_data={"method": method, "params": {"time": self._start}},
             )
-            .first()
-        )
-        assert audit_entry is None, (
-            f"Terminal-status guard failed: AuditLog record was created with "
-            f"pre_cancel_status={audit_entry.payload.get('pre_cancel_status')!r}. "
-            "Persisting a terminal status as pre_cancel_status would block "
-            "future recovery — the guard should have skipped the INSERT."
+            for status, method in (
+                ("failed", "CreateTransaction"),
+                ("processed", "CheckPerformTransaction"),
+            )
+        ])
+        db_session.flush()
+        first_id, latest_id = first.id, latest.id
+
+        received = []
+        connection = db_session.connection()
+
+        def collect(_conn, _cursor, statement, _params, _context, _executemany):
+            received.append(statement.strip())
+
+        event.listen(connection, "before_cursor_execute", collect)
+        try:
+            service = ProviderWebhookService(db_session)
+            response = self._call(service, "GetStatement", {"from": self._start, "to": self._end})
+        finally:
+            event.remove(connection, "before_cursor_execute", collect)
+
+        expected_lifecycle = {
+            "amount": 1250, "create_time": 1893456000000, "perform_time": 0,
+            "cancel_time": 0, "state": 1, "reason": None,
+        }
+        assert response == {
+            "id": "statement-request",
+            "result": {"transactions": [
+                {
+                    **expected_lifecycle,
+                    "id": "first", "time": self._start, "transaction": str(first_id),
+                    "account": {"order_id": "synthetic-order-first"},
+                },
+                {
+                    **expected_lifecycle,
+                    "id": "latest", "time": self._end, "transaction": str(latest_id),
+                    "account": {"order_id": "synthetic-order-latest"},
+                },
+            ]},
+        }
+        assert len(received) == 1
+        assert received[0].startswith("SELECT")
+        assert "FOR UPDATE" not in received[0]
+        assert self._call(service, "GetStatement", {
+            "from": self._start - 1, "to": self._start - 1,
+        })["result"] == {"transactions": []}
+
+    def test_statement_requires_history_of_unlinked_successful_receipt(self, db_session):
+        db_session.add(PaymentWebhook(
+            provider="payme", webhook_id="synthetic-unlinked-create", transaction_id="synthetic-unlinked-order",
+            status="processed", amount=1250, currency="UZS",
+            raw_data={"method": "CreateTransaction", "params": {"time": self._start}},
+        ))
+        db_session.flush()
+        service = ProviderWebhookService(db_session)
+        result = self._call(service, "GetStatement", {"from": self._start, "to": self._end})
+        assert result["error"]["code"] == -32400
+        assert self._call(service, "GetStatement", {
+            "from": self._start + 1, "to": self._end,
+        })["result"] == {"transactions": []}
+
+    @pytest.mark.parametrize("payme_time", [None, "1735689600000", 173568960000000000000])
+    def test_statement_flags_missing_or_invalid_legacy_payme_time(self, db_session, test_visit, payme_time):
+        self._create_rows(db_session, test_visit.id, "legacy", payme_time)
+        self._create_rows(db_session, test_visit.id, "complete", self._start)
+        service = ProviderWebhookService(db_session)
+
+        response = self._call(service, "GetStatement", {"from": self._start, "to": self._end})
+
+        assert response["error"]["code"] == -32400
+        assert "result" not in response
+
+    @pytest.mark.parametrize("params", [
+        {"from": 1735689600000},
+        {"from": 1735776000000, "to": 1735689600000},
+        {"from": True, "to": 1735689600000},
+        {"from": "1735689600000", "to": 1735689600000},
+    ])
+    def test_statement_rejects_invalid_period_before_query(self, db_session, params):
+        repository = Mock()
+        result = self._call(ProviderWebhookService(db_session, repository), "GetStatement", params)
+
+        assert result["error"]["code"] == -32602
+        assert not repository.mock_calls
+
+    def test_statement_requires_payme_authorization_before_query(self, db_session):
+        repository = Mock()
+        result = self._call(
+            ProviderWebhookService(db_session, repository), "GetStatement",
+            {"from": self._start, "to": self._end}, authorized=False,
         )
 
-        # Structured warning was emitted
-        warning_messages = [
-            rec.getMessage()
-            for rec in caplog.records
-            if rec.levelno == logging.WARNING
-            and "terminal state" in rec.getMessage()
-        ]
-        assert any("transaction_id=77" in msg for msg in warning_messages), (
-            f"Expected warning about terminal state with transaction_id=77, "
-            f"got: {warning_messages}"
+        assert result["error"]["code"] == -32504
+        assert not repository.mock_calls
+
+    def test_unsupported_method_is_rejected_before_transaction_handling(self, db_session):
+        repository = Mock()
+        result = self._call(ProviderWebhookService(db_session, repository), "UnsupportedMethod", {})
+
+        assert result["error"]["code"] == -32601
+        assert not repository.mock_calls
+
+    def test_new_create_requires_original_payme_time(self, db_session):
+        repository = Mock()
+        repository.get_existing_transaction.return_value = None
+        result = self._call(
+            ProviderWebhookService(db_session, repository), "CreateTransaction",
+            {"id": "synthetic-missing-time", "account": {"order_id": "synthetic-order"}, "amount": 1250},
         )
+
+        assert result["error"]["code"] == -32602
+        repository.create_webhook.assert_not_called()
+        repository.create_transaction.assert_not_called()
+
+
+    @pytest.mark.parametrize("amount", ["1250", True, 0, 2_147_483_648])
+    def test_new_create_rejects_amount_outside_its_persisted_contract(self, db_session, amount):
+        repository = Mock()
+        repository.get_existing_transaction.return_value = None
+        result = self._call(
+            ProviderWebhookService(db_session, repository), "CreateTransaction",
+            {
+                "id": "synthetic-invalid-amount", "time": self._start,
+                "account": {"order_id": "synthetic-order"}, "amount": amount,
+            },
+        )
+
+        assert result["error"]["code"] == -32602
+        repository.create_webhook.assert_not_called()
+        repository.create_transaction.assert_not_called()

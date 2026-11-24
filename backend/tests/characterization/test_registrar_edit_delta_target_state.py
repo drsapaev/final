@@ -401,7 +401,7 @@ def test_edit_delta_decrease_with_paid_invoice_is_rejected_and_state_unchanged(
     client, db_session, registrar_auth_headers, test_patient, test_doctor
 ):
     service = _create_service(
-        db_session, code="TSQ-PAID-01", name="TS Paid", queue_tag="laboratory_general"
+        db_session, code="TSQ-PAID1", name="TS Paid", queue_tag="laboratory_general"
     )
     queue = _create_queue(
         db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general", day=date.today()
@@ -449,7 +449,7 @@ def test_edit_delta_change_on_completed_visit_is_rejected_without_duplicate(
     """Завершённая позиция дня: «изменение количества» без активной записи
     не должно превращаться в создание дубликата (прежнее поведение)."""
     service = _create_service(
-        db_session, code="TSQ-CLOS-01", name="TS Closed", queue_tag="laboratory_general"
+        db_session, code="TSQ-CLOS1", name="TS Closed", queue_tag="laboratory_general"
     )
     _create_queue(
         db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general", day=date.today()

@@ -14,7 +14,8 @@ export interface RoleQaRoute {
 }
 
 export interface SpecialtyQaRoute extends RoleQaRoute {
-  summaryLabel: string;
+  summaryLabel?: string;
+  legacyQueueHeading?: string;
 }
 
 export interface DenyQaRoute {
@@ -96,9 +97,10 @@ export const AUTHENTICATED_SPECIALTY_QA_ROUTES: SpecialtyQaRoute[] = [
   {
     key: 'doctor-dermatology',
     role: 'Doctor',
+    // A legacy appointments link without a visit opens the current queue.
     path: '/doctor/dermatology?tab=appointments',
     routeId: 'doctor-dermatology',
-    summaryLabel: 'Сводка записей дерматолога',
+    legacyQueueHeading: 'Текущая очередь',
   },
   // PR-QA-02: doctor-dentistry EXCLUDED — appointments assertion is obsolete.
   // Phase 4+ dentistry switch(activeTab) has no 'appointments' case:

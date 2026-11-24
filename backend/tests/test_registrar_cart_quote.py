@@ -190,11 +190,10 @@ def test_quote_unknown_service_is_404(
 # ===================== Codex R1 #3095 =====================
 
 
-def test_quote_honors_custom_price_in_cart_mode(
+def test_quote_rejects_unapproved_price_in_cart_mode(
     client: TestClient, db_session: Session, admin_user
 ):
-    """Codex R1 P2: custom_price зеркалится в квоту, иначе квота (каталог
-    100000) расходится с инвойсом /registrar/cart (врачебная цена 80000)."""
+    """The quote and the save path both require the approved catalog price."""
     service = _service(db_session, code="FIXD-CP", price=100000.00)
 
     response = client.post(
@@ -209,11 +208,8 @@ def test_quote_honors_custom_price_in_cart_mode(
             "pricing_mode": "cart",
         },
     )
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert float(body["items"][0]["unit_price"]) == 80000
-    assert float(body["items"][0]["final_price"]) == 160000
-    assert float(body["total_amount"]) == 160000
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"] == "Изменение цены требует согласования"
 
 
 def test_quote_edit_delta_mode_ignores_repeat_discount(
@@ -256,10 +252,9 @@ def test_quote_edit_delta_mode_ignores_repeat_discount(
     assert body["items"][0]["discount_percent"] == 0
 
 
-def test_quote_edit_delta_mode_applies_all_free_zero(
+def test_quote_edit_delta_requires_an_all_free_request(
     client: TestClient, db_session: Session, admin_user
 ):
-    """edit_delta-режим: all_free → 0 (единственное правило edit-delta)."""
     service = _service(db_session, code="FIXD-ED2", price=100000.00)
     # R10 #3095: маршрутизируемая услуга (см. test_quote_edit_delta_rejects_…)
     service.queue_tag = "fixd_ed2_tag"
@@ -275,47 +270,21 @@ def test_quote_edit_delta_mode_applies_all_free_zero(
             "pricing_mode": "edit_delta",
         },
     )
-    assert edit_delta.status_code == 200
-    assert float(edit_delta.json()["total_amount"]) == 0
-    assert edit_delta.json()["approval_status"] in ("pending", "approved")
+    assert edit_delta.status_code == 409
+    assert "заявка на согласование" in edit_delta.json()["detail"]
 
 
 # ===================== Codex R2 #3095 =====================
 
 
-def test_quote_edit_delta_all_free_reports_approved_like_the_command(
+def test_quote_cart_all_free_reports_pending_when_auto_approval_is_off(
     client: TestClient, db_session: Session, admin_user
 ):
-    """Codex R2 #3095 (P2): RegistrarEditDeltaService._create_visit ВСЕГДА
-    пишет approval_status="approved" и не читает all_free_auto_approve —
-    квота edit_delta не должна предупреждать о согласовании, которого
-    команда не выполняет."""
     service = _service(db_session, code="FIXD-ED3", price=100000.00)
-    # R10 #3095: маршрутизируемая услуга (см. test_quote_edit_delta_rejects_…)
     service.queue_tag = "fixd_ed3_tag"
     db_session.commit()
-    # Явно выключаем авто-approve: раньше это давало "pending" в квоте,
-    # тогда как команда сохранения пишет "approved".
     _set_settings(db_session, all_free_auto_approve=False)
 
-    edit_delta = client.post(
-        "/api/v1/registrar/cart/quote",
-        headers=_auth_headers(admin_user),
-        json={
-            "items": [{"service_id": service.id, "quantity": 1}],
-            "discount_mode": "none",
-            "all_free": True,
-            "pricing_mode": "edit_delta",
-        },
-    )
-    assert edit_delta.status_code == 200
-    body = edit_delta.json()
-    assert float(body["total_amount"]) == 0
-    assert body["approval_status"] == "approved", (
-        "edit-delta command always writes approved — the quote must not claim pending"
-    )
-
-    # cart-режим с теми же настройками честно требует согласования
     cart_mode = client.post(
         "/api/v1/registrar/cart/quote",
         headers=_auth_headers(admin_user),
@@ -330,12 +299,10 @@ def test_quote_edit_delta_all_free_reports_approved_like_the_command(
     assert cart_mode.json()["approval_status"] == "pending"
 
 
-def test_quote_cart_mode_allows_custom_price_when_catalog_price_missing(
+def test_quote_does_not_replace_missing_catalog_price_with_client_value(
     client: TestClient, db_session: Session, admin_user
 ):
-    """Codex R2 #3095 (P2): price=None + валидный custom_price — контракт
-    cart-пути сохранения (create_cart_appointments берёт custom_price
-    первым). Квота обязана считать по custom_price, а не отвечать 409."""
+    """A client-supplied value cannot stand in for a missing catalog price."""
     service = _service(db_session, code="FIXD-CP", price=None)
 
     quoted = client.post(
@@ -348,10 +315,8 @@ def test_quote_cart_mode_allows_custom_price_when_catalog_price_missing(
             "pricing_mode": "cart",
         },
     )
-    assert quoted.status_code == 200, quoted.text
-    body = quoted.json()
-    assert float(body["items"][0]["unit_price"]) == 15000
-    assert float(body["total_amount"]) == 30000
+    assert quoted.status_code == 409, quoted.text
+    assert "не указана цена" in quoted.json()["detail"]
 
     # Нет ни одной эффективной цены — 409 остаётся (отсутствие цены НЕ 0)
     both_missing = client.post(
@@ -387,11 +352,11 @@ def test_quote_full_update_mode_mirrors_the_full_update_route(
     """Codex R2 #3095 (P1): full_update-квота зеркалирует
     _full_update_create_single_independent_entry — консультация при
     repeat/benefit → 0, не-консультация → полная каталог-цена,
-    all_free → 0."""
+    all_free → обычная цена до согласования."""
     consultation = _service(
         db_session, code="FIXD-FU-C", price=100000.00, is_consultation=True
     )
-    lab = _service(db_session, code="FIXD-FU-L", price=60000.00)
+    lab = _service(db_session, code="FIXD-FU-L", price=60000.25)
     _set_settings(db_session, repeat_visit_discount=50)
 
     repeat_quote = client.post(
@@ -429,12 +394,12 @@ def test_quote_full_update_mode_mirrors_the_full_update_route(
             "pricing_mode": "full_update",
         },
     )
-    assert all_free_quote.status_code == 200
-    assert float(all_free_quote.json()["total_amount"]) == 0
-    # Codex R3 #3095 (P2): _full_update_handle_all_free_visit writes
-    # approval_status="pending" for BOTH the unpaid existing visit and a new
-    # visit — the quote must warn about approval, not report approved.
-    assert all_free_quote.json()["approval_status"] == "pending"
+    assert all_free_quote.status_code == 200, all_free_quote.text
+    all_free_body = all_free_quote.json()
+    assert Decimal(str(all_free_body["total_amount"])) == Decimal("120000.50")
+    assert all_free_body["currency"] == "UZS"
+    assert all_free_body["items"][0]["discount_percent"] == 0
+    assert all_free_body["approval_status"] == "pending"
 
 
 # ===================== Codex R3 #3095 =====================
@@ -985,7 +950,7 @@ def test_custom_price_rejected_beyond_two_decimal_places(
     сырое значение и полагался на Numeric(12,2) — 1.005 подтверждался как
     1.00, а сохранялся в счёт как 1.01. Единая точность DTO закрывает
     расхождение, не меняя контракт для корректных 2dp-цен."""
-    service = _service(db_session, code="R8-PREC-01", price=Decimal("100"))
+    service = _service(db_session, code="R8-PREC-01", price=Decimal("1.01"))
 
     # custom_price с 3 знаками — отвергается схемой quote
     quoted = client.post(

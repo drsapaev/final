@@ -18,14 +18,10 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.security import get_password_hash
-from app.models.appointment import Appointment
 from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.service import Service
-from app.models.user import User
 from app.models.visit import Visit
-
 
 # =============================================================================
 # Fixtures
@@ -266,3 +262,46 @@ class TestPaymentSecurity:
         )
         # Должен вернуть ошибку валидации
         assert response.status_code in [400, 422]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("route", "payload"),
+    [
+        ("/payments", None),
+        ("/cashier/payments", {"reason": "SYNTHETIC cancellation"}),
+    ],
+)
+def test_payment_cancel_routes_record_authenticated_actor(
+    client, db_session, test_visit, admin_user, admin_auth_headers, monkeypatch, route, payload,
+):
+    from unittest.mock import AsyncMock
+
+    from sqlalchemy import select
+
+    from app.api.v1.endpoints.cashier import _payments as cashier_payments
+    from app.models.audit import AuditLog
+
+    monkeypatch.setattr(cashier_payments, "_emit_payment_notification", AsyncMock())
+    payment = Payment(
+        visit_id=test_visit.id,
+        amount=Decimal("30000.00"),
+        currency="UZS",
+        method="cash",
+        status="pending",
+    )
+    db_session.add(payment)
+    db_session.commit()
+    payment_id, actor_id = payment.id, admin_user.id
+
+    response = client.post(
+        f"/api/v1{route}/{payment_id}/cancel", headers=admin_auth_headers, json=payload,
+    )
+
+    assert response.status_code == 200, response.text
+    assert db_session.get(Payment, payment_id).status == "cancelled"
+    event = db_session.scalars(select(AuditLog).filter_by(
+        event_type="PAYMENT_CANCELLED", entity_id=payment_id,
+    )).one()
+    assert (event.actor_user_id, event.actor_role, event.actor_type) == (actor_id, "Admin", "staff")
+    assert event.payload == {"previous_status": "pending", "new_status": "cancelled"}

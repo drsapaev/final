@@ -10,19 +10,22 @@ API endpoints для системы форс-мажора и возвратов
 """
 
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import require_active_roles, require_roles
 from app.db.session import get_db
 from app.models.user import User
 from app.services.force_majeure_api_service import (
     ForceMajeureApiDomainError,
     ForceMajeureApiService,
 )
+from app.services.money_input import MoneyInputError, parse_exact_json, parse_money
 
 router = APIRouter()
 
@@ -175,17 +178,15 @@ class AddDepositRequest(BaseModel):
     """Запрос на пополнение депозита"""
 
     patient_id: int
-    amount: float = Field(..., gt=0)
-    description: str | None = None
+    amount: Decimal = Field(..., gt=0, max_digits=12, decimal_places=2, allow_inf_nan=False)
+    description: str | None = Field(None, max_length=500)
+    client_request_id: UUID = Field(description="Один идентификатор команды для всех её повторов")
 
 
-class UseDepositRequest(BaseModel):
+class UseDepositRequest(AddDepositRequest):
     """Запрос на использование депозита для оплаты"""
 
-    patient_id: int
-    amount: float = Field(..., gt=0)
     visit_id: int | None = None
-    description: str | None = None
 
 
 # ========================= ФОРС-МАЖОР =========================
@@ -218,7 +219,7 @@ async def transfer_queue_to_tomorrow(
 async def cancel_queue_with_refund(
     request: ForceMajeureCancelRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    current_user: User = Depends(require_active_roles("Admin", "Registrar")),
 ):
     """
     Массовая отмена очереди с возвратом средств (форс-мажор)
@@ -278,7 +279,7 @@ async def get_refund_requests(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
 ):
     """
     Получить список заявок на возврат
@@ -298,7 +299,7 @@ async def get_refund_requests(
 async def get_refund_request(
     request_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
 ):
     """
     Получить заявку на возврат по ID
@@ -317,7 +318,7 @@ async def process_refund_request(
     request_id: int,
     process_request: ProcessRefundRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
 ):
     """
     Обработать заявку на возврат
@@ -354,7 +355,7 @@ async def get_deposits(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
 ):
     """
     Получить список депозитов пациентов
@@ -374,7 +375,7 @@ async def get_deposits(
 async def get_patient_deposit(
     patient_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier", "Registrar")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier", "Registrar")),
 ):
     """
     Получить депозит пациента
@@ -394,7 +395,7 @@ async def get_deposit_transactions(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
 ):
     """
     Получить историю транзакций депозита
@@ -409,11 +410,20 @@ async def get_deposit_transactions(
     return [DepositTransactionResponse(**item) for item in payload]
 
 
-@router.post("/deposits/add", response_model=DepositResponse)
+async def _exact_deposit_amount(request: Request) -> Decimal:
+    try:
+        payload = parse_exact_json(await request.body())
+        return parse_money(payload.get("amount") if isinstance(payload, dict) else None)
+    except MoneyInputError:
+        raise HTTPException(status_code=422, detail="Некорректная сумма операции") from None
+
+
+@router.post("/deposits/add", response_model=DepositResponse, responses={409: {"description": "Конфликт команды пополнения"}})
 async def add_to_deposit(
     request: AddDepositRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
+    exact_amount: Decimal = Depends(_exact_deposit_amount),
 ):
     """
     Пополнить депозит пациента
@@ -424,18 +434,25 @@ async def add_to_deposit(
     """
     service = ForceMajeureApiService(db)
     try:
-        payload = service.add_to_deposit(request=request, current_user_id=current_user.id)
+        payload = service.add_to_deposit(
+            request=request.model_copy(update={"amount": exact_amount}),
+            current_user_id=current_user.id,
+        )
         return DepositResponse(**payload)
+    except ForceMajeureApiDomainError as exc:
+        service.rollback()
+        raise _domain_http_exception(exc) from exc
     except Exception:
         service.rollback()
         raise
 
 
-@router.post("/deposits/use", response_model=DepositResponse)
+@router.post("/deposits/use", response_model=DepositResponse, responses={409: {"description": "Конфликт команды или решение по визиту ещё не принято"}})
 async def use_deposit_for_payment(
     request: UseDepositRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier")),
+    current_user: User = Depends(require_active_roles("Admin", "Cashier")),
+    exact_amount: Decimal = Depends(_exact_deposit_amount),
 ):
     """
     Использовать депозит для оплаты
@@ -447,11 +464,12 @@ async def use_deposit_for_payment(
     service = ForceMajeureApiService(db)
     try:
         payload = service.use_deposit_for_payment(
-            request=request,
+            request=request.model_copy(update={"amount": exact_amount}),
             current_user_id=current_user.id,
         )
         return DepositResponse(**payload)
     except ForceMajeureApiDomainError as exc:
+        service.rollback()
         raise _domain_http_exception(exc) from exc
     except Exception:
         service.rollback()

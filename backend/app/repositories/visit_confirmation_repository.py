@@ -50,7 +50,7 @@ class VisitConfirmationRepository:
 
     def get_visit_services(self, visit_id: int) -> list[VisitService]:
         return (
-            self.db.query(VisitService).filter(VisitService.visit_id == visit_id).all()
+            self.db.query(VisitService).filter(VisitService.visit_id == visit_id).populate_existing().all()
         )
 
     def get_service(self, service_id: int) -> Service | None:

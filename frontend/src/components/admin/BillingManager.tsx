@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import {
   Card,
@@ -34,7 +34,9 @@ import {
 import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
-import type { Invoice, Payment } from '../../types/domain/billing';
+import { generateCashierClientRequestId } from '../../pages/cashier/cashierPaymentContracts';
+import type { Invoice } from '../../types/domain/billing';
+import type { BillingPaymentListItem } from '../../types/api';
 import logger from '../../utils/logger';
 import { sanitizePrintableHtml } from '../../utils/printWindow';  // PR-35 / P0-7
 import { useTranslation } from '../../i18n/useTranslation';
@@ -58,7 +60,7 @@ type InvoiceForm = {
 
 type PaymentForm = {
   invoice_id: string | number;
-  amount: number | string;
+  amount: string;
   payment_method: string;
   reference_number: string;
   description: string;
@@ -104,21 +106,18 @@ const buildInvoicePayload = (form: InvoiceForm) => ({
   }))
 });
 
-const buildPaymentPayload = (form: PaymentForm) => ({
-  ...form,
-  invoice_id: toNullableInteger(form.invoice_id),
-  amount: Number(form.amount) || 0
-});
-
 const BillingManager = () => {
   const [activeTab, setActiveTab] = useState('invoices');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payments, setPayments] = useState<BillingPaymentListItem[]>([]);
   const [analytics, setAnalytics] = useState<{ summary?: { total_invoices?: number; total_amount?: number; paid_amount?: number; overdue_amount?: number; recent_invoices?: unknown[]; [k: string]: unknown }; status_breakdown?: Array<{ status?: string; count?: number; [k: string]: unknown }>; [k: string]: unknown } | null>(null);
   const [, setSettings] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [showRecordPayment, setShowRecordPayment] = useState(false);
+  const [recordingPayment, setRecordingPayment] = useState(false);
+  const recordingPaymentRef = useRef(false);
+  const paymentRequests = useRef(new Map<number, { id: string; form: PaymentForm }>());
 
   const { t: rawT } = useTranslation();
   const t = rawT;
@@ -126,9 +125,6 @@ const BillingManager = () => {
   const paymentMethodOptions = getPaymentMethodOptions(t);
   const invoiceTypeLabels = Object.fromEntries(
     invoiceTypeOptions.map((option) => [option.value, option.label])
-  );
-  const paymentMethodLabels = Object.fromEntries(
-    paymentMethodOptions.map((option) => [option.value, option.label])
   );
 
   // Форма для создания счета
@@ -149,16 +145,9 @@ const BillingManager = () => {
   });
 
   // Форма для записи платежа
-  const [paymentForm, setPaymentForm] = useState<{
-    invoice_id: string | number;
-    amount: number;
-    payment_method: string;
-    reference_number: string;
-    description: string;
-    notes: string;
-  }>({
+  const [paymentForm, setPaymentForm] = useState<PaymentForm>({
     invoice_id: '',
-    amount: 0,
+    amount: '',
     payment_method: 'cash',
     reference_number: '',
     description: '',
@@ -172,8 +161,8 @@ const BillingManager = () => {
         const response = (await api.get('/billing/invoices')) as import('axios').AxiosResponse<unknown[]>;
         setInvoices(response.data as Invoice[]);
       } else if (activeTab === 'payments') {
-        const response = (await api.get('/billing/payments')) as import('axios').AxiosResponse<unknown[]>;
-        setPayments(response.data as Payment[]);
+        const response = await api.get<BillingPaymentListItem[]>('/billing/payments');
+        setPayments(response.data);
       } else if (activeTab === 'analytics') {
         const response = (await api.get('/billing/analytics')) as import('axios').AxiosResponse<Record<string, unknown>>;
         setAnalytics(response.data);
@@ -221,13 +210,31 @@ const BillingManager = () => {
   };
 
   const handleRecordPayment = async () => {
+    if (recordingPaymentRef.current) return;
+    const invoiceId = toNullableInteger(paymentForm.invoice_id);
+    if (invoiceId === null) {
+      toast.error(t('admin2.bill_pay_record_error'));
+      return;
+    }
+    const request = paymentRequests.current.get(invoiceId) ?? {
+      id: generateCashierClientRequestId(),
+      form: paymentForm,
+    };
+    paymentRequests.current.set(invoiceId, request);
+    recordingPaymentRef.current = true;
+    setRecordingPayment(true);
     try {
-      await api.post('/billing/payments', buildPaymentPayload(paymentForm));
+      await api.post('/billing/payments', {
+        ...paymentForm,
+        invoice_id: invoiceId,
+        client_request_id: request.id,
+      });
+      paymentRequests.current.delete(invoiceId);
       toast.success(t('admin2.bill_pay_recorded'));
       setShowRecordPayment(false);
       setPaymentForm({
         invoice_id: '',
-        amount: 0,
+        amount: '',
         payment_method: 'cash',
         reference_number: '',
         description: '',
@@ -237,6 +244,9 @@ const BillingManager = () => {
     } catch (error) {
       logger.error('Ошибка записи платежа:', error);
       toast.error(getErrorMessage(error) || t('admin2.bill_pay_record_error'));
+    } finally {
+      recordingPaymentRef.current = false;
+      setRecordingPayment(false);
     }
   };
 
@@ -289,7 +299,7 @@ const BillingManager = () => {
     setInvoiceForm({ ...invoiceForm, items: newItems });
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, defaultToDraft = true) => {
     const statusConfig = {
       'draft': { variant: 'secondary', label: t('admin2.bill_status_draft'), icon: FileText },
       'pending': { variant: 'warning', label: t('admin2.bill_status_pending'), icon: Clock },
@@ -300,7 +310,11 @@ const BillingManager = () => {
       'refunded': { variant: 'warning', label: t('admin2.bill_status_refunded'), icon: AlertCircle }
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig['draft'];
+    const matching = Object.prototype.hasOwnProperty.call(statusConfig, status)
+      ? statusConfig[status as keyof typeof statusConfig]
+      : undefined;
+    if (!matching && !defaultToDraft) return <Badge variant="secondary">{status}</Badge>;
+    const config = matching ?? statusConfig.draft;
     const Icon = config.icon;
 
     return (
@@ -398,9 +412,13 @@ const BillingManager = () => {
                   <Button
               variant="outline"
               onClick={() => {
-                setPaymentForm({ ...paymentForm, invoice_id: invoice.id, amount: invoice.balance ?? 0 });
+                const pending = paymentRequests.current.get(Number(invoice.id));
+                setPaymentForm(pending?.form ?? {
+                  ...paymentForm, invoice_id: invoice.id, amount: (invoice.balance ?? 0).toFixed(2),
+                });
                 setShowRecordPayment(true);
               }}
+              disabled={recordingPayment}
               className="admin-p-6-minw-auto-w-32-h-32-d-flex-ai-center-jc-center-3"
               title={t('admin2.bill_record_pay_title')}
               type="button"
@@ -578,6 +596,7 @@ const BillingManager = () => {
             <Button
           variant="outline"
           onClick={() => setShowRecordPayment(false)}
+          disabled={recordingPayment}
           type="button"
           title={t('admin2.bill_close_pay_form_aria')}
           aria-label={t('admin2.bill_close_pay_form_aria')}
@@ -606,8 +625,9 @@ const BillingManager = () => {
               </label>
               <Input
             type="number"
+            step="0.01"
             value={paymentForm.amount}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
             placeholder="0" />
           
             </div>
@@ -651,12 +671,14 @@ const BillingManager = () => {
           <div className="admin-d-flex-jc-end-gap-8-2">
             <Button
           variant="outline"
-          onClick={() => setShowRecordPayment(false)}>
+          onClick={() => setShowRecordPayment(false)}
+          disabled={recordingPayment}>
           
               {t('admin2.bill_cancel_btn')}
             </Button>
             <Button
           onClick={handleRecordPayment}
+          disabled={recordingPayment}
           className="flex items-center justify-center gap-2">
           
               <Save size={16} />
@@ -681,21 +703,15 @@ const BillingManager = () => {
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <h4 className="font-medium">{t('admin2.bill_pay_number', { number: payment.payment_number })}</h4>
-                  <Badge variant={payment.is_confirmed ? 'success' : 'warning'}>
-                    {payment.is_confirmed ? t('admin2.bill_pay_confirmed') : t('admin2.bill_pay_pending_confirm')}
-                  </Badge>
+                  <h4 className="font-medium">{t('admin2.bill_pay_number', { number: payment.receipt_no || payment.id })}</h4>
+                  {getStatusBadge(payment.status, false)}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                  <div>{t('admin2.bill_inv_id_short')} {payment.invoice_id}</div>
-                  <div>{t('admin2.bill_patient_id')} {payment.patient_id}</div>
-                  <div>{t('admin2.bill_amount')} {(payment.amount ?? 0).toLocaleString()} {t('admin2.bill_currency')}</div>
-                  <div>{t('admin2.bill_method_short')} {paymentMethodLabels[payment.payment_method ?? ''] || payment.payment_method}</div>
-                  <div>{t('admin2.bill_date')} {new Date(payment.payment_date || '').toLocaleDateString()}</div>
-                  {Boolean(payment.reference_number) &&
-              <div>{t('admin2.bill_ref_short')} {String(payment.reference_number ?? '')}</div>
-              }
+                  <div>{t('misc.srch_visit_id', { visitId: payment.visit_id })}</div>
+                  <div>{t('admin2.bill_amount')} {payment.amount.toLocaleString()} {payment.currency}</div>
+                  <div>{t('admin2.bill_method_short')} {paymentMethodOptions.find(({ value }) => value === payment.method)?.label ?? payment.method}</div>
+                  <div>{t('admin2.bill_date')} {new Date(payment.paid_at ?? payment.created_at).toLocaleDateString()}</div>
                 </div>
               </div>
             </div>

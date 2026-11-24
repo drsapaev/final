@@ -382,6 +382,20 @@ def test_staff_provider_refund_requires_cashier_and_preserves_local_state(
     assert _audit_actions(db_session) == ["staff_action_failed"]
 
 
+@pytest.mark.parametrize("amount", ["0.001", "NaN"])
+def test_staff_refund_requires_exact_amount(db_session, admin_user, test_visit, amount):
+    payment = Payment(visit_id=test_visit.id, amount=Decimal("10.00"), currency="UZS", method="cash", status="paid")
+    db_session.add(payment)
+    db_session.commit()
+
+    with pytest.raises(TelegramStaffActionAdapterError, match="payment_refund_amount_invalid"):
+        TelegramStaffActionAdapterService(db_session).staff_refund_payment(
+            payment_id=payment.id, amount=amount, actor_user_id=admin_user.id, commit=False,
+        )
+    assert payment.status == "paid" and payment.refunded_amount is None
+    assert _audit_actions(db_session) == ["staff_action_failed"]
+
+
 def test_staff_payment_status_cannot_bypass_refund_action(
     db_session, admin_user, test_visit
 ):

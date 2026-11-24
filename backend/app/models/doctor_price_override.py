@@ -4,7 +4,17 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -22,6 +32,18 @@ class DoctorPriceOverride(Base):
     """
 
     __tablename__ = "doctor_price_overrides"
+    __table_args__ = (
+        CheckConstraint(
+            "(requester_type IS NULL AND requester_user_id IS NULL AND requester_user_id_snapshot IS NULL AND requester_auth_epoch IS NULL) OR "
+            "(requester_type IS NOT NULL AND requester_type IN ('doctor','admin') AND requester_user_id_snapshot IS NOT NULL AND requester_user_id_snapshot > 0 AND "
+            "requester_auth_epoch IS NOT NULL AND requester_auth_epoch >= 0 AND (requester_user_id IS NULL OR requester_user_id = requester_user_id_snapshot))",
+            name="ck_doctor_price_requester_binding",
+        ),
+        CheckConstraint(
+            "(requester_user_id_snapshot IS NULL OR typeof(requester_user_id_snapshot)='integer') AND (requester_auth_epoch IS NULL OR typeof(requester_auth_epoch)='integer')",
+            name="ck_doctor_price_requester_integer_sqlite",
+        ).ddl_if(dialect="sqlite"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
@@ -44,6 +66,31 @@ class DoctorPriceOverride(Base):
         nullable=True,
         index=True
     )  # ✅ SECURITY: SET NULL to preserve override record
+
+    # New requests bind to one concrete association and the context in which
+    # it was requested. NULLs on legacy/deleted data are deliberately unknown;
+    # approval consumers must fail closed and must not infer a binding.
+    target_scope: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    target_visit_service_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("visit_services.id", ondelete="SET NULL"), nullable=True
+    )
+    visit_context_epoch: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    doctor_owner_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    doctor_owner_generation: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+
+    # Nullable for all legacy requests; approval must require exact snapshots.
+    price_context_generation: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    price_line_generation: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    price_owner_generation: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    doctor_user_auth_epoch: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    requester_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    requester_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    requester_user_id_snapshot: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    requester_auth_epoch: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     # Цены
     original_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)

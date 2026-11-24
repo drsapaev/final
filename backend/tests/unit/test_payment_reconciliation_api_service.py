@@ -68,4 +68,4 @@ class TestPaymentReconciliationApiService:
                 )
 
         assert exc_info.value.status_code == 500
-        assert "Reconciliation error" in exc_info.value.detail
+        assert exc_info.value.detail == "Payment reconciliation is temporarily unavailable"

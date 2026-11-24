@@ -1,6 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
 
+import pytest
+
 from app.api.v1.endpoints.registrar_wizard import (
     AllFreeVisitResponse,
     _all_free_available_actions,
@@ -44,3 +46,12 @@ def test_processed_all_free_actions_fail_closed() -> None:
         assert row.available_actions == []
         assert row.can_approve is False
         assert row.can_reject is False
+
+
+@pytest.mark.parametrize('approval_status', ['approved', 'rejected'])
+def test_processed_visit_can_offer_only_invitation_review(approval_status: str) -> None:
+    assert _all_free_available_actions(approval_status, can_review_invitation=True) == ['review_invitation']
+
+
+def test_pending_visit_cannot_offer_invitation_review() -> None:
+    assert _all_free_available_actions('pending', can_review_invitation=True) == ['approve', 'reject']

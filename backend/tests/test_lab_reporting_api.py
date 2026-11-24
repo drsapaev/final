@@ -13,6 +13,7 @@ from app.models.clinic import Doctor
 from app.models.emr import EMR
 from app.models.lab import LabOrder, LabReportInstance, LabResult
 from app.models.patient import Patient
+from app.models.patient_access_audit import PatientAccessAuditLog
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
@@ -478,13 +479,17 @@ def _lab_create_instance_payload(client, auth_headers, test_patient, test_visit)
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("role", ("Admin", "Lab"))
 def test_lab_report_create_same_idempotency_key_replays_committed_instance(
-    client, auth_headers, db_session, test_patient, test_visit
+    client, auth_headers, db_session, admin_user, test_patient, test_visit, role,
 ) -> None:
     """Повторный POST с тем же Idempotency-Key возвращает закоммиченный
     instance_id и не создаёт второй бланк (lost-response retry)."""
+    admin_user.is_superuser = False
+    admin_user.role = role
+    db_session.commit()
     payload = _lab_create_instance_payload(client, auth_headers, test_patient, test_visit)
-    headers = auth_headers | {"Idempotency-Key": "pr3351-r9-create-key-1"}
+    headers = auth_headers | {"Idempotency-Key": f"synthetic-lab-create-replay-{role}"}
 
     first = client.post("/api/v1/lab/report-instances", headers=headers, json=payload)
     assert first.status_code == 200, first.text
@@ -504,6 +509,45 @@ def test_lab_report_create_same_idempotency_key_replays_committed_instance(
         .count()
     )
     assert count == 1, "две отправки с одним ключом создали второй бланк"
+    audit = db_session.query(PatientAccessAuditLog).filter_by(
+        subject_patient_id=test_patient.id,
+        actor_staff_user_id=admin_user.id,
+        resource_type="lab_report",
+        resource_id=str(first_instance_id),
+        action="view",
+    ).one()
+    assert audit.outcome == "success"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("change", ("report_updated", "patient_deleted", "visit_moved", "role_changed"))
+def test_lab_report_create_replay_refuses_stale_results(
+    client, auth_headers, db_session, admin_user, test_patient, test_visit, change,
+) -> None:
+    admin_user.is_superuser = False
+    db_session.commit()
+    payload = _lab_create_instance_payload(client, auth_headers, test_patient, test_visit)
+    headers = auth_headers | {"Idempotency-Key": f"synthetic-lab-create-{change}"}
+    first = client.post("/api/v1/lab/report-instances", headers=headers, json=payload)
+    assert first.status_code == 200, first.text
+    original_id = first.json()["id"]
+
+    if change == "report_updated":
+        db_session.get(LabReportInstance, original_id).signer_snapshot = {"label": "SYNTHETIC-UPDATED"}
+    elif change == "patient_deleted":
+        test_patient.is_deleted = True
+    elif change == "visit_moved":
+        other = _create_patient(db_session)
+        test_visit.patient_id = other.id
+    else:
+        admin_user.role = "Registrar"
+    db_session.commit()
+
+    rejected = client.post("/api/v1/lab/report-instances", headers=headers, json=payload)
+    assert rejected.status_code == 409, rejected.text
+    assert rejected.json()["code"] == "idempotency_reconciliation_required"
+    assert "patient_snapshot" not in rejected.json()
+    assert db_session.query(LabReportInstance.id).all() == [(original_id,)]
 
 
 @pytest.mark.integration

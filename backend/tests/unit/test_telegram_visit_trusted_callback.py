@@ -3,15 +3,18 @@
 import base64
 import struct
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
 from app.api.v1.endpoints import telegram_webhook
+from app.core.config import settings
 from app.models.appointment import Appointment
 from app.models.patient import Patient
 from app.models.telegram_config import TelegramConfig, TelegramUser
+from app.models.visit import VisitService
 from app.services import telegram_webhook_dedup
 from app.services.appointment_rsvp import make_appointment_callback
 from app.services.notifications_pkg import NotificationSenderService
@@ -19,7 +22,23 @@ from app.services.telegram_bot import TelegramBotService
 from app.services.visit_confirmation_service import build_telegram_visit_action_token
 
 
+@pytest.fixture(autouse=True)
+def secure_review_origin(monkeypatch):
+    monkeypatch.setattr(settings, "FRONTEND_URL", "https://synthetic.example")
+
+
+@pytest.fixture
+def telegram_visit_price(db_session, test_visit):
+    # Seed the price before issuing any callback for this visit.
+    db_session.add(VisitService(
+        visit_id=test_visit.id, service_id=123, name="SYNTHETIC",
+        qty=1, price=Decimal("1.00"), currency="UZS",
+    ))
+    db_session.commit()
+
+
 @pytest.mark.parametrize("operation", ["confirm", "cancel"])
+@pytest.mark.usefixtures("telegram_visit_price")
 def test_authenticated_private_callback_controls_only_linked_visit(
     client, db_session, test_visit, monkeypatch, operation
 ):
@@ -142,6 +161,7 @@ async def test_provider_exception_does_not_expose_sensitive_text(monkeypatch, ca
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("telegram_visit_price")
 async def test_view_callback_sends_context_then_distinct_action(db_session, test_visit, monkeypatch):
     link = TelegramUser(chat_id=740610010, patient_id=test_visit.patient_id, active=True,
                         blocked=False, notifications_enabled=True, appointment_reminders=True)
@@ -167,9 +187,15 @@ async def test_view_callback_sends_context_then_distinct_action(db_session, test
                 "data": f"view_visit:{view}"}
     await service._handle_callback_query(callback, db_session)
     payload = service._httpx_post.await_args.kwargs["json"]
-    assert "15:45" in payload["text"] and payload["chat_id"] == link.chat_id
+    assert payload["text"] == "У вас новое уведомление."
+    assert "15:45" not in payload["text"] and payload["chat_id"] == link.chat_id
     actions = payload["reply_markup"]["inline_keyboard"]
-    action = actions[0][0]["callback_data"]
+    assert f"#token={view}&review=telegram" in actions[0][0]["url"]
+    assert "SYNTHETIC-view-token" not in actions[0][0]["url"]
+    from app.services.visit_confirmation_service import VisitConfirmationService
+    assert VisitConfirmationService(db_session).get_visit_info(view)["visit_time"] == "15:45"
+    db_session.rollback()
+    action = actions[1][0]["callback_data"]
     assert action.startswith("confirm_visit:ta") and view not in action
     db_session.refresh(test_visit)
     assert test_visit.status == "pending_confirmation"
@@ -180,6 +206,39 @@ async def test_view_callback_sends_context_then_distinct_action(db_session, test
 
 
 @pytest.mark.asyncio
+async def test_unsafe_review_origin_never_sends_token(db_session, test_visit, monkeypatch):
+    monkeypatch.setattr(settings, "FRONTEND_URL", "http://clinic.example")
+    link = TelegramUser(chat_id=740610010, patient_id=test_visit.patient_id, active=True,
+                        blocked=False, notifications_enabled=True, appointment_reminders=True)
+    test_visit.status = "pending_confirmation"
+    test_visit.visit_date = (datetime.now(UTC) + timedelta(days=3)).date()
+    test_visit.visit_time = "15:45"
+    test_visit.confirmation_channel = "telegram"
+    test_visit.confirmation_token = "SYNTHETIC-no-unsafe-send"
+    test_visit.confirmation_expires_at = datetime.now(UTC) + timedelta(hours=1)
+    db_session.add(link)
+    db_session.commit()
+    view = build_telegram_visit_action_token(
+        visit_id=test_visit.id, confirmation_token=test_visit.confirmation_token,
+        link_id=link.id, chat_id=link.chat_id, patient_id=test_visit.patient_id,
+        link_epoch=link.patient_link_epoch, visit_context_epoch=test_visit.confirmation_context_epoch, purpose="view",
+    )
+    service = TelegramBotService()
+    service.bot_token = "SYNTHETIC-bot"
+    service._answer_callback_query = AsyncMock(return_value=True)
+    service._httpx_post = AsyncMock()
+    await service._handle_callback_query(
+        {"id": "SYNTHETIC-callback", "from": {"id": link.chat_id},
+         "message": {"chat": {"id": link.chat_id, "type": "private"}},
+         "data": f"view_visit:{view}"}, db_session,
+    )
+    service._httpx_post.assert_not_awaited()
+    assert view not in str(service._answer_callback_query.await_args)
+    assert "SYNTHETIC-no-unsafe-send" not in str(service._answer_callback_query.await_args)
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("telegram_visit_price")
 async def test_future_date_only_issuer_view_and_action(db_session, test_visit, monkeypatch):
     from app.services.visit_confirmation_service import VisitConfirmationService
 
@@ -201,10 +260,60 @@ async def test_future_date_only_issuer_view_and_action(db_session, test_visit, m
     callback = fake_send.await_args.kwargs["keyboard"][0][0]["callback_data"]
     preview = VisitConfirmationService(db_session).preview_by_telegram(
         token=callback.split(":", 1)[1], telegram_user_id=str(link.chat_id))
-    assert "время не указано" in preview["text"].lower()
+    assert preview["text"] == "У вас новое уведомление."
+    assert f"#token={callback.split(':', 1)[1]}&review=telegram" in preview["view_url"]
     result = VisitConfirmationService(db_session).confirm_by_telegram(
         token=preview["action_token"], telegram_user_id=str(link.chat_id), source_ip=None, user_agent="telegram")
     assert result["success"]
+
+
+@pytest.mark.asyncio
+async def test_preview_send_after_subject_deletion_contains_no_clinical_details(db_session, test_visit):
+    from app.services.visit_confirmation_service import (
+        VisitConfirmationDomainError,
+        VisitConfirmationService,
+    )
+
+    link = TelegramUser(chat_id=740610010, patient_id=test_visit.patient_id, active=True,
+                        blocked=False, notifications_enabled=True, appointment_reminders=True)
+    test_visit.status = "pending_confirmation"
+    test_visit.visit_date = (datetime.now(UTC) + timedelta(days=3)).date()
+    test_visit.visit_time = "15:45"
+    test_visit.confirmation_channel = "telegram"
+    test_visit.confirmation_token = "SYNTHETIC-stale-preview"
+    test_visit.confirmation_expires_at = datetime.now(UTC) + timedelta(hours=1)
+    db_session.add(link)
+    db_session.commit()
+    capability = build_telegram_visit_action_token(
+        visit_id=test_visit.id, confirmation_token=test_visit.confirmation_token,
+        link_id=link.id, chat_id=link.chat_id, patient_id=test_visit.patient_id,
+        link_epoch=link.patient_link_epoch, visit_context_epoch=test_visit.confirmation_context_epoch, purpose="view",
+    )
+    service = TelegramBotService()
+    service.bot_token = "SYNTHETIC-bot"
+    service._answer_callback_query = AsyncMock(return_value=True)
+    checked = []
+
+    async def transfer_before_send(*args, **kwargs):
+        patient = db_session.get(Patient, test_visit.patient_id)
+        patient.is_deleted = True
+        db_session.commit()
+        assert kwargs["json"]["text"] == "У вас новое уведомление."
+        assert "15:45" not in kwargs["json"]["text"]
+        with pytest.raises(VisitConfirmationDomainError):
+            VisitConfirmationService(db_session).get_visit_info(capability)
+        checked.append(True)
+        return SimpleNamespace(status_code=200, json=lambda: {"ok": True})
+
+    service._httpx_post = AsyncMock(side_effect=transfer_before_send)
+    await service._handle_callback_query(
+        {"id": "SYNTHETIC-callback", "from": {"id": link.chat_id},
+         "message": {"chat": {"id": link.chat_id, "type": "private"}},
+         "data": f"view_visit:{capability}"}, db_session,
+    )
+    service._httpx_post.assert_awaited_once()
+    service._answer_callback_query.assert_awaited_once()
+    assert checked == [True]
 
 
 @pytest.mark.asyncio

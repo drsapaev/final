@@ -567,6 +567,40 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/patients/{patient_id}/birth-date/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Birth Date */
+        post: operations["review_birth_date_api_v1_patients__patient_id__birth_date_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/birth-date/attest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Attest Birth Date */
+        post: operations["attest_birth_date_api_v1_patients__patient_id__birth_date_attest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/visits/visits": {
         parameters: {
             query?: never;
@@ -647,6 +681,50 @@ export type paths = {
         put?: never;
         /** Смена статуса визита */
         post: operations["set_status_api_v1_visits_visits__visit_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/visits/{visit_id}/repeat-evidence/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Проверить контекст исторической консультации
+         * @description Start an audited review; the returned capability is not a login token.
+         */
+        post: operations["review_repeat_consultation_api_v1_visits__visit_id__repeat_evidence_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/visits/{visit_id}/repeat-evidence/attest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Подтвердить историческую консультацию для повторного визита
+         * @description Record an administrator's review of a historical clinical record.
+         *
+         *     The physician identity must come from that reviewed record, not from
+         *     today's mutable Doctor profile. The proof and append-only audit record
+         *     commit together under the Visit lock.
+         */
+        post: operations["attest_repeat_consultation_api_v1_visits__visit_id__repeat_evidence_attest_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1938,6 +2016,40 @@ export type paths = {
          * @description Read a public visit card without putting its bearer token in the URL.
          */
         post: operations["post_visit_info_by_token_api_v1_visits_info_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/visits/{visit_id}/confirmation-reissue/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Invitation Reissue */
+        post: operations["review_invitation_reissue_api_v1_visits__visit_id__confirmation_reissue_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/visits/{visit_id}/confirmation-reissue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reissue Invitation */
+        post: operations["reissue_invitation_api_v1_visits__visit_id__confirmation_reissue_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3630,16 +3742,7 @@ export type paths = {
         put?: never;
         /**
          * Cancel Service In Entry
-         * @description Отменяет услугу в записи очереди с сохранением аудита
-         *
-         *     ВАЖНО:
-         *     - Услуга помечается как отмененная (cancelled=True), но НЕ удаляется
-         *     - Сохраняется причина отмены и информация о том, кто отменил
-         *     - Пересчитывается итоговая сумма
-         *     - Если услуга была оплачена, сохраняется флаг was_paid_before_cancel
-         *     - Синхронизируется со всеми другими queue_entries этого пациента
-         *
-         *     Доступно: администраторам, регистраторам и врачам
+         * @description Отменяет услугу в талоне без привязки к визиту и сохраняет аудит.
          */
         post: operations["cancel_service_in_entry_api_v1_queue_online_entry__entry_id__cancel_service_post"];
         delete?: never;
@@ -6869,15 +6972,7 @@ export type paths = {
         put?: never;
         /**
          * Одобрить или отклонить изменение цены
-         * @description Одобрить или отклонить изменение цены врачом
-         *
-         *     REGPRICE-BE-001/002/003/005 (audit #3892, group 16): the registrar route
-         *     now delegates to the canonical PriceOverrideApprovalService — the SAME
-         *     implementation the dental PUT route uses — so both independently exposed
-         *     routes converge on one outcome: locked decision (409 for the loser of a
-         *     concurrent race), chargeable ``VisitService.price`` update PLUS the
-         *     ``Visit.doctor_price_override`` JSON mirror in one commit, stale-intent
-         *     validation and a mandatory non-blank rejection reason.
+         * @description Рассмотреть изменение цены и обновить черновой счёт при одобрении.
          */
         post: operations["approve_price_override_api_v1_registrar_price_override_approve_post"];
         delete?: never;
@@ -6955,7 +7050,7 @@ export type paths = {
         };
         /**
          * Check Invoice Status
-         * @description Проверка статуса оплаты invoice
+         * @description Read the provider outside the transaction that records its receipt.
          */
         get: operations["check_invoice_status_api_v1_registrar_invoice__invoice_id__status_get"];
         put?: never;
@@ -7200,11 +7295,7 @@ export type paths = {
         };
         get?: never;
         put?: never;
-        /**
-         * Confirm Visit By Registrar
-         * @description Подтверждение визита регистратором (по телефону)
-         *     Присваивает номера в очередях если визит на сегодня
-         */
+        /** Confirm Visit By Registrar */
         post: operations["confirm_visit_by_registrar_api_v1_registrar_visits__visit_id__confirm_post"];
         delete?: never;
         options?: never;
@@ -7388,8 +7479,10 @@ export type paths = {
         put?: never;
         /**
          * Schedule Next Visit
-         * @description Назначение следующего визита врачом (без номера в очереди)
-         *     Номер будет присвоен только после подтверждения пациентом
+         * @description Create one server-priced visit and any row-bound pending requests atomically.
+         *
+         *     A staged invitation is durable but is not dispatched here. The consumer
+         *     and finance fences must be integrated before this slice is mergeable.
          */
         post: operations["schedule_next_visit_api_v1_doctor_visits_schedule_next_post"];
         delete?: never;
@@ -19008,6 +19101,66 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/visit-invitation-status/{visit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Visit Invitation Status
+         * @description Reveal only the current subject's delivery outcome to an active Admin.
+         */
+        get: operations["read_visit_invitation_status_api_v1_notifications_visit_invitation_status__visit_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/visit-invitation-tasks/{handle}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Visit Invitation Task
+         * @description Resolve a neutral inbox handle only for its current authorized recipient.
+         */
+        get: operations["read_visit_invitation_task_api_v1_notifications_visit_invitation_tasks__handle__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/visit-invitation-recoveries/{handle}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Visit Invitation Recovery
+         * @description Resolve a neutral recovery handle for its current Admin recipient.
+         */
+        get: operations["read_visit_invitation_recovery_api_v1_notifications_visit_invitation_recoveries__handle__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notifications/send-appointment-reminder": {
         parameters: {
             query?: never;
@@ -19019,7 +19172,7 @@ export type paths = {
         put?: never;
         /**
          * Send Appointment Reminder
-         * @description Отправка напоминания о записи
+         * @description Queue a neutral reminder for one explicit, currently authorized Visit.
          */
         post: operations["send_appointment_reminder_api_v1_notifications_send_appointment_reminder_post"];
         delete?: never;
@@ -19039,7 +19192,7 @@ export type paths = {
         put?: never;
         /**
          * Send Visit Confirmation
-         * @description Отправка подтверждения визита
+         * @description Queue a neutral notice; details stay in the patient's protected view.
          */
         post: operations["send_visit_confirmation_api_v1_notifications_send_visit_confirmation_post"];
         delete?: never;
@@ -19059,7 +19212,7 @@ export type paths = {
         put?: never;
         /**
          * Send Payment Notification
-         * @description Отправка уведомления об оплате
+         * @description Queue a neutral notice for a confirmed payment belonging to this Visit.
          */
         post: operations["send_payment_notification_api_v1_notifications_send_payment_notification_post"];
         delete?: never;
@@ -21736,7 +21889,7 @@ export type paths = {
         put?: never;
         /**
          * Record Payment
-         * @description Записать платеж
+         * @description Записать платёж с ключом для повторной выдачи исходной квитанции.
          */
         post: operations["record_payment_api_v1_billing_payments_post"];
         delete?: never;
@@ -22041,6 +22194,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/discount-benefits/benefits/encounter/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Registrar Encounter Benefit
+         * @description Подтвердить одну льготу для всех услуг исходного оформления.
+         */
+        post: operations["apply_registrar_encounter_benefit_api_v1_discount_benefits_benefits_encounter_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/discount-benefits/loyalty-programs": {
         parameters: {
             query?: never;
@@ -22234,16 +22407,29 @@ export type paths = {
         };
         /**
          * Get Cashier Stats
-         * @description Получить агрегированную статистику платежей за период.
-         *
-         *     CSH-FE-036 (#3813 follow-up): контракт фиксирован — ОБЕ финансовые
-         *     величины. ``total_amount``/``cash_amount``/``card_amount`` — валовые
-         *     поступления (исходные суммы ``paid``/``completed`` без вычета возвратов;
-         *     значение существующих полей не меняется молча).
-         *     ``refunded_amount``/``net_*`` — поступления за вычетом возвратов.
-         *     ``pending_amount`` с CSH-FE-028 (#3814) считается за вычетом возвратов.
+         * @description Keep legacy UZS totals only when the full snapshot proves them.
          */
         get: operations["get_cashier_stats_api_v1_cashier_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cashier/stats/by-currency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cashier Stats By Currency
+         * @description Return separate buckets; null amounts require explicit reconciliation.
+         */
+        get: operations["get_cashier_stats_by_currency_api_v1_cashier_stats_by_currency_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -22264,6 +22450,26 @@ export type paths = {
          * @description Получить почасовую статистику платежей за день.
          */
         get: operations["get_hourly_stats_api_v1_cashier_stats_hourly_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cashier/stats/hourly/by-currency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Hourly Stats By Currency
+         * @description Return only observed hours; unknown currency is explicitly null.
+         */
+        get: operations["get_hourly_stats_by_currency_api_v1_cashier_stats_hourly_by_currency_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -22452,7 +22658,7 @@ export type paths = {
         put?: never;
         /**
          * Refund Payment
-         * @description Частичный или полный возврат средств по платежу.
+         * @description Частичный или полный возврат кассового платежа с постоянным ключом операции.
          */
         post: operations["refund_payment_api_v1_cashier_payments__payment_id__refund_post"];
         delete?: never;
@@ -22997,6 +23203,8 @@ export type paths = {
          *     - payment_type
          *     - discount_mode
          *     - notes
+         *
+         *     All Free и льготы оформляются отдельной заявкой на согласование.
          *
          *     Атомарность: если хотя бы одна операция не удалась,
          *     все изменения откатываются.
@@ -24727,9 +24935,15 @@ export type components = {
             /** Patient Id */
             patient_id: number;
             /** Amount */
-            amount: number;
+            amount: number | string;
             /** Description */
             description?: string | null;
+            /**
+             * Client Request Id
+             * Format: uuid
+             * @description Один идентификатор команды для всех её повторов
+             */
+            client_request_id: string;
         };
         /** AddUserToGroupRequest */
         AddUserToGroupRequest: {
@@ -25590,6 +25804,13 @@ export type components = {
             /** Payment Processed At */
             payment_processed_at?: string | null;
         };
+        /** ApproveRegistrarBenefitRequest */
+        ApproveRegistrarBenefitRequest: {
+            /** Invoice Id */
+            invoice_id: number;
+            /** Patient Benefit Id */
+            patient_benefit_id: number;
+        };
         /** AssignRoleRequest */
         AssignRoleRequest: {
             /** Role Id */
@@ -26030,6 +26251,32 @@ export type components = {
          * @enum {string}
          */
         BenefitType: "veteran" | "disabled" | "pensioner" | "student" | "child" | "large_family" | "low_income" | "employee";
+        /** BillingPaymentListItem */
+        BillingPaymentListItem: {
+            /** Id */
+            id: number;
+            /** Visit Id */
+            visit_id: number;
+            /** Amount */
+            amount: number;
+            /** Currency */
+            currency: string;
+            /** Method */
+            method: string;
+            /** Status */
+            status: string;
+            /** Receipt No */
+            receipt_no?: string | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Paid At */
+            paid_at: string | null;
+        };
         /** BillingSettingsUpdate */
         BillingSettingsUpdate: {
             /** Invoice Number Prefix */
@@ -26066,6 +26313,35 @@ export type components = {
             company_email?: string | null;
             /** Company Website */
             company_website?: string | null;
+        };
+        /** BirthDateAttestation */
+        BirthDateAttestation: {
+            /** Confirmed Exact Date */
+            confirmed_exact_date: boolean;
+            /** Expected Generation */
+            expected_generation: number;
+            /** Review Expires At */
+            review_expires_at: number;
+            /** Token */
+            token: string;
+        };
+        /** BirthDateReviewResponse */
+        BirthDateReviewResponse: {
+            /** Patient Id */
+            patient_id: number;
+            /**
+             * Birth Date
+             * Format: date
+             */
+            birth_date: string;
+            /** Precision */
+            precision: string;
+            /** Generation */
+            generation: number;
+            /** Review Expires At */
+            review_expires_at: number;
+            /** Token */
+            token: string;
         };
         /** Body_admin_upload_public_site_media */
         Body_admin_upload_public_site_media: {
@@ -26986,6 +27262,8 @@ export type components = {
             items: components["schemas"]["CartQuoteItemResponse"][];
             /** Total Amount */
             total_amount: string;
+            /** Currency */
+            currency: string | null;
             /** Approval Status */
             approval_status: string;
             /**
@@ -27601,6 +27879,38 @@ export type components = {
              */
             client_request_id?: string | null;
         };
+        /** DailyCurrencyStatItem */
+        DailyCurrencyStatItem: {
+            /**
+             * Currency
+             * @description Код валюты; null означает неизвестную валюту
+             */
+            currency: string | null;
+            /** Requires Reconciliation */
+            requires_reconciliation: boolean;
+            /** Total Amount */
+            total_amount: string | null;
+            /** Cash Amount */
+            cash_amount: string | null;
+            /** Card Amount */
+            card_amount: string | null;
+            /** Refunded Amount */
+            refunded_amount: string | null;
+            /** Net Total Amount */
+            net_total_amount: string | null;
+            /** Net Cash Amount */
+            net_cash_amount: string | null;
+            /** Net Card Amount */
+            net_card_amount: string | null;
+            /** Pending Amount */
+            pending_amount: string | null;
+            /** Paid Count */
+            paid_count: number | null;
+            /** Cancelled Count */
+            cancelled_count: number | null;
+            /** Pending Count */
+            pending_count: number | null;
+        };
         /** DataTransferRequest */
         DataTransferRequest: {
             /**
@@ -27791,6 +28101,8 @@ export type components = {
             visit_id: number;
             /** Service Id */
             service_id: number;
+            /** Target Visit Service Id */
+            target_visit_service_id?: number | null;
             /** New Price */
             new_price: number | string;
             /** Reason */
@@ -30215,6 +30527,19 @@ export type components = {
         EmrVersionDataRequest: {
             [key: string]: unknown;
         };
+        /** EncounterBenefitDecision */
+        EncounterBenefitDecision: {
+            /** Application Id */
+            application_id: number;
+            /** Invoice Id */
+            invoice_id: number;
+            /** Gross Total */
+            gross_total: string;
+            /** Benefit Total */
+            benefit_total: string;
+            /** Total Amount */
+            total_amount: string;
+        };
         /**
          * EntryAction
          * @description Действие над одной записью в batch-операции
@@ -31350,6 +31675,8 @@ export type components = {
             patient_id: number;
             /** Amount */
             amount: string;
+            /** Currency */
+            currency?: string | null;
             /** Method */
             method: string;
             /** Status */
@@ -31368,6 +31695,28 @@ export type components = {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HourlyCurrencyStatItem */
+        HourlyCurrencyStatItem: {
+            /** Hour */
+            hour: number;
+            /**
+             * Currency
+             * @description Код валюты платежа; null означает неизвестную валюту
+             */
+            currency: string | null;
+            /**
+             * Count
+             * @description Количество; null при неполной разбивке
+             */
+            count: number | null;
+            /**
+             * Amount
+             * @description Точная сумма; null для неизвестной валюты
+             */
+            amount: string | null;
+            /** Requires Reconciliation */
+            requires_reconciliation: boolean;
         };
         /** HourlyStatItem */
         HourlyStatItem: {
@@ -31492,6 +31841,74 @@ export type components = {
              * @default general
              */
             specialty: string;
+        };
+        /** InvitationReissueRequest */
+        InvitationReissueRequest: {
+            /** Expected Patient Id */
+            expected_patient_id: number;
+            /** Expected Owner Generation */
+            expected_owner_generation: number;
+            /** Expected Context Epoch */
+            expected_context_epoch: number;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "auto" | "telegram" | "pwa" | "phone";
+            /** Token */
+            token: string;
+        };
+        /** InvitationReissueResponse */
+        InvitationReissueResponse: {
+            /** Delivery Id */
+            delivery_id: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "pending" | "unknown" | "sent" | "cancelled";
+            /** Idempotent Replay */
+            idempotent_replay: boolean;
+        };
+        /** InvitationReissueReview */
+        InvitationReissueReview: {
+            /** Visit Id */
+            visit_id: number;
+            /** Patient Id */
+            patient_id: number;
+            /** Patient Name */
+            patient_name: string;
+            /** Visit Date */
+            visit_date: string;
+            /** Visit Time */
+            visit_time: string | null;
+            /** Owner Generation */
+            owner_generation: number;
+            /** Context Epoch */
+            context_epoch: number;
+            /** Channel */
+            channel: string;
+            /** Services */
+            services: components["schemas"]["InvitationReissueServiceItem"][];
+            /** Total Amount */
+            total_amount: number;
+            /** Currency */
+            currency: string | null;
+            /** Token */
+            token: string;
+        };
+        /** InvitationReissueServiceItem */
+        InvitationReissueServiceItem: {
+            /** Name */
+            name: string;
+            /** Code */
+            code: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Price */
+            price: number;
+            /** Total */
+            total: number;
         };
         /** InvoiceCreate */
         InvoiceCreate: {
@@ -35671,8 +36088,13 @@ export type components = {
             /** Invoice Id */
             invoice_id: number;
             /** Amount */
-            amount: number;
+            amount: number | string;
             payment_method: components["schemas"]["PaymentMethod"];
+            /**
+             * Client Request Id
+             * Format: uuid
+             */
+            client_request_id: string;
             /** Reference Number */
             reference_number?: string | null;
             /** Description */
@@ -35755,6 +36177,8 @@ export type components = {
             visit_id?: number | null;
             /** Amount */
             amount: string;
+            /** Currency */
+            currency?: string | null;
             /** Method */
             method: string;
             /** Status */
@@ -36602,6 +37026,8 @@ export type components = {
             visit_id: number;
             /** Service Id */
             service_id: number;
+            /** Target Visit Service Id */
+            target_visit_service_id?: number | null;
             /** New Price */
             new_price: number | string;
             /** Reason */
@@ -39407,6 +39833,12 @@ export type components = {
              * @description Причина возврата
              */
             reason: string;
+            /**
+             * Client Request Id
+             * Format: uuid
+             * @description Постоянный ключ одной операции возврата
+             */
+            client_request_id: string;
         };
         /**
          * RefundRequestResponse
@@ -39473,6 +39905,8 @@ export type components = {
             id: number;
             /** Original Amount */
             original_amount: string;
+            /** Currency */
+            currency?: string | null;
             /** Refunded Amount */
             refunded_amount: string;
             /** Remaining Amount */
@@ -39789,6 +40223,54 @@ export type components = {
          */
         ReorderQueueProfilesRequest: {
             [key: string]: unknown;
+        };
+        /** RepeatConsultationAttestation */
+        RepeatConsultationAttestation: {
+            /** Doctor User Id */
+            doctor_user_id: number;
+            /** Reviewed Record */
+            reviewed_record: boolean;
+            /** Expected Generation */
+            expected_generation: number;
+            /** Review Expires At */
+            review_expires_at: number;
+            /** Token */
+            token: string;
+        };
+        /** RepeatConsultationAttestationResponse */
+        RepeatConsultationAttestationResponse: {
+            /** Success */
+            success: boolean;
+            /** Visit Id */
+            visit_id: number;
+        };
+        /** RepeatConsultationReviewRequest */
+        RepeatConsultationReviewRequest: {
+            /** Doctor User Id */
+            doctor_user_id: number;
+        };
+        /** RepeatConsultationReviewResponse */
+        RepeatConsultationReviewResponse: {
+            /** Visit Id */
+            visit_id: number;
+            /** Patient Id */
+            patient_id: number;
+            /** Doctor Id */
+            doctor_id: number | null;
+            /** Current Doctor User Id */
+            current_doctor_user_id: number | null;
+            /** Doctor User Id */
+            doctor_user_id: number;
+            /** Visit Date */
+            visit_date: string | null;
+            /** Status */
+            status: string;
+            /** Evidence Generation */
+            evidence_generation: number;
+            /** Review Expires At */
+            review_expires_at: number;
+            /** Token */
+            token: string;
         };
         /** RepeatEligibilityCandidate */
         RepeatEligibilityCandidate: {
@@ -40165,10 +40647,14 @@ export type components = {
             };
             /**
              * Idempotent Replay
-             * @description True, когда идентичный intent уже был зафиксирован в окне дедупликации и ответ перестроен из СОХРАНЁННОГО визита (второй визит/токен не создавались).
+             * @description True при авторизованном повторе ранее сохранённого намерения.
              * @default false
              */
             idempotent_replay: boolean;
+            /** Price Override Requests */
+            price_override_requests?: {
+                [key: string]: unknown;
+            }[];
         };
         /** ScheduleNextVisitService */
         ScheduleNextVisitService: {
@@ -40180,7 +40666,7 @@ export type components = {
              */
             quantity: number;
             /** Custom Price */
-            custom_price?: number | null;
+            custom_price?: number | string | null;
         };
         /** ScheduleOut */
         ScheduleOut: {
@@ -42434,11 +42920,17 @@ export type components = {
             /** Patient Id */
             patient_id: number;
             /** Amount */
-            amount: number;
-            /** Visit Id */
-            visit_id?: number | null;
+            amount: number | string;
             /** Description */
             description?: string | null;
+            /**
+             * Client Request Id
+             * Format: uuid
+             * @description Один идентификатор команды для всех её повторов
+             */
+            client_request_id: string;
+            /** Visit Id */
+            visit_id?: number | null;
         };
         /**
          * UserActivityResponse
@@ -43401,7 +43893,7 @@ export type components = {
             /** Total Amount */
             total_amount: number;
             /** Currency */
-            currency: string;
+            currency: string | null;
             /** Confirmation Expires At */
             confirmation_expires_at: string | null;
         };
@@ -43417,6 +43909,38 @@ export type components = {
             price: number;
             /** Total */
             total: number;
+        };
+        /** VisitInvitationRecoveryResponse */
+        VisitInvitationRecoveryResponse: {
+            /** Visit Id */
+            visit_id: number;
+        };
+        /** VisitInvitationStatusResponse */
+        VisitInvitationStatusResponse: {
+            /** Visit Id */
+            visit_id: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "none" | "pending" | "unknown" | "sent" | "cancelled" | "reissue_required";
+            /** Channel */
+            channel: ("telegram" | "pwa" | "phone") | null;
+            /** Confirmation Expired */
+            confirmation_expired: boolean;
+        };
+        /** VisitInvitationTaskResponse */
+        VisitInvitationTaskResponse: {
+            /** Visit Id */
+            visit_id: number;
+            /** Patient Name */
+            patient_name: string;
+            /** Patient Phone */
+            patient_phone: string | null;
+            /** Visit Date */
+            visit_date: string;
+            /** Visit Time */
+            visit_time: string | null;
         };
         /** VisitOut */
         VisitOut: {
@@ -44338,6 +44862,8 @@ export type components = {
             patient_id?: number | null;
             /** Amount */
             amount: string;
+            /** Currency */
+            currency?: string | null;
             /** Method */
             method: string;
             /** Status */
@@ -46412,6 +46938,74 @@ export interface operations {
             };
         };
     };
+    review_birth_date_api_v1_patients__patient_id__birth_date_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BirthDateReviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attest_birth_date_api_v1_patients__patient_id__birth_date_attest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BirthDateAttestation"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_visits_api_v1_visits_visits_get: {
         parameters: {
             query?: {
@@ -46605,6 +47199,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VisitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_repeat_consultation_api_v1_visits__visit_id__repeat_evidence_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepeatConsultationReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepeatConsultationReviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attest_repeat_consultation_api_v1_visits__visit_id__repeat_evidence_attest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepeatConsultationAttestation"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepeatConsultationAttestationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -49020,6 +49684,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VisitInfoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_invitation_reissue_api_v1_visits__visit_id__confirmation_reissue_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationReissueReview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reissue_invitation_api_v1_visits__visit_id__confirmation_reissue_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitationReissueRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationReissueResponse"];
                 };
             };
             /** @description Validation Error */
@@ -52495,6 +53227,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CancelServiceResponse"];
+                };
+            };
+            /** @description Талон связан с визитом или сумма услуг требует сверки */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -58387,6 +59130,17 @@ export interface operations {
                     "application/json": components["schemas"]["CartQuoteResponse"];
                 };
             };
+            /** @description Условия расчёта требуют проверки или согласования */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58418,6 +59172,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EditDeltaResponse"];
+                };
+            };
+            /** @description Условия расчёта требуют проверки или согласования */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -59486,7 +60251,7 @@ export interface operations {
             query: {
                 service_id: number;
                 quantity?: number;
-                custom_price?: number | null;
+                custom_price?: number | string | null;
             };
             header?: never;
             path: {
@@ -81599,6 +82364,99 @@ export interface operations {
             };
         };
     };
+    read_visit_invitation_status_api_v1_notifications_visit_invitation_status__visit_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitInvitationStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_visit_invitation_task_api_v1_notifications_visit_invitation_tasks__handle__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                handle: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitInvitationTaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_visit_invitation_recovery_api_v1_notifications_visit_invitation_recoveries__handle__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                handle: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitInvitationRecoveryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     send_appointment_reminder_api_v1_notifications_send_appointment_reminder_post: {
         parameters: {
             query: {
@@ -81606,6 +82464,7 @@ export interface operations {
                 appointment_date: string;
                 doctor_name: string;
                 department: string;
+                visit_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -81675,6 +82534,7 @@ export interface operations {
                 visit_id: number;
                 amount: number;
                 currency: string;
+                payment_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -86823,9 +87683,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["BillingPaymentListItem"][];
                 };
             };
             /** @description Validation Error */
@@ -86860,6 +87718,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["app__api__v1__endpoints__billing__PaymentResponse"];
                 };
+            };
+            /** @description Payment conflict or reconciliation required */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -87455,6 +88320,67 @@ export interface operations {
             };
         };
     };
+    apply_registrar_encounter_benefit_api_v1_discount_benefits_benefits_encounter_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveRegistrarBenefitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncounterBenefitDecision"];
+                };
+            };
+            /** @description Для решения нужна действующая сессия сотрудника */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Решение доступно администратору */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Счёт, обращение или право на льготу требует сверки */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Подтверждение льготы временно недоступно */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_loyalty_programs_api_v1_discount_benefits_loyalty_programs_get: {
         parameters: {
             query?: {
@@ -87831,6 +88757,40 @@ export interface operations {
             };
         };
     };
+    get_cashier_stats_by_currency_api_v1_cashier_stats_by_currency_get: {
+        parameters: {
+            query?: {
+                /** @description Дата начала */
+                date_from?: string | null;
+                /** @description Дата окончания */
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyCurrencyStatItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_hourly_stats_api_v1_cashier_stats_hourly_get: {
         parameters: {
             query?: {
@@ -87850,6 +88810,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HourlyStatItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_hourly_stats_by_currency_api_v1_cashier_stats_hourly_by_currency_get: {
+        parameters: {
+            query?: {
+                /** @description Дата статистики */
+                target_date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HourlyCurrencyStatItem"][];
                 };
             };
             /** @description Validation Error */
@@ -88586,6 +89578,13 @@ export interface operations {
                     "application/json": components["schemas"]["DepositResponse"];
                 };
             };
+            /** @description Конфликт команды пополнения */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -88618,6 +89617,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DepositResponse"];
                 };
+            };
+            /** @description Конфликт команды или решение по визиту ещё не принято */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -88997,6 +90003,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StructuredErrorResponse"];
+                };
+            };
+            /** @description Запись занята или для режима скидки требуется согласование */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */

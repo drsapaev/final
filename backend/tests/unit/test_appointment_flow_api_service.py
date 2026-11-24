@@ -19,8 +19,14 @@ class TestAppointmentFlowApiService:
         emr_data = SimpleNamespace(appointment_id=0)
 
         class Repository:
-            def get_visit(self, visit_id):
+            def get_locked_visit(self, visit_id):
                 return visit
+
+            def lock_visit_encounter(self, visit_obj):
+                return True
+
+            def get_source_appointments(self, visit_id):
+                return []
 
             def get_existing_appointment_for_visit(self, visit_obj):
                 return existing_appointment
@@ -40,7 +46,7 @@ class TestAppointmentFlowApiService:
 
     def test_resolve_appointment_from_visit_raises_when_visit_missing(self):
         class Repository:
-            def get_visit(self, visit_id):
+            def get_locked_visit(self, visit_id):
                 return None
 
         service = AppointmentFlowApiService(db=None, repository=Repository())

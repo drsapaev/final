@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     CheckConstraint,
     Date,
@@ -111,6 +112,10 @@ class Doctor(Base):
         nullable=True,
         unique=True,
     )  # ✅ SECURITY: SET NULL to preserve doctor record
+    price_owner_generation: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="1")
+    repeat_owner_generation: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, server_default="0"
+    )
     # ✅ INVARIANT (1 doctor = 1 User): doctors.user_id is UNIQUE.
     # Multiple NULLs are allowed by SQL semantics (userless doctor rows are
     # still possible for historical data), but one User can never be linked

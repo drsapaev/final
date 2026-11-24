@@ -9,7 +9,10 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
+from app.models.audit import AuditLog
 from app.models.payment import Payment
 from app.models.payment_webhook import PaymentTransaction
 from app.services.payment_cancel_service import (
@@ -66,7 +69,7 @@ class TestPaymentCancelTransactionAtomicity:
         return payment, tx
 
     def test_cancel_updates_payment_and_transaction_atomically(
-        self, db_session, test_visit
+        self, db_session, test_visit, admin_user,
     ):
         """Both Payment.status and PaymentTransaction.status are 'cancelled'
         after cancel."""
@@ -77,13 +80,37 @@ class TestPaymentCancelTransactionAtomicity:
         service = PaymentCancelService(
             db_session, _FakePaymentManager(PaymentResult(success=True))
         )
-        result = service.cancel_payment(payment_id=payment.id)
+        result = service.cancel_payment(payment_id=payment.id, actor=admin_user)
 
         db_session.refresh(payment)
         db_session.refresh(tx)
         assert result["success"] is True
         assert payment.status == "cancelled"
         assert tx.status == "cancelled"
+        event = db_session.scalars(select(AuditLog).filter_by(
+            event_type="PAYMENT_CANCELLED", entity_id=payment.id,
+        )).one()
+        assert (event.actor_user_id, event.actor_role, event.outcome) == (
+            admin_user.id, admin_user.role, "success",
+        )
+        assert event.payload == {"previous_status": "processing", "new_status": "cancelled"}
+
+    def test_cancel_audit_failure_rolls_back_before_provider_call(self, db_session, test_visit):
+        payment, tx = self._create_payment_with_transaction(db_session, test_visit)
+        provider = MagicMock()
+        service = PaymentCancelService(db_session, provider)
+
+        with patch.object(
+            service.repository, "record_cancellation", side_effect=SQLAlchemyError,
+        ):
+            with pytest.raises(PaymentCancelDomainError) as exc_info:
+                service.cancel_payment(payment_id=payment.id)
+
+        provider.cancel_payment.assert_not_called()
+        assert exc_info.value.status_code == 503
+        db_session.refresh(payment)
+        db_session.refresh(tx)
+        assert (payment.status, tx.status) == ("processing", "processing")
 
     def test_provider_cancel_runs_after_local_rows_are_locked(
         self, db_session, test_visit
@@ -228,6 +255,9 @@ class TestPaymentCancelTransactionAtomicity:
         with pytest.raises(PaymentCancelDomainError) as exc_info:
             service.cancel_payment(payment_id=payment.id)
         assert exc_info.value.status_code == 400
+        assert len(db_session.scalars(select(AuditLog.id).filter_by(
+            event_type="PAYMENT_CANCELLED", entity_id=payment.id,
+        )).all()) == 1
 
     def test_cancel_online_payment_with_completed_transaction(
         self, db_session, test_visit

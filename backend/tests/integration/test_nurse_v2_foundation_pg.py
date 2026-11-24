@@ -27,7 +27,7 @@ by ``alembic upgrade`` (SQLite is never a substitute):
    attempt_no) is rejected; the performer FK enforces real users;
    statuses outside the D1 vocabulary and non-positive attempt numbers
    are rejected by the CHECK constraints (review P2-2).
-4. Downgrade reverses cleanly (head -> 0070 -> head).
+4. The Nurse migration range reverses cleanly (0073 -> 0070 -> 0073).
 5. Review P2 round 2 (PR #3333) — TOCTOU serialization on TWO real
    connections: ``create_assignment`` (the REAL service, on its own
    connection) versus a Nurse lifecycle writer that reproduces
@@ -49,6 +49,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from psycopg import sql
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
@@ -56,6 +57,8 @@ from sqlalchemy.exc import IntegrityError
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 sys.path.insert(0, str(BACKEND_DIR))
+
+from tests._pg_admin_guard import is_local_admin_dsn  # noqa: E402
 
 
 def _candidate_admin_urls() -> list[str]:
@@ -87,53 +90,53 @@ def _run_alembic(sa_url: str, *args: str) -> subprocess.CompletedProcess:
     )
 
 
-def _admin_url() -> str | None:
-    last_error: Exception | None = None
+def _admin_url() -> str:
     for candidate in _candidate_admin_urls():
         try:
+            if not is_local_admin_dsn(candidate):
+                continue
             with psycopg.connect(candidate, connect_timeout=5, autocommit=True) as c:
                 c.execute("SELECT 1")
             return candidate
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
-    pytest.skip(
-        f"disposable PostgreSQL unavailable — NURSE-V2 N2-2 migration "
-        f"acceptance NOT_RUN (last error: {last_error})"
-    )
-    return None
-
-
-def _provision(db_name: str, target: str) -> str:
-    admin_url = _admin_url()
-    u = make_url(admin_url)
-    with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{db_name}"')
-        c.execute(f'CREATE DATABASE "{db_name}"')
-    sa_url = (
-        f"postgresql+psycopg://{u.username}:{u.password}"
-        f"@{u.host}:{u.port}/{db_name}"
-    )
-    r = _run_alembic(sa_url, "upgrade", target)
-    assert r.returncode == 0, r.stderr[-1500:]
-    return sa_url
-
-
-def _drop(db_name: str) -> None:
-    for candidate in _candidate_admin_urls():
-        try:
-            with psycopg.connect(candidate, autocommit=True) as c:
-                c.execute(f'DROP DATABASE IF EXISTS "{db_name}" WITH (FORCE)')
-            return
         except Exception:  # noqa: BLE001
             continue
+    pytest.skip(
+        "disposable loopback PostgreSQL unavailable for NURSE-V2 migration acceptance"
+    )
+
+
+def _provision(db_name: str, target: str) -> tuple[str, str]:
+    admin_url = _admin_url()
+    scratch = make_url(admin_url).set(database=db_name)
+    with psycopg.connect(admin_url, autocommit=True) as conn:
+        conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(db_name)))
+    try:
+        with psycopg.connect(scratch.render_as_string(hide_password=False), autocommit=True) as conn:
+            # The finance triggers use the schema owner. The default
+            # pg_database_owner alias does not own the migrated tables.
+            conn.execute("ALTER SCHEMA public OWNER TO CURRENT_USER")
+        sa_url = scratch.set(drivername="postgresql+psycopg").render_as_string(hide_password=False)
+        result = _run_alembic(sa_url, "upgrade", target)
+        assert result.returncode == 0, result.stderr[-1500:]
+        return sa_url, admin_url
+    except Exception:
+        _drop(db_name, admin_url)
+        raise
+
+
+def _drop(db_name: str, admin_url: str) -> None:
+    with psycopg.connect(admin_url, autocommit=True) as conn:
+        conn.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(db_name)))
 
 
 @pytest.fixture(scope="module")
 def head_url():
     db_name = f"n2v2_fresh_{uuid.uuid4().hex[:8]}"
-    sa_url = _provision(db_name, "head")
-    yield sa_url
-    _drop(db_name)
+    sa_url, admin_url = _provision(db_name, "head")
+    try:
+        yield sa_url
+    finally:
+        _drop(db_name, admin_url)
 
 
 def _insert_user(conn, username: str, role: str = "Nurse") -> int:
@@ -545,12 +548,13 @@ def test_d1_execution_invariants(head_url):
 
 @pytest.mark.integration
 def test_0073_routing_snapshot_downgrade_reverses_in_isolation():
-    """head -> 0072: the three snapshot columns drop cleanly (the table
-    and every 0072 invariant stay); head again: the columns return.
+    """0073 -> 0072: the three snapshot columns drop cleanly (the table
+    and every 0072 invariant stay); 0073 again: the columns return.
     The corrective follow-up's own downgrade surface, pinned on real
     PostgreSQL."""
     db_name = f"n2v2_rt_{uuid.uuid4().hex[:8]}"
-    sa_url = _provision(db_name, "head")
+    target = "0073_execution_routing_snapshot"
+    sa_url, admin_url = _provision(db_name, target)
     try:
         r = _run_alembic(sa_url, "downgrade", "0072_service_executions")
         assert r.returncode == 0, r.stderr[-1500:]
@@ -573,7 +577,7 @@ def test_0073_routing_snapshot_downgrade_reverses_in_isolation():
                 assert "visit_service_id" in columns  # 0072 shape intact
         finally:
             engine.dispose()
-        r = _run_alembic(sa_url, "upgrade", "head")
+        r = _run_alembic(sa_url, "upgrade", target)
         assert r.returncode == 0, r.stderr[-1500:]
         engine = create_engine(sa_url, future=True)
         try:
@@ -596,15 +600,16 @@ def test_0073_routing_snapshot_downgrade_reverses_in_isolation():
         finally:
             engine.dispose()
     finally:
-        _drop(db_name)
+        _drop(db_name, admin_url)
 
 
 @pytest.mark.integration
 def test_downgrade_reverses_cleanly():
     db_name = f"n2v2_down_{uuid.uuid4().hex[:8]}"
-    sa_url = _provision(db_name, "head")
+    target = "0073_execution_routing_snapshot"
+    sa_url, admin_url = _provision(db_name, target)
     try:
-        # head -> 0070: both tables gone
+        # 0073 -> 0070: both tables gone
         r = _run_alembic(sa_url, "downgrade", "0070_lab_results_lineage")
         assert r.returncode == 0, r.stderr[-1500:]
         engine = create_engine(sa_url, future=True)
@@ -623,8 +628,7 @@ def test_downgrade_reverses_cleanly():
                 assert "service_executions" not in tables
         finally:
             engine.dispose()
-        # and back to head — clean re-upgrade
-        r = _run_alembic(sa_url, "upgrade", "head")
+        r = _run_alembic(sa_url, "upgrade", target)
         assert r.returncode == 0, r.stderr[-1500:]
         engine = create_engine(sa_url, future=True)
         try:
@@ -643,7 +647,7 @@ def test_downgrade_reverses_cleanly():
         finally:
             engine.dispose()
     finally:
-        _drop(db_name)
+        _drop(db_name, admin_url)
 
 
 # ---------------- review P2 round 2 (PR #3333): TOCTOU serialization ----------------
