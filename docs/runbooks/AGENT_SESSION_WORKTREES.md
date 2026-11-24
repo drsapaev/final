@@ -229,6 +229,7 @@ Always through the guard script (refuses to deploy anything but merged
 ```powershell
 C:\final\scripts\deploy_restart.ps1 -CheckOnly   # guards only, no restart
 C:\final\scripts\deploy_restart.ps1 -Deploy      # authorized sync, migrations, restart
+C:\final\scripts\deploy_restart.ps1 -Deploy -ExpectedRevision $reviewedSha
 ```
 
 The script verifies branch == `main` and a clean tracked/untracked tree.
@@ -238,7 +239,22 @@ it is not a restart-only invocation. `-CheckOnly` fetches remote refs and checks
 the branch, cleanliness and synchronization without updating checkout files or
 restarting. The production mutex covers the sequence. It stops the uvicorn process tree
 on :18000, starts a detached uvicorn from `backend\.venv` with a hidden window,
-then polls `/api/v1/health` until OK (90s budget).
+then polls `/api/v1/health` (90s budget).
+
+Set `$reviewedSha` to the full commit tested in release staging. With
+`-ExpectedRevision`, a different fetched main stops the deploy before
+fast-forward, stopping the listener, or running migrations. An authorized
+`-Deploy` succeeds after a new loopback listener reports `db: "ok"` and the
+selected Git SHA in `revision`.
+
+The common Uvicorn launcher records the revision when Git can verify a clean
+`main` checkout. The health response omits `revision` when the launcher
+cannot establish it. `-RestartRuntime` uses the existing liveness signal.
+Use the authorized idle synchronization procedure above to install the updated
+guard before the first invocation with `-ExpectedRevision`. A deploy script
+loaded before a fast-forward continues with its original checks for that
+invocation. After rollout, independently read `/api/v1/health` over loopback
+and at the API's public origin and compare both revisions with the selected SHA.
 
 Deploy window: after clinic hours (~18:00+) unless the operator says
 otherwise. A restart drops active sessions — doctors/cashiers get kicked

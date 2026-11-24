@@ -11,15 +11,24 @@ import {
   createPublicSiteApi,
   PublicSiteApiError,
   type PublicSiteApi,
+  type PublicSiteClinic,
   type PublicSiteDoctor,
   type PublicSiteFetch,
   type PublicSiteService,
 } from './publicSiteApi';
 import { loadPublicSitePageData, type PublicSitePageData } from './publicSiteData';
-import { getPublicSiteBreadcrumbs, getPublicSiteSkipLinkLabel, PublicSitePage } from './publicSitePage';
+import { getPublicSiteAnalyticsEndpoint } from './publicSiteAnalytics';
+import { getPublicSitePageMetadata, PUBLIC_SITE_ERROR_TITLES } from './publicSiteMetadata';
+import {
+  getPublicClinicContacts,
+  getPublicSiteBreadcrumbs,
+  PublicSitePage,
+  PublicSiteRequestState,
+} from './publicSitePage';
 
 export interface PublicSiteRuntimeConfig {
   apiOrigin?: string;
+  publicSiteAnalyticsEnabled?: boolean | string;
   siteOrigin?: string;
   deploymentEnvironment?: string;
 }
@@ -30,45 +39,6 @@ export interface PublicSiteAssets {
   appStyles: string[];
   pageStyleText?: string;
 }
-
-interface PageMeta {
-  title: string;
-  description: string;
-}
-
-const BRAND = 'Doktor KosMed Clinic';
-
-const META_COPY: Record<PublicSiteLocale, Record<PublicSitePageKind, PageMeta>> = {
-  ru: {
-    home: { title: `${BRAND} — услуги и врачи`, description: 'Информация об опубликованных услугах, врачах и контактах клиники.' },
-    services: { title: `Услуги — ${BRAND}`, description: 'Опубликованные услуги клиники и информация о них.' },
-    service: { title: `Услуга — ${BRAND}`, description: 'Описание опубликованной услуги клиники.' },
-    doctors: { title: `Врачи — ${BRAND}`, description: 'Профили врачей, опубликованные клиникой.' },
-    doctor: { title: `Врач — ${BRAND}`, description: 'Информация о профиле врача клиники.' },
-    prices: { title: `Цены — ${BRAND}`, description: 'Опубликованные цены на услуги клиники.' },
-    contacts: { title: `Контакты — ${BRAND}`, description: 'Контактные данные клиники.' },
-  },
-  'uz-Latn': {
-    home: { title: `${BRAND} — xizmatlar va shifokorlar`, description: 'Klinikaning e’lon qilingan xizmatlari, shifokorlari va kontaktlari haqida ma’lumot.' },
-    services: { title: `Xizmatlar — ${BRAND}`, description: 'Klinikaning e’lon qilingan xizmatlari va ular haqida ma’lumot.' },
-    service: { title: `Xizmat — ${BRAND}`, description: 'Klinikaning e’lon qilingan xizmati tavsifi.' },
-    doctors: { title: `Shifokorlar — ${BRAND}`, description: 'Klinika tomonidan e’lon qilingan shifokor profillari.' },
-    doctor: { title: `Shifokor — ${BRAND}`, description: 'Klinika shifokorining profili haqida ma’lumot.' },
-    prices: { title: `Narxlar — ${BRAND}`, description: 'Klinika xizmatlari uchun e’lon qilingan narxlar.' },
-    contacts: { title: `Kontaktlar — ${BRAND}`, description: 'Klinikaning kontakt ma’lumotlari.' },
-  },
-};
-
-const ERROR_COPY: Record<PublicSiteLocale, { title: string; message: string }> = {
-  ru: {
-    title: `Страница временно недоступна — ${BRAND}`,
-    message: 'Не удалось загрузить актуальную информацию клиники. Попробуйте открыть страницу позже.',
-  },
-  'uz-Latn': {
-    title: `Sahifa vaqtincha ochilmayapti — ${BRAND}`,
-    message: 'Klinikaning dolzarb ma’lumotlarini yuklab bo‘lmadi. Sahifani keyinroq ochib ko‘ring.',
-  },
-};
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({
@@ -99,40 +69,83 @@ function canonicalOrigin(request: Request, configuredOrigin?: string): string | 
   return safeOrigin(new URL(request.url).origin, true);
 }
 
-function truncateDescription(value: string): string {
-  const compact = value.replace(/\s+/g, ' ').trim();
-  if (compact.length <= 160) return compact;
-  return `${compact.slice(0, 157).trimEnd()}…`;
-}
-
-function serializeJsonLd(value: unknown): string {
-  return JSON.stringify(value)
+function renderJsonLd(value: unknown): string {
+  const json = JSON.stringify(value)
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
     .replace(/&/g, '\\u0026')
     .replace(/\u2028/g, '\\u2028')
     .replace(/\u2029/g, '\\u2029');
+  return `<script type="application/ld+json">${json}</script>`;
 }
 
-function pageMeta(route: PublicSiteRouteMatch, data: PublicSitePageData): PageMeta {
-  const base = META_COPY[route.locale][route.kind];
-  if (route.kind === 'service' && data.service) {
-    return {
-      title: `${data.service.name} — ${BRAND}`,
-      description: truncateDescription(data.service.description),
-    };
-  }
-  if (route.kind === 'doctor' && data.doctor) {
-    return {
-      title: `${data.doctor.name} — ${BRAND}`,
-      description: truncateDescription(data.doctor.bio),
-    };
-  }
-  return base;
+function renderMedicalClinicJsonLd(clinic: PublicSiteClinic | undefined, origin: string): string {
+  const name = clinic?.name?.trim();
+  if (!clinic || !name) return '';
+
+  const { address, telHref, mailtoHref, hours } = getPublicClinicContacts(clinic);
+  if (!address && !telHref && !mailtoHref && !hours) return '';
+
+  const openingHoursSpecification = hours && {
+    '@type': 'OpeningHoursSpecification',
+    dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      .map((day) => `https://schema.org/${day}`),
+    opens: `${hours.start}:00`,
+    closes: `${hours.end}:00`,
+  };
+
+  return renderJsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'MedicalClinic',
+    '@id': `${origin}/#clinic`,
+    url: `${origin}/`,
+    name,
+    address,
+    telephone: telHref?.slice('tel:'.length),
+    email: mailtoHref ? clinic.email?.trim() : undefined,
+    openingHoursSpecification,
+  });
 }
 
 function pagePath(route: PublicSiteRouteMatch, locale: PublicSiteLocale): string {
   return getPublicSitePath(route.kind, locale, route.slug);
+}
+
+function renderDetailJsonLd(
+  route: PublicSiteRouteMatch,
+  data: PublicSitePageData,
+  origin: string,
+  canonical: string,
+): string {
+  if (route.kind === 'doctor' && data.doctor) {
+    const { name, bio } = data.doctor;
+    return renderJsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'ProfilePage',
+      url: canonical,
+      mainEntity: {
+        '@type': 'Person',
+        '@id': new URL(`${pagePath(route, 'uz-Latn')}#doctor`, origin).href,
+        name,
+        description: bio,
+      },
+    });
+  }
+
+  if (route.kind === 'service' && data.service) {
+    const { name, description, category } = data.service;
+    return renderJsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'Service',
+      '@id': new URL(`${pagePath(route, 'uz-Latn')}#service`, origin).href,
+      url: canonical,
+      name,
+      description,
+      category: category ?? undefined,
+    });
+  }
+
+  return '';
 }
 
 function renderPublicDocument(
@@ -141,14 +154,15 @@ function renderPublicDocument(
   origin: string,
   styles: string[],
   pageStyleText?: string,
+  analyticsEndpoint?: string,
 ): string {
-  const meta = pageMeta(route, data);
+  const meta = getPublicSitePageMetadata(route, data);
   const canonical = new URL(pagePath(route, route.locale), origin).href;
   const alternateUz = new URL(pagePath(route, 'uz-Latn'), origin).href;
   const alternateRu = new URL(pagePath(route, 'ru'), origin).href;
   const breadcrumbs = getPublicSiteBreadcrumbs(route, data);
   const breadcrumbJsonLd = breadcrumbs.length > 0
-    ? `<script type="application/ld+json">${serializeJsonLd({
+    ? renderJsonLd({
       '@context': 'https://schema.org',
       '@type': 'BreadcrumbList',
       itemListElement: breadcrumbs.map((item, index) => ({
@@ -157,9 +171,12 @@ function renderPublicDocument(
         name: item.name,
         item: new URL(item.path, origin).href,
       })),
-    })}</script>`
+    })
     : '';
-  const body = renderToString(<PublicSitePage route={route} data={data} />);
+  const entityJsonLd = route.kind === 'contacts'
+    ? renderMedicalClinicJsonLd(data.clinic, origin)
+    : renderDetailJsonLd(route, data, origin, canonical);
+  const body = renderToString(<PublicSitePage route={route} data={data} analyticsEndpoint={analyticsEndpoint} />);
   const css = renderPageStyles(styles, pageStyleText);
 
   return `<!doctype html><html lang="${escapeHtml(route.locale)}"><head>` +
@@ -174,7 +191,7 @@ function renderPublicDocument(
     `<meta property="og:description" content="${escapeHtml(meta.description)}">` +
     `<meta property="og:type" content="website"><meta property="og:url" content="${escapeHtml(canonical)}">` +
     `<meta property="og:locale" content="${route.locale === 'ru' ? 'ru_RU' : 'uz_UZ'}">` +
-    `<meta name="twitter:card" content="summary">${breadcrumbJsonLd}${css}</head>` +
+    `<meta name="twitter:card" content="summary">${breadcrumbJsonLd}${entityJsonLd}${css}</head>` +
     `<body><div id="public-site-root">${body}</div></body></html>`;
 }
 
@@ -321,24 +338,8 @@ export async function handlePublicSiteRequest(
     return new Response(request.method === 'HEAD' ? null : robots, { status: 200, headers });
   }
 
-  if (!origin) {
-    if (resolvePublicSiteRoute(url.pathname) || url.pathname === '/sitemap.xml') {
-      const body = url.pathname === '/sitemap.xml'
-        ? 'Sitemap is temporarily unavailable'
-        : renderErrorDocument(localeHint, assets.pageStyles, assets.pageStyleText);
-      const contentType = url.pathname === '/sitemap.xml'
-        ? 'application/xml; charset=utf-8'
-        : 'text/html; charset=utf-8';
-      return new Response(request.method === 'HEAD' ? null : body, {
-        status: 503,
-        headers: responseHeaders(contentType, true),
-      });
-    }
-    return htmlResponse(renderAppShell(assets), 200, localeHint, true, request.method);
-  }
-
   if (url.pathname === '/sitemap.xml') {
-    if (!config.apiOrigin) {
+    if (!origin || !config.apiOrigin) {
       return new Response(request.method === 'HEAD' ? null : 'Sitemap is temporarily unavailable', {
         status: 503,
         headers: responseHeaders('application/xml; charset=utf-8', true),
@@ -361,6 +362,7 @@ export async function handlePublicSiteRequest(
   if (!route) {
     return htmlResponse(renderAppShell(assets), 200, localeHint, true, request.method);
   }
+  if (!origin) return renderErrorResponse(route, assets, request.method);
 
   try {
     if (!config.apiOrigin) throw new PublicSiteApiError();
@@ -369,11 +371,15 @@ export async function handlePublicSiteRequest(
     const missingDetail = (route.kind === 'service' && !data.service) ||
       (route.kind === 'doctor' && !data.doctor);
     const status = missingDetail ? 404 : 200;
-    const html = renderPublicDocument(route, data, origin, assets.pageStyles, assets.pageStyleText);
+    const analyticsEnabled = config.publicSiteAnalyticsEnabled === true || config.publicSiteAnalyticsEnabled === 'true';
+    const analyticsEndpoint = analyticsEnabled && status === 200 && request.method === 'GET'
+      ? getPublicSiteAnalyticsEndpoint(config.apiOrigin)
+      : undefined;
+    const html = renderPublicDocument(route, data, origin, assets.pageStyles, assets.pageStyleText, analyticsEndpoint);
     return htmlResponse(html, status, route.locale, noIndex || status === 404, request.method);
   } catch {
     // Error details can contain upstream response data; keep the public response generic.
-    return htmlResponse(renderErrorDocument(route.locale, assets.pageStyles, assets.pageStyleText), 503, route.locale, true, request.method);
+    return renderErrorResponse(route, assets, request.method);
   }
 }
 
@@ -410,13 +416,15 @@ function renderPageStyles(styles: string[], pageStyleText?: string): string {
   return pageStyleText || styles.map((href) => `<link rel="stylesheet" href="${escapeHtml(href)}">`).join('');
 }
 
-function renderErrorDocument(locale: PublicSiteLocale, styles: string[], pageStyleText?: string): string {
-  const error = ERROR_COPY[locale];
-  const css = renderPageStyles(styles, pageStyleText);
-  return '<!doctype html><html lang="' + escapeHtml(locale) + '"><head>' +
+function renderErrorResponse(route: PublicSiteRouteMatch, assets: PublicSiteAssets, method: string): Response {
+  const { locale } = route;
+  const title = PUBLIC_SITE_ERROR_TITLES[locale];
+  const css = renderPageStyles(assets.pageStyles, assets.pageStyleText);
+  const body = renderToString(<PublicSiteRequestState route={route} status="error" />);
+  const html = `<!doctype html><html lang="${escapeHtml(locale)}"><head>` +
     '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
     '<meta name="robots" content="noindex,nofollow">' +
-    `<title>${escapeHtml(error.title)}</title>${css}</head>` +
-    `<body><div class="public-site"><a class="public-site__skip-link" href="#main-content">${escapeHtml(getPublicSiteSkipLinkLabel(locale))}</a>` +
-    `<main id="main-content" tabindex="-1" class="public-site__error"><h1>${escapeHtml(error.title)}</h1><p>${escapeHtml(error.message)}</p></main></div></body></html>`;
+    `<title>${escapeHtml(title)}</title>${css}</head>` +
+    `<body>${body}</body></html>`;
+  return htmlResponse(html, 503, locale, true, method);
 }

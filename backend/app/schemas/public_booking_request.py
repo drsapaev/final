@@ -84,6 +84,9 @@ class PublicBookingRequestOut(BaseModel):
     id: UUID
     service_slug: str
     doctor_slug: str
+    service_name_ru: str | None = None
+    service_name_uz: str | None = None
+    doctor_display_name: str | None = None
     appointment_date: date
     appointment_time: time
     appointment_id: int | None = None

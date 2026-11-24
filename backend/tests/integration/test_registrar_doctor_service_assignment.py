@@ -35,6 +35,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.crud.clinic import clinic_today
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
@@ -61,10 +62,10 @@ def _cart_payload(*, patient_id: int, visits: list[dict]) -> dict:
     }
 
 
-def _visit(*, doctor_id: int | None, services: list[dict]) -> dict:
+def _visit(db_session: Session, *, doctor_id: int | None, services: list[dict]) -> dict:
     return {
         "doctor_id": doctor_id,
-        "visit_date": date.today().isoformat(),
+        "visit_date": clinic_today(db_session).isoformat(),
         "department": "general",
         "services": services,
     }
@@ -135,7 +136,7 @@ def _doctor_queue_entries(
     queues = (
         db_session.query(DailyQueue)
         .filter(
-            DailyQueue.day == date.today(),
+            DailyQueue.day == clinic_today(db_session),
             DailyQueue.specialist_id == doctor_id,
             DailyQueue.active.is_(True),
         )
@@ -145,7 +146,7 @@ def _doctor_queue_entries(
         db_session.query(OnlineQueueEntry)
         .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
         .filter(
-            DailyQueue.day == date.today(),
+            DailyQueue.day == clinic_today(db_session),
             DailyQueue.specialist_id == doctor_id,
         )
         .all()
@@ -180,6 +181,7 @@ def test_pinned_service_rejects_other_same_specialty_doctor(
             patient_id=test_patient.id,
             visits=[
                 _visit(
+                    db_session,
                     doctor_id=other_cardiologist.id,
                     services=[{"service_id": service.id, "quantity": 1}],
                 )
@@ -218,6 +220,7 @@ def test_pinned_service_books_with_assigned_doctor(
             patient_id=test_patient.id,
             visits=[
                 _visit(
+                    db_session,
                     doctor_id=pinned_to.id,
                     services=[{"service_id": service.id, "quantity": 1}],
                 )
@@ -256,6 +259,7 @@ def test_pinned_service_specialty_still_enforced_for_own_doctor(
             patient_id=test_patient.id,
             visits=[
                 _visit(
+                    db_session,
                     doctor_id=dentist.id,
                     services=[{"service_id": service.id, "quantity": 1}],
                 )
@@ -333,6 +337,7 @@ def test_same_doctor_different_tags_share_one_queue_entry(
             patient_id=test_patient.id,
             visits=[
                 _visit(
+                    db_session,
                     doctor_id=dermatologist.id,
                     services=[
                         {"service_id": consult.id, "quantity": 1},
@@ -371,17 +376,17 @@ def test_get_or_create_daily_queue_converges_doctor_tag_spellings(
     doctor = _make_doctor(db_session, specialty="cardiology")
 
     first = queue_service.get_or_create_daily_queue(
-        db_session, day=date.today(), specialist_id=doctor.id, queue_tag="cardio"
+        db_session, day=clinic_today(db_session), specialist_id=doctor.id, queue_tag="cardio"
     )
     second = queue_service.get_or_create_daily_queue(
-        db_session, day=date.today(), specialist_id=doctor.id, queue_tag="cardiology"
+        db_session, day=clinic_today(db_session), specialist_id=doctor.id, queue_tag="cardiology"
     )
 
     assert first.id == second.id
     assert (
         db_session.query(DailyQueue)
         .filter(
-            DailyQueue.day == date.today(),
+            DailyQueue.day == clinic_today(db_session),
             DailyQueue.specialist_id == doctor.id,
         )
         .count()
@@ -416,7 +421,7 @@ def test_edit_delta_strict_lookup_finds_merged_entry_across_tags(
     visit = Visit(
         patient_id=test_patient.id,
         doctor_id=dermatologist.id,
-        visit_date=date.today(),
+        visit_date=clinic_today(db_session),
         status="confirmed",
     )
     db_session.add(visit)
@@ -445,7 +450,7 @@ def test_edit_delta_strict_lookup_finds_merged_entry_across_tags(
 
     wizard_seam = RegistrarWizardQueueAssignmentService(db_session)
     wizard_seam.assign_same_day_queue_numbers(
-        [visit], target_day=date.today(), source="test"
+        [visit], target_day=clinic_today(db_session), source="test"
     )
 
     queues, entries = _doctor_queue_entries(db_session, dermatologist.id)
@@ -455,7 +460,7 @@ def test_edit_delta_strict_lookup_finds_merged_entry_across_tags(
     found = service_obj._find_active_entry(
         patient_id=test_patient.id,
         queue_tag=procedure.queue_tag,
-        target_date=date.today(),
+        target_date=clinic_today(db_session),
         preferred_entry_ids={merged_entry.id},
         specialist_id=None,
         strict_entry_id=merged_entry.id,
@@ -494,7 +499,7 @@ def test_edit_delta_quote_rejects_pinned_service_for_other_doctor(
             "discount_mode": "none",
             "pricing_mode": "edit_delta",
             "patient_id": test_patient.id,
-            "target_date": date.today().isoformat(),
+            "target_date": clinic_today(db_session).isoformat(),
         },
     )
 
@@ -567,6 +572,7 @@ def test_unflagged_pinned_service_rejects_other_doctor_on_cart_save(
             patient_id=test_patient.id,
             visits=[
                 _visit(
+                    db_session,
                     doctor_id=other_cardiologist.id,
                     services=[{"service_id": service.id, "quantity": 1}],
                 )
@@ -603,6 +609,7 @@ def test_unflagged_pinned_service_rejects_doctorless_visit(
             patient_id=test_patient.id,
             visits=[
                 _visit(
+                    db_session,
                     doctor_id=None,
                     services=[{"service_id": service.id, "quantity": 1}],
                 )
@@ -637,6 +644,7 @@ def test_unflagged_pinned_service_books_with_assigned_doctor(
             patient_id=test_patient.id,
             visits=[
                 _visit(
+                    db_session,
                     doctor_id=pinned_to.id,
                     services=[{"service_id": service.id, "quantity": 1}],
                 )
@@ -784,6 +792,7 @@ def test_unflagged_pin_on_resource_tag_cart_save_books_resource_queue(
             patient_id=test_patient.id,
             visits=[
                 _visit(
+                    db_session,
                     doctor_id=None,
                     services=[{"service_id": service.id, "quantity": 1}],
                 )
@@ -797,7 +806,7 @@ def test_unflagged_pin_on_resource_tag_cart_save_books_resource_queue(
     resource_queue = (
         db_session.query(DailyQueue)
         .filter(
-            DailyQueue.day == date.today(),
+            DailyQueue.day == clinic_today(db_session),
             DailyQueue.queue_tag == resource_tag,
         )
         .one()
@@ -831,6 +840,7 @@ def test_unflagged_pin_on_resource_tag_cart_save_books_resource_queue(
             patient_id=fresh_patient.id,
             visits=[
                 _visit(
+                    db_session,
                     doctor_id=pinned_to.id,
                     services=[{"service_id": service.id, "quantity": 1}],
                 )
@@ -880,7 +890,7 @@ def test_unflagged_pinned_service_edit_delta_quote_rejects_other_doctor(
             "discount_mode": "none",
             "pricing_mode": "edit_delta",
             "patient_id": test_patient.id,
-            "target_date": date.today().isoformat(),
+            "target_date": clinic_today(db_session).isoformat(),
         },
     )
     assert rejected.status_code == 409, rejected.text
@@ -900,7 +910,7 @@ def test_unflagged_pinned_service_edit_delta_quote_rejects_other_doctor(
             "discount_mode": "none",
             "pricing_mode": "edit_delta",
             "patient_id": test_patient.id,
-            "target_date": date.today().isoformat(),
+            "target_date": clinic_today(db_session).isoformat(),
         },
     )
     assert accepted.status_code == 200, accepted.text
