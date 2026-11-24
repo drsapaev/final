@@ -16,7 +16,7 @@ class _AlertRecorder:
         self.created = []
 
     def create_alert(self, alert_type, severity, message, details=None):
-        self.created.append((alert_type, message))
+        self.created.append((alert_type, severity, details))
         return type("A", (), {"message": message})()
 
 
@@ -72,7 +72,18 @@ def test_latency_alert_fires_above_min_samples(monkeypatch):
     alerts = state.evaluate_sla_alerts()
 
     assert "latency" in alerts
-    assert rec.created, "alert must be created above the sample floor"
+    assert rec.created == [
+        (
+            obs.AlertType.SYSTEM_RESOURCE,
+            obs.AlertSeverity.CRITICAL,
+            {
+                "latency_p95_ms": 30_000.0,
+                "latency_threshold_ms": 100.0,
+                "window_requests": 25,
+                "window_seconds": 300,
+            },
+        )
+    ]
 
 
 def test_healthy_window_never_alerts(monkeypatch):
