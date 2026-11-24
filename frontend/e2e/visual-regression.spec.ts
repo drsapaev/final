@@ -72,6 +72,15 @@ function jsonResponse(body: unknown): { status: number; contentType: string; bod
   return { status: 200, contentType: 'application/json; charset=utf-8', body: JSON.stringify(body) };
 }
 
+const emptyLabVisualWorklist = {
+  entries: [],
+  total: 0,
+  counts: { actionable: 0, today: 0, overdue: 0, awaiting_specimen: 0, in_review: 0, ready: 0 },
+  next_cursor: null,
+  date: '2026-08-29',
+  timezone: 'Asia/Tashkent',
+};
+
 const registrarVisualTabs = createRegistrarTabsQaPayload([
   {
     target_kind: 'profile', target_id: 91001, custom_title: null,
@@ -817,29 +826,39 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     });
   });
 
-  // --- Surface 4/5: Lab (/lab → LabPanel). No data table on this screen
-  // (queue cards + virtualized card list) — nothing to wire sticky headers
-  // on; the baseline locks the zero-delta invariant for the screen.
-  test('PR-UI-12-4 lab screen — lab queue (zero-delta lock, no tables)', async ({ page }) => {
+  // --- Surface 4/5: Lab (/lab → LabPanel). The populated server worklist
+  // pins the Lab v2 filters, counts and queue cards.
+  test('PR-UI-12-4 lab screen — populated lab worklist', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-08-29T12:00:00+05:00'));
     await installAuth(page, labProfile);
     await page.route('**/api/v1/**', async (route) => {
       const url = new URL(route.request().url());
       const { pathname } = url;
       if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
       if (pathname === '/api/v1/auth/me') { await route.fulfill(jsonResponse(labProfile)); return; }
-      if (pathname === '/api/v1/lab/queue/today') {
+      if (pathname === '/api/v1/lab/worklist/search' && route.request().method() === 'POST') {
         await route.fulfill(jsonResponse({
+          ...emptyLabVisualWorklist,
           entries: Array.from({ length: 5 }, (_, i) => ({
-            id: 600 + i,
+            id: `order:${600 + i}`,
+            order_id: 600 + i,
             appointment_id: 600 + i,
-            patient_fio: `Тестов Тест Тестович ${i + 1}`,
+            visit_id: 700 + i,
+            patient_fio: `SYNTHETIC-LAB ${i + 1}`,
             patient_id: 400 + i,
-            status: i === 0 ? 'in_progress' : 'waiting',
+            status: i === 0 ? 'in_progress' : 'pending',
+            work_date: emptyLabVisualWorklist.date,
             created_at: '2026-08-29T09:00:00+05:00',
+            service_details: [{
+              id: 800 + i, visit_service_id: 900 + i, code: 'L01', name: 'Общий анализ крови', quantity: 1,
+            }],
             services: ['Общий анализ крови'],
+            service_codes: ['L01'],
+            progress: { total_reports: 0, released_reports: 0, ordered_tests: 1, released_tests: 0, canceled_tests: 0 },
             queue_number: i + 1,
           })),
           total: 5,
+          counts: { ...emptyLabVisualWorklist.counts, actionable: 5, today: 5 },
         }));
         return;
       }
@@ -853,11 +872,12 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     });
 
     await page.goto('/lab');
-    await page.locator('.lqw-root').first().waitFor({ state: 'visible', timeout: 15000 });
-    await expect(page.locator('.lqw-root').getByText('Тестов Тест Тестович 1').first()).toBeVisible();
+    const worklist = page.locator('.lqw-root');
+    await expect(worklist.getByText('Рабочий список', { exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(worklist.getByText('SYNTHETIC-LAB 1', { exact: true })).toBeVisible();
     await page.waitForTimeout(300);
 
-    await expect(page.locator('.lqw-root').first()).toHaveScreenshot('pr124-lab-screen.png', {
+    await expect(worklist).toHaveScreenshot('pr124-lab-screen.png', {
       maxDiffPixelRatio: 0.01,
       animations: 'disabled',
     });
@@ -1436,6 +1456,10 @@ test.describe('Visual regression — PR-UI-18 twelve screens · part 2: doctor, 
     await page.clock.install({ time: PR18P2_INSTANT });
     await page.routeWebSocket('**/*', ws => { ws.close(); });
     await installAuthenticatedQaHarness(page, { role });
+    if (role === 'Lab') {
+      await page.route('**/api/v1/lab/worklist/search', (route) =>
+        route.fulfill(jsonResponse(emptyLabVisualWorklist)));
+    }
     await pinPr18Part2Theme(page, mode);
     await page.goto(path);
     await expect(page.locator(`.app-shell[data-route-id="${routeId}"]`)).toBeVisible({ timeout: 15000 });
@@ -1443,6 +1467,11 @@ test.describe('Visual regression — PR-UI-18 twelve screens · part 2: doctor, 
       async () => (await page.locator('body').innerText()).trim().length,
       { message: `${routeId} should render non-empty body text` }
     ).toBeGreaterThan(0);
+    if (role === 'Lab') {
+      const worklist = page.locator('.lqw-root');
+      await expect(worklist.getByText('Рабочий список', { exact: true })).toBeVisible();
+      await expect(worklist.getByText('Всего: 0', { exact: true })).toBeVisible();
+    }
     await settleForPr18Part2Capture(page);
     await expectPr18Part2ThemeApplied(page, mode);
     await expect(page).toHaveScreenshot(baselineName, {

@@ -58025,6 +58025,238 @@
         }
       }
     },
+    "/api/v1/lab/report-instances/{instance_id}/submit-review": {
+      "post": {
+        "tags": [
+          "lab-reporting",
+          "lab-reporting"
+        ],
+        "summary": "Submit Lab Report For Review",
+        "operationId": "submit_lab_report_for_review_api_v1_lab_report_instances__instance_id__submit_review_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Instance Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabReportVersionCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabReportInstanceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/report-instances/{instance_id}/review": {
+      "post": {
+        "tags": [
+          "lab-reporting",
+          "lab-reporting"
+        ],
+        "summary": "Review Lab Report",
+        "operationId": "review_lab_report_api_v1_lab_report_instances__instance_id__review_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Instance Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabReportVersionCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabReportInstanceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/report-instances/{instance_id}/return-to-draft": {
+      "post": {
+        "tags": [
+          "lab-reporting",
+          "lab-reporting"
+        ],
+        "summary": "Return Lab Report To Draft",
+        "operationId": "return_lab_report_to_draft_api_v1_lab_report_instances__instance_id__return_to_draft_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Instance Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabReportReasonCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabReportInstanceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/report-instances/{instance_id}/qc": {
+      "post": {
+        "tags": [
+          "lab-reporting",
+          "lab-reporting"
+        ],
+        "summary": "Record Lab Report Qc",
+        "operationId": "record_lab_report_qc_api_v1_lab_report_instances__instance_id__qc_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Instance Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabReportQCIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabReportInstanceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/lab/report-instances/{instance_id}/finalize": {
       "post": {
         "tags": [
@@ -58049,6 +58281,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/LabReportVersionCommand"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Command"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -58097,6 +58346,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/LabReportReasonCommand"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Command"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -58304,6 +58570,1073 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Preview Lab Template Version Pdf Api V1 Lab Template Versions  Version Id  Preview Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/orders/{order_id}/specimens": {
+      "get": {
+        "tags": [
+          "lab-reporting"
+        ],
+        "summary": "List Order Specimens",
+        "operationId": "lab_list_order_specimens",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Order Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenListOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Laboratory access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found in this context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "lab-reporting"
+        ],
+        "summary": "Create Specimen",
+        "operationId": "lab_create_specimen",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Order Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabSpecimenCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Laboratory access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found in this context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or unavailable action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/visits/{visit_id}/specimens": {
+      "post": {
+        "tags": [
+          "lab-reporting"
+        ],
+        "summary": "Create Visit Specimen",
+        "operationId": "lab_collect_specimen_for_visit",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabSpecimenCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Laboratory access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found in this context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or unavailable action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/specimens/scan": {
+      "post": {
+        "tags": [
+          "lab-reporting"
+        ],
+        "summary": "Scan Specimen",
+        "operationId": "lab_scan_specimen",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabSpecimenScan"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Laboratory access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found in this context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/lab/specimens/{specimen_id}/events": {
+      "post": {
+        "tags": [
+          "lab-reporting"
+        ],
+        "summary": "Apply Specimen Event",
+        "operationId": "lab_apply_specimen_event",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "specimen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Specimen Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabSpecimenTransitionCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Laboratory access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found in this context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or unavailable action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/specimens/{specimen_id}/assignments": {
+      "post": {
+        "tags": [
+          "lab-reporting"
+        ],
+        "summary": "Assign Specimen",
+        "operationId": "lab_assign_specimen",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "specimen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Specimen Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabSpecimenAssignmentCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Laboratory access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found in this context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or unavailable action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/specimens/{specimen_id}/label": {
+      "post": {
+        "tags": [
+          "lab-reporting"
+        ],
+        "summary": "Issue Specimen Label",
+        "operationId": "lab_issue_specimen_label",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "specimen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Specimen Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabSpecimenCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Issued Code 128 label",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Laboratory access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found in this context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or unavailable action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabSpecimenErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/worklist/search": {
+      "post": {
+        "tags": [
+          "lab-reporting"
+        ],
+        "summary": "List Lab Worklist",
+        "description": "Read a page of work and counters across the same search scope.\n\nThe search body keeps patient names and barcode values out of URLs.",
+        "operationId": "list_lab_worklist_api_v1_lab_worklist_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabWorklistSearch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabWorklistPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/lab/visits/{visit_id}/tests/{visit_service_id}/cancel": {
+      "post": {
+        "tags": [
+          "lab-reporting"
+        ],
+        "summary": "Cancel Lab Ordered Test",
+        "operationId": "cancel_lab_ordered_test_api_v1_lab_visits__visit_id__tests__visit_service_id__cancel_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "visit_service_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Service Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabOrderedTestCancellation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabCanceledOrderedTest"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/critical-communications": {
+      "get": {
+        "tags": [
+          "lab-critical-communications"
+        ],
+        "summary": "List Communications",
+        "operationId": "list_communications_api_v1_lab_critical_communications_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Id"
+            }
+          },
+          {
+            "name": "open_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Open Only"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CommunicationOut"
+                  },
+                  "title": "Response List Communications Api V1 Lab Critical Communications Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/critical-communications/{task_id}/assign": {
+      "post": {
+        "tags": [
+          "lab-critical-communications"
+        ],
+        "summary": "Assign Communication",
+        "operationId": "assign_communication_api_v1_lab_critical_communications__task_id__assign_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunicationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/critical-communications/{task_id}/escalate": {
+      "post": {
+        "tags": [
+          "lab-critical-communications"
+        ],
+        "summary": "Escalate Communication",
+        "operationId": "escalate_communication_api_v1_lab_critical_communications__task_id__escalate_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunicationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/critical-communications/{task_id}/acknowledge": {
+      "post": {
+        "tags": [
+          "lab-critical-communications"
+        ],
+        "summary": "Acknowledge Communication",
+        "operationId": "acknowledge_communication_api_v1_lab_critical_communications__task_id__acknowledge_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunicationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/imports": {
+      "post": {
+        "tags": [
+          "lab-operations"
+        ],
+        "summary": "Import Lab Values",
+        "operationId": "import_lab_values_api_v1_lab_imports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabImportBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabImportBatchOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/lab/imports/preview": {
+      "post": {
+        "tags": [
+          "lab-operations"
+        ],
+        "summary": "Preview Lab Import",
+        "operationId": "preview_lab_import_api_v1_lab_imports_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabImportBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabImportBatchOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/lab/metrics": {
+      "get": {
+        "tags": [
+          "lab-operations"
+        ],
+        "summary": "Lab Metrics",
+        "operationId": "lab_metrics_api_v1_lab_metrics_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "default": 7,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabMetricsOut"
                 }
               }
             }
@@ -84389,6 +85722,111 @@
         "title": "CommonUpdates",
         "description": "Общие обновления для всех записей пациента"
       },
+      "CommunicationOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "report_instance_id": {
+            "type": "integer",
+            "title": "Report Instance Id"
+          },
+          "supersedes_communication_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Communication Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "needs_assignment",
+              "pending",
+              "inbox_recorded",
+              "escalated",
+              "acknowledged",
+              "superseded"
+            ],
+            "title": "State"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "inbox_recorded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inbox Recorded At"
+          },
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          },
+          "escalated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escalated At"
+          },
+          "available_actions": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "assign",
+                "escalate",
+                "acknowledge"
+              ]
+            },
+            "type": "array",
+            "title": "Available Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "report_instance_id",
+          "supersedes_communication_id",
+          "state",
+          "attempts",
+          "created_at",
+          "inbox_recorded_at",
+          "acknowledged_at",
+          "escalated_at"
+        ],
+        "title": "CommunicationOut"
+      },
       "ComplaintAnalysisRequest": {
         "properties": {
           "complaint": {
@@ -96709,6 +98147,35 @@
         "title": "JoinSessionStartResponse",
         "description": "Ответ с данными сессии"
       },
+      "LabCanceledOrderedTest": {
+        "properties": {
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id"
+          },
+          "visit_service_id": {
+            "type": "integer",
+            "title": "Visit Service Id"
+          },
+          "canceled_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Canceled At"
+          },
+          "canceled_by_user_id": {
+            "type": "integer",
+            "title": "Canceled By User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_id",
+          "visit_service_id",
+          "canceled_at",
+          "canceled_by_user_id"
+        ],
+        "title": "LabCanceledOrderedTest"
+      },
       "LabCatalogAnalyteOut": {
         "properties": {
           "code": {
@@ -96806,6 +98273,39 @@
               }
             ],
             "title": "Age Max Months"
+          },
+          "material_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Code"
+          },
+          "method_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method Code"
+          },
+          "unit_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Code"
           },
           "text": {
             "anyOf": [
@@ -97073,6 +98573,356 @@
         ],
         "title": "LabCriticalFindingOut"
       },
+      "LabImportBatch": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "csv"
+            ],
+            "title": "Source"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/LabImportRow"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Rows"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "rows"
+        ],
+        "title": "LabImportBatch"
+      },
+      "LabImportBatchOut": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/LabImportRowOut"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "LabImportBatchOut"
+      },
+      "LabImportRow": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Message Id"
+          },
+          "report_instance_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Report Instance Id"
+          },
+          "specimen_barcode": {
+            "type": "string",
+            "maxLength": 24,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9-]+$",
+            "title": "Specimen Barcode"
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
+          "replace_existing": {
+            "type": "boolean",
+            "title": "Replace Existing",
+            "default": false
+          },
+          "method_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.%/^-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method Code"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/LabImportValue"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Values"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "message_id",
+          "report_instance_id",
+          "specimen_barcode",
+          "values"
+        ],
+        "title": "LabImportRow"
+      },
+      "LabImportRowOut": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Message Id"
+          },
+          "report_instance_id": {
+            "type": "integer",
+            "title": "Report Instance Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "saved",
+              "duplicate",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "receipt_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Id"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "existing_values": {
+            "type": "integer",
+            "title": "Existing Values",
+            "default": 0
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "report_not_found",
+                  "report_locked",
+                  "stale_report",
+                  "specimen_mismatch",
+                  "method_mismatch",
+                  "unknown_analyte",
+                  "duplicate_analyte",
+                  "unit_mismatch",
+                  "invalid_value",
+                  "message_conflict",
+                  "values_exist"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "report_instance_id",
+          "status"
+        ],
+        "title": "LabImportRowOut"
+      },
+      "LabImportValue": {
+        "properties": {
+          "analyte_code": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.%/^-]+$",
+            "title": "Analyte Code"
+          },
+          "value_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Text"
+          },
+          "value_numeric": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Numeric"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "result_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "numeric",
+                  "qualified_numeric",
+                  "coded_qualitative",
+                  "text",
+                  "absent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Kind"
+          },
+          "comparator": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "lt",
+                  "lte",
+                  "gt",
+                  "gte"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparator"
+          },
+          "qualitative_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "negative",
+                  "positive",
+                  "indeterminate"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualitative Code"
+          },
+          "absence_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Absence Reason"
+          },
+          "unit_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Code"
+          },
+          "method_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "analyte_code"
+        ],
+        "title": "LabImportValue"
+      },
       "LabInterpretRequest": {
         "properties": {
           "results": {
@@ -97123,6 +98973,73 @@
         "title": "LabInterpretRequest",
         "description": "Запрос на интерпретацию анализов"
       },
+      "LabMetricsOut": {
+        "properties": {
+          "from_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "From At"
+          },
+          "until_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Until At"
+          },
+          "actionable": {
+            "type": "integer",
+            "title": "Actionable"
+          },
+          "overdue": {
+            "type": "integer",
+            "title": "Overdue"
+          },
+          "rejected_samples": {
+            "type": "integer",
+            "title": "Rejected Samples"
+          },
+          "held_samples": {
+            "type": "integer",
+            "title": "Held Samples"
+          },
+          "turnaround_pairs": {
+            "type": "integer",
+            "title": "Turnaround Pairs"
+          },
+          "average_turnaround_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Turnaround Minutes"
+          },
+          "released_corrections": {
+            "type": "integer",
+            "title": "Released Corrections"
+          },
+          "communications_open": {
+            "type": "integer",
+            "title": "Communications Open"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_at",
+          "until_at",
+          "actionable",
+          "overdue",
+          "rejected_samples",
+          "held_samples",
+          "turnaround_pairs",
+          "average_turnaround_minutes",
+          "released_corrections",
+          "communications_open"
+        ],
+        "title": "LabMetricsOut"
+      },
       "LabOrderCreate": {
         "properties": {
           "template_id": {
@@ -97154,6 +99071,33 @@
               }
             ],
             "title": "Notes"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "routine",
+                  "urgent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
           }
         },
         "type": "object",
@@ -97332,6 +99276,108 @@
           "status"
         ],
         "title": "LabOrderSummaryOut"
+      },
+      "LabOrderedTestCancellation": {
+        "properties": {
+          "order_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "LabOrderedTestCancellation"
+      },
+      "LabQCEvidenceOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "rejected",
+              "not_applicable"
+            ],
+            "title": "Status"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "instrument_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Ref"
+          },
+          "series_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "LabQCEvidenceOut"
+      },
+      "LabReleaseSpecimenOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "revision"
+        ],
+        "title": "LabReleaseSpecimenOut"
       },
       "LabReportBulkSaveResponse": {
         "properties": {
@@ -97683,6 +99729,18 @@
             ],
             "title": "Template Version Id"
           },
+          "study_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Date"
+          },
           "service_codes": {
             "items": {
               "type": "string"
@@ -97696,6 +99754,14 @@
             },
             "type": "array",
             "title": "Service Items"
+          },
+          "visit_service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Visit Service Ids"
           },
           "signer_overrides": {
             "additionalProperties": true,
@@ -97777,6 +99843,25 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "managed_release": {
+            "type": "boolean",
+            "title": "Managed Release",
+            "default": false
+          },
+          "workflow_events": {
+            "items": {
+              "$ref": "#/components/schemas/LabReportWorkflowEventOut"
+            },
+            "type": "array",
+            "title": "Workflow Events"
+          },
+          "release_holds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Release Holds"
           },
           "patient_snapshot": {
             "additionalProperties": true,
@@ -97952,6 +100037,22 @@
             "type": "string",
             "title": "Status"
           },
+          "managed_release": {
+            "type": "boolean",
+            "title": "Managed Release",
+            "default": false
+          },
+          "supersedes_instance_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Instance Id"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -98091,10 +100192,119 @@
               }
             ],
             "title": "Branding Snapshot"
+          },
+          "study_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Date"
           }
         },
         "type": "object",
         "title": "LabReportInstanceUpdate"
+      },
+      "LabReportQCIn": {
+        "properties": {
+          "expected_updated_at": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 19,
+            "title": "Expected Updated At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "rejected",
+              "not_applicable"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "instrument_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Ref"
+          },
+          "series_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Ref"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_updated_at",
+          "status"
+        ],
+        "title": "LabReportQCIn"
+      },
+      "LabReportReasonCommand": {
+        "properties": {
+          "expected_updated_at": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 19,
+            "title": "Expected Updated At"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_updated_at",
+          "reason"
+        ],
+        "title": "LabReportReasonCommand"
       },
       "LabReportRenderedFieldOut": {
         "properties": {
@@ -98190,6 +100400,46 @@
             ],
             "title": "Highlight Rule"
           },
+          "choice_options": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice Options"
+          },
+          "choice_option_codes": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "negative",
+                        "positive",
+                        "indeterminate"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice Option Codes"
+          },
           "value_text": {
             "anyOf": [
               {
@@ -98211,6 +100461,130 @@
               }
             ],
             "title": "Value Numeric"
+          },
+          "result_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "numeric",
+                  "qualified_numeric",
+                  "coded_qualitative",
+                  "text",
+                  "absent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Kind"
+          },
+          "comparator": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "lt",
+                  "lte",
+                  "gt",
+                  "gte"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparator"
+          },
+          "qualitative_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "negative",
+                  "positive",
+                  "indeterminate"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualitative Code"
+          },
+          "absence_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Absence Reason"
+          },
+          "method_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method Code"
+          },
+          "value_display": {
+            "type": "string",
+            "title": "Value Display",
+            "default": ""
+          },
+          "evaluation_status": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "not_evaluated",
+              "not_applicable",
+              "evaluated",
+              "unknown"
+            ],
+            "title": "Evaluation Status",
+            "default": "unknown"
+          },
+          "interpretation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "normal",
+                  "low",
+                  "high",
+                  "warning",
+                  "abnormal",
+                  "critical",
+                  "negative",
+                  "positive",
+                  "indeterminate"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interpretation"
+          },
+          "evaluation_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Snapshot"
           },
           "comment": {
             "anyOf": [
@@ -98867,6 +101241,93 @@
               }
             ],
             "title": "Comment"
+          },
+          "result_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "numeric",
+                  "qualified_numeric",
+                  "coded_qualitative",
+                  "text",
+                  "absent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Kind"
+          },
+          "comparator": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "lt",
+                  "lte",
+                  "gt",
+                  "gte"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparator"
+          },
+          "qualitative_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "negative",
+                  "positive",
+                  "indeterminate"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualitative Code"
+          },
+          "absence_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Absence Reason"
+          },
+          "unit_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Code"
+          },
+          "method_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method Code"
           }
         },
         "type": "object",
@@ -98874,6 +101335,144 @@
           "field_key"
         ],
         "title": "LabReportValueIn"
+      },
+      "LabReportVersionCommand": {
+        "properties": {
+          "expected_updated_at": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 19,
+            "title": "Expected Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_updated_at"
+        ],
+        "title": "LabReportVersionCommand"
+      },
+      "LabReportWorkflowEventOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "entered",
+              "submitted",
+              "reviewed",
+              "returned",
+              "qc_recorded",
+              "finalized",
+              "revision_created"
+            ],
+            "title": "Kind"
+          },
+          "actor_user_id": {
+            "type": "integer",
+            "title": "Actor User Id"
+          },
+          "actor_name": {
+            "type": "string",
+            "title": "Actor Name"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "report_version": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Report Version"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabReportWorkflowEvidenceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "actor_user_id",
+          "actor_name",
+          "occurred_at",
+          "report_version"
+        ],
+        "title": "LabReportWorkflowEventOut"
+      },
+      "LabReportWorkflowEvidenceOut": {
+        "properties": {
+          "specimens": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LabReleaseSpecimenOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specimens"
+          },
+          "qc_event_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qc Event Id"
+          },
+          "review_event_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Event Id"
+          },
+          "qc": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabQCEvidenceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "LabReportWorkflowEvidenceOut"
       },
       "LabResultItem": {
         "properties": {
@@ -99193,6 +101792,544 @@
         "type": "object",
         "title": "LabServiceContextItemIn"
       },
+      "LabSpecimenAssignmentCommand": {
+        "properties": {
+          "visit_service_ids": {
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0.0
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Visit Service Ids"
+          },
+          "report_instance_ids": {
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0.0
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Report Instance Ids"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "add",
+              "remove"
+            ],
+            "title": "Operation",
+            "default": "add"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "request_id"
+        ],
+        "title": "LabSpecimenAssignmentCommand"
+      },
+      "LabSpecimenCommand": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "request_id"
+        ],
+        "title": "LabSpecimenCommand"
+      },
+      "LabSpecimenCreate": {
+        "properties": {
+          "visit_service_ids": {
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0.0
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Visit Service Ids"
+          },
+          "report_instance_ids": {
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0.0
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Report Instance Ids"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "material_code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$",
+            "title": "Material Code"
+          },
+          "container_code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$",
+            "title": "Container Code"
+          },
+          "parent_specimen_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Specimen Id"
+          },
+          "replaces_specimen_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaces Specimen Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "material_code",
+          "container_code"
+        ],
+        "title": "LabSpecimenCreate"
+      },
+      "LabSpecimenErrorOut": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "LabSpecimenErrorOut"
+      },
+      "LabSpecimenEventOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "collect",
+              "receive",
+              "accept",
+              "hold",
+              "reject",
+              "print_label",
+              "assign",
+              "unassign",
+              "aliquot",
+              "recollect"
+            ],
+            "title": "Action"
+          },
+          "resulting_status": {
+            "type": "string",
+            "enum": [
+              "expected",
+              "collected",
+              "received",
+              "accepted",
+              "held",
+              "rejected"
+            ],
+            "title": "Resulting Status"
+          },
+          "actor_user_id": {
+            "type": "integer",
+            "title": "Actor User Id"
+          },
+          "happened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Happened At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "visit_service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Visit Service Ids"
+          },
+          "report_instance_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Report Instance Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "revision",
+          "action",
+          "resulting_status",
+          "actor_user_id",
+          "happened_at",
+          "reason",
+          "visit_service_ids",
+          "report_instance_ids"
+        ],
+        "title": "LabSpecimenEventOut"
+      },
+      "LabSpecimenListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LabSpecimenOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "data_status": {
+            "type": "string",
+            "enum": [
+              "known",
+              "unknown"
+            ],
+            "title": "Data Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "data_status"
+        ],
+        "title": "LabSpecimenListOut"
+      },
+      "LabSpecimenOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id"
+          },
+          "visit_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Id"
+          },
+          "barcode": {
+            "type": "string",
+            "title": "Barcode"
+          },
+          "material_code": {
+            "type": "string",
+            "title": "Material Code"
+          },
+          "container_code": {
+            "type": "string",
+            "title": "Container Code"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "expected",
+              "collected",
+              "received",
+              "accepted",
+              "held",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "collected_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collected At"
+          },
+          "received_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Received At"
+          },
+          "accepted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "latest_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Reason"
+          },
+          "parent_specimen_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Specimen Id"
+          },
+          "replaces_specimen_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaces Specimen Id"
+          },
+          "visit_service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Visit Service Ids"
+          },
+          "report_instance_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Report Instance Ids"
+          },
+          "available_actions": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "collect",
+                "receive",
+                "accept",
+                "hold",
+                "reject",
+                "print_label",
+                "assign",
+                "aliquot",
+                "recollect"
+              ]
+            },
+            "type": "array",
+            "title": "Available Actions"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/LabSpecimenEventOut"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "order_id",
+          "visit_id",
+          "barcode",
+          "material_code",
+          "container_code",
+          "status",
+          "revision",
+          "created_at",
+          "collected_at",
+          "received_at",
+          "accepted_at",
+          "latest_reason",
+          "parent_specimen_id",
+          "replaces_specimen_id",
+          "visit_service_ids",
+          "report_instance_ids",
+          "available_actions",
+          "events"
+        ],
+        "title": "LabSpecimenOut"
+      },
+      "LabSpecimenScan": {
+        "properties": {
+          "barcode": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Barcode"
+          },
+          "order_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "barcode"
+        ],
+        "title": "LabSpecimenScan"
+      },
+      "LabSpecimenTransitionCommand": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "collect",
+              "receive",
+              "accept",
+              "hold",
+              "reject"
+            ],
+            "title": "Action"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "request_id",
+          "action"
+        ],
+        "title": "LabSpecimenTransitionCommand"
+      },
       "LabTemplateResolutionIn": {
         "properties": {
           "patient_id": {
@@ -99328,6 +102465,559 @@
           "resolution_mode"
         ],
         "title": "LabTemplateResolutionOut"
+      },
+      "LabWorklistCounts": {
+        "properties": {
+          "actionable": {
+            "type": "integer",
+            "title": "Actionable"
+          },
+          "today": {
+            "type": "integer",
+            "title": "Today"
+          },
+          "overdue": {
+            "type": "integer",
+            "title": "Overdue"
+          },
+          "awaiting_specimen": {
+            "type": "integer",
+            "title": "Awaiting Specimen"
+          },
+          "in_review": {
+            "type": "integer",
+            "title": "In Review"
+          },
+          "ready": {
+            "type": "integer",
+            "title": "Ready"
+          }
+        },
+        "type": "object",
+        "required": [
+          "actionable",
+          "today",
+          "overdue",
+          "awaiting_specimen",
+          "in_review",
+          "ready"
+        ],
+        "title": "LabWorklistCounts"
+      },
+      "LabWorklistEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "patient_fio": {
+            "type": "string",
+            "title": "Patient Fio"
+          },
+          "patient_birth_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Birth Year"
+          },
+          "visit_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Id"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "order_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          },
+          "queue_entry_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Entry Id"
+          },
+          "queue_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Number"
+          },
+          "queue_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Status"
+          },
+          "appointment_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Time"
+          },
+          "work_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Work Date"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "routine",
+                  "urgent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "awaiting_specimen",
+              "in_progress",
+              "in_review",
+              "held",
+              "partial",
+              "ready",
+              "canceled"
+            ],
+            "title": "Status"
+          },
+          "hold_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Reason"
+          },
+          "service_details": {
+            "items": {
+              "$ref": "#/components/schemas/LabWorklistService"
+            },
+            "type": "array",
+            "title": "Service Details"
+          },
+          "services": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "service_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Service Codes"
+          },
+          "report_instance_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Instance Id"
+          },
+          "report_template_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Template Name"
+          },
+          "lab_report_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lab Report Status"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/LabWorklistProgress"
+          },
+          "specimen_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Specimen Ids"
+          },
+          "specimen_barcodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Specimen Barcodes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "patient_id",
+          "patient_fio",
+          "patient_birth_year",
+          "visit_id",
+          "appointment_id",
+          "order_id",
+          "queue_entry_id",
+          "queue_number",
+          "queue_status",
+          "appointment_time",
+          "work_date",
+          "created_at",
+          "due_at",
+          "priority",
+          "status",
+          "hold_reason",
+          "service_details",
+          "services",
+          "service_codes",
+          "report_instance_id",
+          "report_template_name",
+          "lab_report_status",
+          "progress",
+          "specimen_ids",
+          "specimen_barcodes"
+        ],
+        "title": "LabWorklistEntry"
+      },
+      "LabWorklistPage": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/LabWorklistEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/LabWorklistCounts"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries",
+          "total",
+          "counts",
+          "next_cursor",
+          "date",
+          "timezone"
+        ],
+        "title": "LabWorklistPage"
+      },
+      "LabWorklistProgress": {
+        "properties": {
+          "total_reports": {
+            "type": "integer",
+            "title": "Total Reports"
+          },
+          "released_reports": {
+            "type": "integer",
+            "title": "Released Reports"
+          },
+          "ordered_tests": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordered Tests"
+          },
+          "released_tests": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released Tests"
+          },
+          "canceled_tests": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canceled Tests"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_reports",
+          "released_reports"
+        ],
+        "title": "LabWorklistProgress"
+      },
+      "LabWorklistSearch": {
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Q",
+            "default": ""
+          },
+          "barcode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Barcode"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "actionable",
+              "today",
+              "overdue",
+              "awaiting_specimen",
+              "in_review",
+              "ready"
+            ],
+            "title": "View",
+            "default": "actionable"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "oldest",
+              "newest",
+              "name"
+            ],
+            "title": "Sort",
+            "default": "oldest"
+          },
+          "from_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Date"
+          },
+          "to_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Date"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 50
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LabWorklistSearch"
+      },
+      "LabWorklistService": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "visit_service_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Service Id"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "canceled": {
+            "type": "boolean",
+            "title": "Canceled",
+            "default": false
+          },
+          "can_cancel": {
+            "type": "boolean",
+            "title": "Can Cancel",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "visit_service_id",
+          "code",
+          "name",
+          "quantity"
+        ],
+        "title": "LabWorklistService"
       },
       "LicenseActivationCreate": {
         "properties": {
