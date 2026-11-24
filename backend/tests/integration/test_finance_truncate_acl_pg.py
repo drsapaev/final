@@ -335,3 +335,106 @@ def test_finance_trigger_revoke_rolls_back_if_gateway_can_assume_executable_role
 
         assert _can_execute(connection, scope, scope.gateway, name)
         assert _can_execute(connection, scope, scope.inherited, name)
+
+
+_FINANCE_LEDGER_TEST_TABLES = (
+    "user_audit_logs", "provider_attempts", "provider_attempt_visits",
+    "provider_active_visit_reservations",
+)
+
+
+@pytest.fixture
+def finance_metadata_scope(finance_scope, monkeypatch):
+    migration = _migration("0159_finance_metadata_acl.py")
+    scope = replace(finance_scope, migration=migration)
+    monkeypatch.setattr(migration, "_GATEWAY_ROLES", (scope.gateway,))
+    audit = scope.qualified("user_audit_logs")
+    version = scope.qualified("alembic_version")
+    registry = scope.qualified("kaspi_issued_payment_refs")
+    ledgers = [scope.qualified(name) for name in _FINANCE_LEDGER_TEST_TABLES]
+    with scope.engine.begin() as connection:
+        for table in (*ledgers, registry):
+            connection.exec_driver_sql(f"CREATE TABLE {table} (id integer)")
+        connection.exec_driver_sql(
+            f"CREATE TABLE {version} (version_num varchar(32) PRIMARY KEY)"
+        )
+        connection.exec_driver_sql(f"ALTER TABLE {audit} ENABLE ROW LEVEL SECURITY")
+        connection.exec_driver_sql(
+            f"CREATE POLICY synthetic_audit_append ON {audit} "
+            f"FOR INSERT TO {scope.maintainer} WITH CHECK (true)"
+        )
+        tables = ", ".join((*ledgers, version, registry))
+        connection.exec_driver_sql(
+            f"GRANT ALL PRIVILEGES ON TABLE {tables} TO {scope.gateway}, {scope.maintainer}"
+        )
+        connection.exec_driver_sql(f"GRANT SELECT ON TABLE {registry} TO PUBLIC")
+        connection.exec_driver_sql(f"GRANT TRUNCATE, TRIGGER ON TABLE {audit} TO PUBLIC")
+        connection.exec_driver_sql(
+            f"GRANT INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES ON TABLE {version} TO PUBLIC"
+        )
+    return scope
+
+
+def test_metadata_acl_keeps_audit_appends_and_version_reads(finance_metadata_scope):
+    scope = finance_metadata_scope
+    table_admin = ("TRUNCATE", "REFERENCES", "TRIGGER")
+    if scope.engine.dialect.server_version_info >= (17,):
+        table_admin += ("MAINTAIN",)
+    version_writes = (*table_admin, "INSERT", "UPDATE", "DELETE")
+    with scope.engine.begin() as connection:
+        assert _has(connection, scope, scope.gateway, "user_audit_logs", "TRUNCATE")
+        assert _has(connection, scope, scope.gateway, "alembic_version", "UPDATE")
+
+        _migrate(scope, connection)
+        _migrate(scope, connection, downgrade=True)
+        _migrate(scope, connection)
+
+        for role in (scope.gateway, scope.inherited):
+            for table in _FINANCE_LEDGER_TEST_TABLES:
+                for privilege in table_admin:
+                    assert not _has(connection, scope, role, table, privilege)
+            for privilege in version_writes:
+                assert not _has(connection, scope, role, "alembic_version", privilege)
+            for privilege in ("SELECT", *version_writes):
+                assert not _has(connection, scope, role, "kaspi_issued_payment_refs", privilege)
+
+        for table in _FINANCE_LEDGER_TEST_TABLES:
+            for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+                assert _has(connection, scope, scope.gateway, table, privilege)
+        assert _has(connection, scope, scope.maintainer, "kaspi_issued_payment_refs", "INSERT")
+        assert _has(connection, scope, scope.gateway, "alembic_version", "SELECT")
+        assert _has(connection, scope, scope.gateway, "unrelated_inventory", "TRUNCATE")
+        for privilege in version_writes:
+            assert _has(connection, scope, scope.maintainer, "alembic_version", privilege)
+
+        connection.exec_driver_sql(f"SET LOCAL ROLE {scope.maintainer}")
+        connection.exec_driver_sql(
+            f"INSERT INTO {scope.qualified('user_audit_logs')} (id) VALUES (1)"
+        )
+        connection.exec_driver_sql(
+            f"INSERT INTO {scope.qualified('alembic_version')} (version_num) "
+            "VALUES ('synthetic_revision')"
+        )
+
+
+def test_metadata_acl_rejects_reachable_column_write(finance_metadata_scope):
+    scope = finance_metadata_scope
+    version = scope.qualified("alembic_version")
+    with scope.engine.begin() as connection:
+        connection.exec_driver_sql(
+            f"GRANT UPDATE (version_num) ON TABLE {version} TO {scope.inherited}"
+        )
+        membership_options = (
+            "WITH INHERIT FALSE, SET TRUE"
+            if connection.dialect.server_version_info >= (16,)
+            else ""
+        )
+        connection.exec_driver_sql(
+            f"GRANT {scope.inherited} TO {scope.gateway} {membership_options}"
+        )
+    with pytest.raises(RuntimeError, match="Remaining finance metadata write privileges"):
+        with scope.engine.begin() as connection:
+            _migrate(scope, connection)
+    with scope.engine.connect() as connection:
+        assert _has(connection, scope, scope.gateway, "user_audit_logs", "TRUNCATE")
+        assert _has(connection, scope, scope.gateway, "alembic_version", "UPDATE")
