@@ -86,7 +86,7 @@ describe('EMR round 19 wiring (source contract)', () => {
     const orderBlock = lab.slice(orderStart, orderEnd);
     // Intent captured at start, rechecked after the confirm and before the POST.
     expect(orderBlock).toContain('const startContext = contextRef.current');
-    const confirmIdx = orderBlock.indexOf('await (confirm');
+    const confirmIdx = orderBlock.indexOf('await confirm(');
     expect(orderBlock).toContain('contextRef.current.patientId !== startContext.patientId');
     expect(orderBlock).toContain('requestEpochRef.current !== epoch');
     const recheckIdx = orderBlock.indexOf('if (!ok || contextChanged()) return;');
