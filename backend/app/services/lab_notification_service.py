@@ -79,7 +79,7 @@ class LabNotificationService:
         event_type: str,
         recipient_id: int,
         entity_id: int,
-        expected_value: float | str | None = None,
+        expected: dict[str, Any] | None = None,
         source: LabReportInstance | None = None,
     ) -> bool:
         snapshots = (
@@ -100,19 +100,22 @@ class LabNotificationService:
             )
             .all()
         )
-        if expected_value is None:
+        if expected is None:
             return bool(snapshots)
         for snapshot, event_at in snapshots:
             metadata = (snapshot or {}).get("metadata") or {}
             if source is None:
-                if metadata.get("value") == expected_value:
+                if metadata.get("value") == expected["value"]:
                     return True
                 continue
             if metadata.get("report_instance_id") == source.id:
                 return True
             if (
                 "report_instance_id" not in metadata
-                and metadata.get("value") == expected_value
+                and expected["value"] is not None
+                and metadata.get("value") == expected["value"]
+                and metadata.get("patient_id") == source.patient_id
+                and metadata.get("unit") == expected["unit"]
                 and _as_aware_utc(event_at) >= _as_aware_utc(source.finalized_at)
             ):
                 # Adopt an existing delivery for this release during rollout.
@@ -396,7 +399,7 @@ class LabNotificationService:
         result: LabResult,
         source: LabReportInstance | None,
         report_value: LabReportValue | None,
-    ) -> list[tuple[float | str, dict[str, Any], str | None]]:
+    ) -> list[tuple[float | str | None, dict[str, Any], str | None]]:
         if source is None:
             if result.source_instance_id is not None or result.source_root_instance_id is not None:
                 return []
@@ -419,24 +422,42 @@ class LabNotificationService:
             return []
         if not isinstance(snapshot, dict) or not isinstance(payload, dict):
             return []
+        unit = snapshot.get("unit") or ""
         if (
             snapshot.get("template_version_id") != source.template_version_id
             or snapshot.get("visible") is not True
             or snapshot.get("status") != "evaluated"
             or snapshot.get("interpretation") != "critical"
-            or (snapshot.get("unit") or None) != result.unit
-            or (snapshot.get("unit_code") and not snapshot.get("unit"))
-            or not self._matches_source_value(result, report_value)
+            or not isinstance(unit, str)
+            or (unit[:32] or None) != result.unit
+            or (snapshot.get("unit_code") and not unit)
+            or payload.get("comparator") is not None
         ):
             return []
 
-        if payload.get("kind") == "numeric" and report_value.value_numeric is not None:
+        kind = payload.get("kind")
+        if (
+            kind == "numeric"
+            and report_value.value_numeric is not None
+            and report_value.value_numeric.is_finite()
+        ):
             value = float(report_value.value_numeric)
-        elif payload.get("kind") == "coded_qualitative" and payload.get("qualitative_code") in (
+        elif kind == "coded_qualitative" and payload.get("qualitative_code") in (
             "positive", "negative", "indeterminate",
         ):
             value = payload["qualitative_code"]
+        elif kind == "text" and report_value.value_numeric is None and report_value.value_text:
+            # Route the doctor to the report without copying free text to the inbox.
+            value = None
         else:
+            return []
+
+        from app.services.lab_reporting import LabReportingService
+
+        # The legacy projection narrows both value and unit. Use the same
+        # display formatter and widths when checking its link to the release.
+        display = LabReportingService(self.db)._format_result_display(report_value)
+        if not display or display[:128] != result.value:
             return []
         applied_thresholds = snapshot.get("thresholds") or {}
         if not isinstance(applied_thresholds, dict):
@@ -444,7 +465,7 @@ class LabNotificationService:
         flag_meta = report_value.resolved_flag_meta
         direction = flag_meta.get("direction") if isinstance(flag_meta, dict) else None
         thresholds = {
-            "unit": snapshot.get("unit") or "",
+            "unit": unit,
             "low": applied_thresholds.get("critical_low"),
             "high": applied_thresholds.get("critical_high"),
             "analyte_code": snapshot.get("analyte_code"),
@@ -539,7 +560,7 @@ class LabNotificationService:
     async def _notify_doctor_critical_value(
         self,
         result: LabResult,
-        value: float | str,
+        value: float | str | None,
         thresholds: dict,
         *,
         source: LabReportInstance | None = None,
@@ -588,14 +609,19 @@ class LabNotificationService:
                 "report_instance_id": source.id,
                 "analyte_code": thresholds.get("analyte_code"),
                 "unit_code": thresholds.get("unit_code"),
-                "value_display": result.value,
             })
-        display_value = metadata.get("value_display", value)
+            if value is not None:
+                metadata["value_display"] = result.value
+        if value is None:
+            result_message = f"В анализе {result.test_name} у пациента #{patient_id} обнаружена критическая находка."
+        else:
+            display_value = metadata.get("value_display", value)
+            result_message = f"{result.test_name}: {display_value} {metadata['unit']} у пациента #{patient_id}."
         canonical_recorded = self._lab_inbox_delivery_exists(
             event_type="lab_critical_result",
             recipient_id=recipient_id,
             entity_id=result.id,
-            expected_value=value,
+            expected=metadata,
             source=source,
         )
         newly_recorded = False
@@ -610,7 +636,7 @@ class LabNotificationService:
                 recipient=doctor_user,
                 event_type="lab_critical_result",
                 title="Критический результат анализа",
-                message=f"{result.test_name}: {display_value} {thresholds.get('unit', '')} у пациента #{patient_id}.",
+                message=result_message,
                 metadata=metadata,
             )
             newly_recorded = canonical_recorded
@@ -633,7 +659,7 @@ class LabNotificationService:
             event_type="lab_critical_finding",
             recipient_id=recipient_id,
             entity_id=result.id,
-            expected_value=value,
+            expected=metadata,
             source=source,
         )
         if not finding_recorded:

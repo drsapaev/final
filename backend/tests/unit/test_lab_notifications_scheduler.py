@@ -101,7 +101,7 @@ def released_result(db_session, test_patient, test_visit):
         *, previous=None, status="FINALIZED", managed=False, amount="25",
         evaluation="evaluated", interpretation="critical", snapshot_unit="mmol/L",
         projected_unit="mmol/L", test_name="SYNTHETIC-Глюкоза", snapshot_overrides=None,
-        finalized_at=None, projection=None,
+        finalized_at=None, projection=None, text_value=None,
     ):
         source = LabReportInstance(
             order_id=order.id,
@@ -128,11 +128,15 @@ def released_result(db_session, test_patient, test_visit):
         }
         if snapshot_overrides:
             snapshot.update(snapshot_overrides)
+        payload = None
+        if snapshot is not None:
+            payload = {"kind": "numeric" if text_value is None else "text"}
         db_session.add(LabReportValue(
             instance_id=source.id,
             field_key="synthetic_analyte_slot",
-            value_numeric=Decimal(amount),
-            result_payload={"kind": "numeric"} if snapshot is not None else None,
+            value_numeric=Decimal(amount) if text_value is None else None,
+            value_text=text_value,
+            result_payload=payload,
             evaluation_snapshot=snapshot,
             resolved_flag_meta={"direction": "high"},
         ))
@@ -182,6 +186,50 @@ async def test_scheduler_uses_frozen_exact_release_without_reading_display_name(
         assert metadata["value"] == 13
         assert metadata["critical_high"] == "12"
     assert outcome["critical_results"][0]["unit"] == "mmol/L"
+
+
+@pytest.mark.asyncio
+async def test_scheduler_uses_full_snapshot_unit_for_truncated_projection(
+    db_session, released_result, monkeypatch,
+):
+    unit = "SYNTHETIC validation unit longer than 32 characters"
+    released_result(snapshot_unit=unit, projected_unit=unit[:32])
+    released_result(snapshot_unit=unit, projected_unit=unit[:31] + "X")
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(mod.notification_sender_service, "send_lab_event_notification", sender)
+
+    outcome = await mod.LabNotificationService(db_session).check_critical_values()
+
+    assert outcome["critical_found"] == 1
+    assert outcome["critical_results"][0]["unit"] == unit
+    assert sender.await_count == 2
+    assert all(call.kwargs["metadata"]["unit"] == unit for call in sender.await_args_list)
+
+
+@pytest.mark.asyncio
+async def test_scheduler_notifies_for_exact_critical_text_without_copying_raw_finding(
+    db_session, released_result, monkeypatch,
+):
+    finding = "SYNTHETIC critical text " * 6
+    result, source = released_result(text_value=finding, amount=finding[:128])
+    released_result(text_value=finding, amount=finding[1:129])
+    released_result(text_value=finding, amount=finding[:128], interpretation="normal")
+    broadcast = AsyncMock()
+    monkeypatch.setattr(NotificationPlatformService, "_broadcast_delivery_with_policy", broadcast)
+    scheduler = mod.LabNotificationService(db_session)
+
+    outcome = await scheduler.check_critical_values()
+    await scheduler.check_critical_values()
+
+    assert outcome["critical_found"] == 1
+    assert outcome["critical_results"][0]["result_id"] == result.id
+    events = db_session.scalars(select(NotificationEvent).where(
+        NotificationEvent.entity_id == str(result.id),
+    )).all()
+    assert {event.event_type for event in events} == {"lab_critical_result", "lab_critical_finding"}
+    assert all(event.payload_snapshot["metadata"]["report_instance_id"] == source.id for event in events)
+    assert all("SYNTHETIC critical text" not in str(event.payload_snapshot) for event in events)
+    assert broadcast.await_count == 2
 
 
 @pytest.mark.asyncio
@@ -237,35 +285,61 @@ async def test_scheduler_keeps_valid_historical_linked_and_unlinked_fallback(
     assert all("report_instance_id" not in item for item in metadata if item["result_id"] == unlinked.id)
 
 
+@pytest.fixture
+def add_prior_critical_deliveries(db_session, cardio_user):
+    old_time = datetime.now(UTC) - timedelta(minutes=2)
+
+    def add(result, source, **overrides):
+        metadata = {"value": 25.0, "patient_id": source.patient_id, "unit": "mmol/L"}
+        metadata.update(overrides)
+        for sequence, event_type in enumerate(("lab_critical_result", "lab_critical_finding"), 1):
+            event = NotificationEvent(
+                event_type=event_type,
+                dedup_key=f"synthetic-old:{event_type}",
+                source_module="lab",
+                entity_type="lab_result",
+                entity_id=str(result.id),
+                title="SYNTHETIC",
+                message="SYNTHETIC",
+                payload_snapshot={"metadata": metadata},
+                created_at=old_time,
+            )
+            db_session.add(NotificationDelivery(
+                event=event,
+                recipient_type="user",
+                recipient_id=cardio_user.id,
+                role="Doctor",
+                channel="in_app_inbox",
+                dedup_key=f"synthetic-old-delivery:{event_type}",
+                sequence_id=sequence,
+                delivery_status="delivered",
+            ))
+        db_session.flush()
+
+    return add
+
+
 @pytest.mark.asyncio
-async def test_scheduler_adopts_prior_delivery_and_deduplicates_identical_corrections_by_release(
-    db_session, released_result, cardio_user, monkeypatch,
+@pytest.mark.parametrize("overrides", [{"unit": "mg/dL"}, {"patient_id": -1}])
+async def test_scheduler_does_not_adopt_delivery_for_another_unit_or_patient(
+    db_session, released_result, add_prior_critical_deliveries, monkeypatch, overrides,
 ):
     result, source = released_result()
-    old_time = datetime.now(UTC) - timedelta(minutes=2)
-    for sequence, event_type in enumerate(("lab_critical_result", "lab_critical_finding"), 1):
-        event = NotificationEvent(
-            event_type=event_type,
-            dedup_key=f"synthetic-old:{event_type}",
-            source_module="lab",
-            entity_type="lab_result",
-            entity_id=str(result.id),
-            title="SYNTHETIC",
-            message="SYNTHETIC",
-            payload_snapshot={"metadata": {"value": 25.0}},
-            created_at=old_time,
-        )
-        db_session.add(NotificationDelivery(
-            event=event,
-            recipient_type="user",
-            recipient_id=cardio_user.id,
-            role="Doctor",
-            channel="in_app_inbox",
-            dedup_key=f"synthetic-old-delivery:{event_type}",
-            sequence_id=sequence,
-            delivery_status="delivered",
-        ))
-    db_session.flush()
+    add_prior_critical_deliveries(result, source, **overrides)
+    broadcast = AsyncMock()
+    monkeypatch.setattr(NotificationPlatformService, "_broadcast_delivery_with_policy", broadcast)
+
+    await mod.LabNotificationService(db_session).check_critical_values()
+
+    assert broadcast.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_scheduler_adopts_prior_delivery_and_deduplicates_identical_corrections_by_release(
+    db_session, released_result, add_prior_critical_deliveries, monkeypatch,
+):
+    result, source = released_result()
+    add_prior_critical_deliveries(result, source)
     broadcast = AsyncMock()
     monkeypatch.setattr(NotificationPlatformService, "_broadcast_delivery_with_policy", broadcast)
     scheduler = mod.LabNotificationService(db_session)
