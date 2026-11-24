@@ -44,10 +44,11 @@ class CRUDPrescription(CRUDBase[Prescription, PrescriptionCreate, PrescriptionUp
         emr_revision_id: int | None,
         values: dict,
         appointment_id: int | None = None,
+        legacy_item: Prescription | None = None,
     ) -> Prescription:
         # The visit lock covers the first insert as well as updates from both APIs.
         db.query(Visit.id).filter(Visit.id == visit_id).with_for_update().one()
-        item = self.get_by_visit(db, visit_id=visit_id)
+        item = self.get_by_visit(db, visit_id=visit_id) or legacy_item
         if item is None and appointment_id is not None:
             previous = self.get_by_appointment(db, appointment_id=appointment_id)
             if previous and previous.visit_id in (None, visit_id):

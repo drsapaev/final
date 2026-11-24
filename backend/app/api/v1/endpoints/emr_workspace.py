@@ -81,7 +81,7 @@ def get_emr_workspace(
     offset: int = Query(0, ge=0, le=10000),
     limit: int = Query(25, ge=1, le=50),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     ensure_emr_visit_access(db, visit_id, current_user)
     service = EMRWorkspaceService(db)
@@ -105,7 +105,7 @@ def put_clinical_entry(
     payload: ClinicalEntryWrite,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_WRITE_ROLES)),
 ):
     ensure_emr_visit_access(db, visit_id, current_user)
     service = EMRWorkspaceService(db)
@@ -131,7 +131,7 @@ def get_clinical_entry_history(
     request: Request,
     patient_id: int | None = Query(None, gt=0),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     ensure_emr_visit_access(db, visit_id, current_user)
     service = EMRWorkspaceService(db)
@@ -161,7 +161,7 @@ def get_workspace_history_document(
     request: Request,
     patient_id: int | None = Query(None, gt=0),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     ensure_emr_visit_access(db, visit_id, current_user)
     ensure_emr_visit_access(db, source_visit_id, current_user)
@@ -183,7 +183,7 @@ def get_workspace_prescription(
     request: Request,
     patient_id: int = Query(gt=0),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     ensure_emr_visit_access(db, visit_id, current_user)
     try:
@@ -203,18 +203,26 @@ def post_workspace_prescription(
     payload: IssuePrescription,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_WRITE_ROLES)),
 ):
     ensure_emr_visit_access(db, visit_id, current_user)
     try:
         visit, patient = EMRWorkspaceService(db).context(visit_id, payload.patient_id)
-        if visit.status == "canceled":
-            raise WorkspaceError(409, "VISIT_CANCELED")
-        result = issue_prescription(db, visit, payload.expected_row_version)
+        result = issue_prescription(
+            db,
+            visit,
+            payload.expected_row_version,
+            authorize_visit=lambda locked_id: ensure_emr_visit_access(
+                db, locked_id, current_user
+            ),
+        )
         db.commit()
     except WorkspaceError as error:
         db.rollback()
         raise fail_workspace(error) from error
+    except HTTPException:
+        db.rollback()
+        raise
     audit_workspace(
         db, request, current_user, patient.id, visit_id, "edit", str(result.id)
     )
@@ -227,7 +235,7 @@ def get_workspace_labs(
     request: Request,
     patient_id: int | None = Query(None, gt=0),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     ensure_emr_visit_access(db, visit_id, current_user)
     try:
@@ -248,7 +256,7 @@ def post_workspace_lab_review(
     payload: LabReviewRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_WRITE_ROLES)),
 ):
     ensure_emr_visit_access(db, visit_id, current_user)
     try:

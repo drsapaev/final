@@ -4,7 +4,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
+
+from app.models.appointment import Appointment
 from app.models.emr import Prescription
+from app.models.enums import AppointmentStatus
 from app.models.lab import (
     LabOrder,
     LabReportInstance,
@@ -19,6 +23,24 @@ from app.models.visit import Visit
 
 def emr_path(visit_id):
     return f"/api/v1/v2/emr/{visit_id}"
+
+
+def save_prescribable_workspace(client, headers, visit_id):
+    saved = client.post(
+        emr_path(visit_id), headers=headers, json={
+            "is_draft": False,
+            "data": {
+                "specialty": "cardiology",
+                "medications": {"list": [{
+                    "name": "SYNTHETIC item", "dosage": "SYNTHETIC dosage",
+                    "frequency": "SYNTHETIC frequency", "duration": "SYNTHETIC duration",
+                    "quantity": 2,
+                }]},
+            },
+        },
+    )
+    assert saved.status_code == 200, saved.text
+    return saved.json()
 
 
 def test_longitudinal_versions_are_scoped_and_do_not_change_the_visit_emr(
@@ -252,6 +274,114 @@ def test_lab_review_belongs_to_the_exact_report_version_and_order(
     assert correction["reviews"] == []
     assert previous["id"] == first.id and not previous["is_current_final"]
     assert previous["reviews"] == [reviewed.json()]
+
+
+def test_workspace_rx_reuses_exact_appointment_only_prescription(
+    client, db_session, cardio_auth_headers, test_visit,
+):
+    matching, different_time = [Appointment(
+        patient_id=test_visit.patient_id, doctor_id=test_visit.doctor_id,
+        appointment_date=test_visit.visit_date, appointment_time=appointment_time,
+        status=AppointmentStatus.IN_VISIT,
+    ) for appointment_time in ("10:00:00", "11:00")]
+    db_session.add_all([matching, different_time])
+    db_session.flush()
+    legacy, unrelated = [Prescription(appointment_id=appointment.id, is_draft=False)
+                         for appointment in (matching, different_time)]
+    db_session.add_all([legacy, unrelated])
+    db_session.commit()
+    saved = save_prescribable_workspace(client, cardio_auth_headers, test_visit.id)
+    route = f"{emr_path(test_visit.id)}/workspace/prescription"
+    body = {"patient_id": test_visit.patient_id, "expected_row_version": saved["row_version"]}
+    lookup = client.get(route, headers=cardio_auth_headers, params={"patient_id": test_visit.patient_id})
+    assert lookup.status_code == 200, lookup.text
+    assert lookup.json() == {
+        "id": legacy.id, "visit_id": test_visit.id, "emr_version": None, "is_draft": False,
+    }
+    assert legacy.visit_id is None
+
+    issued = client.post(route, headers=cardio_auth_headers, json=body)
+    assert issued.status_code == 200, issued.text
+    assert issued.json()["id"] == legacy.id
+    assert issued.json()["emr_version"] == saved["version"]
+    assert legacy.visit_id == test_visit.id
+    assert legacy.appointment_id == matching.id
+    assert unrelated.visit_id is None
+    assert client.post(route, headers=cardio_auth_headers, json=body).json() == issued.json()
+    assert db_session.query(Prescription).filter_by(visit_id=test_visit.id).count() == 1
+
+
+def test_workspace_rx_refuses_ambiguous_legacy_visit_mapping(
+    client, db_session, cardio_auth_headers, test_visit,
+):
+    appointment = Appointment(
+        patient_id=test_visit.patient_id, doctor_id=test_visit.doctor_id,
+        appointment_date=test_visit.visit_date, appointment_time=test_visit.visit_time,
+        status=AppointmentStatus.IN_VISIT,
+    )
+    another_visit = Visit(
+        patient_id=test_visit.patient_id, doctor_id=test_visit.doctor_id,
+        visit_date=test_visit.visit_date, visit_time=test_visit.visit_time,
+    )
+    db_session.add_all([appointment, another_visit])
+    db_session.flush()
+    legacy = Prescription(appointment_id=appointment.id, is_draft=False)
+    db_session.add(legacy)
+    db_session.commit()
+    saved = save_prescribable_workspace(client, cardio_auth_headers, test_visit.id)
+    route = f"{emr_path(test_visit.id)}/workspace/prescription"
+    lookup = client.get(route, headers=cardio_auth_headers, params={"patient_id": test_visit.patient_id})
+    assert lookup.status_code == 409, lookup.text
+    attempt = client.post(route, headers=cardio_auth_headers, json={
+        "patient_id": test_visit.patient_id, "expected_row_version": saved["row_version"],
+    })
+    assert attempt.status_code == 409, attempt.text
+    assert attempt.json()["detail"]["code"] == "PRESCRIPTION_LEGACY_AMBIGUOUS"
+    assert legacy.visit_id is None
+    assert db_session.query(Prescription).filter_by(visit_id=test_visit.id).count() == 0
+
+
+@pytest.mark.parametrize("change,expected_status,expected_code", [
+    ({"status": "canceled"}, 409, "VISIT_CANCELED"),
+    ({"doctor_id": None}, 403, None),
+])
+def test_workspace_rx_refreshes_visit_status_and_owner_under_lock(
+    client, db_session, cardio_auth_headers, test_visit,
+    change, expected_status, expected_code,
+):
+    saved = save_prescribable_workspace(client, cardio_auth_headers, test_visit.id)
+    visit_id, patient_id = test_visit.id, test_visit.patient_id
+    db_session.refresh(test_visit)
+    db_session.execute(Visit.__table__.update().where(Visit.id == visit_id).values(**change))
+    stale_field, changed_value = next(iter(change.items()))
+    assert getattr(test_visit, stale_field) != changed_value
+
+    attempted = client.post(
+        f"{emr_path(visit_id)}/workspace/prescription", headers=cardio_auth_headers,
+        json={"patient_id": patient_id, "expected_row_version": saved["row_version"]},
+    )
+    assert attempted.status_code == expected_status, attempted.text
+    if expected_code:
+        assert attempted.json()["detail"]["code"] == expected_code
+    assert db_session.query(Prescription).filter_by(visit_id=visit_id).count() == 0
+
+
+def test_workspace_rejects_inactive_account_even_with_active_doctor_profile(
+    client, db_session, cardio_auth_headers, cardio_user, test_doctor, test_visit,
+):
+    saved = save_prescribable_workspace(client, cardio_auth_headers, test_visit.id)
+    cardio_user.is_active = False
+    db_session.commit()
+    assert test_doctor.active
+
+    path = f"{emr_path(test_visit.id)}/workspace"
+    lookup = client.get(path, headers=cardio_auth_headers)
+    assert lookup.status_code == 403, lookup.text
+    attempt = client.post(f"{path}/prescription", headers=cardio_auth_headers, json={
+        "patient_id": test_visit.patient_id, "expected_row_version": saved["row_version"],
+    })
+    assert attempt.status_code == 403, attempt.text
+    assert db_session.query(Prescription).filter_by(visit_id=test_visit.id).count() == 0
 
 
 def test_workspace_lab_trend_uses_scoped_numeric_values_from_the_exact_report(
