@@ -10,7 +10,6 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine, make_url
-
 from tests._pg_admin_guard import is_local_admin_dsn
 from tests.integration.test_encounter_migration_pg import _migration
 
@@ -680,3 +679,103 @@ def test_financial_sequence_acl_rolls_back_on_assumable_update(finance_sequence_
         assert _has_sequence(
             connection, scope, scope.inherited, _PROTECTED_SEQUENCES[0], "UPDATE"
         )
+
+
+@pytest.fixture
+def payment_evidence_scope(finance_scope, monkeypatch):
+    migration = _migration("0164_payment_evidence_acl.py")
+    scope = replace(finance_scope, migration=migration)
+    monkeypatch.setattr(migration, "_GATEWAY_ROLES", (scope.gateway,))
+    with scope.engine.begin() as connection:
+        connection.exec_driver_sql(f"ALTER ROLE {scope.gateway} BYPASSRLS")
+        for relation in ("payment_webhooks", "payment_transactions"):
+            table = scope.qualified(relation)
+            connection.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN status text")
+            connection.exec_driver_sql(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+            connection.exec_driver_sql(
+                f"GRANT UPDATE, DELETE, TRIGGER ON {table} TO {scope.gateway}, {scope.maintainer}"
+            )
+            connection.exec_driver_sql(f"GRANT DELETE, TRIGGER ON {table} TO PUBLIC")
+        connection.exec_driver_sql(
+            f"GRANT DELETE, TRIGGER ON {scope.qualified('unrelated_inventory')} TO {scope.gateway}"
+        )
+    return scope
+
+
+def test_payment_evidence_revocation_preserves_callback_workflow(payment_evidence_scope):
+    scope = payment_evidence_scope
+    final_states = {"payment_webhooks": "processed", "payment_transactions": "completed"}
+    with scope.engine.begin() as connection:
+        for relation in final_states:
+            for privilege in ("DELETE", "TRIGGER"):
+                assert _has(connection, scope, scope.gateway, relation, privilege)
+                assert _has(connection, scope, scope.inherited, relation, privilege)
+
+        _migrate(scope, connection)
+
+        for relation in final_states:
+            for privilege in ("DELETE", "TRIGGER"):
+                assert not _has(connection, scope, scope.gateway, relation, privilege)
+                assert not _has(connection, scope, scope.inherited, relation, privilege)
+                assert _has(connection, scope, scope.maintainer, relation, privilege)
+        for privilege in ("DELETE", "TRIGGER"):
+            assert _has(
+                connection, scope, scope.gateway, "unrelated_inventory", privilege
+            )
+
+        connection.exec_driver_sql(f"SET LOCAL ROLE {scope.gateway}")
+        for relation in final_states:
+            table = scope.qualified(relation)
+            connection.exec_driver_sql(
+                f"INSERT INTO {table} (id, status) VALUES (1, 'pending')"
+            )
+            locked_status = connection.scalar(
+                text(f"SELECT status FROM {table} WHERE id = 1 FOR UPDATE")
+            )
+            assert locked_status == "pending"
+            connection.execute(
+                text(f"UPDATE {table} SET status = :status WHERE id = 1"),
+                {"status": final_states[relation]},
+            )
+
+    with scope.engine.begin() as connection:
+        _migrate(scope, connection, downgrade=True)
+        for relation in final_states:
+            for privilege in ("DELETE", "TRIGGER"):
+                assert not _has(connection, scope, scope.gateway, relation, privilege)
+        _migrate(scope, connection)
+        for relation, status in final_states.items():
+            assert (
+                connection.scalar(
+                    text(f"SELECT status FROM {scope.qualified(relation)} WHERE id = 1")
+                )
+                == status
+            )
+
+
+@pytest.mark.parametrize("privilege", ["DELETE", "TRIGGER"])
+def test_payment_evidence_rejects_assumable_destructive_grants(
+    payment_evidence_scope, privilege
+):
+    scope = payment_evidence_scope
+    table = scope.qualified("payment_transactions")
+    with scope.engine.begin() as connection:
+        if connection.dialect.server_version_info < (16,):
+            connection.exec_driver_sql(f"GRANT {scope.inherited} TO {scope.gateway}")
+        else:
+            connection.exec_driver_sql(
+                f"GRANT {scope.inherited} TO {scope.gateway} WITH INHERIT FALSE, SET TRUE"
+            )
+        connection.exec_driver_sql(f"GRANT {privilege} ON {table} TO {scope.inherited}")
+
+    with (
+        pytest.raises(RuntimeError, match="Remaining payment evidence privileges"),
+        scope.engine.begin() as connection,
+    ):
+        _migrate(scope, connection)
+
+    with scope.engine.begin() as connection:
+        assert _has(connection, scope, scope.gateway, "payment_webhooks", privilege)
+        connection.exec_driver_sql(f"REVOKE {scope.inherited} FROM {scope.gateway}")
+        _migrate(scope, connection)
+        assert not _has(connection, scope, scope.gateway, "payment_transactions", privilege)
