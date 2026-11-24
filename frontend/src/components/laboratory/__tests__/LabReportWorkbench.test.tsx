@@ -3,7 +3,7 @@ import '@testing-library/jest-dom';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportWorkbenchRaw from '../LabReportWorkbench';
@@ -512,6 +512,61 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       </ThemeProvider>
     );
   }
+
+  it.each([
+    {
+      language: 'ru', save: 'Сохранить черновик', preview: 'Предпросмотр PDF', release: 'Утвердить',
+      releaseTitle: 'Утверждение отчёта', releaseMessage: 'После утверждения отчёт становится неизменяемым.',
+      released: 'Отчёт утверждён.', cancel: 'Отмена', print: 'Печать результата', notifyPatient: 'Отправить пациенту',
+      revise: 'Исправленная версия', reviseTitle: 'Создание исправленной версии', reviseConfirm: 'Создать версию',
+    },
+    {
+      language: 'uz-Cyrl', save: 'Қораламани сақлаш', preview: 'PDFни олдиндан кўриш', release: 'Тасдиқлаш',
+      releaseTitle: 'Ҳисоботни тасдиқлаш', releaseMessage: 'Тасдиқлангандан кейин ҳисоботни ўзгартириб бўлмайди.',
+      released: 'Ҳисобот тасдиқланди.', cancel: 'Бекор қилиш', print: 'Натижани чоп этиш', notifyPatient: 'Беморга юбориш',
+      revise: 'Тузатилган версия', reviseTitle: 'Тузатилган версияни яратиш', reviseConfirm: 'Версия яратиш',
+    },
+    {
+      language: 'uz-Latn', save: 'Qoralamani saqlash', preview: 'PDF ko‘rib chiqish', release: 'Tasdiqlash',
+      releaseTitle: 'Hisobotni tasdiqlash', releaseMessage: 'Tasdiqlangandan so\'ng, hisobot o\'zgartirib bo\'lmaydigan bo\'ladi.',
+      released: 'Hisobot tasdiqlandi.', cancel: 'Bekor qilish', print: 'Natijani chop etish', notifyPatient: 'Bemorga yuborish',
+      revise: 'Tuzatilgan versiya', reviseTitle: 'Tuzatilgan versiya yaratish', reviseConfirm: 'Versiya yaratish',
+    },
+  ])('localizes the report actions, dialogs, and outcome in $language', async (labels) => {
+    await i18n.changeLanguage(labels.language);
+    try {
+      const notify = vi.fn();
+      const finalized = { ...reopenedDraftInstance, status: 'FINALIZED', available_actions: ['print', 'revise'] };
+      mockedApi.finalize.mockResolvedValue(finalized);
+      const draft = renderWithActiveInstance({
+        activeInstance: { ...reopenedDraftInstance, available_actions: ['edit', 'save_draft', 'preview', 'finalize'] },
+        notify,
+      });
+
+      expect(screen.getByRole('button', { name: labels.save })).toBeEnabled();
+      expect(screen.getByRole('button', { name: labels.preview })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: labels.release, exact: true }));
+      const releaseDialog = within(await screen.findByRole('dialog', { name: labels.releaseTitle }));
+      expect(releaseDialog.getByText(labels.releaseMessage)).toBeVisible();
+      expect(releaseDialog.getByRole('button', { name: labels.cancel })).toBeEnabled();
+      fireEvent.click(releaseDialog.getByRole('button', { name: labels.release }));
+      await waitFor(() => expect(notify).toHaveBeenCalledWith('success', labels.released));
+      expect(mockedApi.finalize).toHaveBeenCalledWith(reopenedDraftInstance.id, reopenedDraftInstance.updated_at);
+      draft.unmount();
+
+      renderWithActiveInstance({ activeInstance: finalized });
+      expect(screen.getByRole('button', { name: labels.print })).toBeEnabled();
+      expect(screen.getByRole('button', { name: labels.notifyPatient })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: labels.revise, exact: true }));
+      const reviseDialog = within(await screen.findByRole('dialog', { name: labels.reviseTitle }));
+      expect(reviseDialog.getByRole('button', { name: labels.reviseConfirm })).toBeDisabled();
+      fireEvent.click(reviseDialog.getByRole('button', { name: labels.cancel }));
+      expect(screen.queryByRole('dialog', { name: labels.reviseTitle })).not.toBeInTheDocument();
+    } finally {
+      cleanup();
+      await i18n.changeLanguage('ru');
+    }
+  });
 
   // ── LABPRINT (audit 3886, round 14) ─────────────────────────────────
   it('LABPRINT-FE-003: an ambiguous 2xx ACK does not mark printed, does not fall back and does not blind-retry', async () => {
