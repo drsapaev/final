@@ -633,7 +633,7 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     await page.goto('/lab');
     await page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) }).click();
     const report = page.locator('#lab-panel-tabpanel-reports');
-    const releaseHold = report.getByText(/Связанная проба ещё не принята/);
+    const releaseHold = report.getByText('Не все связанные пробы приняты');
     await expect(releaseHold).toBeVisible();
     const result = report.getByRole('textbox', { name: /Лейкоциты/ });
     await result.fill('SYNTHETIC unsaved change');
