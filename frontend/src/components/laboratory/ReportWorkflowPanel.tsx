@@ -148,6 +148,7 @@ export function ReportWorkflowDialog({
   const canSubmit = (!isQC || status !== '') && (!requiresReason || Boolean(reason.trim()))
     && (!requiresSeries || Boolean(method.trim() && series.trim()));
   const title = action === 'revise' ? t('confirm.revise_title') : t(`workbench.workflow_${action}`);
+  const unusualChangeLabel = t('workbench.workflow_mark_unusual_change');
 
   return (
     <Modal isOpen title={title} onClose={saving ? undefined : onClose} size="small" closeOnEscape={!saving} closeOnBackdrop={!saving}>
@@ -165,9 +166,9 @@ export function ReportWorkflowDialog({
         {action === 'review' && <p>{t('workbench.workflow_review_note_help')}</p>}
         {action === 'return_to_draft' && (
           <label>
-            <input type="checkbox" checked={unusualChange} disabled={saving}
+            <input type="checkbox" aria-label={unusualChangeLabel} checked={unusualChange} disabled={saving}
               onChange={(event) => setUnusualChange(event.target.checked)} />
-            {t('workbench.workflow_mark_unusual_change')}
+            {unusualChangeLabel}
           </label>
         )}
         {isQC && (
