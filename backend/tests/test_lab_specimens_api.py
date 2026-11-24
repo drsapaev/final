@@ -357,6 +357,31 @@ def test_lab_specimen_labels_and_reads_require_active_staff(
         "print_label",
     ]
 
+    printed = listed["items"][0]
+    reprint_body = {"request_id": str(uuid4()), "expected_revision": printed["revision"]}
+    reprint = client.post(label_url, json=reprint_body, headers=headers)
+    assert reprint.status_code == 200, reprint.text
+    assert reprint.headers["content-disposition"] == result.headers["content-disposition"]
+    assert reprint.content == result.content
+
+    replay = client.post(label_url, json=reprint_body, headers=headers)
+    assert replay.status_code == 200, replay.text
+    assert replay.content == result.content
+    reprinted = client.get(
+        f"{LAB_API}/orders/{row['order_id']}/specimens", headers=headers
+    ).json()["items"][0]
+    assert reprinted["id"] == row["id"]
+    assert reprinted["barcode"] == row["barcode"]
+    assert reprinted["revision"] == row["revision"] + 2
+    assert [
+        (event["action"], event["actor_user_id"], event["revision"])
+        for event in reprinted["events"]
+    ] == [
+        ("create", actor.id, row["revision"]),
+        ("print_label", actor.id, row["revision"] + 1),
+        ("print_label", actor.id, row["revision"] + 2),
+    ]
+
 
 def test_specimen_openapi_documents_context_and_binary_labels(client):
     paths = client.get("/openapi.json").json()["paths"]
