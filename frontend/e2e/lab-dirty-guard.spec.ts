@@ -23,13 +23,15 @@ const LAB_PROFILE = {
   roles: ['Lab'],
 };
 
-// Minimal unsigned token shape: the UI only decodes claims client-side and
-// every API call is mocked, so the signature is irrelevant here.
-const FAKE_TOKEN = [
-  'eyJhbGciOiJIUzI1NiJ9',
-  'eyJzdWIiOiI3Iiwicm9sZSI6IkxhYiIsImV4cCI6OTk5OTk5OTk5OX0',
-  'sig',
-].join('.');
+// Browser-only test session. Every API request in this spec is mocked.
+function mockSessionToken(expiresAtSeconds: number): string {
+  const encode = (claims: object) => Buffer.from(JSON.stringify(claims)).toString('base64url');
+  const header = encode({ alg: 'none', typ: 'JWT' });
+  const claims = encode({ sub: String(LAB_PROFILE.id), role: LAB_PROFILE.role, exp: expiresAtSeconds });
+  return [header, claims, 'qa'].join('.');
+}
+
+const FAKE_TOKEN = mockSessionToken(9_999_999_999);
 
 const TEMPLATES_SUMMARY = [
   { id: 5, code: 'rule_demo', name: 'Rule Demo', family: 'chemistry', is_active: true, published_version_id: 51, draft_version_id: null, latest_version_id: 51 },
@@ -2231,28 +2233,10 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
   // закрывается ТОЛЬКО после нового значения access token с будущим exp;
   // неудача оставляет его открытым с явной ошибкой.
   test('the extend-session button performs a real refresh: failure keeps the warning open, success lands a new token (review round 9)', async ({ page }) => {
-    // Токен внутри 5-минутного порога: предупреждение срабатывает на
-    // mount-проверке опроса. Собирается в рантайме (как installToken в
-    // компонентных тестах) — единый JWT-литерал в исходнике триггерит
-    // secret-сканер CI.
-    const nearExpiryToken = [
-      'eyJhbGciOiJIUzI1NiJ9',
-      Buffer.from(JSON.stringify({
-        sub: '7',
-        role: 'Lab',
-        exp: Math.floor((Date.now() + 4 * 60_000) / 1000),
-      })).toString('base64'),
-      'sig',
-    ].join('.');
-    const freshToken = [
-      'eyJhbGciOiJIUzI1NiJ9',
-      Buffer.from(JSON.stringify({
-        sub: '7',
-        role: 'Lab',
-        exp: Math.floor((Date.now() + 60 * 60_000) / 1000),
-      })).toString('base64'),
-      'sig',
-    ].join('.');
+    // The near-expiry session is already within the warning window on mount.
+    const now = Math.floor(Date.now() / 1000);
+    const nearExpiryToken = mockSessionToken(now + 4 * 60);
+    const freshToken = mockSessionToken(now + 60 * 60);
     await page.addInitScript((token) => {
       window.sessionStorage.setItem('auth_token', token);
       window.sessionStorage.setItem('refresh_token', token);
@@ -2326,11 +2310,8 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
       const reportTab = page.getByRole('tab', { name: /Отчёты/ });
       await reportTab.focus();
 
-      await page.evaluate(() => {
-        const claims = { sub: '7', role: 'Lab', exp: Math.floor((Date.now() + 40_000) / 1000) };
-        const encoded = btoa(JSON.stringify(claims)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-        window.sessionStorage.setItem('auth_token', ['eyJhbGciOiJIUzI1NiJ9', encoded, 'sig'].join('.'));
-      });
+      const expiresAt = await page.evaluate(() => Math.floor((Date.now() + 40_000) / 1000));
+      await page.evaluate((token) => window.sessionStorage.setItem('auth_token', token), mockSessionToken(expiresAt));
       await page.clock.fastForward(30_000);
       const warning = page.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' });
       await expect(warning.getByRole('button', { name: 'Позже' })).toBeFocused();
