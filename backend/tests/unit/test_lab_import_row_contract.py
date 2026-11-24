@@ -13,6 +13,7 @@ from app.models.lab_import import LabImportReceipt
 from app.models.role_permission import Permission
 from app.schemas.lab_import import LabImportBatch, LabImportRow
 from app.schemas.lab_release import LabReportQCIn
+from app.services import lab_import
 from app.services.lab_import import _digest
 from app.services.lab_reporting import LabReportingService
 from tests.unit.test_lab_managed_release import _staff
@@ -104,6 +105,118 @@ def test_malformed_import_rows_keep_position_and_valid_siblings_commit(
     assert replay.json()["rows"][1]["status"] == "duplicate"
     assert replay.json()["rows"][1]["receipt_id"] == receipt.id
     assert len(db_session.scalars(select(LabImportReceipt)).all()) == 1
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("second_field", "intervening_edit", "version_override", "second_error"),
+    [
+        ("wbc", False, None, None),
+        ("hgb", False, None, "values_exist"),
+        ("wbc", True, None, "stale_report"),
+        ("wbc", False, "0001-01-01T00:00:00+01:00", "stale_report"),
+    ],
+)
+def test_same_report_import_rows_use_the_same_preview_without_losing_other_writes(
+    client,
+    db_session,
+    admin_user,
+    admin_auth_headers,
+    test_patient,
+    monkeypatch,
+    second_field,
+    intervening_edit,
+    version_override,
+    second_error,
+):
+    service, report = synthetic_report(db_session, test_patient.id)
+    fields = service._field_map(report.template_version)
+    specimens = [
+        accepted_specimen(db_session, report, f"SYNTHETIC-BATCH-{index}")
+        for index in range(2)
+    ]
+    rows = [
+        {
+            "message_id": str(uuid4()),
+            "report_instance_id": report.id,
+            "specimen_barcode": specimen.barcode,
+            "values": [
+                {
+                    "analyte_code": key,
+                    "unit_code": service._resolve_field_unit_code(fields[key])
+                    or service._resolve_field_unit(fields[key]),
+                    "value_text": value,
+                }
+            ],
+        }
+        for specimen, key, value in zip(
+            specimens, ("hgb", second_field), ("11", "22"), strict=True
+        )
+    ]
+    batch = {"source": "manual", "rows": rows}
+    response = client.post(
+        f"{IMPORT_URL}/preview", json=batch, headers=admin_auth_headers
+    )
+    assert response.status_code == 200
+    first_preview, second_preview = response.json()["rows"]
+    assert first_preview["status"] == second_preview["status"] == "ready"
+    assert first_preview["updated_at"] == second_preview["updated_at"]
+    for row in rows:
+        row["expected_updated_at"] = first_preview["updated_at"]
+        row["replace_existing"] = True
+    if version_override is not None:
+        rows[1]["expected_updated_at"] = version_override
+
+    if intervening_edit:
+        process_row = lab_import._process_row
+
+        def process_with_edit(db, source, actor_id, row, **options):
+            outcome = process_row(db, source, actor_id, row, **options)
+            if options["row_index"] == 0 and outcome.status == "saved":
+                LabReportingService(db).bulk_upsert_values(
+                    report.id,
+                    [{"field_key": second_field, "value_text": "33"}],
+                    expected_updated_at=outcome.updated_at.isoformat(),
+                    actor_user_id=admin_user.id,
+                )
+            return outcome
+
+        monkeypatch.setattr(lab_import, "_process_row", process_with_edit)
+
+    response = client.post(IMPORT_URL, json=batch, headers=admin_auth_headers)
+    assert response.status_code == 200
+    first, second = response.json()["rows"]
+    assert first["status"] == "saved" and first["row_index"] == 0
+    assert second["row_index"] == 1 and second["error_code"] == second_error
+    values = {
+        value.field_key: value
+        for value in db_session.scalars(
+            select(LabReportValue).where(LabReportValue.instance_id == report.id)
+        )
+    }
+    assert values["hgb"].value_numeric == 11
+    assert values["hgb"].result_payload["source_specimen_id"] == specimens[0].id
+    if intervening_edit:
+        assert values[second_field].value_numeric == 33
+    if second_error is not None:
+        assert second["status"] == "error"
+        assert len(db_session.scalars(select(LabImportReceipt)).all()) == 1
+        return
+
+    assert second["status"] == "saved"
+    assert values[second_field].value_numeric == 22
+    assert values[second_field].result_payload["source_specimen_id"] == specimens[1].id
+    replay = client.post(IMPORT_URL, json=batch, headers=admin_auth_headers)
+    assert replay.status_code == 200
+    assert [row["status"] for row in replay.json()["rows"]] == [
+        "duplicate",
+        "duplicate",
+    ]
+    assert [row["receipt_id"] for row in replay.json()["rows"]] == [
+        first["receipt_id"],
+        second["receipt_id"],
+    ]
+    assert len(db_session.scalars(select(LabImportReceipt)).all()) == 2
 
 
 @pytest.mark.unit

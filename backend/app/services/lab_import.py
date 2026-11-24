@@ -2,7 +2,8 @@
 
 import hashlib
 import json
-from datetime import UTC
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -19,6 +20,13 @@ class RowRejected(Exception):
     def __init__(self, code: str):
         super().__init__(code)
         self.code = code
+
+
+@dataclass(frozen=True)
+class _BatchReportWrite:
+    approved_at: datetime
+    updated_at: datetime
+    field_keys: set[str]
 
 
 def _receipt(db: Session, source: str, message_id: str) -> LabImportReceipt | None:
@@ -121,6 +129,7 @@ def _process_row(
     *,
     row_index: int,
     preview: bool,
+    report_writes: dict[int, _BatchReportWrite],
 ) -> LabImportRowOut:
     digest = _digest(row)
     message_id = str(row.message_id)
@@ -141,17 +150,21 @@ def _process_row(
         service._assert_instance_mutable_draft(instance)
     except LabReportingDomainError as exc:
         raise RowRejected("report_locked") from exc
-    token = (
-        row.expected_updated_at.astimezone(UTC).isoformat()
-        if row.expected_updated_at
-        else None
-    )
+    approved_at = row.expected_updated_at
+    previous_write = report_writes.get(instance.id)
+    token = None
     if not preview:
-        if token is None:
+        if approved_at is None:
             raise RowRejected("stale_report")
+        expected = approved_at
+        if previous_write is not None and previous_write.approved_at == approved_at:
+            # Advance only across commits made by this batch. An intervening
+            # write elsewhere still fails the version check under the row lock.
+            expected = previous_write.updated_at
         try:
+            token = expected.astimezone(UTC).isoformat()
             service._assert_not_concurrently_modified(instance, token)
-        except LabReportingDomainError as exc:
+        except (LabReportingDomainError, OverflowError) as exc:
             raise RowRejected("stale_report") from exc
 
     specimen_repository = SpecimenRepository(db)
@@ -203,6 +216,11 @@ def _process_row(
             updated_at=updated_at,
             existing_values=existing_values,
         )
+    assert approved_at is not None
+    if previous_write is not None and not previous_write.field_keys.isdisjoint(
+        field_keys
+    ):
+        raise RowRejected("values_exist")
     if existing_values and not row.replace_existing:
         raise RowRejected("values_exist")
     import_origins = {
@@ -259,6 +277,11 @@ def _process_row(
         updated_at=updated_at,
     )
     db.commit()
+    if previous_write is not None:
+        field_keys.update(previous_write.field_keys)
+    report_writes[row.report_instance_id] = _BatchReportWrite(
+        approved_at=approved_at, updated_at=updated_at, field_keys=field_keys
+    )
     return response
 
 
@@ -270,13 +293,20 @@ def process_import_batch(
     preview: bool = False,
 ) -> list[LabImportRowOut]:
     responses = []
+    report_writes: dict[int, _BatchReportWrite] = {}
     for row_index, row in enumerate(batch.rows):
         try:
             if isinstance(row, tuple):
                 raise RowRejected("invalid_row")
             responses.append(
                 _process_row(
-                    db, batch.source, actor_id, row, row_index=row_index, preview=preview
+                    db,
+                    batch.source,
+                    actor_id,
+                    row,
+                    row_index=row_index,
+                    preview=preview,
+                    report_writes=report_writes,
                 )
             )
         except RowRejected as exc:
