@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   BadgeCheck,
@@ -318,6 +318,53 @@ export default function UserProfile() {
   const [activeTab, setActiveTab] = useState('info');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailFeedback, setEmailFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const emailRequestActive = useRef(false);
+  const emailRequestSequence = useRef(0);
+  const emailSessionVersion = useRef(0);
+  const profileMounted = useRef(false);
+
+  useEffect(() => {
+    profileMounted.current = true;
+    const onAuthChange = () => {
+      emailSessionVersion.current += 1;
+      emailRequestSequence.current += 1;
+      emailRequestActive.current = false;
+      setEmailSending(false);
+      setEmailFeedback(null);
+    };
+    window.addEventListener('authStateChanged', onAuthChange);
+    return () => { profileMounted.current = false; window.removeEventListener('authStateChanged', onAuthChange); };
+  }, []);
+
+  async function requestEmailVerification() {
+    if (emailRequestActive.current) return;
+    emailRequestActive.current = true;
+    const version = emailSessionVersion.current;
+    const sequence = ++emailRequestSequence.current;
+    setEmailSending(true);
+    setEmailFeedback(null);
+    try {
+      const response = await api.post('/authentication/email-verification');
+      if (profileMounted.current && version === emailSessionVersion.current) {
+        setEmailFeedback(response.data?.success === true
+          ? { kind: 'success', text: t('misc.ev_request_success') }
+          : { kind: 'error', text: t('misc.ev_request_error') });
+      }
+    } catch (error) {
+      if (profileMounted.current && version === emailSessionVersion.current) {
+        const status = (error as HttpApiError)?.response?.status;
+        const key = status === 429 ? 'misc.ev_request_rate_limit' : status === 401 ? 'misc.ev_request_login' : 'misc.ev_request_error';
+        setEmailFeedback({ kind: 'error', text: t(key) });
+      }
+    } finally {
+      if (emailRequestSequence.current === sequence) {
+        emailRequestActive.current = false;
+        if (profileMounted.current && version === emailSessionVersion.current) setEmailSending(false);
+      }
+    }
+  }
 
   const summaryBadges = useMemo(() => {
     if (!profile) {
@@ -545,7 +592,7 @@ export default function UserProfile() {
               <Button
                 variant="primary"
                 onClick={handleSaveProfile}
-                disabled={!hasChanges}
+                disabled={!hasChanges || emailSending}
                 loading={saving}
                 startIcon={<Save size={16} />}
               >
@@ -688,6 +735,14 @@ export default function UserProfile() {
                     icon={Mail}
                     placeholder="user@example.com"
                   />
+                  {Boolean(profile.email) && !profile.email_verified && (
+                    <>
+                      <Button type="button" variant="outline" disabled={saving || emailSending || draft.email !== String(profile.email)} onClick={requestEmailVerification}>
+                        {t(emailSending ? 'misc.ev_request_sending' : 'misc.ev_request_button')}
+                      </Button>
+                      {emailFeedback && <Alert severity={emailFeedback.kind} role={emailFeedback.kind === 'error' ? 'alert' : 'status'}>{emailFeedback.text}</Alert>}
+                    </>
+                  )}
                 </ProfileField>
                 <ProfileField label={t('misc.up_label_phone')}>
                   <Input

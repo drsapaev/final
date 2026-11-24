@@ -4,6 +4,7 @@ Split from openai_provider.py.
 """
 from __future__ import annotations
 
+from app.services.ai.icd_provider_result import parse_icd_provider_suggestions
 from app.services.ai.openai_provider_pkg._base import (
     AIRequest,
     Any,
@@ -98,13 +99,9 @@ class ClinicalMixin(OpenAIProviderMixinBase):
         response = await self.generate(request)
 
         if response.error:
-            return []
+            raise RuntimeError("AI provider unavailable")
 
-        try:
-            return json.loads(response.content)
-        except Exception:
-            return []
-
+        return parse_icd_provider_suggestions(response.content)
 
     async def interpret_lab_results(
         self, results: list[dict[str, Any]], patient_info: dict | None = None

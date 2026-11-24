@@ -7,6 +7,7 @@ import threading
 import time as time_module
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
 
 import pytest
@@ -700,11 +701,15 @@ def test_postgres_future_quota_excludes_terminal_and_elapsed_appointments(
         assert count == 4
 
 
-def test_portal_and_confirmed_booking_do_not_deadlock_on_patient_reference(
-    booking_request_pg_engine, monkeypatch
-):
-    """The existing portal and public writer can reserve different slots together."""
-    engine = booking_request_pg_engine
+@dataclass(frozen=True)
+class _MixedBookingPost:
+    path: str
+    payload: dict[str, object]
+    patient_id: int
+    token: str
+
+
+def _seed_mixed_booking_posts(engine, *, duration_minutes, separate_patients):
     unique = uuid.uuid4().hex[:12]
     with Session(engine) as db:
         doctor_user = User(
@@ -714,27 +719,40 @@ def test_portal_and_confirmed_booking_do_not_deadlock_on_patient_reference(
             is_active=True,
             full_name="Synthetic Doctor",
         )
-        patient_user = User(
-            username=f"mixed-booking-patient-{unique}",
-            hashed_password="synthetic-test-only",
-            role="Patient",
-            is_active=True,
-            full_name="Synthetic Patient",
-        )
-        db.add_all([doctor_user, patient_user])
-        db.flush()
-        patient = Patient(
-            user_id=patient_user.id,
-            first_name="Synthetic",
-            last_name=f"Patient {unique}",
-        )
+
+        def add_patient(channel):
+            user = User(
+                username=f"mixed-booking-{channel}-patient-{unique}",
+                hashed_password="synthetic-test-only",
+                role="Patient",
+                is_active=True,
+                full_name=f"Synthetic {channel} patient",
+            )
+            db.add(user)
+            db.flush()
+            patient = Patient(
+                user_id=user.id,
+                first_name="Synthetic",
+                last_name=f"{channel} patient {unique}",
+            )
+            db.add(patient)
+            db.flush()
+            return user, patient
+
+        db.add(doctor_user)
+        public_user, public_patient = add_patient("public")
+        if separate_patients:
+            portal_user, portal_patient = add_patient("portal")
+        else:
+            portal_user, portal_patient = public_user, public_patient
+
         department = Department(
             key=f"mixed-booking-{unique}",
             name_ru="Synthetic department",
             name_uz="Synthetic department",
             active=True,
         )
-        db.add_all([patient, department])
+        db.add(department)
         db.flush()
         doctor = Doctor(
             user_id=doctor_user.id,
@@ -752,7 +770,7 @@ def test_portal_and_confirmed_booking_do_not_deadlock_on_patient_reference(
             description_ru="Synthetic service description.",
             description_uz="Synthetic service description.",
             slug=f"mixed-booking-service-{unique}",
-            duration_minutes=20,
+            duration_minutes=duration_minutes,
             active=True,
             show_on_website=True,
             requires_doctor=True,
@@ -801,22 +819,56 @@ def test_portal_and_confirmed_booking_do_not_deadlock_on_patient_reference(
             ]
         )
         db.commit()
-        patient_id = patient.id
-        doctor_id = doctor.id
-        patient_token = mint_access_token(patient_user)
-        portal_body = {
-            "appointmentDate": target_date.isoformat(),
-            "appointmentTime": "09:20",
-            "doctorId": doctor_id,
-            "serviceIds": [service.id],
-        }
-        public_body = {
-            "service_slug": service.slug,
-            "doctor_slug": doctor.slug,
-            "appointment_date": target_date.isoformat(),
-            "appointment_time": "09:00",
-            "expected_settings_version": 1,
-        }
+        public_token = mint_access_token(public_user)
+        portal_token = (
+            mint_access_token(portal_user) if separate_patients else public_token
+        )
+        portal = _MixedBookingPost(
+            path=PATIENT_PORTAL_BOOKING,
+            payload={
+                "appointmentDate": target_date.isoformat(),
+                "appointmentTime": "09:20",
+                "doctorId": doctor.id,
+                "serviceIds": [service.id],
+            },
+            patient_id=portal_patient.id,
+            token=portal_token,
+        )
+        public = _MixedBookingPost(
+            path=PATIENT_CONFIRMED_APPOINTMENTS,
+            payload={
+                "service_slug": service.slug,
+                "doctor_slug": doctor.slug,
+                "appointment_date": target_date.isoformat(),
+                "appointment_time": "09:00",
+                "expected_settings_version": 1,
+            },
+            patient_id=public_patient.id,
+            token=public_token,
+        )
+        return doctor.id, {"portal": portal, "public": public}
+
+
+def _post_mixed_booking(client, booking):
+    return client.post(
+        booking.path,
+        headers={
+            "Authorization": f"Bearer {booking.token}",
+            "Idempotency-Key": uuid.uuid4().hex,
+        },
+        json=booking.payload,
+    )
+
+
+def test_portal_and_confirmed_booking_do_not_deadlock_on_patient_reference(
+    booking_request_pg_engine, monkeypatch
+):
+    """The existing portal and public writer can reserve adjacent slots together."""
+    engine = booking_request_pg_engine
+    doctor_id, bookings = _seed_mixed_booking_posts(
+        engine, duration_minutes=20, separate_patients=False
+    )
+    patient_id = bookings["portal"].patient_id
 
     portal_has_doctor = threading.Event()
     public_has_patient = threading.Event()
@@ -868,21 +920,14 @@ def test_portal_and_confirmed_booking_do_not_deadlock_on_patient_reference(
     app.dependency_overrides[deps.get_db] = override_get_db
     try:
         with TestClient(app, raise_server_exceptions=False) as client:
-            headers = {"Authorization": f"Bearer {patient_token}"}
             with ThreadPoolExecutor(max_workers=2) as executor:
                 portal_future = executor.submit(
-                    client.post,
-                    PATIENT_PORTAL_BOOKING,
-                    headers={**headers, "Idempotency-Key": uuid.uuid4().hex},
-                    json=portal_body,
+                    _post_mixed_booking, client, bookings["portal"]
                 )
                 if not portal_has_doctor.wait(timeout=10):
                     pytest.fail("Portal doctor lock not acquired")
                 public_future = executor.submit(
-                    client.post,
-                    PATIENT_CONFIRMED_APPOINTMENTS,
-                    headers={**headers, "Idempotency-Key": uuid.uuid4().hex},
-                    json=public_body,
+                    _post_mixed_booking, client, bookings["public"]
                 )
                 portal_response = portal_future.result(timeout=25)
                 public_response = public_future.result(timeout=25)
@@ -908,6 +953,112 @@ def test_portal_and_confirmed_booking_do_not_deadlock_on_patient_reference(
             "09:00",
             "09:20",
         ]
+
+
+@pytest.mark.parametrize(
+    ("first_channel", "second_channel", "second_error"),
+    [
+        ("public", "portal", {"reason": "appointment_time_slot_occupied"}),
+        ("portal", "public", {"code": "booking_time_unavailable"}),
+    ],
+    ids=["public-first", "portal-first"],
+)
+def test_mixed_booking_writers_reject_overlapping_intervals(
+    booking_request_pg_engine, monkeypatch, first_channel, second_channel, second_error
+):
+    """Two patients requesting overlapping starts share the same doctor lock."""
+    engine = booking_request_pg_engine
+    doctor_id, bookings = _seed_mixed_booking_posts(
+        engine, duration_minutes=40, separate_patients=True
+    )
+    first = bookings[first_channel]
+    second = bookings[second_channel]
+    assert first.patient_id != second.patient_id
+
+    modules = {
+        "portal": patient_portal_module,
+        "public": booking_request_service_module,
+    }
+    first_module = modules[first_channel]
+    second_module = modules[second_channel]
+    first_lock = first_module.lock_doctor_for_slot_reservation
+    second_lock = second_module.lock_doctor_for_slot_reservation
+    first_locked = threading.Event()
+    second_lock_attempted = threading.Event()
+    release_first = threading.Event()
+    pids = {}
+
+    def hold_first_lock(db, selected_doctor_id):
+        assert selected_doctor_id == doctor_id
+        doctor = first_lock(db, selected_doctor_id)
+        pids["first"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+        first_locked.set()
+        assert release_first.wait(timeout=12), "First booking was not released"
+        return doctor
+
+    def observe_second_lock(db, selected_doctor_id):
+        assert selected_doctor_id == doctor_id
+        pids["second"] = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+        second_lock_attempted.set()
+        return second_lock(db, selected_doctor_id)
+
+    monkeypatch.setattr(
+        first_module, "lock_doctor_for_slot_reservation", hold_first_lock
+    )
+    monkeypatch.setattr(
+        second_module, "lock_doctor_for_slot_reservation", observe_second_lock
+    )
+
+    def override_get_db():
+        with Session(engine) as db:
+            yield db
+
+    monkeypatch.setitem(app.dependency_overrides, deps.get_db, override_get_db)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            first_future = executor.submit(_post_mixed_booking, client, first)
+            try:
+                assert first_locked.wait(
+                    timeout=5
+                ), "First writer did not lock the doctor"
+                second_future = executor.submit(_post_mixed_booking, client, second)
+                assert second_lock_attempted.wait(
+                    timeout=5
+                ), "Second writer did not reach the doctor lock"
+                assert pids["first"] != pids["second"]
+                blocking_query = text(
+                    "SELECT :first_pid = ANY(pg_blocking_pids(:second_pid))"
+                )
+                with engine.execution_options(
+                    isolation_level="AUTOCOMMIT"
+                ).connect() as observer:
+                    deadline = time_module.monotonic() + 5
+                    while not observer.execute(
+                        blocking_query,
+                        {"first_pid": pids["first"], "second_pid": pids["second"]},
+                    ).scalar_one():
+                        assert (
+                            time_module.monotonic() < deadline
+                        ), "Second writer did not wait on the first doctor lock"
+                        time_module.sleep(0.02)
+            finally:
+                release_first.set()
+            first_response = first_future.result(timeout=15)
+            second_response = second_future.result(timeout=15)
+
+    assert first_response.status_code == 201, first_response.text
+    assert second_response.status_code == 409, second_response.text
+    assert second_response.json()["detail"] == second_error
+    with Session(engine) as db:
+        appointment = db.query(Appointment).one()
+        first_id_field = "id" if first_channel == "public" else "appointment_id"
+        assert appointment.id == first_response.json()[first_id_field]
+        assert appointment.patient_id == first.patient_id
+        assert appointment.doctor_id == doctor_id
+        expected_start = "09:00" if first_channel == "public" else "09:20"
+        assert appointment.appointment_time == expected_start
+        assert appointment.duration_minutes_snapshot == 40
+        assert appointment.status == "scheduled"
 
 
 def test_concurrent_staff_confirmations_create_one_appointment_for_slot(
@@ -1130,7 +1281,12 @@ def test_concurrent_staff_confirmations_create_one_appointment_for_slot(
                     deadline = time_module.monotonic() + 5
                     observed_wait = False
                     activity_summary = []
-                    with engine.connect() as observer:
+                    # PostgreSQL keeps the first activity snapshot for the
+                    # transaction. Each poll needs its own snapshot.
+                    observer_engine = engine.execution_options(
+                        isolation_level="AUTOCOMMIT"
+                    )
+                    with observer_engine.connect() as observer:
                         while time_module.monotonic() < deadline:
                             if second_future.done():
                                 break

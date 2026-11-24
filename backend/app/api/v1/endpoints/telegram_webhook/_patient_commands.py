@@ -140,23 +140,17 @@ def _is_patient_settings_context_template(template_key: str | None) -> bool:
 def _upsert_ticket_qr_telegram_user(
     db: Session,
     message: dict[str, Any],
-    patient_id: int | None = None,
     language_code: str | None = None,
     notifications_enabled: bool | None = None,
-) -> None:
-    chat = message.get("chat") or {}
+) -> TelegramUser:
+    chat_id = int(message["chat"]["id"])
     from_user = message.get("from") or {}
-    chat_id = chat.get("id")
-    if chat_id is None:
-        return
 
-    telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, int(chat_id))
+    telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
     payload = {
         "username": from_user.get("username"),
         "first_name": from_user.get("first_name"),
         "last_name": from_user.get("last_name"),
-        "active": True,
-        "blocked": False,
         "last_activity": datetime.now(UTC),
     }
     if language_code is not None:
@@ -165,33 +159,26 @@ def _upsert_ticket_qr_telegram_user(
         payload["language_code"] = _normalize_patient_language(
             from_user.get("language_code") or TELEGRAM_LANGUAGE_RU
         )
-    if patient_id is not None:
-        payload["patient_id"] = patient_id
-    if notifications_enabled is not None:
-        payload["notifications_enabled"] = notifications_enabled
-        payload["appointment_reminders"] = notifications_enabled
-        payload["lab_notifications"] = notifications_enabled
-
     if telegram_user:
         for field, value in payload.items():
             if hasattr(telegram_user, field):
                 setattr(telegram_user, field, value)
         db.flush()
-        return
+        return telegram_user
 
-    create_notifications_enabled = payload.pop("notifications_enabled", False)
-    create_appointment_reminders = payload.pop("appointment_reminders", False)
-    create_lab_notifications = payload.pop("lab_notifications", False)
-    db.add(
-        TelegramUser(
-            **payload,
-            chat_id=int(chat_id),
-            notifications_enabled=create_notifications_enabled,
-            appointment_reminders=create_appointment_reminders,
-            lab_notifications=create_lab_notifications,
-        )
+    enabled = bool(notifications_enabled)
+    telegram_user = TelegramUser(
+        **payload,
+        chat_id=chat_id,
+        active=True,
+        blocked=False,
+        notifications_enabled=enabled,
+        appointment_reminders=enabled,
+        lab_notifications=enabled,
     )
+    db.add(telegram_user)
     db.flush()
+    return telegram_user
 
 
 def _staff_telegram_reference_hash(chat_id: int) -> str:

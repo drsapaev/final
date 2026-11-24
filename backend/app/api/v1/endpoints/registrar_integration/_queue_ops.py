@@ -381,6 +381,14 @@ def _active_resource_id_for_exact_tag(db: Session, tag: str | None) -> int | Non
     return resource.id if resource else None
 
 
+def _resolve_registrar_queue_cabinet(
+    db: Session, daily_queue_id: int | None
+) -> str | None:
+    return queue_resource_routing.effective_queue_cabinet(
+        _cached_daily_queue(db, daily_queue_id)
+    )
+
+
 def _resolve_registrar_row_owner(
     *,
     db: Session,
@@ -709,6 +717,28 @@ def start_queue_visit(
                             status_code=status.HTTP_403_FORBIDDEN,
                             detail="Queue entry belongs to another specialist",
                         )
+                else:
+                    # REGSTART-BE-001 residual (group95 correction): valid
+                    # resource-owned DailyQueue rows use specialist_id=NULL
+                    # (queue_resource_id XOR) and previously BYPASSED the
+                    # ownership guard entirely, letting Doctor/specialty/Lab
+                    # callers start a resource queue entry and its linked
+                    # Visit. The canonical doctor-panel route denies
+                    # non-Admin/Registrar there too — mirror that here.
+                    # Admin/Registrar operators keep the legacy workflow.
+                    logger.warning(
+                        "start_queue_visit: non-operator denied on resource "
+                        "queue entry_id=%d caller_user_id=%d",
+                        queue_entry.id,
+                        current_user.id,
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=(
+                            "Записи ресурсной очереди может начать только "
+                            "Админ или Регистратор"
+                        ),
+                    )
             linked_visit = None
             if queue_entry.visit_id:
                 linked_visit = (
@@ -1830,8 +1860,15 @@ def _process_online_queue_entry(
         patient_id = online_entry.patient_id
         patient_name = online_entry.patient_name or "Неизвестный пациент"
         phone = online_entry.phone or "Не указан"
-        patient_birth_year = online_entry.birth_year
-        address = online_entry.address
+        # Desk/QR entries can carry only an intake snapshot. An exact linked
+        # patient's exact date takes precedence. A documented intake year
+        # remains displayable when the linked card has no full birth date.
+        # Never resolve a different card by name or phone.
+        patient = _cached_patient(db, patient_id) if patient_id is not None else None
+        patient_birth_year = (
+            patient.birth_date.year if patient and patient.birth_date else online_entry.birth_year
+        )
+        address = patient.address if patient is not None else online_entry.address
         entry_status = online_entry.status
         source = online_entry.source or "online"
         discount_mode = online_entry.discount_mode or "none"

@@ -1,8 +1,10 @@
+import type { components } from '../types/api';
 import type { HttpApiError } from '../types/errors';
+import { formatRegistrarDate } from '../utils/dateUtils';
 import { extractDetailReason } from '../utils/error-utils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { Card, Button, Badge } from '../components/ui/macos';
+import { Card, Badge } from '../components/ui/macos';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import logger from '../utils/logger';
 import { api } from '../api/client';
@@ -18,25 +20,35 @@ import {
 import PanelEmptyState from '../components/patient/PanelEmptyState';
 import PatientBookingPanel from '../components/patient/PatientBookingPanel';
 import PatientCabinetSummary from '../components/patient/PatientCabinetSummary';
+import WebAuthnRegistration from '../components/patient/WebAuthnRegistration';
+import { subscribe as subscribeAuth } from '../stores/auth';
 import PatientFormsPreview from '../components/patient/PatientFormsPreview';
 import PublicBookingRequestsPanel from '../components/patient/PublicBookingRequestsPanel';
 import './patient.css';
 import { useTranslation } from '../i18n/useTranslation';
 import { AlertTriangle, Calendar, FileText, Heart, Home, RotateCw, type LucideIcon } from 'lucide-react';
 
-interface PatientAppointment {
-  id: string | number;
-  doctor: string;
-  date: string;
-  time: string;
-  status: string;
-}
+type PatientAppointment = components['schemas']['AppointmentHistoryItem'];
 
-interface PatientResult {
-  id: string | number;
-  title: string;
-  date: string;
-}
+// PATPORTAL-FE-001 (results): the card consumed a fixture type with
+// `title`/`date` fields that do not exist in the endpoint contract —
+// every row rendered blank. The real contract is LabOrderOut.
+type PatientResult = components['schemas']['LabOrderOut'];
+
+/** PATPORTAL-FE-002: the backend status is a free-form 16-char string;
+ * the badge must carry an honest label per status vocabulary instead of
+ * collapsing every non-`scheduled` status into a green «Завершён». */
+const APPOINTMENT_STATUS_BADGE: Record<string, { variant: 'info' | 'success' | 'danger' | 'warning' | 'secondary'; labelKey: string }> = {
+  scheduled: { variant: 'info', labelKey: 'misc.pp_zaplanirovan' },
+  completed: { variant: 'success', labelKey: 'misc.pp_zavershyon' },
+  cancelled: { variant: 'danger', labelKey: 'misc.pp_otmenyon' },
+  no_show: { variant: 'warning', labelKey: 'misc.pp_ne_yavilsya' },
+  pending: { variant: 'warning', labelKey: 'misc.pp_ozhidaet' },
+};
+
+const appointmentBadge = (status?: string | null) =>
+  (status && APPOINTMENT_STATUS_BADGE[status])
+  || { variant: 'secondary' as const, labelKey: 'misc.pp_status_neizvesten' };
 
 interface FormsPreview {
   forms?: unknown[];
@@ -63,11 +75,15 @@ interface FormsPreview {
  * отдельно продолжает использовать Telegram Mini App identity (initData).
  */
 const PatientPanel = () => {
-  const { t: rawT } = useTranslation();
+  const { t: rawT, language } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   useBreakpoint();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const [isPatient, setIsPatient] = useState(false);
+  useEffect(() => subscribeAuth(({ token, profile }) => {
+    setIsPatient(Boolean(token) && String(profile?.role ?? '').toLowerCase() === 'patient');
+  }), []);
 
   // L-H-6 fix: activeSection вычисляется из URL (path или ?tab=).
   const activeSection = (() => {
@@ -293,7 +309,10 @@ const PatientPanel = () => {
                 ) : activeSection === 'booking' ? (
                   <PatientBookingPanel />
                 ) : activeSection === 'cabinet' ? (
-                  <PatientCabinetSummary />
+                  <>
+                    <PatientCabinetSummary />
+                    {isPatient && <WebAuthnRegistration />}
+                  </>
                 ) : activeSection === 'payments' ? (
                   <PatientCabinetSummary mode="payments" />
                 ) : activeSection === 'documents' ? (
@@ -318,12 +337,16 @@ const PatientPanel = () => {
                   {appointments.length > 0 ? (
                     appointments.map((a) => (
                       <div key={a.id} className="pp-home-list-item">
-                        <div>
-                          <div className="pp-list-item-primary">{a.doctor}</div>
-                          <div className="pp-list-item-secondary">{a.date} · {a.time}</div>
+                        <div className="pp-list-item-primary">
+                          <time dateTime={a.appointment_date}>
+                            {formatRegistrarDate(a.appointment_date, language)}
+                          </time>
+                          {a.appointment_time && (
+                            <> · <time dateTime={a.appointment_time}>{a.appointment_time}</time></>
+                          )}
                         </div>
-                        <Badge variant={a.status === 'scheduled' ? 'info' : 'success'}>
-                          {a.status === 'scheduled' ? t('misc.pp_zaplanirovan') : t('misc.pp_zavershyon')}
+                        <Badge variant={appointmentBadge(a.status).variant}>
+                          {t(appointmentBadge(a.status).labelKey)}
                         </Badge>
                       </div>
                     ))
@@ -347,13 +370,18 @@ const PatientPanel = () => {
                     results.map((r) => (
                       <div key={r.id} className="pp-home-list-item">
                         <div>
-                          <div className="pp-list-item-primary">{r.title}</div>
-                          <div className="pp-list-item-secondary">{r.date}</div>
+                          {/* PATPORTAL-FE-001 (results): render the
+                              LabOrderOut contract — created date and
+                              status — not the nonexistent title/date. */}
+                          <div className="pp-list-item-primary">
+                            {r.created_at && (
+                              <time dateTime={r.created_at}>
+                                {formatRegistrarDate(r.created_at.slice(0, 10), language)}
+                              </time>
+                            )}
+                          </div>
+                          <div className="pp-list-item-secondary">{r.status}</div>
                         </div>
-                        <Button variant="outline" size="small">
-                          <FileText size={16} aria-hidden="true" />
-                          Открыть
-                        </Button>
                       </div>
                     ))
                   ) : (

@@ -9,6 +9,7 @@ Passkeys are phishing-resistant by design (WebAuthn standard).
 
 Fields:
 - patient_id: linked patient
+- owner_user_id: user who registered the credential, or NULL for legacy keys
 - credential_id: WebAuthn credential ID (base64url, unique)
 - public_key: COSE-encoded public key
 - sign_count: replay protection counter
@@ -51,6 +52,15 @@ class PasskeyCredential(Base):
         nullable=False,
         index=True,
         comment="Patient who owns this passkey",
+    )
+    # Legacy credentials have no trustworthy enrollment owner and remain NULL.
+    # Consumers must reject NULL or a mismatch with the patient's current user.
+    owner_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="User who enrolled this credential; NULL means unknown owner",
     )
 
     # ─── WebAuthn credential ───────────────────────────────────────────────

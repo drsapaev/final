@@ -491,8 +491,8 @@ export default function Settings() {void
                 <div className="settings-card-title">{t('misc.settings_phone_verification_title')}</div>
                 <PhoneVerification
                 showPhoneInput={true}
-                title={t('misc.settings_phone_verification_title')}
-                onVerified={() => notify.success(t('misc.settings_phone_verified'))} />
+                purpose="phone_change"
+                title={t('misc.settings_phone_verification_title')} />
 
               </div>
             </div>

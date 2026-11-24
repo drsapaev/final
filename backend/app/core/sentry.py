@@ -24,7 +24,11 @@ import os
 import re
 from typing import Any
 
-from app.core.pii_masker import mask_pii
+from app.core.pii_masker import (
+    is_public_site_analytics_ingest_path,
+    is_sensitive_verification_path,
+    mask_pii,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -430,7 +434,7 @@ def _safe_contexts(value: Any) -> dict[str, Any]:
     return safe
 
 
-def _safe_extra(value: Any) -> dict[str, Any]:
+def _safe_extra(value: Any, *, alert_type: str | None = None) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     safe: dict[str, Any] = {}
@@ -458,6 +462,17 @@ def _safe_extra(value: Any) -> dict[str, Any]:
         number = _bounded_number(value.get(field), minimum, maximum)
         if number is not None and int(number) == number:
             safe[field] = int(number)
+    if alert_type == "system_resource":
+        # These values describe a whole SLA window, not individual requests.
+        for field, minimum, maximum, integer in (
+            ("latency_p95_ms", 0, 3_600_000, False),
+            ("latency_threshold_ms", 100, 30_000, False),
+            ("window_requests", 1, 1_000_000, True),
+            ("window_seconds", 60, 3_600, True),
+        ):
+            number = _bounded_number(value.get(field), minimum, maximum)
+            if number is not None and (not integer or int(number) == number):
+                safe[field] = int(number) if integer else number
     return safe
 
 
@@ -801,18 +816,18 @@ def sanitize_sentry_payload(event: dict[str, Any]) -> dict[str, Any]:
             safe["trace"] = trace
         else:
             safe.pop("trace")
-    if "extra" in safe:
-        extra = _safe_extra(safe["extra"])
-        if extra:
-            safe["extra"] = extra
-        else:
-            safe.pop("extra")
+    tags = _safe_tags(safe.get("tags"))
     if "tags" in safe:
-        tags = _safe_tags(safe["tags"])
         if tags:
             safe["tags"] = tags
         else:
             safe.pop("tags")
+    if "extra" in safe:
+        extra = _safe_extra(safe["extra"], alert_type=tags.get("alert_type"))
+        if extra:
+            safe["extra"] = extra
+        else:
+            safe.pop("extra")
     if "exception" in safe:
         exception = _safe_exception(safe["exception"])
         if exception:
@@ -956,6 +971,57 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
     Missing fields are skipped silently — this function must not raise on
     events with partial structure (e.g. ``{}`` or ``{"exception": {}}``).
     """
+    request = event.get("request")
+    request_url = request.get("url") if isinstance(request, dict) else None
+    if is_sensitive_verification_path(request_url) or is_sensitive_verification_path(
+        event.get("transaction")
+    ):
+        # Verification failures may contain arbitrary SMS text, a six-digit
+        # `code`, whole request bodies or exception locals.  A generic `code`
+        # key cannot be globally redacted (it also denotes medical ICD codes),
+        # so retain only safe diagnostic fields for these specific routes.
+        safe = {
+            key: event[key]
+            for key in (
+                "event_id",
+                "timestamp",
+                "level",
+                "platform",
+                "environment",
+                "release",
+                "dist",
+            )
+            if key in event
+        }
+        safe["transaction"] = "[REDACTED VERIFICATION]"
+        if isinstance(request, dict) and request.get("method") in {
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS",
+        }:
+            safe["request"] = {"method": request["method"]}
+        exception = event.get("exception")
+        values = exception.get("values") if isinstance(exception, dict) else None
+        if isinstance(values, list):
+            types = []
+            for value in values:
+                kind = value.get("type") if isinstance(value, dict) else None
+                if isinstance(kind, str) and re.fullmatch(
+                    r"[A-Za-z_][A-Za-z0-9_.]{0,127}", kind
+                ):
+                    types.append({"type": kind})
+            if types:
+                safe["exception"] = {"values": types}
+        # Preserve the historical in-place contract: the installed SDK hook
+        # and some callers intentionally continue using the original dict.
+        event.clear()
+        event.update(safe)
+        return event
+
     if "request" in event:
         event["request"] = mask_pii(event["request"])
 
@@ -968,6 +1034,12 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
         def _scrumb(b: Any) -> Any:
             if not isinstance(b, dict):
                 return mask_pii(b)
+            data = b.get("data")
+            if isinstance(data, dict) and any(
+                is_sensitive_verification_path(data.get(key))
+                for key in ("url", "from", "to")
+            ):
+                return {"category": "[REDACTED VERIFICATION]"}
             scrubbed = {**b, "data": mask_pii(b.get("data", {}))}
             message = scrubbed.get("message")
             if isinstance(message, str):
@@ -1110,6 +1182,12 @@ def init_sentry() -> None:
         the cycle while still recording the failure in stdout logs.
         """
         try:
+            request = event.get("request")
+            request_url = request.get("url") if isinstance(request, dict) else None
+            if is_public_site_analytics_ingest_path(
+                request_url
+            ) or is_public_site_analytics_ingest_path(event.get("transaction")):
+                return None
             sanitize_event(event)
             _redact_unstructured_event_text(event)
             event.update(_redact_ai_content(event))

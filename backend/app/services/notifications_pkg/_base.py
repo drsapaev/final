@@ -39,6 +39,7 @@ from app.services.telegram.bot import telegram_bot  # noqa: F401
 logger = logging.getLogger(__name__)
 
 _jinja_env = SandboxedEnvironment(autoescape=True)
+_jinja_text_env = SandboxedEnvironment(autoescape=False)
 
 
 class NotificationSenderMixinBase:

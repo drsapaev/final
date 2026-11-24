@@ -12,6 +12,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.public_site_admin import WEBSITE_SLUG_PATTERN
+
 PublicSiteLocale = Literal["uz-Latn", "ru"]
 
 
@@ -56,6 +58,17 @@ class PublicSiteServiceOut(BaseModel):
     )
     currency: str | None = None
     category: str | None = None
+
+
+class PublicSiteRelatedDoctorOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    slug: str = Field(max_length=160, pattern=WEBSITE_SLUG_PATTERN)
+    name: str
+
+
+class PublicSiteServiceDetailOut(PublicSiteServiceOut):
+    related_doctors: list[PublicSiteRelatedDoctorOut] = Field(default_factory=list)
 
 
 class PublicSiteDoctorOut(BaseModel):

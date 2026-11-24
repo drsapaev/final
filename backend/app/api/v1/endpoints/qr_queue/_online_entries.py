@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from app.api.v1.endpoints.qr_queue._analytics import (
     UpdateOnlineEntryRequest,  # noqa: F401
 )
@@ -119,7 +121,7 @@ def update_online_entry(
 class FullUpdateOnlineEntryRequest(BaseModel):
     """Запрос на полное обновление онлайн записи через мастер регистрации"""
 
-    patient_data: dict  # {patient_name, phone, birth_year, address}
+    patient_data: dict  # {patient_name, phone, birth_year, optional full birth_date, address}
     visit_type: str  # paid/repeat/benefit
     discount_mode: str  # none/repeat/benefit
     services: list[dict]  # [{service_id, quantity}]
@@ -157,6 +159,27 @@ def _full_update_find_and_validate_entry(
 
     original_entry_discount_mode = entry.discount_mode
     return entry, original_entry_discount_mode
+
+
+def _full_update_validate_birth_date(patient_data: dict) -> None:
+    """Keep a year-only snapshot separate from the real date of birth."""
+    raw = patient_data.get("birth_date")
+    if raw is None:
+        return
+
+    from app.crud.patient import validate_birthdate
+
+    try:
+        birth_date = date.fromisoformat(raw)
+        if raw != birth_date.isoformat() or not validate_birthdate(birth_date):
+            raise ValueError
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Некорректная дата рождения: ожидается ГГГГ-ММ-ДД",
+        ) from None
+    patient_data["birth_date"] = birth_date
+    patient_data["birth_year"] = birth_date.year
 
 
 def _full_update_patient_data(entry, patient_data: dict):
@@ -199,7 +222,6 @@ def _full_update_sync_patient_and_entries(
     - For other_entries with a visit_id, refreshes services from VisitService.
     """
     import json
-    from datetime import date
 
     from app.models.online_queue import OnlineQueueEntry
     from app.models.patient import Patient
@@ -226,8 +248,8 @@ def _full_update_sync_patient_and_entries(
             if patient_data.get("phone"):
                 patient.phone = patient_data["phone"]
 
-            if patient_data.get("birth_year"):
-                patient.birth_date = date(patient_data["birth_year"], 1, 1)
+            if patient_data.get("birth_date") is not None:
+                patient.birth_date = patient_data["birth_date"]
 
             if patient_data.get("address"):
                 patient.address = patient_data["address"]
@@ -542,8 +564,6 @@ def _full_update_ensure_patient_for_visit(
     patient_data: dict,
 ):
     """Section 4.6.2: Create temp Patient if entry has no patient_id. Returns patient_id_for_visit."""
-    from datetime import date
-
     from app.models.patient import Patient
 
     # ✅ ИСПРАВЛЕНО: Для QR-пациентов без patient_id нужно создать Patient или пропустить создание Visit
@@ -568,11 +588,7 @@ def _full_update_ensure_patient_for_visit(
             first_name=first_name,
             middle_name=name_parts.get("middle_name"),
             phone=patient_data.get("phone", ""),
-            birth_date=(
-                date(patient_data.get("birth_year", 1990), 1, 1)
-                if patient_data.get("birth_year")
-                else None
-            ),
+            birth_date=patient_data.get("birth_date"),
             address=patient_data.get("address", ""),
         )
         db.add(temp_patient)
@@ -2234,6 +2250,7 @@ def full_update_online_entry(
                 quote_token=request.quote_token,
             )
 
+        _full_update_validate_birth_date(request.patient_data)
         _full_update_patient_data(entry, request.patient_data)
         _full_update_visit_type(entry, request)
 

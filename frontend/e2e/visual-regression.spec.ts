@@ -33,8 +33,8 @@
  * All API calls are mocked — no backend needed.
  */
 
-import { test, expect } from '@playwright/test';
-import { installAuthenticatedQaHarness } from './support/authenticatedQa';
+import { test, expect, type Page } from '@playwright/test';
+import { createRegistrarTabsQaPayload, installAuthenticatedQaHarness } from './support/authenticatedQa';
 
 function base64UrlEncode(value: unknown): string {
   return Buffer.from(JSON.stringify(value))
@@ -70,6 +70,38 @@ function createToken(profile: { id: number; username: string }): string {
 
 function jsonResponse(body: unknown): { status: number; contentType: string; body: string } {
   return { status: 200, contentType: 'application/json; charset=utf-8', body: JSON.stringify(body) };
+}
+
+const registrarVisualTabs = createRegistrarTabsQaPayload([
+  {
+    target_kind: 'profile', target_id: 91001, custom_title: null,
+    title: 'Cardiology', title_ru: 'Кардиология', profile_key: 'cardiology',
+    queue_tags: ['cardiology'], icon: 'Heart', color: '#ef4444',
+    visible: true, available: true, reason_code: null,
+  },
+  {
+    target_kind: 'doctor', target_id: 1, custom_title: null,
+    title: 'Dr Test', title_ru: null, profile_key: null,
+    queue_tags: [], icon: 'UserCheck', color: null,
+    visible: true, available: true, reason_code: null,
+  },
+]);
+
+async function openRegistrarWithTabs(page: Page, expectedLabels: string[]) {
+  const registryResponse = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === '/api/v1/registrar/tabs'
+      && response.request().method() === 'GET');
+  await page.goto('/registrar');
+  const response = await registryResponse;
+  expect(response.ok()).toBe(true);
+  expect(await response.json()).toMatchObject({ mode: 'configured', version: 1 });
+  const tabs = page.locator('.modern-tabs');
+  await expect(tabs.getByRole('tab')).toHaveCount(expectedLabels.length);
+  for (const label of expectedLabels) {
+    await expect(tabs.getByRole('tab', { name: label, exact: true })).toBeVisible();
+  }
+  await expect(tabs.getByRole('alert')).toHaveCount(0);
+  await expect(tabs.getByRole('status')).toHaveCount(0);
 }
 
 const samplePendingPayment = {
@@ -278,6 +310,10 @@ test.describe('Visual regression — registrar wizard', () => {
       const { pathname } = url;
       if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
       if (pathname === '/api/v1/auth/me') { await route.fulfill(jsonResponse(registrarProfile)); return; }
+      if (pathname === '/api/v1/registrar/tabs') {
+        await route.fulfill(jsonResponse(registrarVisualTabs));
+        return;
+      }
       if (pathname === '/api/v1/queues/profiles') {
         await route.fulfill(jsonResponse({
           success: true,
@@ -380,6 +416,10 @@ test.describe('Visual regression — registrar EAT', () => {
       const { pathname } = url;
       if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
       if (pathname === '/api/v1/auth/me') { await route.fulfill(jsonResponse(registrarProfile)); return; }
+      if (pathname === '/api/v1/registrar/tabs') {
+        await route.fulfill(jsonResponse(registrarVisualTabs));
+        return;
+      }
       if (pathname === '/api/v1/queues/profiles') {
         await route.fulfill(jsonResponse({
           success: true,
@@ -442,19 +482,9 @@ test.describe('Visual regression — registrar EAT', () => {
   // to pass with zero-delta. 09d (EAT migration) is expected to introduce
   // intentional deltas — re-baseline per Rule 13 step A–D at that time.
   test('Surface 1: registrar EAT — desktop 1280×720', async ({ page }) => {
-    await page.goto('/registrar');
-    // PR-UI-09c-4: deterministic readiness wait. The previous fixed
-    // waitForTimeout(3000) raced the Vite dev-server cold module transform
-    // (EAT now eagerly imports the canonical DataTable, adding module
-    // requests to the /registrar graph) — on loaded CI runners the
-    // ModernTabs "Загрузка отделений..." state outlived the sleep and the
-    // body fallback captured a transient loading state (12328 px diff).
-    // Wait for the department tabs to finish loading instead; catch() keeps
-    // the original behavior of screenshotting whatever rendered — a real
-    // readiness regression then fails the snapshot assertion itself.
-    await page.locator('.tab-button.all-departments').first()
-      .waitFor({ state: 'visible', timeout: 15000 })
-      .catch(() => {});
+    // The always-present system button does not prove that registry loading
+    // succeeded. Require both configured targets before taking a baseline.
+    await openRegistrarWithTabs(page, ['Кардиология', 'Dr Test']);
     await page.waitForTimeout(300);
     const tableEl = page.locator('table').first();
     // Wait for the table to be present (EAT lazy-renders on data fetch).
@@ -477,12 +507,7 @@ test.describe('Visual regression — registrar EAT', () => {
   test('Surface 4: registrar EAT — mobile 375×720 (scroll lock)', async ({ page }) => {
     // Override the project's default desktop viewport for this test only.
     await page.setViewportSize({ width: 375, height: 720 });
-    await page.goto('/registrar');
-    // PR-UI-09c-4: deterministic readiness wait (see Surface 1 note) —
-    // replaces the fixed 3000ms sleep that raced ModernTabs loading.
-    await page.locator('.tab-button.all-departments').first()
-      .waitFor({ state: 'visible', timeout: 15000 })
-      .catch(() => {});
+    await openRegistrarWithTabs(page, ['Кардиология', 'Dr Test']);
     await page.waitForTimeout(300);
     const tableEl = page.locator('table').first();
     await tableEl.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
@@ -635,6 +660,10 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
       if (pathname === '/api/v1/auth/me') { await route.fulfill(jsonResponse(registrarProfile)); return; }
       if (pathname === '/api/v1/queue/available-specialists') {
         await route.fulfill(jsonResponse({ specialists: [{ id: 1, doctor_name: 'Dr Test', specialty: 'cardiology', cabinet: '12' }] }));
+        return;
+      }
+      if (pathname === '/api/v1/registrar/tabs') {
+        await route.fulfill(jsonResponse(createRegistrarTabsQaPayload([registrarVisualTabs.tabs[1]])));
         return;
       }
       if (pathname === '/api/v1/registrar/queues/today') {
@@ -1324,7 +1353,7 @@ test.describe('Visual regression — PR-UI-18 twelve screens · part 1: login, d
     await page.routeWebSocket('**/*', ws => { ws.close(); });
     await installAuthenticatedQaHarness(page, { role: 'Registrar' });
     await pinPr18Theme(page, 'light');
-    await page.goto('/registrar');
+    await openRegistrarWithTabs(page, ['Кардиолог', 'ЭКГ', 'Дерматолог', 'Стоматолог', 'Лаборатория', 'Процедуры']);
     await expect(page.locator('.app-shell[data-route-id="registrar-home"]')).toBeVisible({ timeout: 15000 });
     await expect.poll(
       async () => (await page.locator('body').innerText()).trim().length,
@@ -1343,7 +1372,7 @@ test.describe('Visual regression — PR-UI-18 twelve screens · part 1: login, d
     await page.routeWebSocket('**/*', ws => { ws.close(); });
     await installAuthenticatedQaHarness(page, { role: 'Registrar' });
     await pinPr18Theme(page, 'dark');
-    await page.goto('/registrar');
+    await openRegistrarWithTabs(page, ['Кардиолог', 'ЭКГ', 'Дерматолог', 'Стоматолог', 'Лаборатория', 'Процедуры']);
     await expect(page.locator('.app-shell[data-route-id="registrar-home"]')).toBeVisible({ timeout: 15000 });
     await expect.poll(
       async () => (await page.locator('body').innerText()).trim().length,

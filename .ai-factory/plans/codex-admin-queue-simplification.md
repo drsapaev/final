@@ -1,5 +1,42 @@
 # План исправления и упрощения административной настройки очередей
 
+## Уточнение T19 — единое управление вкладками регистратуры (2026-11-16)
+
+**Статус на 19 ноября 2026:** T19 **MERGED** в [PR #4117](https://github.com/drsapaev/final/pull/4117), squash `e33adf5e949cdb5b6cad225aba36a200a8ebd44a`. Проверенный HEAD `4f95116c6`, CI 33 PASS / 12 SKIPPED после повтора Frontend E2E. Оба P2 закрыты. **Tier‑2 — PARTIAL**, новый live staging отложен по решению пользователя. Детали в [EVIDENCE.md](admin-queue-simplification/EVIDENCE.md).
+
+**Текущий этап плана:** T00–T17 и T19 слиты. T18 остаётся **IN_PROGRESS / PARTIAL**. Чекпоинт #4132 слит в `b94e7b8f0`. Локальный Chromium подтвердил активацию worker после исправления `no-store` с телом и отсутствие такого ответа в кэше. Live-проверка открыта. См. [RESUME.md](admin-queue-simplification/RESUME.md).
+
+Пользователь отверг разделение на две группы «Направления»/«Врачи»: все вкладки должны настраиваться в одном месте. Незакоммиченный grouped patch сохранён отдельно и не является итоговой реализацией.
+
+### Проверка QueueProfile и решение
+
+Модель queue_profile.py и Create/Update в registrar_integration/_queue_profiles.py содержат queue_tags/department_key, но не doctor target. QueueProfile участвует в QR, admission, availability и защищённых bindings. Врачебные строки не добавляются в этот доменный профиль.
+
+Единый внутренний реестр хранится в существующей JSON-настройке ClinicSettings с ключом registrar_tabs_v1. Новых таблиц, миграций и сущности Direction нет. Backend владеет конфигурацией; frontend отображает один список.
+
+### Контракт
+
+- Строка: target_kind=profile|doctor, положительный target_id (ID QueueProfile либо Doctor), локальное название, видимость. Порядок — положение в массиве. Дубликаты typed target запрещены; максимум одна вкладка на врача/профиль.
+- GET /registrar/tabs возвращает единый список видимых доступных вкладок. GET/PUT /admin/registrar-tabs обслуживает Admin editor и варианты целей. Admin пишет, существующие внутренние роли читают по RBAC.
+- До первого сохранения GET read-only воспроизводит текущий набор: активные профили, затем доступные врачи. Администратор явно сохраняет снимок. Затем новые профили/врачи не добавляют вкладки автоматически. Сохранённый пустой массив остаётся пустым.
+- Скрытие, переименование, сортировка и удаление строки меняют только реестр. Врач/профиль, очереди, ownership, номера, queue_time, статусы, визиты и история не меняются.
+- «Все отделения» — постоянный общий фильтр. QR-публикация остаётся самостоятельным поведением QueueProfile.
+- Ссылки по неизменяемому ID; удалённый target не подменяется новым с тем же названием/ключом. Admin видит недоступные цели. Старые dept и doctor_id deep links сохраняют доступ к истории; скрытый выбранный фильтр явно показывается с ручным сбросом.
+- Endpoint возвращает profile_filters с tags и названиями всех существующих профилей отдельно от видимых tabs: скрытая/архивная вкладка не нарушает старый dept-фильтр. Эти метаданные не создают вкладки.
+- PUT проверяет expected_version, сериализует конкурирующие записи, валидирует цели и пишет обязательный audit в той же транзакции: actor, old/new config, reason, request ID, без имён/PHI. Generic ClinicSettings writer не меняет зарезервированный ключ.
+- Ошибка чтения не становится пустым успехом; failed refresh сохраняет последние подтверждённые данные, поздний ответ не заменяет свежий.
+
+### Этапы и приёмка
+
+1. T19.1 — typed DTO/service/routes, generic-settings guard, optimistic version, atomic audit. Проверки RBAC, duplicates/invalid target, empty, stale PUT, audit rollback и read-only legacy; отсутствие queue writes.
+2. T19.2 — одна Admin таблица: добавить цель, название, показать/скрыть, переместить, удалить вкладку, сохранить. Registrar читает единый endpoint без второго автоматического списка врачей. Старый редактор профилей остаётся раскрываемым блоком «Направления и QR».
+3. T19.3 — OpenAPI/generated types; focused tests mixed order, visibility, empty/error, deep links/back/forward. Пять локалей и видимые мобильные названия.
+4. Synthetic PostgreSQL/browser с обычным Admin 2FA, явным first-save и отсутствием новых автодобавлений. Целевые результаты записаны для протестированных ревизий. Новый live staging и полный T18/STAGING_VALIDATION остаются открытыми.
+
+Откат сохраняет конфигурацию/audit и данные очередей. Production/deploy/merge отдельно. Stop: необходимость менять ownership/history/admission, неоднозначный target, повреждённая настройка или недоступная обязательная проверка/штатный security hook.
+
+## Исторический checkpoint T00–T18 (сохранён без переоценки evidence)
+
 **Версия:** 4.21 — T00–T17 MERGED; T18.10/RQ-18 PASS; T18 final acceptance IN_PROGRESS; Tier-2 PARTIAL. PR #3937 code/evidence HEAD `8aa45a453909a542a55467175b4b4f2768b355e0` passed Unified CI, security and corrected body gates against main #3938 `8edd6a25ed6b88ba4fddcf247dae2e397848d8cc`. A checkpoint-only follow-up is pending exact-head checks; reviews/threads remain empty, user owns merge. A memory-safe canonical artifact path and current-source T18.1–5/T18.8–9 verification remain.
 **Создан:** 30 сентября 2026. **Обновлён:** 2026-11-09, Asia/Tashkent.
 **Текущий этап:** T00–T17 MERGED. T18.10/RQ-18 passed on app SHA `16e04af35e47663481a08923d8625d94a1c9d010`; 68/68 observed assets matched in that Session. PR #3937 code/evidence HEAD `8aa45a45` passed CI; this checkpoint-only follow-up needs its own exact-head checks. Independent review and user merge remain. T18.1–5 is NOT_RUN after host-RAM interruption; T18.8–9 browser checks remain open. The existing hosted artifact path is incompatible; implement a checksum-verified staging artifact path before another local staging build. T18/Tier-2 PARTIAL.
@@ -83,7 +120,8 @@
 | T15 | MERGED | Восстанавливаемый URL-контекст; #3711, merge `ccbf519fdb0f9a32c3a71837202dfea296f13383` |
 | T16 | MERGED | Конечная навигация и совместимые входы; PR #3718, merge `cb6a2cc0d0b2c130fe290ebf2d93cd76b73aec43` |
 | T17 | MERGED | Bulk/CSV; PR #3721 merged after the user's confirmation |
-| T18 | IN_PROGRESS / PARTIAL | T18.10 and RQ-18 PASS on recorded app SHA; current-source T18.1–5 and T18.8–9, compatible legacy live-spec harness, final QA/runbook evidence remain |
+| T18 | IN_PROGRESS / PARTIAL | RQ-18 #4034 и чекпоинты #4131/#4132 слиты. Локальный fix SW подтверждён Chromium. Текущие live-сценарии и финальная предрелизная приёмка ожидают staging. |
+| T19 | MERGED / TIER-2 PARTIAL | PR #4117, merge `e33adf5e9`. Новый live staging отложен. |
 
 ### Неопределённости и условия их закрытия
 

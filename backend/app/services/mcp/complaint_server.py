@@ -119,7 +119,7 @@ class MedicalComplaintMCPServer(BaseMCPServer):
                 try:
                     provider_type = AIProviderType(provider.lower())
                 except ValueError:
-                    logger.warning(f"Invalid provider: {provider}, using default")
+                    logger.warning("Invalid provider, using default")
 
             # Анализ через AI менеджер
             result = await self.ai_manager.analyze_complaint(
@@ -130,8 +130,7 @@ class MedicalComplaintMCPServer(BaseMCPServer):
 
             # Проверяем на ошибки и используем fallback на другие провайдеры
             if result.get("error"):
-                _error_msg = result.get("error", "").lower()
-                logger.warning(f"Primary AI provider failed: {result.get('error')}")
+                logger.warning("Primary AI provider failed")
 
                 # Пробуем альтернативные провайдеры
                 alternative_providers = [
@@ -160,7 +159,7 @@ class MedicalComplaintMCPServer(BaseMCPServer):
                             break
                     except Exception as e:
                         logger.error(
-                            f"Fallback to {alt_provider.value} failed: {str(e)}"
+                            "Fallback AI provider failed error_type=%s", type(e).__name__
                         )
                         continue
 
