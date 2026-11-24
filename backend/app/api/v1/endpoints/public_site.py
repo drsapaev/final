@@ -24,6 +24,7 @@ from app.schemas.public_site import (
     PublicSiteDoctorOut,
     PublicSiteLocale,
     PublicSiteNotFoundOut,
+    PublicSiteServiceDetailOut,
     PublicSiteServiceOut,
 )
 from app.schemas.public_site_media import PublicSiteMediaErrorOut
@@ -140,7 +141,7 @@ def list_public_services(
 
 @router.get(
     "/services/{slug}",
-    response_model=PublicSiteServiceOut,
+    response_model=PublicSiteServiceDetailOut,
     responses={
         404: {
             "model": PublicSiteNotFoundOut,
@@ -154,7 +155,7 @@ def get_public_service(
     slug: str,
     locale: PublicSiteLocale = Query(...),
     db: Session = Depends(get_db),
-) -> PublicSiteServiceOut:
+) -> PublicSiteServiceDetailOut:
     service = _read_service(db).get_service(slug, locale)
     if service is None:
         raise _public_not_found()

@@ -24,7 +24,11 @@ import os
 import re
 from typing import Any
 
-from app.core.pii_masker import is_sensitive_verification_path, mask_pii
+from app.core.pii_masker import (
+    is_public_site_analytics_ingest_path,
+    is_sensitive_verification_path,
+    mask_pii,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -430,7 +434,7 @@ def _safe_contexts(value: Any) -> dict[str, Any]:
     return safe
 
 
-def _safe_extra(value: Any) -> dict[str, Any]:
+def _safe_extra(value: Any, *, alert_type: str | None = None) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     safe: dict[str, Any] = {}
@@ -458,6 +462,17 @@ def _safe_extra(value: Any) -> dict[str, Any]:
         number = _bounded_number(value.get(field), minimum, maximum)
         if number is not None and int(number) == number:
             safe[field] = int(number)
+    if alert_type == "system_resource":
+        # These values describe a whole SLA window, not individual requests.
+        for field, minimum, maximum, integer in (
+            ("latency_p95_ms", 0, 3_600_000, False),
+            ("latency_threshold_ms", 100, 30_000, False),
+            ("window_requests", 1, 1_000_000, True),
+            ("window_seconds", 60, 3_600, True),
+        ):
+            number = _bounded_number(value.get(field), minimum, maximum)
+            if number is not None and (not integer or int(number) == number):
+                safe[field] = int(number) if integer else number
     return safe
 
 
@@ -801,18 +816,18 @@ def sanitize_sentry_payload(event: dict[str, Any]) -> dict[str, Any]:
             safe["trace"] = trace
         else:
             safe.pop("trace")
-    if "extra" in safe:
-        extra = _safe_extra(safe["extra"])
-        if extra:
-            safe["extra"] = extra
-        else:
-            safe.pop("extra")
+    tags = _safe_tags(safe.get("tags"))
     if "tags" in safe:
-        tags = _safe_tags(safe["tags"])
         if tags:
             safe["tags"] = tags
         else:
             safe.pop("tags")
+    if "extra" in safe:
+        extra = _safe_extra(safe["extra"], alert_type=tags.get("alert_type"))
+        if extra:
+            safe["extra"] = extra
+        else:
+            safe.pop("extra")
     if "exception" in safe:
         exception = _safe_exception(safe["exception"])
         if exception:
@@ -967,12 +982,26 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
         # so retain only safe diagnostic fields for these specific routes.
         safe = {
             key: event[key]
-            for key in ("event_id", "timestamp", "level", "platform", "environment", "release", "dist")
+            for key in (
+                "event_id",
+                "timestamp",
+                "level",
+                "platform",
+                "environment",
+                "release",
+                "dist",
+            )
             if key in event
         }
         safe["transaction"] = "[REDACTED VERIFICATION]"
         if isinstance(request, dict) and request.get("method") in {
-            "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS",
         }:
             safe["request"] = {"method": request["method"]}
         exception = event.get("exception")
@@ -981,7 +1010,9 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
             types = []
             for value in values:
                 kind = value.get("type") if isinstance(value, dict) else None
-                if isinstance(kind, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]{0,127}", kind):
+                if isinstance(kind, str) and re.fullmatch(
+                    r"[A-Za-z_][A-Za-z0-9_.]{0,127}", kind
+                ):
                     types.append({"type": kind})
             if types:
                 safe["exception"] = {"values": types}
@@ -1151,6 +1182,12 @@ def init_sentry() -> None:
         the cycle while still recording the failure in stdout logs.
         """
         try:
+            request = event.get("request")
+            request_url = request.get("url") if isinstance(request, dict) else None
+            if is_public_site_analytics_ingest_path(
+                request_url
+            ) or is_public_site_analytics_ingest_path(event.get("transaction")):
+                return None
             sanitize_event(event)
             _redact_unstructured_event_text(event)
             event.update(_redact_ai_content(event))

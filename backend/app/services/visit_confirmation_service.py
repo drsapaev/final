@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 # SSOT: день КЛИНИКИ — канонический хелпер живёт в crud.clinic рядом с
 # get_queue_settings (нейтральный слой, доступный всем контекстам).
 from app.crud.clinic import clinic_today as _clinic_today  # noqa: E402
+from app.services.telegram_patient_link import lock_telegram_patient_target
 
 CONFIRMATION_PROCESSING_STATUS = "confirmation_processing"
 
@@ -101,8 +102,14 @@ def _as_aware_utc(value: datetime) -> datetime:
 
 
 def build_telegram_visit_action_token(
-    *, visit_id: int, confirmation_token: str, link_id: int,
-    chat_id: int, patient_id: int, link_epoch: int, visit_context_epoch: int,
+    *,
+    visit_id: int,
+    confirmation_token: str,
+    link_id: int,
+    chat_id: int,
+    patient_id: int,
+    link_epoch: int,
+    visit_context_epoch: int,
     purpose: str = "action",
 ) -> str:
     """Derive a compact chat-bound capability without exposing the PWA token.
@@ -111,28 +118,44 @@ def build_telegram_visit_action_token(
     callback_data limit including the ``confirm_visit:`` action prefix.
     Changing the underlying visit token or link generation invalidates it.
     """
-    if (not confirmation_token or not settings.SECRET_KEY or purpose not in {"view", "action"}
-        or isinstance(chat_id, bool) or not isinstance(chat_id, int) or not 0 < chat_id < 2**63
-        or isinstance(visit_context_epoch, bool) or not isinstance(visit_context_epoch, int)
-        or not 0 <= visit_context_epoch < 2**63):
+    if (
+        not confirmation_token
+        or not settings.SECRET_KEY
+        or purpose not in {"view", "action"}
+        or isinstance(chat_id, bool)
+        or not isinstance(chat_id, int)
+        or not 0 < chat_id < 2**63
+        or isinstance(visit_context_epoch, bool)
+        or not isinstance(visit_context_epoch, int)
+        or not 0 <= visit_context_epoch < 2**63
+    ):
         raise ValueError("Visit invitation is unavailable")
     try:
         packed = struct.pack(">IIQ", visit_id, link_id, link_epoch)
     except (struct.error, TypeError, ValueError, OverflowError) as exc:
         raise ValueError("Visit invitation is unavailable") from exc
     binding = json.dumps(
-        [chat_id, patient_id, confirmation_token, visit_context_epoch], separators=(",", ":"),
+        [chat_id, patient_id, confirmation_token, visit_context_epoch],
+        separators=(",", ":"),
         ensure_ascii=True,
     ).encode("utf-8")
     digest = hmac.new(
         settings.SECRET_KEY.encode("utf-8"),
-        b"telegram-visit-" + purpose.encode("ascii") + b"-v1\0" + packed + b"\0" + binding,
+        b"telegram-visit-"
+        + purpose.encode("ascii")
+        + b"-v1\0"
+        + packed
+        + b"\0"
+        + binding,
         hashlib.sha256,
     ).digest()[:16]
     # Derive a per-capability mask from its authentication tag so identifiers
     # are not readable from callback_data. The tag is verified after lookup.
-    mask = hmac.new(settings.SECRET_KEY.encode("utf-8"),
-                    b"telegram-visit-mask-v1\0" + digest, hashlib.sha256).digest()[:16]
+    mask = hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        b"telegram-visit-mask-v1\0" + digest,
+        hashlib.sha256,
+    ).digest()[:16]
     encrypted = bytes(a ^ b for a, b in zip(packed, mask, strict=True))
     encoded = base64.urlsafe_b64encode(encrypted + digest).rstrip(b"=").decode("ascii")
     return ("tv" if purpose == "view" else "ta") + encoded
@@ -145,8 +168,11 @@ def _parse_telegram_visit_action_token(token: str) -> tuple[int, int, int] | Non
         raw = base64.b64decode(token[2:] + "=", altchars=b"-_", validate=True)
         if len(raw) != 32:
             return None
-        mask = hmac.new(settings.SECRET_KEY.encode("utf-8"),
-                        b"telegram-visit-mask-v1\0" + raw[16:], hashlib.sha256).digest()[:16]
+        mask = hmac.new(
+            settings.SECRET_KEY.encode("utf-8"),
+            b"telegram-visit-mask-v1\0" + raw[16:],
+            hashlib.sha256,
+        ).digest()[:16]
         packed = bytes(a ^ b for a, b in zip(raw[:16], mask, strict=True))
         visit_id, link_id, epoch = struct.unpack(">IIQ", packed)
         if not visit_id or not link_id or epoch > 2**63 - 1:
@@ -212,18 +238,39 @@ def consume_telegram_ticket_start_token(db, token: str) -> Visit | None:
     if not parsed:
         return None
 
-    now = datetime.now(UTC)
     token_hash = parsed["token_hash"]
-    visit = db.query(Visit).filter(Visit.confirmation_token == token_hash).first()
-    if not visit:
+    target = (
+        db.query(Visit.id, Visit.patient_id)
+        .filter(Visit.confirmation_token == token_hash)
+        .first()
+    )
+    if target is None:
         return None
 
-    if (
+    # The patient-phone trigger also locks the card before its visits.
+    lock_telegram_patient_target(db, target.patient_id)
+    visit = (
+        db.query(Visit)
+        .filter(
+            Visit.id == target.id,
+            Visit.patient_id == target.patient_id,
+            Visit.confirmation_token == token_hash,
+        )
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if visit is None:
+        return None
+
+    now = datetime.now(UTC)
+    if _as_aware_utc(parsed["expires_at"]) < now or (
         visit.confirmation_expires_at
         and _as_aware_utc(visit.confirmation_expires_at) < now
     ):
         return None
 
+    # Reuse the audited metadata-only UPDATE after validating under both locks.
     updated = (
         db.query(Visit)
         .filter(Visit.id == visit.id, Visit.confirmation_token == token_hash)
@@ -235,10 +282,7 @@ def consume_telegram_ticket_start_token(db, token: str) -> Visit | None:
             synchronize_session=False,
         )
     )
-    if updated != 1:
-        return None
-
-    return visit
+    return visit if updated == 1 else None
 
 
 class VisitConfirmationService:
@@ -276,12 +320,9 @@ class VisitConfirmationService:
         # never returns the cached identity-map instance, so it sees the
         # freshest committed lease even when this session already holds
         # the visit object (with possibly pending local changes).
-        pending_query = (
-            self.repository.db.query(Visit.id)
-            .filter(
-                Visit.confirmation_token == token,
-                Visit.status == "pending_confirmation",
-            )
+        pending_query = self.repository.db.query(Visit.id).filter(
+            Visit.confirmation_token == token,
+            Visit.status == "pending_confirmation",
         )
         if expected_visit_id is not None:
             pending_query = pending_query.filter(Visit.id == expected_visit_id)
@@ -337,12 +378,9 @@ class VisitConfirmationService:
             # vs the token raced away / already processed (None).
             # The cause check reads bare COLUMNS so it never consults
             # the identity map's possibly-stale copy.
-            raced_query = (
-                self.repository.db.query(
-                    Visit.id, Visit.status, Visit.reminder_claimed_at
-                )
-                .filter(Visit.confirmation_token == token)
-            )
+            raced_query = self.repository.db.query(
+                Visit.id, Visit.status, Visit.reminder_claimed_at
+            ).filter(Visit.confirmation_token == token)
             if expected_visit_id is not None:
                 raced_query = raced_query.filter(Visit.id == expected_visit_id)
             raced_row = raced_query.first()
@@ -371,28 +409,33 @@ class VisitConfirmationService:
             )
 
         self.repository.db.flush()
-        claimed_query = (
-            self.repository.db.query(Visit)
-            .filter(
-                Visit.confirmation_token == token,
-                Visit.status == CONFIRMATION_PROCESSING_STATUS,
-            )
+        claimed_query = self.repository.db.query(Visit).filter(
+            Visit.confirmation_token == token,
+            Visit.status == CONFIRMATION_PROCESSING_STATUS,
         )
         if expected_visit_id is not None:
             claimed_query = claimed_query.filter(Visit.id == expected_visit_id)
         return claimed_query.populate_existing().first()
 
-    def _resolve_telegram_visit_action_token(self, token: str, *, purpose: str = "action") -> tuple[int, int, int, str]:
+    def _resolve_telegram_visit_action_token(
+        self, token: str, *, purpose: str = "action"
+    ) -> tuple[int, int, int, str]:
         """Resolve a signed capability; the underlying PWA token stays local."""
         parsed = _parse_telegram_visit_action_token(token)
         if parsed is None:
-            raise VisitConfirmationDomainError(status_code=404, detail="Приглашение недействительно")
+            raise VisitConfirmationDomainError(
+                status_code=404, detail="Приглашение недействительно"
+            )
         visit_id, link_id, epoch = parsed
         row = (
             self.repository.db.query(
-                Visit.confirmation_token, Visit.patient_id,
-                TelegramUser.id, TelegramUser.chat_id, TelegramUser.patient_id,
-                TelegramUser.patient_link_epoch, Visit.confirmation_context_epoch,
+                Visit.confirmation_token,
+                Visit.patient_id,
+                TelegramUser.id,
+                TelegramUser.chat_id,
+                TelegramUser.patient_id,
+                TelegramUser.patient_link_epoch,
+                Visit.confirmation_context_epoch,
             )
             .select_from(Visit)
             .join(TelegramUser, TelegramUser.id == link_id)
@@ -400,19 +443,34 @@ class VisitConfirmationService:
             .first()
         )
         if row is None or not row[0] or row[1] != row[4] or row[5] != epoch:
-            raise VisitConfirmationDomainError(status_code=404, detail="Приглашение недействительно")
+            raise VisitConfirmationDomainError(
+                status_code=404, detail="Приглашение недействительно"
+            )
         expected = build_telegram_visit_action_token(
-            visit_id=visit_id, confirmation_token=row[0], link_id=link_id,
-            chat_id=row[3], patient_id=row[1], link_epoch=epoch,
-            visit_context_epoch=row[6], purpose=purpose,
+            visit_id=visit_id,
+            confirmation_token=row[0],
+            link_id=link_id,
+            chat_id=row[3],
+            patient_id=row[1],
+            link_epoch=epoch,
+            visit_context_epoch=row[6],
+            purpose=purpose,
         )
         if not hmac.compare_digest(token, expected):
-            raise VisitConfirmationDomainError(status_code=404, detail="Приглашение недействительно")
+            raise VisitConfirmationDomainError(
+                status_code=404, detail="Приглашение недействительно"
+            )
         return visit_id, link_id, epoch, row[0]
 
     def _require_linked_telegram_actor(
-        self, visit: Visit, telegram_user_id: str | None, *,
-        capability: str, link_id: int, link_epoch: int, purpose: str = "action",
+        self,
+        visit: Visit,
+        telegram_user_id: str | None,
+        *,
+        capability: str,
+        link_id: int,
+        link_epoch: int,
+        purpose: str = "action",
     ) -> None:
         """Bind a trusted private-chat actor to the patient on the locked visit.
 
@@ -446,50 +504,95 @@ class VisitConfirmationService:
                 status_code=403, detail="Действие недоступно для этого чата"
             )
         expected = build_telegram_visit_action_token(
-            visit_id=visit.id, confirmation_token=visit.confirmation_token,
-            link_id=link.id, chat_id=link.chat_id, patient_id=visit.patient_id,
+            visit_id=visit.id,
+            confirmation_token=visit.confirmation_token,
+            link_id=link.id,
+            chat_id=link.chat_id,
+            patient_id=visit.patient_id,
             link_epoch=link.patient_link_epoch,
-            visit_context_epoch=visit.confirmation_context_epoch, purpose=purpose,
+            visit_context_epoch=visit.confirmation_context_epoch,
+            purpose=purpose,
         )
         if not hmac.compare_digest(capability, expected):
-            raise VisitConfirmationDomainError(status_code=403, detail="Действие недоступно для этого чата")
+            raise VisitConfirmationDomainError(
+                status_code=403, detail="Действие недоступно для этого чата"
+            )
 
-    def preview_by_telegram(self, *, token: str, telegram_user_id: str) -> dict[str, str]:
+    def preview_by_telegram(
+        self, *, token: str, telegram_user_id: str
+    ) -> dict[str, str]:
         """Validate under locks; caller releases transaction before provider delivery."""
-        visit_id, link_id, link_epoch, raw_token = self._resolve_telegram_visit_action_token(token, purpose="view")
-        visit = (self.repository.db.query(Visit).filter(Visit.id == visit_id)
-                 .with_for_update().populate_existing().first())
+        visit_id, link_id, link_epoch, raw_token = (
+            self._resolve_telegram_visit_action_token(token, purpose="view")
+        )
+        visit = (
+            self.repository.db.query(Visit)
+            .filter(Visit.id == visit_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
         if visit is None or visit.status != "pending_confirmation":
-            raise VisitConfirmationDomainError(status_code=404, detail="Приглашение недоступно")
+            raise VisitConfirmationDomainError(
+                status_code=404, detail="Приглашение недоступно"
+            )
         self._require_valid_telegram_invitation(visit, raw_token)
-        self._require_linked_telegram_actor(visit, telegram_user_id, capability=token,
-                                            link_id=link_id, link_epoch=link_epoch, purpose="view")
+        self._require_linked_telegram_actor(
+            visit,
+            telegram_user_id,
+            capability=token,
+            link_id=link_id,
+            link_epoch=link_epoch,
+            purpose="view",
+        )
         doctor = visit.doctor
         doctor_user = doctor.user if doctor else None
-        doctor_name = (doctor_user.full_name or doctor_user.username) if doctor_user else "Врач"
+        doctor_name = (
+            (doctor_user.full_name or doctor_user.username) if doctor_user else "Врач"
+        )
         doctor_name = " ".join(doctor_name.split())[:200]
         from app.models.visit import VisitService
 
-        services = (self.repository.db.query(VisitService.name)
-                    .filter(VisitService.visit_id == visit.id).order_by(VisitService.id).all())
-        service_names = [" ".join((row[0] or "").split())[:120] for row in services[:15]]
-        service_text = "\n".join(f"• {name}" for name in service_names if name) or "Не указаны"
+        services = (
+            self.repository.db.query(VisitService.name)
+            .filter(VisitService.visit_id == visit.id)
+            .order_by(VisitService.id)
+            .all()
+        )
+        service_names = [
+            " ".join((row[0] or "").split())[:120] for row in services[:15]
+        ]
+        service_text = (
+            "\n".join(f"• {name}" for name in service_names if name) or "Не указаны"
+        )
         if len(services) > 15:
             service_text += "\n• ..."
-        date = visit.visit_date.strftime("%d.%m.%Y") if visit.visit_date else "не указана"
+        date = (
+            visit.visit_date.strftime("%d.%m.%Y") if visit.visit_date else "не указана"
+        )
         when = visit.visit_time or "время не указано"
         action_token = build_telegram_visit_action_token(
-            visit_id=visit.id, confirmation_token=raw_token, link_id=link_id,
-            chat_id=int(telegram_user_id), patient_id=visit.patient_id, link_epoch=link_epoch,
+            visit_id=visit.id,
+            confirmation_token=raw_token,
+            link_id=link_id,
+            chat_id=int(telegram_user_id),
+            patient_id=visit.patient_id,
+            link_epoch=link_epoch,
             visit_context_epoch=visit.confirmation_context_epoch,
         )
-        return {"text": f"Визит №{visit.id}: {date}, {when}\nВрач: {doctor_name}\nУслуги:\n{service_text}", "action_token": action_token}
+        return {
+            "text": f"Визит №{visit.id}: {date}, {when}\nВрач: {doctor_name}\nУслуги:\n{service_text}",
+            "action_token": action_token,
+        }
 
     @staticmethod
     def _require_valid_telegram_invitation(visit: Visit, token: str) -> None:
         """Recheck mutable token properties under the locked visit row."""
         if visit.confirmation_token != token or visit.confirmation_channel not in (
-            "telegram", "auto", None, ""
+            "telegram",
+            "auto",
+            None,
+            "",
         ):
             raise VisitConfirmationDomainError(
                 status_code=400, detail="Приглашение недействительно"
@@ -504,16 +607,27 @@ class VisitConfirmationService:
         from app.tasks.worker import _appointment_start_utc, _clinic_timezone
 
         if visit.visit_date is None:
-            raise VisitConfirmationDomainError(status_code=400, detail="Время визита недоступно")
+            raise VisitConfirmationDomainError(
+                status_code=400, detail="Время визита недоступно"
+            )
         if not visit.visit_time:
-            if visit.visit_date <= datetime.now(UTC).astimezone(_clinic_timezone()).date():
-                raise VisitConfirmationDomainError(status_code=400, detail="Время визита недоступно")
+            if (
+                visit.visit_date
+                <= datetime.now(UTC).astimezone(_clinic_timezone()).date()
+            ):
+                raise VisitConfirmationDomainError(
+                    status_code=400, detail="Время визита недоступно"
+                )
             return
         if not re.fullmatch(r"\d{2}:\d{2}", visit.visit_time):
-            raise VisitConfirmationDomainError(status_code=400, detail="Время визита недоступно")
+            raise VisitConfirmationDomainError(
+                status_code=400, detail="Время визита недоступно"
+            )
         start = _appointment_start_utc(visit)
         if start is None or start <= datetime.now(UTC):
-            raise VisitConfirmationDomainError(status_code=400, detail="Время визита недоступно")
+            raise VisitConfirmationDomainError(
+                status_code=400, detail="Время визита недоступно"
+            )
 
     def confirm_by_telegram(
         self,
@@ -526,7 +640,9 @@ class VisitConfirmationService:
         visit = None
         try:
             capability = token
-            visit_id, link_id, link_epoch, token = self._resolve_telegram_visit_action_token(capability)
+            visit_id, link_id, link_epoch, token = (
+                self._resolve_telegram_visit_action_token(capability)
+            )
             security_check = self.security_service.validate_confirmation_request(
                 token=token,
                 source_ip=source_ip,
@@ -573,8 +689,11 @@ class VisitConfirmationService:
 
             self._require_valid_telegram_invitation(visit, token)
             self._require_linked_telegram_actor(
-                visit, telegram_user_id, capability=capability,
-                link_id=link_id, link_epoch=link_epoch,
+                visit,
+                telegram_user_id,
+                capability=capability,
+                link_id=link_id,
+                link_epoch=link_epoch,
             )
 
             result = self._confirm_visit(
@@ -708,22 +827,28 @@ class VisitConfirmationService:
         """Cancel only for the verified actor from a trusted Telegram update."""
         try:
             capability = token
-            visit_id, link_id, link_epoch, token = self._resolve_telegram_visit_action_token(capability)
+            visit_id, link_id, link_epoch, token = (
+                self._resolve_telegram_visit_action_token(capability)
+            )
             security_check = self.security_service.validate_confirmation_request(
-                token=token, source_ip=source_ip, user_agent=user_agent,
+                token=token,
+                source_ip=source_ip,
+                user_agent=user_agent,
                 channel="telegram",
             )
             if not security_check.allowed:
                 if security_check.reason == "Недействительный токен подтверждения":
                     raise VisitConfirmationDomainError(
-                        status_code=404, detail="Приглашение недействительно или уже использовано"
+                        status_code=404,
+                        detail="Приглашение недействительно или уже использовано",
                     )
                 raise VisitConfirmationDomainError(
                     status_code=429 if security_check.retry_after else 400,
                     detail="Приглашение недействительно или недоступно",
                     headers=(
                         {"Retry-After": str(security_check.retry_after)}
-                        if security_check.retry_after else None
+                        if security_check.retry_after
+                        else None
                     ),
                 )
 
@@ -737,8 +862,13 @@ class VisitConfirmationService:
                 .first()
             )
             if candidate is not None and candidate.reminder_claimed_at is not None:
-                if datetime.now(UTC) - _as_aware_utc(candidate.reminder_claimed_at) < LEASE_TTL:
-                    if not wait_for_reminder_lease_clear(self.repository.db, candidate.id):
+                if (
+                    datetime.now(UTC) - _as_aware_utc(candidate.reminder_claimed_at)
+                    < LEASE_TTL
+                ):
+                    if not wait_for_reminder_lease_clear(
+                        self.repository.db, candidate.id
+                    ):
                         raise VisitConfirmationDomainError(
                             status_code=409, detail="Визит сейчас обрабатывается"
                         )
@@ -772,8 +902,11 @@ class VisitConfirmationService:
 
             self._require_valid_telegram_invitation(visit, token)
             self._require_linked_telegram_actor(
-                visit, telegram_user_id, capability=capability,
-                link_id=link_id, link_epoch=link_epoch,
+                visit,
+                telegram_user_id,
+                capability=capability,
+                link_id=link_id,
+                link_epoch=link_epoch,
             )
 
             class _CancelActor:
@@ -1148,9 +1281,7 @@ class VisitConfirmationService:
                     int(row[0])
                     for row in (
                         self.repository.db.query(Service.doctor_id)
-                        .join(
-                            VisitService, VisitService.service_id == Service.id
-                        )
+                        .join(VisitService, VisitService.service_id == Service.id)
                         .filter(
                             VisitService.visit_id == visit.id,
                             Service.queue_tag == queue_tag,

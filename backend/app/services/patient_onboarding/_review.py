@@ -1,4 +1,5 @@
 """Review mixin for PatientOnboardingService. Split from patient_onboarding_service.py."""
+
 from __future__ import annotations
 
 from app.services.patient_onboarding._base import *  # noqa: F401, F403
@@ -17,19 +18,24 @@ from app.services.patient_onboarding._base import (  # noqa: F401
     _utc_now,
 )
 from app.services.patient_service import PatientService  # noqa: F401
+from app.services.telegram_patient_link import (
+    TelegramPatientLinkConflict,
+    link_telegram_patient,
+)
 
 
 class ReviewMixin(PatientOnboardingServiceMixinBase):
     """Review methods."""
 
-    def submit_response(self, row: PatientOnboardingRequest, *, created: bool) -> dict[str, Any]:
+    def submit_response(
+        self, row: PatientOnboardingRequest, *, created: bool
+    ) -> dict[str, Any]:
         return {
             "request": _request_payload(row),
             "created": created,
             "messageKey": "patient_onboarding_submitted",
             "safeNextAction": self.safe_next_action(row),
         }
-
 
     def list_pending(
         self,
@@ -51,9 +57,10 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
             .limit(limit)
             .all()
         )
-        items = [self._registrar_request_payload(self._refresh_expired(row)) for row in rows]
+        items = [
+            self._registrar_request_payload(self._refresh_expired(row)) for row in rows
+        ]
         return {"items": items, "total": total}
-
 
     def analytics_summary(self) -> dict[str, Any]:
         now = _utc_now()
@@ -89,11 +96,16 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
                     overdue_requests += 1
             if created_at is not None and reviewed_at is not None:
                 review_durations.append((reviewed_at - created_at).total_seconds() / 60)
-                if row.status in {"linked_existing", "created_patient"} and reviewed_at >= start_of_day:
+                if (
+                    row.status in {"linked_existing", "created_patient"}
+                    and reviewed_at >= start_of_day
+                ):
                     linked_or_created_today += 1
 
         submitted_total = len(refreshed_rows)
-        linked_total = status_counts["linked_existing"] + status_counts["created_patient"]
+        linked_total = (
+            status_counts["linked_existing"] + status_counts["created_patient"]
+        )
         rejected_total = status_counts["rejected"]
         needs_more_info_total = status_counts["needs_more_info"]
 
@@ -112,11 +124,29 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
         ):
             telemetry_counts[str(action)] = telemetry_counts.get(str(action), 0) + 1
 
-        conversion_rate = round((linked_total / submitted_total) * 100, 1) if submitted_total else 0.0
-        rejection_rate = round((rejected_total / submitted_total) * 100, 1) if submitted_total else 0.0
-        needs_more_info_rate = round((needs_more_info_total / submitted_total) * 100, 1) if submitted_total else 0.0
-        average_review_time = round(sum(review_durations) / len(review_durations), 1) if review_durations else 0.0
-        average_pending_time = round(sum(pending_durations) / len(pending_durations), 1) if pending_durations else 0.0
+        conversion_rate = (
+            round((linked_total / submitted_total) * 100, 1) if submitted_total else 0.0
+        )
+        rejection_rate = (
+            round((rejected_total / submitted_total) * 100, 1)
+            if submitted_total
+            else 0.0
+        )
+        needs_more_info_rate = (
+            round((needs_more_info_total / submitted_total) * 100, 1)
+            if submitted_total
+            else 0.0
+        )
+        average_review_time = (
+            round(sum(review_durations) / len(review_durations), 1)
+            if review_durations
+            else 0.0
+        )
+        average_pending_time = (
+            round(sum(pending_durations) / len(pending_durations), 1)
+            if pending_durations
+            else 0.0
+        )
 
         return OnboardingAnalyticsSummaryResponse(
             funnel={
@@ -143,7 +173,6 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
             },
             generatedAt=now,
         ).model_dump(by_alias=True)
-
 
     def export_requests_csv(self, *, status_filter: str = "") -> str:
         query = self.db.query(PatientOnboardingRequest)
@@ -178,18 +207,30 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
             row = self._refresh_expired(row)
             audit_trail = self._build_audit_trail(int(row.id))
             latest_audit = audit_trail[0] if audit_trail else {}
-            reviewed_by, reviewer_role = self._staff_display_name(row.reviewed_by_user_id)
+            reviewed_by, reviewer_role = self._staff_display_name(
+                row.reviewed_by_user_id
+            )
             writer.writerow(
                 {
                     "request_id": int(row.id),
                     "status": row.status,
-                    "created_at": _as_aware_utc(row.created_at).isoformat() if row.created_at else "",
-                    "reviewed_at": _as_aware_utc(row.reviewed_at).isoformat() if row.reviewed_at else "",
+                    "created_at": (
+                        _as_aware_utc(row.created_at).isoformat()
+                        if row.created_at
+                        else ""
+                    ),
+                    "reviewed_at": (
+                        _as_aware_utc(row.reviewed_at).isoformat()
+                        if row.reviewed_at
+                        else ""
+                    ),
                     "contact_name_masked": _mask_name(row.contact_name),
                     "contact_phone_masked": _mask_phone(row.contact_phone) or "",
                     "desired_service": row.desired_service or "",
                     "desired_branch": row.desired_branch or "",
-                    "desired_date": row.desired_date.isoformat() if row.desired_date else "",
+                    "desired_date": (
+                        row.desired_date.isoformat() if row.desired_date else ""
+                    ),
                     "desired_time": row.desired_time or "",
                     "reviewed_by": reviewed_by or "",
                     "reviewer_role": reviewer_role or "",
@@ -198,11 +239,12 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
             )
         return output.getvalue()
 
-
     def _get_reviewable(self, request_id: int) -> PatientOnboardingRequest:
         row = (
             self.db.query(PatientOnboardingRequest)
             .filter(PatientOnboardingRequest.id == int(request_id))
+            .with_for_update()
+            .populate_existing()
             .first()
         )
         if row is None:
@@ -218,7 +260,6 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
             )
         return row
 
-
     def search_candidates_for_request(
         self,
         *,
@@ -229,7 +270,9 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
         self._validate_audit_actor(actor)
         row = self._get_reviewable(request_id)
         response = self.search_candidates(row, search_payload)
-        audit_payload = self._duplicate_search_payload(response, search_payload=search_payload)
+        audit_payload = self._duplicate_search_payload(
+            response, search_payload=search_payload
+        )
         self._record_audit(
             action=SEARCH_AUDIT_ACTION,
             row=row,
@@ -238,7 +281,6 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
         )
         self.db.commit()
         return response.model_dump(by_alias=True)
-
 
     def _require_duplicate_review(
         self,
@@ -251,7 +293,6 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
                 detail={"reason": "duplicate_review_required"},
             )
         return snapshot
-
 
     def _resolve_candidate_patient(
         self,
@@ -267,6 +308,24 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
             .first()
         )
 
+    def _link_verified_patient(
+        self, row: PatientOnboardingRequest, patient: Patient
+    ) -> None:
+        try:
+            if row.telegram_user_id is None:
+                raise TelegramPatientLinkConflict("telegram_user_not_found")
+            link_telegram_patient(
+                self.db,
+                patient_id=int(patient.id),
+                chat_id=int(row.telegram_chat_id),
+                expected_telegram_user_id=int(row.telegram_user_id),
+            )
+        except TelegramPatientLinkConflict as exc:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"reason": exc.reason},
+            ) from exc
 
     def link_existing_patient(
         self,
@@ -295,17 +354,7 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"reason": "patient_not_found"},
             )
-        telegram_user = (
-            self.db.query(TelegramUser)
-            .filter(TelegramUser.id == row.telegram_user_id)
-            .first()
-        )
-        if telegram_user is None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={"reason": "telegram_user_not_found"},
-            )
-        telegram_user.patient_id = int(patient.id)
+        self._link_verified_patient(row, patient)
         row.status = "linked_existing"
         row.resolved_patient_id = int(patient.id)
         row.reviewed_by_user_id = int(actor.id)
@@ -341,7 +390,6 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
             "messageKey": "patient_onboarding_linked_existing",
         }
 
-
     def create_patient_from_request(
         self,
         *,
@@ -361,7 +409,9 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
                 status_code=status.HTTP_409_CONFLICT,
                 detail={"reason": "duplicate_review_override_required"},
             )
-        if high_confidence_exists and not _clean_text(payload.reason_code, max_length=64):
+        if high_confidence_exists and not _clean_text(
+            payload.reason_code, max_length=64
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"reason": "duplicate_override_reason_required"},
@@ -378,54 +428,53 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
                     detail={"reason": "candidate_review_required"},
                 )
 
-        patient = PatientService(self.db).create_patient(
-            request=request,
-            patient_in=payload.patient,
-            current_user=actor,
-        )
-        telegram_user = (
-            self.db.query(TelegramUser)
-            .filter(TelegramUser.id == row.telegram_user_id)
-            .first()
-        )
-        if telegram_user is not None:
-            telegram_user.patient_id = int(patient.id)
-        row.status = "created_patient"
-        row.resolved_patient_id = int(patient.id)
-        row.reviewed_by_user_id = int(actor.id)
-        row.reviewed_at = _utc_now()
-        row.review_message = safe_note or _default_review_message(
-            "created_patient",
-            payload.reason_code,
-        )
-        row.updated_at = _utc_now()
-        audit_payload = {
-            "reason_code": payload.reason_code,
-            "review_candidate_id": payload.review_candidate_id,
-            "confirm_create_despite_duplicates": payload.confirm_create_despite_duplicates,
-            "high_confidence_duplicate_present": high_confidence_exists,
-            "resolved_patient_ref": _patient_ref(int(patient.id)),
-            "note_hash": _safe_note_hash(safe_note),
-        }
-        self._record_audit(
-            action=REVIEWED_AUDIT_ACTION,
-            row=row,
-            actor_user_id=int(actor.id),
-            payload=audit_payload,
-        )
-        self._record_audit(
-            action="patient_onboarding_created_patient",
-            row=row,
-            actor_user_id=int(actor.id),
-            payload=audit_payload,
-        )
-        self.db.commit()
+        def resolve_request(patient: Patient) -> None:
+            self._link_verified_patient(row, patient)
+            row.status = "created_patient"
+            row.resolved_patient_id = int(patient.id)
+            row.reviewed_by_user_id = int(actor.id)
+            row.reviewed_at = _utc_now()
+            row.review_message = safe_note or _default_review_message(
+                "created_patient",
+                payload.reason_code,
+            )
+            row.updated_at = _utc_now()
+            audit_payload = {
+                "reason_code": payload.reason_code,
+                "review_candidate_id": payload.review_candidate_id,
+                "confirm_create_despite_duplicates": payload.confirm_create_despite_duplicates,
+                "high_confidence_duplicate_present": high_confidence_exists,
+                "resolved_patient_ref": _patient_ref(int(patient.id)),
+                "note_hash": _safe_note_hash(safe_note),
+            }
+            self._record_audit(
+                action=REVIEWED_AUDIT_ACTION,
+                row=row,
+                actor_user_id=int(actor.id),
+                payload=audit_payload,
+            )
+            self._record_audit(
+                action="patient_onboarding_created_patient",
+                row=row,
+                actor_user_id=int(actor.id),
+                payload=audit_payload,
+            )
+
+        try:
+            PatientService(self.db).create_patient(
+                request=request,
+                patient_in=payload.patient,
+                current_user=actor,
+                before_commit=resolve_request,
+            )
+        except Exception:
+            self.db.rollback()
+            raise
         self.db.refresh(row)
         return {
             "request": self._registrar_request_payload(row),
             "messageKey": "patient_onboarding_created_patient",
         }
-
 
     def request_more_info(
         self,
@@ -446,7 +495,9 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
         row.status = "needs_more_info"
         row.reviewed_by_user_id = int(actor.id)
         row.reviewed_at = _utc_now()
-        row.review_message = note or _default_review_message("needs_more_info", reason_code)
+        row.review_message = note or _default_review_message(
+            "needs_more_info", reason_code
+        )
         row.updated_at = _utc_now()
         audit_payload = {
             "reason_code": reason_code,
@@ -470,7 +521,6 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
             "request": self._registrar_request_payload(row),
             "messageKey": "patient_onboarding_needs_more_info",
         }
-
 
     def reject(
         self,
@@ -515,5 +565,3 @@ class ReviewMixin(PatientOnboardingServiceMixinBase):
             "request": self._registrar_request_payload(row),
             "messageKey": "patient_onboarding_rejected",
         }
-
-

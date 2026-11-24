@@ -6,6 +6,7 @@ with PII masking applied to the query string. This provides a basic audit
 trail for HIPAA compliance without leaking patient phone numbers, emails,
 or other PII that may appear in query parameters.
 """
+
 import logging
 from collections.abc import Callable
 from contextvars import ContextVar
@@ -14,7 +15,11 @@ from uuid import uuid4
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.core.pii_masker import is_sensitive_verification_path, mask_pii
+from app.core.pii_masker import (
+    is_public_site_analytics_ingest_path,
+    is_sensitive_verification_path,
+    mask_pii,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +56,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(  # type: ignore[override]
         self, request: Request, call_next: Callable[[Request], Response]
     ) -> Response:
+        if is_public_site_analytics_ingest_path(request.url.path):
+            # The intake writes aggregate totals and takes no authenticated action.
+            return await call_next(request)
+
         # Генерируем уникальный request_id для каждого запроса
         request_id = str(uuid4())
         request.state.request_id = request_id
@@ -91,8 +100,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
             # This catches both `phone=...` and `email=...` style params.
             try:
                 from urllib.parse import parse_qs
-                params = {k: v if len(v) > 1 else v[0]
-                          for k, v in parse_qs(request.url.query).items()}
+
+                params = {
+                    k: v if len(v) > 1 else v[0]
+                    for k, v in parse_qs(request.url.query).items()
+                }
                 masked = mask_pii(params)
                 # Re-serialize as k=v pairs for compact log line
                 parts = []

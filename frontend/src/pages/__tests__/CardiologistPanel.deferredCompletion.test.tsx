@@ -40,6 +40,7 @@ const state = vi.hoisted(() => ({
   changeSelection: null as ((value: TestSelection | null) => void) | null,
   currentSelection: null as TestSelection | null,
   activeTab: 'visit',
+  callNext: true,
 }));
 
 vi.mock('../../hooks/useDoctorPanelState', async () => {
@@ -98,7 +99,10 @@ vi.mock('../../i18n/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 vi.mock('../../components/common/ConfirmDialog', () => ({
-  useConfirm: () => [async () => true, null],
+  useConfirm: () => [async (options: { confirmationOption?: { onConfirm: (checked: boolean) => void } }) => {
+    options.confirmationOption?.onConfirm(state.callNext);
+    return true;
+  }, null],
 }));
 vi.mock('../../components/cardiology/VisitTab', () => ({
   default: (props: {
@@ -216,6 +220,7 @@ beforeEach(() => {
   state.changeSelection = null;
   state.currentSelection = null;
   state.activeTab = 'visit';
+  state.callNext = true;
   vi.mocked(apiClient.get).mockImplementation(async (url: unknown) => {
     if (url === '/doctor/my-info') return { data: { doctor: { id: 1 } } } as never;
     if (url === '/registrar/queues/today') return { data: { queues: [] } } as never;
@@ -340,7 +345,8 @@ describe('DOCFLOW-FE-004 — deferred cardiology completion ACK respects live se
     expect(queueService.completeVisit).toHaveBeenCalledTimes(1);
   });
 
-  it('positive control: the current visit A still finishes on an explicit success ACK', async () => {
+  it.each([false, true])('finishes the current visit and honors call next choice %s', async (callNext) => {
+    state.callNext = callNext;
     const held = deferred<{ success: boolean }>();
     vi.mocked(queueService.completeVisit).mockReturnValue(held.promise as never);
     await mount('/doctor/cardiology?tab=visit&patientId=11&visitId=101');
@@ -365,6 +371,6 @@ describe('DOCFLOW-FE-004 — deferred cardiology completion ACK respects live se
     });
     expect(vi.mocked(notify.success)).toHaveBeenCalledWith('cardio.visit_completed');
     expect(vi.mocked(notify.error)).not.toHaveBeenCalled();
-    expect(queueService.callNextWaiting).toHaveBeenCalledTimes(1);
+    expect(queueService.callNextWaiting).toHaveBeenCalledTimes(callNext ? 1 : 0);
   });
 });

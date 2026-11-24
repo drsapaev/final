@@ -240,7 +240,9 @@ export const CircularProgress = React.forwardRef<HTMLDivElement, CircularProgres
         width={dimensions.width}
         height={dimensions.height}
         viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
-        style={{ transform: 'rotate(-90deg)' }}>
+        style={{ transform: 'rotate(-90deg)' }}
+        aria-hidden="true"
+        focusable="false">
 
         {/* Background circle */}
         <circle

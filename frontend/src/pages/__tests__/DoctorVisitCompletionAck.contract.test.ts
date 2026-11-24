@@ -90,7 +90,7 @@ describe('DOCFLOW-FE-001/002 — dermatology visit completion honesty (source co
     expect(completionFlow).toContain('queueService.completeVisit');
     expect(completionHandler).not.toBe('');
     expect(completionHandler).toContain('guardTransition(');
-    expect(completionHandler).toContain('runCompletionFlow(completionContext, entryId)');
+    expect(completionHandler).toContain('runCompletionFlow(completionContext, entryId, callNext)');
   });
 
   it('DOCFLOW-FE-002 (existing positive reference): keeps the post-confirm identity recheck', () => {

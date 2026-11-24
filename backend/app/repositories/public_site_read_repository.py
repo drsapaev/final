@@ -5,7 +5,9 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.crud.queue_resource_routing import resolve_tag_resource
 from app.models.clinic import ClinicSettings, Doctor
+from app.models.department import DepartmentService
 from app.models.medical_specialty import MedicalSpecialty
 from app.models.public_site_media import PublicSiteMedia
 from app.models.service import Service
@@ -86,6 +88,43 @@ class PublicSiteReadRepository:
             .where(*self._public_doctor_filters(), Doctor.id == doctor_id)
         )
         return self.db.scalars(statement).first()
+
+    def service_has_resource_queue(self, queue_tag: str | None) -> bool:
+        return resolve_tag_resource(self.db, queue_tag) is not None
+
+    def list_public_service_doctor_candidates(self, service: Service) -> list[Doctor]:
+        """Read published profiles within the service's explicit assignments."""
+        department_ids = set(
+            self.db.scalars(
+                select(DepartmentService.department_id).where(
+                    DepartmentService.service_id == service.id
+                )
+            )
+        )
+        if service.department_id is not None:
+            if department_ids and service.department_id not in department_ids:
+                return []
+            department_ids = {service.department_id}
+
+        if (
+            service.doctor_id is None
+            and not department_ids
+            and not (service.department_key or "").strip()
+        ):
+            return []
+
+        statement = (
+            select(Doctor)
+            .join(User, Doctor.user_id == User.id)
+            .options(joinedload(Doctor.user), joinedload(Doctor.department))
+            .where(*self._public_doctor_filters())
+            .order_by(Doctor.slug.asc())
+        )
+        if service.doctor_id is not None:
+            statement = statement.where(Doctor.id == service.doctor_id)
+        if department_ids:
+            statement = statement.where(Doctor.department_id.in_(department_ids))
+        return list(self.db.scalars(statement).all())
 
     def get_published_clinic_logo(self) -> PublicSiteMedia | None:
         statement = select(PublicSiteMedia).where(
