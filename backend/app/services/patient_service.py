@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -157,9 +158,7 @@ class PatientService:
             if current_patient is None or current_patient.id != patient_id:
                 raise PatientReadAccessDenied("patient_self_scope_mismatch")
 
-        if current_user.is_superuser or not is_doctor_role_spelling(
-            current_user.role
-        ):
+        if current_user.is_superuser or not is_doctor_role_spelling(current_user.role):
             return None
 
         allowed_doctor_ids = self._doctor_allowed_doctor_ids(current_user)
@@ -181,10 +180,7 @@ class PatientService:
         phone: str | None,
     ) -> list[Patient]:
         doctor_ids = None
-        if (
-            is_doctor_role_spelling(current_user.role)
-            and not current_user.is_superuser
-        ):
+        if is_doctor_role_spelling(current_user.role) and not current_user.is_superuser:
             doctor_ids = self._doctor_allowed_doctor_ids(current_user)
         return patient_crud.get_patients(
             self.db,
@@ -249,7 +245,9 @@ class PatientService:
         request: Request,
         patient_in: PatientCreate,
         current_user: User,
+        before_commit: Callable[[Patient], None] | None = None,
     ) -> Patient:
+        """Create a patient, optionally staging related writes before its commit."""
         birth_date_explicit = "birth_date" in patient_in.model_fields_set
         if patient_in.phone:
             existing_patient = patient_crud.get_patient_by_phone(
@@ -416,6 +414,8 @@ class PatientService:
             )
             if audit is None:
                 raise RuntimeError("patient creation audit unavailable")
+            if before_commit is not None:
+                before_commit(patient)
             self.db.commit()
         except Exception:
             self.db.rollback()
@@ -433,9 +433,7 @@ class PatientService:
             else "registrar_panel"
         )
         try:
-            _request_bind_is_sqlite = (
-                self.db.get_bind().dialect.name == "sqlite"
-            )
+            _request_bind_is_sqlite = self.db.get_bind().dialect.name == "sqlite"
         except Exception:
             _request_bind_is_sqlite = False
 

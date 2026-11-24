@@ -881,6 +881,8 @@ const DermatologistPanelUnified = () => {
     hasMoreProcedures,
     loadingMoreExaminations,
     loadingMoreProcedures,
+    loadMoreExaminationsError,
+    loadMoreProceduresError,
     loadMoreExaminations,
     loadMoreProcedures,
     loading: patientHistoryLoading,
@@ -1677,6 +1679,8 @@ const DermatologistPanelUnified = () => {
               hasMoreProcedures={hasMoreProcedures}
               loadingMoreExaminations={loadingMoreExaminations}
               loadingMoreProcedures={loadingMoreProcedures}
+              loadMoreExaminationsError={loadMoreExaminationsError}
+              loadMoreProceduresError={loadMoreProceduresError}
               onLoadMoreExaminations={loadMoreExaminations}
               onLoadMoreProcedures={loadMoreProcedures}
               historyLoading={patientHistoryLoading}

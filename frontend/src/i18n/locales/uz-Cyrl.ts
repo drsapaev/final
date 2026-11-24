@@ -1568,6 +1568,7 @@ const uzCyrl = {
     derma_panel_patient_history_title: 'Бемор тарихи',
     derma_panel_patient_history_select_prompt: 'Тарихини кўриш учун беморни қидиринг ва танланг.',
     derma_panel_patient_history_loading: 'Бемор тарихи юкланмоқда...',
+    derma_panel_patient_history_load_more_failed: 'Тарихнинг кейинги саҳифасини юклаш амалга ошмади — фақат юкланган ёзувлар кўрсатилган. Қайтадан уриниб кўринг.',
     derma_panel_patient_history_error: 'Бемор тарихининг бир қисмини юклаб бўлмади.',
     derma_panel_patient_history_appointments: 'Қабуллар',
     derma_panel_patient_history_examinations: 'Тери кўриклари',

@@ -1557,6 +1557,7 @@ const en = {
     derma_panel_patient_history_title: 'Patient history',
     derma_panel_patient_history_select_prompt: 'Search for and select a patient to view their history.',
     derma_panel_patient_history_loading: 'Loading patient history...',
+    derma_panel_patient_history_load_more_failed: 'Failed to load the next history page — only the records already loaded are shown. Try again.',
     derma_panel_patient_history_error: 'Some patient history could not be loaded.',
     derma_panel_patient_history_appointments: 'Appointments',
     derma_panel_patient_history_examinations: 'Skin examinations',

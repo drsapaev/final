@@ -77,6 +77,7 @@ def provision_price_endpoint_database(url, runtime_role, capability_role):
             schema_owner = db.execute(text("SELECT pg_catalog.pg_get_userbyid(nspowner) FROM pg_catalog.pg_namespace WHERE nspname='public'")).scalar_one()
             table_owner = db.execute(text("SELECT pg_catalog.pg_get_userbyid(relowner) FROM pg_catalog.pg_class WHERE oid='public.visit_invitation_deliveries'::pg_catalog.regclass")).scalar_one()
             # Apply the price and invitation pieces used by this focused fixture.
+            # The Visit ORM also requires the appointment provenance fields from 0153.
             # The standard invitation provisioner checks the trigger body from 0130.
             operations = Operations(MigrationContext.configure(db, opts={"version_table_schema": "public"}))
             for revision in (
@@ -84,6 +85,7 @@ def provision_price_endpoint_database(url, runtime_role, capability_role):
                 "0126_invitation_issuer_auth",
                 "0128_invitation_price_approval",
                 "0130_invitation_nonce_guard",
+                "0153_visit_start_appointment",
             ):
                 migration = _module(f"synthetic_{revision}", root / "backend/alembic/versions" / f"{revision}.py")
                 migration.op = operations
