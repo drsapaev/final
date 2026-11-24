@@ -104,7 +104,7 @@ also maps `TELEGRAM_BOT_TOKEN` into that service. Use a fresh synthetic
 patient and record the exact tested SHA, native result and teardown.
 Do not reuse the reminder workflow or production credentials.
 
-For PR #4195 only, the reviewed **Mini App native staging acceptance**
+For PR #4195, the reviewed **Mini App native staging acceptance**
 workflow can supplement an exact-SHA Cloud run that is otherwise complete.
 Dispatch from `main` with `acceptance=pr-4195-arq-reminder` and `source-sha`
 set to the full current PR #4195 head after it includes the current `main`.
@@ -115,6 +115,19 @@ and verifies the four workflow, helper and runbook files against trusted
 on `main`, while the run attests the exact PR head. The existing protected
 environment, `miniapp-staging.finalclinic.fyi` hostname, and default
 `pr-4118-sessions` choice apply.
+
+For PR #4251, use `acceptance=pr-4251-arq-reminder` from protected `main`
+with `source-sha=7a1d512e87bd052dd1ee06199fec7a82e7d27d0e`.
+The workflow admits only that reviewed app commit while it remains the
+open same-repository PR head and the remote `codex/laboratory-panel-v2`
+branch tip. The app commit must descend from review base
+`11d4a5edd1979ed167ae4acb6b75e7d72eda9239`. The workflow commit must be the
+current `main`, which also supplies the trusted ARQ helper. An app change
+requires review of its new SHA before updating the pin on protected `main`.
+Use the same `staging-integrations` environment and staging HTTPS hostname.
+Dispatch only with explicit authorization for the approved private test
+recipient and the single reminder. The result supplements the exact-SHA
+Cloud run with the Telegram evidence described below.
 
 When the run summary says native onboarding is ready, use the approved
 Telegram identity in the staging bot's Mini App. In Appointments submit the
