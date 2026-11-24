@@ -69,18 +69,18 @@ def _map_values(
             fields_by_analyte.setdefault(field.analyte_code, []).append(field)
 
     mapped = []
-    seen: set[str] = set()
+    seen_fields: set[str] = set()
     for value in row.values:
         code = value.field_key
-        if code in seen:
-            raise RowRejected("duplicate_analyte")
-        seen.add(code)
         definitions = fields_by_analyte.get(code, [])
         if source == "manual" and not definitions and code in field_map:
             definitions = [field_map[code]]
         if len(definitions) != 1:
             raise RowRejected("unknown_analyte")
         field = definitions[0]
+        if field.field_key in seen_fields:
+            raise RowRejected("duplicate_analyte")
+        seen_fields.add(field.field_key)
         unit_code = service._resolve_field_unit_code(field)
         legacy_unit = service._resolve_field_unit(field) if unit_code is None else None
         expected_unit = unit_code or (legacy_unit if source == "manual" else None)

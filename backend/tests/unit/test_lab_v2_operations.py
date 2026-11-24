@@ -279,6 +279,75 @@ def test_csv_uses_the_published_catalog_mapping(db_session, test_patient):
 
 
 @pytest.mark.unit
+def test_manual_import_rejects_aliases_of_the_same_field_in_preview_and_save(
+    db_session, test_patient
+):
+    actor = synthetic_user(db_session, "Lab")
+    service, old_report = synthetic_report(db_session, test_patient.id)
+    draft = service.create_template_version(
+        old_report.template_id, old_report.template_version_id
+    )
+    field = service._field_map(draft)["hgb"]
+    field_key = "synthetic_hgb_slot"
+    field.field_key = field_key
+    field.analyte_code = "hgb"
+    field.unit_code = "g_per_l"
+    db_session.commit()
+    published = service.publish_template_version(draft.id)
+    report = service.create_instance(
+        {
+            "patient_id": test_patient.id,
+            "template_id": old_report.template_id,
+            "template_version_id": published.id,
+        }
+    )
+    specimen = accepted_specimen(db_session, report, "SYNTHETIC-IMPORT-ALIAS")
+    catalog_value = {"analyte_code": "hgb", "unit_code": "g_per_l", "value_text": "12"}
+    field_value = {**catalog_value, "analyte_code": field_key, "value_text": "34"}
+    valid_value = {**catalog_value, "value_text": "7"}
+    rows = [
+        {
+            "message_id": str(uuid4()),
+            "report_instance_id": report.id,
+            "specimen_barcode": specimen.barcode,
+            "values": values,
+        }
+        for values in (
+            [catalog_value, field_value],
+            [catalog_value, catalog_value],
+            [valid_value],
+        )
+    ]
+    expected_errors = ["duplicate_analyte", "duplicate_analyte", None]
+
+    preview = process_import_batch(
+        db_session,
+        LabImportBatch(source="manual", rows=rows),
+        actor_id=actor.id,
+        preview=True,
+    )
+    assert [item.error_code for item in preview] == expected_errors
+    assert preview[-1].status == "ready"
+    assert db_session.scalar(select(LabImportReceipt.id)) is None
+
+    for row in rows:
+        row["expected_updated_at"] = preview[-1].updated_at
+    saved = process_import_batch(
+        db_session, LabImportBatch(source="manual", rows=rows), actor_id=actor.id
+    )
+
+    assert [item.error_code for item in saved] == expected_errors
+    assert [item.status for item in saved] == ["error", "error", "saved"]
+    receipt = db_session.scalars(select(LabImportReceipt)).one()
+    assert receipt.message_id == rows[-1]["message_id"]
+    value = db_session.scalars(
+        select(LabReportValue).where(LabReportValue.instance_id == report.id)
+    ).one()
+    assert value.field_key == field_key
+    assert value.value_numeric == Decimal("7")
+
+
+@pytest.mark.unit
 def test_critical_communication_inbox_is_separate_from_acknowledgment(
     db_session,
     test_patient,
