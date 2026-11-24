@@ -647,9 +647,10 @@
   "vite_footer_accessibility_follow_up": {
     "audit_date": "2026-11-24",
     "source_base_sha": "0eae311131203de965e9ec08c54c508425dc48eb",
+    "measurement_checkout_sha": "755ce61ed3690b33f25fa5f933729ef51093b473",
     "tested_runtime_blobs": {
       "frontend/src/providers/AppProviders.tsx": "b79d7a68a784b83b139f3f0e220e53ef6c90d311",
-      "frontend/src/publicSiteStyles.css": "410dc7a8a38cd744ae26267aad4d35be512f0836"
+      "frontend/src/publicSiteStyles.css": "b1d30b4d673125756404e49ca853105d98e533d6"
     },
     "scope": "Synthetic Vite service catalog in Windows WebKit 26.6 at 320 CSS px. Public Contacts and Staff login footer links on /ru/services and /services in light mode, with /ru/services as the dark-mode control.",
     "before": {
@@ -659,7 +660,7 @@
       "default_light_link_contrast_after_dismissal": [4.38, 4.42]
     },
     "after": {
-      "notification": "With default browser notification permission, the prompt was absent 5704 to 5751 ms after the page heading was visible in all three route and theme combinations. Both links passed trial clicks in each combination.",
+      "notification": "With default browser notification permission, the prompt was absent 5700 to 5710 ms after the page heading was visible in all three route and theme combinations. Both links passed trial clicks in each combination.",
       "light_link_contrast_default_and_focus": [5.41, 5.46],
       "light_link_contrast_hover": [5.88, 5.93],
       "dark_link_contrast_default_ru": [7.35, 7.45],

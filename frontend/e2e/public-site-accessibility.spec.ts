@@ -600,13 +600,16 @@ test.describe('public-site accessibility', () => {
       }
     }
 
-    await navigateInApp(page, '/login');
+    await page.goto(VITE_ORIGIN + '/login');
+    await expect(page).toHaveURL(VITE_ORIGIN + '/login');
     await expect(page.locator('input[autocomplete="username"]')).toBeVisible();
     await page.clock.runFor(6_000);
     await expect(prompt).toBeVisible();
 
+    await page.evaluate(() => { document.documentElement.dataset.notificationPromptTest = 'same-document'; });
     await navigateInApp(page, '/ru/services');
     await expect(page.getByRole('heading', { level: 1, name: SERVICE_TITLES.ru, exact: true })).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-notification-prompt-test', 'same-document');
     await expect(prompt).toHaveCount(0);
   });
 

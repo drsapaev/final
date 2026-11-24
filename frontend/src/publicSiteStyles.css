@@ -518,7 +518,7 @@ html.public-site-document body {
 }
 
 :where(html.public-site-document[data-theme="light"]) .public-site__footer a {
-  color: var(--mac-accent-blue-hover, #0051d5);
+  color: var(--mac-accent-blue-hover, var(--mac-text-primary, currentColor));
 }
 
 .public-site__footer-links {
