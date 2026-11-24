@@ -528,3 +528,97 @@ def test_recorded_critical_task_follows_current_doctor(
         "inbox_recorded",
         "acknowledged",
     ]
+
+
+@pytest.mark.unit
+def test_critical_release_without_doctor_remains_accessible_and_correction_has_own_task(
+    db_session, test_patient, test_visit, client, auth_headers, monkeypatch
+):
+    test_visit.doctor_id = None
+    service, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.status = "FINALIZED"
+    report.finalized_at = datetime.now(UTC)
+    report.values.append(
+        LabReportValue(
+            field_key="hgb",
+            value_numeric=Decimal("1"),
+            evaluation_snapshot={
+                "status": "evaluated",
+                "interpretation": "critical",
+                "visible": True,
+            },
+        )
+    )
+    task = record_released_report(db_session, report)
+    assert task is not None and task.state == "needs_assignment"
+    assert task.recipient_user_id is None
+    assert report.order.status != "completed"
+    db_session.commit()
+
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender
+    )
+    assert run(dispatch_pending(db_session)) == 0
+    sender.assert_not_awaited()
+
+    route = "/api/v1/lab/critical-communications"
+    listed = client.get(route, params={"visit_id": test_visit.id}, headers=auth_headers)
+    assert listed.status_code == 200
+    assert [(item["id"], item["state"]) for item in listed.json()] == [
+        (task.id, "needs_assignment"),
+    ]
+    published_pdf = client.get(
+        f"/api/v1/lab/report-instances/{report.id}/pdf", headers=auth_headers,
+    )
+    assert published_pdf.status_code == 200
+    assert published_pdf.headers["content-disposition"] == (
+        f'inline; filename="lab-report-{report.id}.pdf"'
+    )
+    assert published_pdf.content.startswith(b"%PDF")
+
+    rejected_assignment = client.post(f"{route}/{task.id}/assign", headers=auth_headers)
+    assert rejected_assignment.status_code == 409
+    first_escalation = client.post(f"{route}/{task.id}/escalate", headers=auth_headers)
+    repeated_escalation = client.post(f"{route}/{task.id}/escalate", headers=auth_headers)
+    assert first_escalation.status_code == repeated_escalation.status_code == 200
+    assert first_escalation.json()["state"] == "escalated"
+    assert first_escalation.json()["escalated_at"] == repeated_escalation.json()["escalated_at"]
+    sender.assert_not_awaited()
+
+    doctor = synthetic_user(db_session, "Doctor")
+    profile = Doctor(user_id=doctor.id, specialty="cardiology", active=True)
+    db_session.add(profile)
+    db_session.flush()
+    test_visit.doctor_id = profile.id
+    db_session.commit()
+    assigned = client.post(f"{route}/{task.id}/assign", headers=auth_headers)
+    assert assigned.status_code == 200 and assigned.json()["state"] == "pending"
+    assert run(dispatch_pending(db_session)) == 1
+    assert task.state == "inbox_recorded" and task.acknowledged_at is None
+
+    revision = service.revise(report.id)
+    revision.values[0].evaluation_snapshot = {
+        "status": "evaluated",
+        "interpretation": "normal",
+        "visible": True,
+    }
+    revision.status = "FINALIZED"
+    revision.finalized_at = datetime.now(UTC)
+    corrected_task = record_released_report(db_session, revision)
+    assert corrected_task is not None and corrected_task.report_instance_id == revision.id
+    assert corrected_task.id != task.id
+    assert corrected_task.supersedes_communication_id == task.id
+    assert corrected_task.field_keys == []
+    assert task.state == "superseded"
+    assert report.values[0].evaluation_snapshot["interpretation"] == "critical"
+    db_session.commit()
+
+    assert run(dispatch_pending(db_session)) == 1
+    assert run(dispatch_pending(db_session)) == 0
+    assert [call.kwargs["entity_id"] for call in sender.await_args_list] == [
+        task.id,
+        corrected_task.id,
+    ]
+    assert sender.await_args.kwargs["title"] == "Исправлен критический лабораторный результат"
+    assert corrected_task.acknowledged_at is None
