@@ -25,6 +25,7 @@ import type { EMRTextFieldChangeEvent } from '../EMRTextField';
 import './CardiologySection.css';
 import { Heart, FileText } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
+import { selectEchoMeasurements } from '@/utils/echoMeasurements';
 
 /**
  * CardiologySection Component
@@ -56,7 +57,7 @@ export function CardiologySection({
 }: CardiologySectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
   const ecgData = ecgDataRaw as Record<string, any>;
-  const echoData = echoDataRaw as Record<string, any>;
+  const echoData = selectEchoMeasurements(echoDataRaw);
   const labResults = labResultsRaw as Record<string, any>;
   const [activeTab, setActiveTab] = useState('ecg'); // 'ecg' | 'echo' | 'labs' | 'risk'
 
@@ -176,7 +177,7 @@ export function CardiologySection({
                         </div>
 
                     {/* Summary of the latest Echo data stored in specialty_data.echo */}
-                    {(echoData?.ef || echoData?.edd || echoData?.la || echoData?.conclusion) &&
+                    {Object.values(echoData).some(Boolean) &&
         <div className="cardiology-interpretation">
                             <h4>{t('misc.cs_latest_echo')}</h4>
                             <div className="cardiology-ecg-summary">
@@ -192,8 +193,8 @@ export function CardiologySection({
                                 {echoData?.la &&
                                     <div><strong>{t('misc.cs_la')}</strong> {echoData.la} {t('misc.cs_unit_mm')}</div>
                                 }
-                                {echoData?.aortic?.peak_velocity &&
-                                    <div><strong>{t('misc.cs_vmax_av')}</strong> {echoData.aortic.peak_velocity} {t('misc.cs_unit_ms2')}</div>
+                                {echoData.aorticPeakVelocity &&
+                                    <div><strong>{t('misc.cs_vmax_av')}</strong> {echoData.aorticPeakVelocity} {t('misc.cs_unit_ms2')}</div>
                                 }
                             </div>
                             {echoData?.conclusion &&

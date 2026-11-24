@@ -155,6 +155,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     // overwrite the new visit's clinical state.
     const visitEpochRef = useRef(0);
     const visitIdentityRef = useRef<number | string | null>(visitId);
+    const draftSaveEpochRef = useRef<number | null>(null);
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -363,6 +364,8 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     // =========================================================================
     const saveEMR = useCallback(async (options: Record<string, unknown> = {}) => {
         const { isDraft = true, force = false } = options;
+        const epoch = visitEpochRef.current;
+        if (visitIdentityRef.current !== visitId || draftSaveEpochRef.current === epoch) return null;
 
         if (writeAccessDeniedRef.current) {
             logger.info('[FIX:EMR403] saveEMR skipped because access was already denied', {
@@ -376,8 +379,8 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             };
         }
 
+        draftSaveEpochRef.current = epoch;
         dispatch(emrActions.saveStart());
-        const epoch = visitEpochRef.current;
         const stillCurrentVisit = () => isMountedRef.current && visitEpochRef.current === epoch;
 
         try {
@@ -402,7 +405,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             if (stillCurrentVisit()) {
                 dispatch(emrActions.saveSuccess(response.data));
             }
-            return response.data;
+            return visitEpochRef.current === epoch ? response.data : null;
         } catch (error) {
             const apiError = toEMRApiError(error);
             if (isAccessDeniedStatus(apiError?.response?.status)) {
@@ -484,13 +487,16 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             }
             dispatch(emrActions.saveError(apiError.message || 'Ошибка сохранения'));
             throw error;
+        } finally {
+            if (draftSaveEpochRef.current === epoch) draftSaveEpochRef.current = null;
         }
     }, [handleAccessDenied, specialty, visitId, markServerFinalized]);
 
     // =========================================================================
     // SIGN EMR
     // =========================================================================
-    const signEMR = useCallback(async (options: { rowVersion?: number } = {}) => {
+    const signEMR = useCallback(async (options: { rowVersion?: number; data?: Record<string, unknown> } = {}) => {
+        if (visitIdentityRef.current !== visitId || draftSaveEpochRef.current === visitEpochRef.current) return null;
         if (writeAccessDeniedRef.current) {
             logger.info('[FIX:EMR403] signEMR skipped because access was already denied', {
                 visitId,
@@ -509,10 +515,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
 
         try {
             const payload = {
-                // EMRSIGN-FE-001: the signed revision must equal the latest
-                // explicitly approved clinical snapshot — serialize the live
-                // document, never a stale render closure.
-                data: normalizeEMRData(stateRef.current.data, specialty),
+                data: normalizeEMRData(options.data ?? stateRef.current.data, specialty),
                 row_version: options.rowVersion ?? stateRef.current.rowVersion,
                 client_session_id: clientSessionId.current,
             };

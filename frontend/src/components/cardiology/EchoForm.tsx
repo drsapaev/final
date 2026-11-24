@@ -28,6 +28,7 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from 'react';
 import type { HttpApiError } from '../../types/errors';
+import { normalizeEchoForEditor } from '../../utils/echoMeasurements';
 
 // === Domain types ===
 // EchoForm tracks echocardiography measurements grouped by anatomical
@@ -261,7 +262,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   useEffect(() => {
     // Explicit initialData still wins: callers that own the data pass it.
     if (initialData) {
-      applyEchoData(deepMerge(DEFAULT_ECHO_DATA as Record<string, unknown>, initialData as Record<string, unknown>) as EchoData);
+      applyEchoData(deepMerge(DEFAULT_ECHO_DATA, normalizeEchoForEditor(initialData)) as EchoData);
       canonicalUnknownRef.current = false;
       draftTouchedRef.current.clear();
       setHydrationFailed(false);
@@ -308,7 +309,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         const specialtyData = storedData?.specialty_data as Record<string, unknown> | undefined;
         const storedEcho = specialtyData?.echo;
         const serverBase = (storedEcho && typeof storedEcho === 'object'
-          ? deepMerge(DEFAULT_ECHO_DATA as Record<string, unknown>, storedEcho as Record<string, unknown>)
+          ? deepMerge(DEFAULT_ECHO_DATA, normalizeEchoForEditor(storedEcho))
           : { ...(DEFAULT_ECHO_DATA as Record<string, unknown>) }) as EchoData;
         if (draftTouchedRef.current.size > 0) {
           // RETRO-3947-01: the doctor typed while the canonical state was

@@ -174,7 +174,7 @@ export async function persistEMRAndRefresh(
 export async function persistAndSignEMR(actions: {
     confirm: () => Promise<boolean>;
     save: (options: Record<string, unknown>) => Promise<unknown>;
-    sign: (options: { rowVersion: number }) => Promise<unknown>;
+    sign: (options: { rowVersion: number; data?: Record<string, unknown> }) => Promise<unknown>;
     onPersisted?: () => void | Promise<void>;
 }): Promise<PersistAndSignResult> {
     let confirmed: boolean;
@@ -204,7 +204,8 @@ export async function persistAndSignEMR(actions: {
     };
 
     try {
-        const signed = await actions.sign({ rowVersion });
+        const savedData = (saved as { data?: Record<string, unknown> }).data;
+        const signed = await actions.sign(savedData ? { rowVersion, data: savedData } : { rowVersion });
         await refreshStatus();
         return isRejectedEMRWrite(signed) ? 'sign_failed' : 'sign_attempted';
     } catch {
@@ -259,7 +260,7 @@ interface EMRHookResult {
     canRedo: boolean;
     loadEMR: (forceRefresh?: boolean) => Promise<unknown>;
     saveEMR: (opts?: Record<string, unknown>) => Promise<unknown>;
-    signEMR: (opts?: { rowVersion?: number }) => Promise<unknown>;
+    signEMR: (opts?: { rowVersion?: number; data?: Record<string, unknown> }) => Promise<unknown>;
     amendEMR: (reason: string, opts?: Record<string, unknown>) => Promise<unknown>;
     setField: (field: string, value: unknown) => void;
     setNestedField: (path: string, value: unknown) => void;
@@ -316,16 +317,10 @@ export function EMRContainerV2({
         reloadFromServer,
     } = useEMR(visitId, { specialty: canonicalSpecialty }) as EMRHookResult;
     const [isPreparingCompletion, setIsPreparingCompletion] = useState(false);
+    const [isSigning, setIsSigning] = useState(false);
+    const signingScopeRef = useRef<object | null>(null);
     const completionScopeRef = useRef({ visitId, active: true });
-    // EMRSIGN-FE-001 + EMRAMEND-FE-002 (audit 3886 round 17): `isSaving` now
-    // locks field editing for the whole save→sign transaction so the doctor
-    // cannot type text B while the save of text A is in flight — the signed
-    // revision must equal the latest explicitly approved clinical snapshot.
-    // `isAmended` joins `isSigned` because an amended record is a finalized
-    // state whose ordinary fields must never be editable through the plain
-    // save/sign UI (the reasoned amendment flow is the only sanctioned
-    // correction pathway — see `amendAllowed` below).
-    const editingDisabled = isReadOnly || isSigned || isAmended || isPreparingCompletion || completionBusy || isSaving;
+    const editingDisabled = isReadOnly || isSigned || isAmended || isPreparingCompletion || completionBusy || isSigning;
     // EMRAMEND-FE-001 (audit 3886 round 17): the amendment workflow must be
     // REACHABLE on the very records it exists for (signed, and — after round
     // 16 — amended ones eligible for a repeat reasoned correction). The old
@@ -795,7 +790,11 @@ export function EMRContainerV2({
 
     // Actions
     const handleSign = useCallback(async () => {
-        if ((isReadOnly && !canSignReadOnly) || isPreparingCompletion || completionBusy) return;
+        const scope = completionScopeRef.current;
+        if ((isReadOnly && !canSignReadOnly) || isPreparingCompletion || completionBusy
+            || isSaving || signingScopeRef.current === scope || accessDenied || conflict) return;
+        signingScopeRef.current = scope;
+        setIsSigning(true);
         const confirmSigning = () => confirm({
             title: t('misc.emr_sign_title'),
             message: t('misc.emr_sign_message'),
@@ -808,14 +807,23 @@ export function EMRContainerV2({
         // token (row_version), NOT the clinical revision (version). signSavedEMR
         // validates the token; persistAndSignEMR derives row_version from the save
         // response itself and refreshes the parent status after persisting.
-        const result = isReadOnly
-            ? await signSavedEMR({ confirm: confirmSigning, rowVersion, sign: signEMR })
-            : await persistAndSignEMR({
-                confirm: confirmSigning,
-                save: saveEMR,
-                sign: signEMR,
-                onPersisted: refreshParentStatus,
-            });
+        let result: PersistAndSignResult;
+        const sign: typeof signEMR = (options) => scope.active ? signEMR(options) : Promise.resolve(null);
+        try {
+            result = isReadOnly
+                ? await signSavedEMR({ confirm: confirmSigning, rowVersion, sign })
+                : await persistAndSignEMR({
+                    confirm: confirmSigning,
+                    save: (options) => scope.active ? saveEMR(options) : Promise.resolve(null),
+                    sign,
+                    onPersisted: () => scope.active ? refreshParentStatus() : undefined,
+                });
+        } finally {
+            if (signingScopeRef.current === scope) {
+                signingScopeRef.current = null;
+                setIsSigning(false);
+            }
+        }
         if (result === 'save_failed') {
             logger.error('[EMR] Save-and-sign stopped because the save did not return a valid non-draft version');
         } else if (result === 'sign_failed') {
@@ -829,6 +837,9 @@ export function EMRContainerV2({
         isReadOnly,
         isPreparingCompletion,
         completionBusy,
+        isSaving,
+        accessDenied,
+        conflict,
         canSignReadOnly,
         rowVersion,
         refreshParentStatus,
@@ -840,6 +851,7 @@ export function EMRContainerV2({
             || isReadOnly
             || isPreparingCompletion
             || completionBusy
+            || signingScopeRef.current === completionScopeRef.current
             || isLoading
             || isSaving
             || accessDenied
@@ -1119,6 +1131,7 @@ export function EMRContainerV2({
                         onChange={handleFieldChange('complaints')}
                         disabled={editingDisabled}
                         doctorId={doctorId}
+                        specialty={canonicalSpecialty}
                     />
 
                     <AnamnesisMorbiSection
@@ -1126,6 +1139,7 @@ export function EMRContainerV2({
                         onChange={handleFieldChange('anamnesis_morbi')}
                         disabled={editingDisabled}
                         doctorId={doctorId}
+                        specialty={canonicalSpecialty}
                         icd10Code={data?.icd10_code || ''}
                     />
 
