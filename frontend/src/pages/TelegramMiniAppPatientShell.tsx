@@ -6,6 +6,7 @@ import {
   Alert, Badge, Button, Card, CardContent, Input, Select, Textarea,
   Checkbox } from '../components/ui/macos';
 import { api } from '../api/client';
+import { loadTelegramWebApp } from '../utils/telegramWebApp';
 
 const MINI_APP_LANGUAGE_RU = 'ru';
 const MINI_APP_LANGUAGE_UZ = 'uz-Latn';
@@ -517,6 +518,7 @@ function TelegramMiniAppPatientShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const selectedSection = getTelegramMiniAppSelectedSection(location.search);
+  const [sdkSettled, setSdkSettled] = useState(false);
   const [state, setState] = useState<{
     status: string;
     manifest: Record<string, any> | null;
@@ -634,6 +636,16 @@ function TelegramMiniAppPatientShell() {
 
   useEffect(() => {
     let isMounted = true;
+    if (!sdkSettled && !getTelegramMiniAppInitData() && !getTelegramMiniAppEntryToken(location.search)) {
+      // A native Telegram launch may only expose initData after the SDK runs.
+      void loadTelegramWebApp().then(() => {
+        if (isMounted) setSdkSettled(true);
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+
     const effectLanguageCode = getTelegramMiniAppClientLanguage();
     notifyTelegramMiniAppReady();
 
@@ -806,7 +818,7 @@ function TelegramMiniAppPatientShell() {
     return () => {
       isMounted = false;
     };
-  }, [location.search, selectedSection]);
+  }, [location.search, sdkSettled, selectedSection]);
 
   // Round-14 (owner P1, PR-3386 merge review): the booking form on THIS
   // shell submits canonical Department.key values, so it loads the same

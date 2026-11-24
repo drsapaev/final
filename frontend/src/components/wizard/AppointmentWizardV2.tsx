@@ -1,3 +1,4 @@
+import { useWizardEditBirthDate } from './useWizardEditBirthDate';
 import { useTranslation } from '../../i18n/useTranslation';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
@@ -190,7 +191,6 @@ import {
   genderToPatientSexForApi,
   // Fix E: календарная валидация даты рождения (31.02, високосные, будущие)
   getBirthDateValidationError,
-  formatBirthDateInput,
   convertDateToISO,
   convertDateFromISO,
   // Fix A: наследованные поля выбранной карточки не протекают в нового пациента
@@ -356,7 +356,9 @@ const AppointmentWizardV2 = ({
   const [doctorsRequestStatus, setDoctorsRequestStatus] = useState<DoctorsRequestStatus>('idle');
   const [filteredServices, setFilteredServices] = useState<ServiceData[]>([]);
   const [showAllServices, setShowAllServices] = useState(false);
-  const [formattedBirthDate, setFormattedBirthDate] = useState('');
+  const initialContentRef = useRef<string>('');
+  const { formattedBirthDate, setFormattedBirthDate, birthDateEditedRef, handleBirthDateChange: updateBirthDate } =
+    useWizardEditBirthDate({ isOpen: Boolean(isOpen), editMode: Boolean(editMode), initialData, getPatient, initialContentRef, setWizardData });
   const [repeatEligibilityByItemId, setRepeatEligibilityByItemId] = useState({} as Record<string, unknown>);
   const [isRepeatEligibilityLoading, setIsRepeatEligibilityLoading] = useState(false);
 
@@ -365,6 +367,7 @@ const AppointmentWizardV2 = ({
   // Эффект для инициализации данных при открытии
   useEffect(() => {
     if (isOpen) {
+      birthDateEditedRef.current = false;
 
       // ✅ ИСПРАВЛЕНО: Строгая проверка editMode перед загрузкой данных
       if (editMode === true && initialData !== null && initialData !== undefined) {
@@ -374,10 +377,8 @@ const AppointmentWizardV2 = ({
         // Парсим услуги из initialData (предполагаем, что они приходят в определенном формате)
         // В реальном приложении может потребоваться маппинг
 
-        // ✅ ИСПРАВЛЕНО: Правильная инициализация даты рождения
-        const birthDateRaw = initialData.patient_birth_date || (
-        initialData.patient_birth_year ? `${initialData.patient_birth_year}-01-01` : '');
-        const birthDate = String(birthDateRaw ?? '');
+        // A worklist birth year is not a date of birth.
+        const birthDate = String(initialData.patient_birth_date ?? '');
         const initialDataPatient = (initialData.patient as { fio?: string; phone?: string; address?: string } | null | undefined) ?? {};
         const initialCartItems = (() => {
           const items = normalizeServicesFromInitialData(initialData, []);
@@ -441,9 +442,7 @@ const AppointmentWizardV2 = ({
         });
 
         // ✅ ИСПРАВЛЕНО: Синхронизация formattedBirthDate
-        if (birthDate) {
-          setFormattedBirthDate(convertDateFromISO(birthDate));
-        }
+        setFormattedBirthDate(birthDate ? convertDateFromISO(birthDate) : '');
 
       } else {
         setActiveServiceCategory(activeTabToWizardCategory(activeTab));
@@ -601,7 +600,6 @@ const AppointmentWizardV2 = ({
   // Fix F (Codex R1 PR 3097): снимок исходного содержимого мастера на момент
   // открытия (edit-mode данные или пустая форма). Служит базой для diff'а
   // «есть ли реально несохранённые правки» при закрытии.
-  const initialContentRef = useRef<string>('');
 
   // Общее количество шагов
   const totalSteps = TOTAL_STEPS;
@@ -893,17 +891,7 @@ const AppointmentWizardV2 = ({
     setErrors((prev) => ({ ...prev, fio: null }));
   };
 
-  const handleBirthDateChange = (value: string) => {
-    const formatted = formatBirthDateInput(value);
-    setFormattedBirthDate(formatted);
-
-    // Конвертируем в ISO формат для сохранения
-    const isoDate = convertDateToISO(formatted);
-    setWizardData((prev) => ({
-      ...prev,
-      patient: { ...prev.patient, birth_date: isoDate }
-    }));
-  };
+  const handleBirthDateChange = (value: string) => { updateBirthDate(value); };
 
   // ===================== ЗАГРУЗКА ДАННЫХ =====================
 
@@ -2181,7 +2169,11 @@ const AppointmentWizardV2 = ({
       }
 
       const initialPatientSex = genderToPatientSexForApi(resolvePatientGenderValue(initialData));
-      if (editMode && patientId && selectedPatientSex && selectedPatientSex !== initialPatientSex) {
+      const hasEditDeltaRemoval = editMode && !fullUpdateQuoteRoute &&
+        detectRemovedServicesWithinRetainedEntries(editOriginalServiceIdentity, wizardData.cart.items).length > 0;
+      // For a partial removal, edit-delta alone persists demographic edits so
+      // a rejected service change cannot partially save the patient's data.
+      if (editMode && !hasEditDeltaRemoval && patientId && selectedPatientSex && selectedPatientSex !== initialPatientSex) {
         // UX Audit Stage 3 (Wizard issue 5.1): Заменён raw fetch() PUT на updatePatient() из api/patients.
         try {
           await updatePatient(patientId, { sex: selectedPatientSex });
@@ -2220,11 +2212,9 @@ const AppointmentWizardV2 = ({
       const originalQueueIds = editOriginalIdentity.queueIds; // ✅ available throughout handleComplete
       const entryUpdatedAtMap = editOriginalIdentity.entryUpdatedAtMap;
 
-      // REG-FE-084 (follow-up audit 2026-11-02): удаление ОДНОЙ услуги из
-      // СОХРАНЯЕМОЙ записи не поддерживается backend edit-контрактом (нет
-      // per-service remove-команды) — прежний путь молча терял правку и
-      // рапортовал успех. Громкий отказ ДО сабмита; детектор — wizardUtils.
-      if (editMode) {
+      // Legacy full-update and non-queue paths still do not support a
+      // partial removal. Edit-delta prices and saves the explicit zero target.
+      if (editMode && (fullUpdateQuoteRoute || !hasQueueEntries)) {
         const removed = detectRemovedServicesWithinRetainedEntries(
           editOriginalIdentity, wizardData.cart.items);
         if (removed.length > 0) {
@@ -2262,9 +2252,9 @@ const AppointmentWizardV2 = ({
             const patientData: Record<string, unknown> = {
               patient_name: wizardData.patient.fio || wizardData.patient.name,
               phone: normalizedPhone,
-              birth_year: wizardData.patient.birth_date ?
-              parseInt(wizardData.patient.birth_date.split('-')[0]) :
-              null,
+              ...(birthDateEditedRef.current && wizardData.patient.birth_date
+                ? { birth_date: wizardData.patient.birth_date }
+                : {}),
               address: wizardData.patient.address || null
             };
 
@@ -2429,7 +2419,7 @@ const AppointmentWizardV2 = ({
           const patientDataForEditDelta: Record<string, unknown> = {
             full_name: wizardData.patient.fio || wizardData.patient.name,
             phone: normalizedPhone,
-            birth_date: wizardData.patient.birth_date || wizardData.patient.birthDate || null,
+            birth_date: birthDateEditedRef.current ? wizardData.patient.birth_date || undefined : undefined,
             sex: selectedPatientSex,
             address: wizardData.patient.address || null
           };
@@ -2650,9 +2640,9 @@ const AppointmentWizardV2 = ({
         const patientUpdateData: Record<string, unknown> = {
           full_name: wizardData.patient.fio || wizardData.patient.name,
           phone: normalizedPhone,
-          birth_date: wizardData.patient.birth_date || wizardData.patient.birthDate,
+          birth_date: birthDateEditedRef.current ? wizardData.patient.birth_date || undefined : undefined,
           sex: selectedPatientSex,
-          address: wizardData.patient.address
+          address: wizardData.patient.address || (initialData?.address ? '' : undefined)
         };
 
         // Удаляем undefined значения
@@ -3038,9 +3028,9 @@ const AppointmentWizardV2 = ({
 
   // Улучшенный заголовок для Шага 2
   const Step2Header =
-  <div style={wizardHeaderShellStyle}>
+  <div className="wizard-service-header" style={wizardHeaderShellStyle}>
       {/* 1. Поиск (Слева) */}
-      <div style={{ flex: '0 0 300px', minWidth: 0 }}>
+      <div className="wizard-service-search">
         <Input
         placeholder={t('misc.aw_search_service_placeholder')}
         value={serviceSearchQuery}
@@ -3055,18 +3045,12 @@ const AppointmentWizardV2 = ({
       </div>
 
       {/* 2. Категории (Центр) */}
-      <div style={{
-      flex: 1,
-      display: 'flex',
-      justifyContent: 'center',
-      gap: 'var(--mac-spacing-2)',
-      padding: '0 8px',
-      flexWrap: 'wrap'
-    }}>
+      <div className="wizard-service-categories">
         {categories.map((cat) =>
       <button
         key={cat.id}
         type="button"
+        aria-pressed={activeServiceCategory === cat.id}
         onClick={() => setActiveServiceCategory(cat.id)}
         style={{
           ...wizardSegmentButtonBase,
@@ -3097,25 +3081,20 @@ const AppointmentWizardV2 = ({
             <span style={{ fontSize: 'var(--mac-font-size-lg)', display: 'inline-flex', alignItems: 'center' }}>
             {cat.icon && <cat.icon size={16} aria-hidden="true" />}
           </span>
-            {cat.label}
+            {t(cat.labelKey)}
           </button>
       )}
       </div>
 
       {/* 3. Действия (Справа) */}
-      <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 'var(--mac-spacing-2)',
-      flex: '0 0 auto'
-    }}>
+      <div className="wizard-service-actions">
         {/* Кнопка обновления */}
         <button
         type="button"
         onClick={handleReloadServices}
         disabled={isReloadingServices}
         title={t('misc.aw_refresh_services_title')}
-        aria-label={isReloadingServices ? 'Refreshing service list' : 'Refresh service list'}
+        aria-label={t('misc.aw_refresh_services_title')}
         style={{
           width: '34px',
           height: '34px',

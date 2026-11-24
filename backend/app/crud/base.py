@@ -29,14 +29,15 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         return db.query(self.model).offset(skip).limit(limit).all()
 
     # Create
-    def create(self, db: Session, *, obj_in: CreateSchemaType) -> ModelType:
+    def create(
+        self, db: Session, *, obj_in: CreateSchemaType, commit: bool = True
+    ) -> ModelType:
+        """Create a row. With commit=False, the caller owns the transaction."""
         data: dict[str, Any] = obj_in.model_dump(exclude_unset=True)
         # ✅ ИСКЛЮЧАЕМ только schema-only поля, которых реально нет в целевой модели
         # full_name используется только для нормализации ДО создания модели, но не сохраняется в БД
         fields_to_exclude = [
-            field
-            for field in ("full_name", "email")
-            if not hasattr(self.model, field)
+            field for field in ("full_name", "email") if not hasattr(self.model, field)
         ]
         if fields_to_exclude:
             logger.debug(
@@ -62,7 +63,10 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         db_obj = self.model(**data)  # type: ignore[arg-type]
         db.add(db_obj)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         db.refresh(db_obj)
         return db_obj
 

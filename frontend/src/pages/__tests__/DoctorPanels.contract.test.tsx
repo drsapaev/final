@@ -206,10 +206,13 @@ describe('Doctor panels SSOT contract', () => {
     expect(dermatology).toContain('appointmentCompletionStatus.canComplete');
     expect(dermatology).toContain('{emr && !emr.is_draft &&');
     expect(dermatology).toContain('canCompleteDermatologyVisit(');
-    // DERMAHIST-FE-003: onPersisted refreshes the canonical status AND
-    // reloads the same-patient history snapshot (multi-line handler).
-    expect(dermatology).toContain('refreshCanonicalStatus(currentVisitContext, true)');
-    expect(dermatology).toMatch(/onPersisted=\{\(\) => \{[\s\S]*?patientHistory\.reload\(\);[\s\S]*?\}\}/);
+    // DERMAHIST-FE-003: the onPersisted binding keeps the canonical status
+    // refresh AND reloads the same-patient history (async callback — the
+    // canonical refresh stays awaited first, then the history hook reloads).
+    expect(dermatology).toContain('onPersisted={async () => {');
+    expect(dermatology).toContain('await refreshCanonicalStatus(currentVisitContext, true);');
+    expect(dermatology).toContain('patientHistory.reload();');
+    expect(dermatology).toContain('savedPatientId === String(historyPatientIdRef.current ?? \'\')');
 
     expect(prescriptionSystem).toContain('canCreatePrescription');
     expect(prescriptionSystem).toContain('const prescriptionEligible = canCreatePrescription === true');
@@ -261,9 +264,9 @@ describe('Doctor panels SSOT contract', () => {
     // ONLY call target — fail closed on a missing field, never fall back
     // to a local can_call scan.
     expect(source).toContain(
-      "Object.prototype.hasOwnProperty.call(queuePayload, 'next_call_entry_id')",
+      'Object.prototype.hasOwnProperty.call(queuePayload, \'next_call_entry_id\')',
     );
-    expect(source).not.toContain("hasBackendQueueAction(entry, 'call', 'can_call')");
+    expect(source).not.toContain('hasBackendQueueAction(entry, \'call\', \'can_call\')');
     expect(source).toContain('canCallNext: data?.can_call_next === true');
     expect(source).toContain('canCallNext: queueControls.canCallNext');
     // Contract: call-next must use selectNextCallEntryId from the queue payload.

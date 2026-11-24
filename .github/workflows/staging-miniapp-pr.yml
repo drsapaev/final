@@ -1,23 +1,70 @@
 name: Mini App PR staging preflight
 
 on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/staging-miniapp-pr.yml']
   workflow_dispatch:
     inputs:
       source-sha:
         description: Full reviewed source SHA for PR 4118
         required: true
         type: string
+      runtime-smoke:
+        description: Also boot and remove the isolated token-free staging stack
+        type: boolean
+        default: false
+      protected-smoke:
+        description: Verify the staging bot credential reaches the isolated backend only
+        type: boolean
+        default: false
+      native-rehearsal:
+        description: Check exact Mini App ingress on loopback, without credentials
+        type: boolean
+        default: false
+      native-protected:
+        description: Rehearse the same ingress with the protected backend credential, still on loopback
+        type: boolean
+        default: false
+
+  workflow_call:
+    inputs:
+      source-sha:
+        type: string
+        required: true
+      native-live:
+        type: boolean
+        required: true
+      native-arq:
+        type: boolean
+        default: false
+      native-lab-arq:
+        type: boolean
+        default: false
+    secrets:
+      STAGING_TELEGRAM_BOT_TOKEN:
+        required: true
+      STAGING_TELEGRAM_CHAT_ID:
+        required: true
+      STAGING_MINIAPP_TUNNEL_TOKEN:
+        required: true
 
 permissions: {}
 
 jobs:
   compose-preflight:
-    # Load the reviewed workflow from main, not from the PR source ref.
-    if: github.repository == 'drsapaev/final' && github.ref == 'refs/heads/main'
+    # Manual runs use main; the scoped infra PR can also prove the token-free job.
+    if: >-
+      github.repository == 'drsapaev/final' &&
+      !inputs.native-arq &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == 'drsapaev/final' &&
+        github.head_ref == 'ci/miniapp-pr-runtime-smoke-20261120'))
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 40
     env:
-      REQUESTED_SHA: ${{ inputs.source-sha }}
+      REQUESTED_SHA: ${{ github.event_name == 'pull_request' && '33f35996a1f86726b17f8caa819d1ed99aa1729a' || inputs.source-sha }}
       REVIEWED_SHA: 33f35996a1f86726b17f8caa819d1ed99aa1729a
     steps:
       - name: Check out the exact approved public source
@@ -105,5 +152,1388 @@ jobs:
             printf '### Mini App staging preflight\n\n'
             printf 'Source SHA: `%s`\n\n' "$REVIEWED_SHA"
             printf 'Compose wiring: PASS (synthetic marker only)\n\n'
-            printf 'Native Telegram acceptance: NOT_RUN. No containers, secrets or tunnel were used.\n'
+            printf 'Native Telegram acceptance: NOT_RUN. No real bot token or tunnel was used.\n'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Boot and verify the token-free loopback stack
+        if: github.event_name == 'pull_request' || inputs.runtime-smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          d="$(mktemp -d)"
+          project="miniapp-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          frontend=http://127.0.0.1:18080
+          backend=http://127.0.0.1:18001
+          docker_args=(docker compose --project-name "$project" --env-file "$d/runtime.env"
+            -f source/ops/compose.staging.yml)
+          cleanup() {
+            local result=$? teardown=PASS type residual image
+            local -a ls_options
+            trap - EXIT
+            if ! "${docker_args[@]}" down --volumes --remove-orphans --rmi local; then
+              teardown=FAIL
+            fi
+            for type in container network volume image; do
+              ls_options=(-q)
+              if [[ "$type" == container || "$type" == image ]]; then ls_options+=(-a); fi
+              if ! residual="$(docker "$type" ls "${ls_options[@]}" --filter "label=com.docker.compose.project=$project")"; then
+                teardown=FAIL
+              elif [[ -n "$residual" ]]; then
+                teardown=FAIL
+              fi
+            done
+            for image in "$project-backend" "$project-frontend"; do
+              if docker image inspect "$image" >/dev/null 2>&1; then teardown=FAIL; fi
+            done
+            printf '\nRuntime teardown: %s.\n' "$teardown" >> "$GITHUB_STEP_SUMMARY"
+            rm -rf -- "$d"
+            if [[ "$teardown" != PASS ]]; then exit 1; fi
+            exit "$result"
+          }
+
+          cat > "$d/runtime.env" <<ENV
+          STAGING_PUBLIC_BASE_URL=$frontend
+          STAGING_PUBLIC_WS_URL=ws://127.0.0.1:18080
+          STAGING_PUBLIC_WS_HOST=127.0.0.1:18080
+          CORS_ORIGINS=$frontend
+          APP_VERSION=$REVIEWED_SHA
+          VERCEL_GIT_COMMIT_SHA=$REVIEWED_SHA
+          CSRF_ENABLED=1
+          CLINIC_PURPOSE=miniapp-token-free-smoke
+          CLINIC_OWNER=github-actions
+          POSTGRES_USER=miniapp_synthetic
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          POSTGRES_DB=miniapp_synthetic
+          SECRET_KEY=$(openssl rand -hex 32)
+          ADMIN_USERNAME=miniapp_synthetic
+          ADMIN_PASSWORD=Aa1_$(openssl rand -hex 24)
+          ADMIN_EMAIL=miniapp@example.invalid
+          ADMIN_FULL_NAME=Synthetic Staging
+          TELEGRAM_BOT_TOKEN=
+          VITE_SENTRY_DSN=
+          SENTRY_DSN=
+          ENV
+          unset TELEGRAM_BOT_TOKEN VITE_SENTRY_DSN SENTRY_DSN
+          trap cleanup EXIT
+
+          "${docker_args[@]}" up --detach --build --wait --wait-timeout 280 postgres redis backend frontend
+
+          expected=$'backend\nfrontend\npostgres\nredis'
+          actual=$("${docker_args[@]}" ps --services --status running | LC_ALL=C sort)
+          test "$actual" = "$expected"
+          "${docker_args[@]}" exec -T backend sh -euc 'test -z "${TELEGRAM_BOT_TOKEN:-}"'
+          for service in postgres backend frontend; do
+            container=$("${docker_args[@]}" ps -q "$service")
+            docker inspect --format '{{json .NetworkSettings.Ports}}' "$container" |
+              python3 -c 'import json,sys; a=[b for row in json.load(sys.stdin).values() if row for b in row]; assert a and all(b["HostIp"] == "127.0.0.1" for b in a)'
+          done
+          "${docker_args[@]}" exec -T postgres psql -XAt --set ON_ERROR_STOP=on \
+            -U miniapp_synthetic -d miniapp_synthetic -c 'select count(*) from patients' |
+            grep -Fxq 0
+          curl --noproxy '*' --fail --silent --show-error --max-time 10 "$backend/" |
+            python3 -c 'import json,sys; assert json.load(sys.stdin)["version"] == sys.argv[1]' "$REVIEWED_SHA"
+          curl --noproxy '*' --fail --silent --show-error --max-time 10 "$frontend/api/v1/health" |
+            python3 -c 'import json,sys; assert json.load(sys.stdin)["db"] == "ok"'
+          curl --noproxy '*' --fail --silent --show-error --max-time 10 \
+            -D "$d/miniapp.headers" -o /dev/null "$frontend/telegram/mini-app/patient"
+          grep -iE '^content-security-policy:.*https://telegram\.org/js/telegram-web-app\.js' "$d/miniapp.headers" >/dev/null
+          status="$(curl --noproxy '*' --silent --show-error --max-time 10 -o "$d/csrf.json" \
+            -w '%{http_code}' -H 'Content-Type: application/json' --data '{}' \
+            "$frontend/api/v1/telegram/mini-app/auth/exchange")"
+          test "$status" = 403
+          python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["reason"] == "missing_cookie"' "$d/csrf.json"
+          printf '\nRuntime smoke: PASS (loopback, empty patient table, no worker or bot token, expected SHA, Mini App CSP and CSRF rejection).\n' >> "$GITHUB_STEP_SUMMARY"
+
+  protected-backend-smoke:
+    # The workflow itself must be on main; pull requests never get this Environment.
+    if: >-
+      github.repository == 'drsapaev/final' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.protected-smoke
+    needs: compose-preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: staging-integrations
+    permissions: {}
+    env:
+      REVIEWED_SHA: 33f35996a1f86726b17f8caa819d1ed99aa1729a
+    steps:
+      - name: Prepare a sealed backend build without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          d="$RUNNER_TEMP/miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mkdir "$d"
+          git -C "$d" init --quiet source
+          git -C "$d/source" fetch --no-tags --depth=1 https://github.com/drsapaev/final.git "$REVIEWED_SHA"
+          git -C "$d/source" checkout --quiet --detach FETCH_HEAD
+          test "$(git -C "$d/source" rev-parse HEAD)" = "$REVIEWED_SHA"
+
+          cat > "$d/runtime.env" <<ENV
+          STAGING_PUBLIC_BASE_URL=http://127.0.0.1
+          CORS_ORIGINS=http://127.0.0.1
+          APP_VERSION=$REVIEWED_SHA
+          CSRF_ENABLED=1
+          WORKERS=1
+          CLINIC_PURPOSE=miniapp-protected-smoke
+          CLINIC_OWNER=github-actions
+          POSTGRES_USER=miniapp_synthetic
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          POSTGRES_DB=miniapp_synthetic
+          SECRET_KEY=$(openssl rand -hex 32)
+          ADMIN_USERNAME=miniapp_synthetic
+          ADMIN_PASSWORD=Aa1_$(openssl rand -hex 24)
+          ADMIN_EMAIL=miniapp@example.invalid
+          ADMIN_FULL_NAME=Synthetic Staging
+          VITE_SENTRY_DSN=
+          SENTRY_DSN=
+          ENV
+          cat > "$d/sealed.yml" <<'COMPOSE'
+          services:
+            postgres:
+              ports: !reset []
+            backend:
+              ports: !reset []
+              dns: [127.0.0.1]
+              # Run the pinned source baked into the staging image. Do not let
+              # this root-running container create files in the runner checkout.
+              volumes: !override
+                - staging_backend_data:/data
+            frontend:
+              ports: !reset []
+            worker:
+              environment:
+                TELEGRAM_BOT_TOKEN: ""
+          networks:
+            default:
+              internal: true
+              driver_opts:
+                com.docker.network.bridge.gateway_mode_ipv4: isolated
+          COMPOSE
+          args=(docker compose --project-name "miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            --env-file "$d/runtime.env" -f "$d/source/ops/compose.staging.yml" -f "$d/sealed.yml")
+          cat > "$d/check-config.py" <<'PY'
+          import json
+          import sys
+
+          config = json.load(sys.stdin)
+          services = config["services"]
+          marker = "synthetic-runtime-binding"
+          names = {"postgres", "redis", "backend"}
+          assert set(config["networks"]) == {"default"}
+          network = config["networks"]["default"]
+          assert network["internal"] is True and not network.get("external")
+          assert network["driver_opts"]["com.docker.network.bridge.gateway_mode_ipv4"] == "isolated"
+          assert services["backend"]["dns"] == ["127.0.0.1"]
+          assert services["backend"]["environment"]["TELEGRAM_BOT_TOKEN"] == marker
+          for name, service in services.items():
+              assert not service.get("ports")
+              assert not service.get("network_mode") and not service.get("privileged")
+              assert (marker in json.dumps(service)) == (name == "backend")
+              if name in names:
+                  assert set(service.get("networks", {})) == {"default"}
+                  assert all(mount["type"] == "volume" for mount in service.get("volumes", []))
+                  assert set(service.get("depends_on", {})) <= names
+          assert [(m["source"], m["target"]) for m in services["backend"].get("volumes", [])] == [
+              ("staging_backend_data", "/data")
+          ]
+          print("PASS: marker goes only to backend; selected services have no host mounts or published ports and use one internal network.")
+          PY
+          TELEGRAM_BOT_TOKEN=synthetic-runtime-binding "${args[@]}" config --format json |
+            python3 "$d/check-config.py"
+          unset TELEGRAM_BOT_TOKEN
+          "${args[@]}" pull postgres redis
+          "${args[@]}" build backend
+
+      - name: Start the sealed backend and verify the protected input without printing it
+        shell: bash
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.STAGING_TELEGRAM_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${TELEGRAM_BOT_TOKEN:-}" || {
+            echo "::error::STAGING_TELEGRAM_BOT_TOKEN is missing in staging-integrations."
+            exit 1
+          }
+          d="$RUNNER_TEMP/miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test "$(git -C "$d/source" rev-parse HEAD)" = "$REVIEWED_SHA"
+          args=(docker compose --project-name "miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            --env-file "$d/runtime.env" -f "$d/source/ops/compose.staging.yml" -f "$d/sealed.yml")
+          if ! "${args[@]}" up --detach --no-build --pull never --wait --wait-timeout 280 postgres redis backend >/dev/null 2>&1; then
+            echo "::error::Sealed backend failed to start. Secret-bearing runtime logs were not collected."
+            exit 1
+          fi
+          unset TELEGRAM_BOT_TOKEN
+          expected=$'backend\npostgres\nredis'
+          actual=$("${args[@]}" ps --services --status running | LC_ALL=C sort)
+          test "$actual" = "$expected"
+          project="miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test "$(docker network inspect --format '{{.Internal}}' "${project}_default")" = true
+          "${args[@]}" exec -T postgres psql -XAt --set ON_ERROR_STOP=on \
+            -U miniapp_synthetic -d miniapp_synthetic -c 'select count(*) from patients' | grep -Fxq 0
+          "${args[@]}" exec -T backend python - "$REVIEWED_SHA" <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          assert os.environ.get("TELEGRAM_BOT_TOKEN")
+          assert os.environ["TELEGRAM_BOT_TOKEN"] != "synthetic-runtime-binding"
+          with urllib.request.urlopen("http://127.0.0.1:18000/", timeout=10) as response:
+              assert json.load(response)["version"] == sys.argv[1]
+          PY
+          {
+            printf 'Protected backend smoke: PASS (credential present only in selected backend, empty patient table, expected SHA, internal network).\n'
+            printf 'Telegram identity, HTTPS, native WebView acceptance and delivery: NOT_RUN.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tear down only this sealed project
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          project="miniapp-protected-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          result=PASS
+          if [[ -f "$d/runtime.env" && -f "$d/sealed.yml" ]]; then
+            docker compose --project-name "$project" --env-file "$d/runtime.env" \
+              -f "$d/source/ops/compose.staging.yml" -f "$d/sealed.yml" \
+              down --volumes --remove-orphans --rmi local || {
+                echo "::error::Isolated project docker compose down failed."
+                result=FAIL
+              }
+          fi
+          for type in container network volume image; do
+            ls_options=(-q)
+            if [[ "$type" == container || "$type" == image ]]; then ls_options+=(-a); fi
+            if ! residual="$(docker "$type" ls "${ls_options[@]}" --filter "label=com.docker.compose.project=$project")"; then
+              echo "::error::Could not list remaining Docker resources of type $type."
+              result=FAIL
+            elif [[ -n "$residual" ]]; then
+              echo "::error::Isolated project still owns Docker resources of type $type."
+              result=FAIL
+            fi
+          done
+          if docker image inspect "$project-backend" >/dev/null 2>&1; then
+            echo "::error::The isolated backend image tag still exists."
+            result=FAIL
+          fi
+          if ! rm -rf -- "$d" || [[ -e "$d" || -L "$d" ]]; then
+            echo "::error::Could not remove the isolated runner workspace."
+            result=FAIL
+          fi
+          printf 'Protected backend teardown: %s.\n' "$result" >> "$GITHUB_STEP_SUMMARY"
+          test "$result" = PASS
+
+  native-rehearsal:
+    if: >-
+      github.repository == 'drsapaev/final' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
+        inputs.native-rehearsal && !inputs.native-protected) ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == 'drsapaev/final' &&
+        github.head_ref == 'ci/miniapp-native-rehearsal-20261121'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Prepare exact isolated backend, frontend and ingress
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          sha=33f35996a1f86726b17f8caa819d1ed99aa1729a
+          host=miniapp-staging.finalclinic.fyi
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          project="miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mkdir "$d"
+          git init -q "$d/source"
+          git -C "$d/source" fetch -q --no-tags --depth=1 https://github.com/drsapaev/final.git "$sha"
+          git -C "$d/source" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$d/source" rev-parse HEAD)" = "$sha"
+          cat > "$d/runtime.env" <<ENV
+          APP_VERSION=$sha
+          VERCEL_GIT_COMMIT_SHA=$sha
+          STAGING_PUBLIC_BASE_URL=https://$host
+          STAGING_PUBLIC_WS_URL=wss://$host
+          STAGING_PUBLIC_WS_HOST=$host
+          CORS_ORIGINS=https://$host
+          CSRF_ENABLED=1
+          WORKERS=1
+          CLINIC_PURPOSE=miniapp-native-rehearsal
+          CLINIC_OWNER=github-actions
+          POSTGRES_USER=miniapp_synthetic
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          POSTGRES_DB=miniapp_synthetic
+          SECRET_KEY=$(openssl rand -hex 32)
+          ADMIN_USERNAME=miniapp_synthetic
+          ADMIN_PASSWORD=Aa1_$(openssl rand -hex 24)
+          ADMIN_EMAIL=miniapp@example.invalid
+          ADMIN_FULL_NAME=Synthetic Staging
+          SENTRY_DSN=
+          VITE_SENTRY_DSN=
+          NATIVE_FRONTEND_IMAGE=$project-frontend
+          NATIVE_NGINX_CONF=$d/ingress.conf
+          ENV
+          cat > "$d/native.yml" <<'YAML'
+          services:
+            postgres:
+              ports: !reset []
+            backend:
+              ports: !reset []
+              dns: [127.0.0.1]
+              volumes: !override
+                - staging_backend_data:/data
+            frontend:
+              image: ${NATIVE_FRONTEND_IMAGE:?}
+              ports: !reset []
+              build:
+                args:
+                  VITE_API_URL: ""
+                  VITE_API_BASE_URL: same-origin
+                  VITE_WS_URL: ""
+                  VITE_WS_HOST: ""
+            worker:
+              environment:
+                TELEGRAM_BOT_TOKEN: ""
+            gateway:
+              image: ${NATIVE_FRONTEND_IMAGE:?}
+              ports:
+                - "127.0.0.1:18086:80"
+              volumes:
+                - ${NATIVE_NGINX_CONF:?}:/etc/nginx/conf.d/default.conf:ro
+              networks: [default, ingress]
+              depends_on:
+                backend:
+                  condition: service_healthy
+                frontend:
+                  condition: service_healthy
+          networks:
+            default:
+              internal: true
+              driver_opts:
+                com.docker.network.bridge.gateway_mode_ipv4: isolated
+            ingress: {}
+          YAML
+          cat > "$d/compose" <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          d="$(dirname "$0")"
+          exec docker compose --project-name "miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --env-file "$d/runtime.env" -f "$d/source/ops/compose.staging.yml" -f "$d/native.yml" "$@"
+          SH
+          chmod 700 "$d/compose"
+          touch "$d/ingress.conf"
+          TELEGRAM_BOT_TOKEN=synthetic-marker "$d/compose" config --format json | python3 -c '
+          import json, sys
+          c = json.load(sys.stdin)
+          s = c["services"]
+          assert set(c["networks"]) == {"default", "ingress"}
+          assert c["networks"]["default"]["internal"] is True
+          assert not any(x.get("external") for x in c["networks"].values())
+          assert all(not v.get("network_mode") and not v.get("privileged") for v in s.values())
+          assert s["backend"]["environment"]["TELEGRAM_BOT_TOKEN"] == "synthetic-marker"
+          assert s["backend"]["environment"]["CSRF_ENABLED"] == "1"
+          ports = s["gateway"]["ports"]
+          assert len(ports) == 1
+          assert (ports[0].get("host_ip"), ports[0].get("target"), str(ports[0].get("published")), ports[0].get("protocol")) == ("127.0.0.1", 80, "18086", "tcp")
+          assert set(s["gateway"]["networks"]) == {"default","ingress"}
+          assert len(s["gateway"]["volumes"]) == 1
+          assert s["gateway"]["volumes"][0]["read_only"] is True
+          assert s["gateway"]["volumes"][0]["target"] == "/etc/nginx/conf.d/default.conf"
+          for k in {"backend","frontend","redis","postgres"}:
+              assert not s[k].get("ports")
+              assert set(s[k]["networks"]) == {"default"}
+              assert all(v["type"] == "volume" for v in s[k].get("volumes", []))
+              assert set(s[k].get("depends_on", {})) <= {"backend","frontend","redis","postgres"}
+          assert all("synthetic-marker" not in json.dumps(v) for k, v in s.items() if k != "backend")
+          print("PASS: only the gateway is published on loopback; token is backend-only.")
+          '
+          "$d/compose" pull postgres redis
+          "$d/compose" build backend frontend
+
+      - name: Start synthetic stack without loading credentials
+        if: github.event_name != 'workflow_dispatch' || !inputs.native-protected
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          TELEGRAM_BOT_TOKEN= "$d/compose" up -d --no-build --pull never --wait --wait-timeout 280 postgres redis backend frontend
+          "$d/compose" exec -T backend sh -ec 'test -z "${TELEGRAM_BOT_TOKEN:-}"'
+
+      - name: Verify Mini App revision and reject out-of-scope requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          sha=33f35996a1f86726b17f8caa819d1ed99aa1729a
+          host=miniapp-staging.finalclinic.fyi
+          patient=/telegram/mini-app/patient
+          cabinet="$patient?section=cabinet"
+          "$d/compose" exec -T postgres psql -XAt --set ON_ERROR_STOP=on \
+            -U miniapp_synthetic -d miniapp_synthetic -c 'select count(*) from patients' | grep -Fxq 0
+          "$d/compose" exec -T backend python -c "import urllib.request,json; assert json.load(urllib.request.urlopen('http://127.0.0.1:18000/', timeout=10))['version'] == '$sha'"
+          "$d/compose" exec -T frontend grep -Fq "const BUILD_VERSION = '$sha';" /usr/share/nginx/html/sw.js
+          "$d/compose" exec -T frontend find /usr/share/nginx/html/assets -type f > "$d/asset-list"
+          python3 - "$d" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          d = Path(sys.argv[1])
+          root = "/usr/share/nginx/html"
+          assets = sorted({p.removeprefix(root) for p in (d / "asset-list").read_text().splitlines()})
+          assert 0 < len(assets) <= 1000
+          assert all(re.fullmatch(r"/assets/[A-Za-z0-9._-]+", p) for p in assets)
+          prefix = "/api/v1/telegram/mini-app/"
+          exact_api = ("auth/exchange", "auth/refresh", "auth/logout", "sessions/list",
+                       "sessions/revoke-all", "patient/manifest", "cabinet/summary")
+          routes = [
+              '    "GET:/telegram/mini-app/patient" static;',
+              '    "GET:/telegram/mini-app/patient?section=cabinet" static;',
+              '    "GET:/favicon.svg" static;',
+              '    "GET:/api/v1/auth/csrf-token" api;',
+              *[f'    "GET:{path}" static;' for path in assets],
+              *[f'    "POST:{prefix}{path}" api;' for path in exact_api],
+              '    ~^POST:/api/v1/telegram/mini-app/sessions/[a-f0-9-][a-f0-9-]*/revoke$ api;',
+          ]
+          conf = r"""
+          map_hash_bucket_size 256;
+          map_hash_max_size 4096;
+          map "$request_method:$request_uri" $destination {
+              default denied;
+          ROUTES
+          }
+          map $destination $upstream_name {
+              default "";
+              static frontend:80;
+              api backend:18000;
+          }
+          server {
+              listen 80 default_server;
+              server_name miniapp-staging.finalclinic.fyi;
+              access_log off;
+              error_log /dev/null;
+              client_max_body_size 32k;
+              resolver 127.0.0.11 ipv6=off;
+              if ($http_host != miniapp-staging.finalclinic.fyi) { return 404; }
+              if ($destination = denied) { return 404; }
+              location / {
+                  proxy_pass http://$upstream_name$request_uri;
+                  proxy_set_header Host miniapp-staging.finalclinic.fyi;
+                  proxy_set_header X-Forwarded-Proto https;
+                  proxy_set_header X-Forwarded-Host miniapp-staging.finalclinic.fyi;
+                  proxy_set_header X-Forwarded-For "";
+                  proxy_set_header Upgrade "";
+                  proxy_set_header Connection close;
+                  proxy_hide_header Cache-Control;
+                  add_header Cache-Control "no-store, private" always;
+              }
+          }
+          """
+          (d / "ingress.conf").write_text(conf.replace("ROUTES", "\n".join(routes)))
+          PY
+          "$d/compose" up -d --no-deps --no-build --pull never gateway
+          ready=false
+          status=000
+          for _ in {1..30}; do
+            status="$(curl -sS --max-time 3 -H "Host: $host" -D "$d/headers" -o "$d/page" -w '%{http_code}' "http://127.0.0.1:18086$cabinet" 2>/dev/null || true)"
+            if [[ "$status" == 200 ]]; then ready=true; break; fi
+            sleep 1
+          done
+          if [[ "$ready" != true ]]; then
+            echo "::error::Loopback Cabinet did not become ready (HTTP $status)."
+            "$d/compose" logs --no-color --tail 15 gateway || true
+            exit 1
+          fi
+          grep -iE '^content-security-policy:.*https://telegram\.org/js/telegram-web-app\.js' "$d/headers" >/dev/null
+          grep -iE '^cache-control:.*no-store' "$d/headers" >/dev/null
+          grep -qiE '^cross-origin-embedder-policy: require-corp' "$d/headers"
+          script_path="$(sed -nE 's@.*src="(/assets/[A-Za-z0-9._-]+\.js)".*@\1@p' "$d/page" | head -n1)"
+          test -n "$script_path"
+          curl -fsS --max-time 10 -H "Host: $host" "http://127.0.0.1:18086$script_path" -o "$d/bundle.js"
+          expected_hash="$("$d/compose" exec -T frontend sha256sum "/usr/share/nginx/html$script_path" | cut -d' ' -f1)"
+          test "$(sha256sum "$d/bundle.js" | cut -d' ' -f1)" = "$expected_hash"
+          for denied in / /docs /openapi.json /api/v1/auth/me /api/v1/patients /sw.js /assets/not-built.js "$patient?not=allowed"; do
+            test "$(curl -sS --max-time 5 -H "Host: $host" -o /dev/null -w '%{http_code}' "http://127.0.0.1:18086$denied")" = 404
+          done
+          test "$(curl -sS --max-time 5 -H 'Host: unrelated.invalid' -o /dev/null -w '%{http_code}' "http://127.0.0.1:18086$patient")" = 404
+          test "$(curl -sS --max-time 5 -H "Host: $host" -X POST -o /dev/null -w '%{http_code}' "http://127.0.0.1:18086$patient")" = 404
+          status="$(curl -sS --max-time 5 -H "Host: $host" -H 'Content-Type: application/json' --data '{}' -o "$d/csrf.json" -w '%{http_code}' "http://127.0.0.1:18086/api/v1/telegram/mini-app/auth/exchange")"
+          test "$status" = 403
+          python3 -c 'import json, sys; assert json.load(open(sys.argv[1]))["reason"] == "missing_cookie"' "$d/csrf.json"
+          curl -fsS --max-time 5 -H "Host: $host" "http://127.0.0.1:18086/api/v1/auth/csrf-token" -o "$d/bootstrap.json"
+          python3 -c 'import json, sys; assert json.load(open(sys.argv[1]))["csrf_token"]' "$d/bootstrap.json"
+          test "$("$d/compose" ps --services --status running | sort)" = $'backend\nfrontend\ngateway\npostgres\nredis'
+          printf 'Loopback Mini App ingress and CSRF: PASS at `%s`. Public HTTPS and native Telegram: NOT_RUN.\n' "$sha" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove exactly this isolated stack
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          project="miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          result=PASS
+          if [[ -x "$d/compose" ]]; then
+            "$d/compose" down --volumes --remove-orphans --rmi local || result=FAIL
+          fi
+          # The frontend has an explicit project-owned tag; Compose can keep it.
+          if docker image inspect "$project-frontend" >/dev/null 2>&1; then
+            docker image rm "$project-frontend" || result=FAIL
+          fi
+          for type in container network volume image; do
+            opts=(-q)
+            if [[ "$type" == container || "$type" == image ]]; then opts+=(-a); fi
+            if ! remaining="$(docker "$type" ls "${opts[@]}" --filter "label=com.docker.compose.project=$project")" || [[ -n "$remaining" ]]; then
+              result=FAIL
+            fi
+          done
+          if docker image inspect "$project-backend" >/dev/null 2>&1; then result=FAIL; fi
+          rm -rf -- "$d" || result=FAIL
+          printf 'Isolated Mini App teardown: %s.\n' "$result" >> "$GITHUB_STEP_SUMMARY"
+          test "$result" = PASS
+
+  native-protected-rehearsal:
+    if: >-
+      github.repository == 'drsapaev/final' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      (inputs.native-protected || inputs.native-live || inputs.native-arq) &&
+      !inputs.native-rehearsal &&
+      (!inputs.native-lab-arq || inputs.native-arq) &&
+      (!(inputs.native-live || inputs.native-arq) ||
+       (github.workflow_ref == 'drsapaev/final/.github/workflows/staging-miniapp-native-live.yml@refs/heads/main' &&
+        !inputs.native-protected &&
+        ((inputs.native-live && !inputs.native-arq && inputs.source-sha == '33f35996a1f86726b17f8caa819d1ed99aa1729a') ||
+         (inputs.native-arq && !inputs.native-live))))
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ (inputs.native-live || inputs.native-arq) && 65 || 35 }}
+    environment: staging-integrations
+    permissions:
+      pull-requests: read
+    env:
+      REVIEWED_SHA: ${{ !inputs.native-arq && '33f35996a1f86726b17f8caa819d1ed99aa1729a' || inputs.source-sha }}
+      RUN_ARQ_ACCEPTANCE: ${{ inputs.native-arq }}
+      RUN_LAB_ARQ_ACCEPTANCE: ${{ inputs.native-lab-arq }}
+      WORKFLOW_SHA: ${{ github.workflow_sha }}
+    steps:
+      - name: Verify the exact PR 4251 metadata
+        if: env.RUN_LAB_ARQ_ACCEPTANCE == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$REVIEWED_SHA" =~ ^[a-f0-9]{40}$ ]]; then
+            echo '::error::PR #4251 acceptance requires its full current head SHA.'
+            exit 1
+          fi
+          # The PR's REST base.sha can lag main. The checkout step verifies the
+          # live refs/heads/main against WORKFLOW_SHA before building anything.
+          if ! gh api --hostname github.com repos/drsapaev/final/pulls/4251 | python3 -c '
+          import json
+          import sys
+
+          pr = json.load(sys.stdin)
+          head, base = pr["head"], pr["base"]
+          sys.exit(not (
+              pr["number"] == 4251 and pr["state"] == "open"
+              and head["repo"]["full_name"] == base["repo"]["full_name"] == "drsapaev/final"
+              and head["ref"] == "codex/laboratory-panel-v2" and base["ref"] == "main"
+              and head["sha"] == sys.argv[1]
+          ))
+          ' "$REVIEWED_SHA" 2>/dev/null; then
+            echo '::error::Could not verify open same-repository PR #4251, its exact app head and expected base branch.'
+            exit 1
+          fi
+
+      - name: Verify the current PR 4195 metadata
+        if: env.RUN_ARQ_ACCEPTANCE == 'true' && env.RUN_LAB_ARQ_ACCEPTANCE != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh api --hostname github.com repos/drsapaev/final/pulls/4195 | python3 -c '
+          import json
+          import sys
+
+          pr = json.load(sys.stdin)
+          head, base = pr["head"], pr["base"]
+          sys.exit(not (
+              pr["number"] == 4195 and pr["state"] == "open"
+              and head["repo"]["full_name"] == base["repo"]["full_name"] == "drsapaev/final"
+              and head["ref"] == "codex/kosmed-shell-robots-20261122" and base["ref"] == "main"
+              and head["sha"] == sys.argv[1] and base["sha"] == sys.argv[2]
+          ))
+          ' "$REVIEWED_SHA" "$WORKFLOW_SHA" 2>/dev/null; then
+            echo '::error::Could not verify the current open same-repository PR #4195 head and main base.'
+            exit 1
+          fi
+
+      - name: Prepare exact isolated backend, frontend and ingress
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          sha=$REVIEWED_SHA
+          host=miniapp-staging.finalclinic.fyi
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          project="miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mkdir "$d"
+          source="$d/source"
+          origin=https://github.com/drsapaev/final.git
+          git init -q "$source"
+          if [[ "$RUN_LAB_ARQ_ACCEPTANCE" == true ]]; then
+            pinned_app=7a1d512e87bd052dd1ee06199fec7a82e7d27d0e
+            review_base=11d4a5edd1979ed167ae4acb6b75e7d72eda9239
+            for revision in "$sha" "$WORKFLOW_SHA"; do
+              if [[ ! "$revision" =~ ^[a-f0-9]{40}$ ]]; then
+                echo '::error::Full PR #4251 app and workflow commit SHAs are required.'
+                exit 1
+              fi
+            done
+            git -C "$source" fetch -q --no-tags --depth=64 "$origin" \
+              refs/heads/main:refs/remotes/origin/main \
+              refs/heads/codex/laboratory-panel-v2:refs/remotes/origin/laboratory-panel-v2 \
+              refs/pull/4251/head:refs/remotes/origin/pr-4251
+            if [[ "$(git -C "$source" rev-parse refs/remotes/origin/main)" != "$WORKFLOW_SHA" ||
+                  "$(git -C "$source" rev-parse refs/remotes/origin/laboratory-panel-v2)" != "$sha" ||
+                  "$(git -C "$source" rev-parse refs/remotes/origin/pr-4251)" != "$sha" ]] ||
+              ! git -C "$source" merge-base --is-ancestor "$review_base" "$sha"; then
+              echo '::error::PR #4251 or main changed, or the pinned app commit lacks the reviewed base.'
+              exit 1
+            fi
+            if [[ "$sha" != "$pinned_app" ]]; then
+              # Accept just the pinned app's direct merge of this workflow main.
+              if [[ "$(git -C "$source" show -s --format=%P "$sha")" != "$pinned_app $WORKFLOW_SHA" ]] ||
+                ! git -C "$source" merge-base --is-ancestor "$review_base" "$WORKFLOW_SHA"; then
+                echo '::error::PR #4251 head must be the reviewed app or its exact two-parent merge of current main.'
+                exit 1
+              fi
+
+              workflow_paths=(
+                '.github/workflows/staging-miniapp-pr.yml'
+                '.github/workflows/staging-miniapp-native-live.yml'
+                'docs/runbooks/STAGING_VALIDATION.md'
+              )
+              included=()
+              excluded=()
+              for path in "${workflow_paths[@]}"; do
+                git -C "$source" cat-file -e "$WORKFLOW_SHA:$path"
+                included+=(":(top,literal)$path")
+                excluded+=(":(top,exclude,literal)$path")
+              done
+              diff_options=(--quiet --no-ext-diff --no-textconv --no-renames --ignore-submodules=none)
+              if ! git -C "$source" diff "${diff_options[@]}" "$review_base" "$WORKFLOW_SHA" -- . "${excluded[@]}" ||
+                ! git -C "$source" diff "${diff_options[@]}" "$pinned_app" "$sha" -- . "${excluded[@]}" ||
+                ! git -C "$source" diff "${diff_options[@]}" "$WORKFLOW_SHA" "$sha" -- "${included[@]}"; then
+                echo '::error::PR #4251 merge changes the reviewed app, or main differs outside the three approved workflow and runbook paths.'
+                exit 1
+              fi
+            fi
+            git -C "$source" show "$WORKFLOW_SHA:ops/scripts/staging_miniapp_arq_check.py" > "$d/arq-check.py"
+            test -s "$d/arq-check.py"
+            printf 'PR #4251 source verification: PASS at `%s` (reviewed app `%s`, review base `%s`, current workflow `%s`).\n' \
+              "$sha" "$pinned_app" "$review_base" "$WORKFLOW_SHA" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$RUN_ARQ_ACCEPTANCE" == true ]]; then
+            approved=10a8cac30b21b9885ef320257d7add032c6ef5ac
+            for revision in "$sha" "$WORKFLOW_SHA" "$approved"; do
+              if [[ ! "$revision" =~ ^[a-f0-9]{40}$ ]]; then
+                echo '::error::A full approved source, current workflow and requested PR commit SHA are required.'
+                exit 1
+              fi
+            done
+            git -C "$source" fetch -q --no-tags --depth=64 "$origin" \
+              refs/heads/main:refs/remotes/origin/main refs/pull/4195/head:refs/remotes/origin/pr-4195
+            if [[ "$(git -C "$source" rev-parse refs/remotes/origin/main)" != "$WORKFLOW_SHA" ||
+                  "$(git -C "$source" rev-parse refs/remotes/origin/pr-4195)" != "$sha" ]] ||
+              ! git -C "$source" merge-base --is-ancestor "$WORKFLOW_SHA" "$sha"; then
+              echo '::error::PR or main changed, or the requested commit does not include the current workflow commit.'
+              exit 1
+            fi
+            if ! git -C "$source" cat-file -e "$approved^{commit}" 2>/dev/null; then
+              git -C "$source" fetch -q --no-tags --depth=1 "$origin" "$approved"
+              test "$(git -C "$source" rev-parse FETCH_HEAD)" = "$approved"
+            fi
+
+            # These four paths are supplied by the trusted workflow commit.
+            # The rest of the candidate tree must equal the reviewed app commit.
+            helper_paths=(
+              '.github/workflows/staging-miniapp-pr.yml'
+              '.github/workflows/staging-miniapp-native-live.yml'
+              'ops/scripts/staging_miniapp_arq_check.py'
+              'docs/runbooks/STAGING_VALIDATION.md'
+            )
+            included=()
+            excluded=()
+            for path in "${helper_paths[@]}"; do
+              git -C "$source" cat-file -e "$WORKFLOW_SHA:$path"
+              included+=(":(top,literal)$path")
+              excluded+=(":(top,exclude,literal)$path")
+            done
+            if ! git -C "$source" diff --quiet --no-ext-diff --no-textconv "$approved" "$sha" -- . "${excluded[@]}" ||
+              ! git -C "$source" diff --quiet --no-ext-diff --no-textconv "$WORKFLOW_SHA" "$sha" -- "${included[@]}"; then
+              echo '::error::PR #4195 tree differs from the reviewed app source or trusted workflow files.'
+              exit 1
+            fi
+            git -C "$source" show "$WORKFLOW_SHA:ops/scripts/staging_miniapp_arq_check.py" > "$d/arq-check.py"
+            test -s "$d/arq-check.py"
+            printf 'PR #4195 source verification: PASS at `%s` (reviewed app `%s`, current workflow `%s`).\n' \
+              "$sha" "$approved" "$WORKFLOW_SHA" >> "$GITHUB_STEP_SUMMARY"
+          else
+            git -C "$source" fetch -q --no-tags --depth=1 "$origin" "$sha"
+            test "$(git -C "$source" rev-parse FETCH_HEAD)" = "$sha"
+          fi
+          git -C "$source" checkout -q --detach "$sha"
+          test "$(git -C "$source" rev-parse HEAD)" = "$sha"
+          if [[ "$RUN_ARQ_ACCEPTANCE" == true ]]; then
+            # A native HTTPS button has no entry token. Verify the candidate
+            # can load the platform SDK before building or injecting secrets.
+            sdk=https://telegram.org/js/telegram-web-app.js
+            if ! git -C "$d/source" grep -Fq "$sdk" -- frontend/index.html frontend/src ||
+              ! git -C "$d/source" grep -Fq "$sdk" -- frontend/docker/nginx.staging.conf; then
+              echo '::error::Exact candidate lacks the native Mini App SDK loader or staging CSP permission.'
+              printf 'Native HTTPS and ARQ: BLOCKED before credentials. Candidate `%s` must load the Telegram SDK under staging CSP.\n' "$sha" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          fi
+          cat > "$d/runtime.env" <<ENV
+          APP_VERSION=$sha
+          VERCEL_GIT_COMMIT_SHA=$sha
+          STAGING_PUBLIC_BASE_URL=https://$host
+          STAGING_PUBLIC_WS_URL=wss://$host
+          STAGING_PUBLIC_WS_HOST=$host
+          CORS_ORIGINS=https://$host
+          CSRF_ENABLED=1
+          WORKERS=1
+          CLINIC_PURPOSE=miniapp-native-rehearsal
+          CLINIC_OWNER=github-actions
+          POSTGRES_USER=miniapp_synthetic
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          POSTGRES_DB=miniapp_synthetic
+          SECRET_KEY=$(openssl rand -hex 32)
+          ADMIN_USERNAME=miniapp_synthetic
+          ADMIN_PASSWORD=Aa1_$(openssl rand -hex 24)
+          ADMIN_EMAIL=miniapp@example.invalid
+          ADMIN_FULL_NAME=Synthetic Staging
+          SENTRY_DSN=
+          VITE_SENTRY_DSN=
+          NATIVE_FRONTEND_IMAGE=$project-frontend
+          NATIVE_NGINX_CONF=$d/ingress.conf
+          ENV
+          cat > "$d/native.yml" <<'YAML'
+          services:
+            postgres:
+              ports: !reset []
+            backend:
+              ports: !reset []
+              dns: [127.0.0.1]
+              environment:
+                CSRF_ENABLED: ${CSRF_ENABLED:?missing native staging CSRF setting}
+              volumes: !override
+                - staging_backend_data:/data
+            frontend:
+              image: ${NATIVE_FRONTEND_IMAGE:?}
+              ports: !reset []
+              build:
+                args:
+                  VITE_API_URL: ""
+                  VITE_API_BASE_URL: same-origin
+                  VITE_WS_URL: ""
+                  VITE_WS_HOST: ""
+            worker:
+              environment:
+                TELEGRAM_BOT_TOKEN: ""
+            gateway:
+              image: ${NATIVE_FRONTEND_IMAGE:?}
+              ports:
+                - "127.0.0.1:18086:80"
+              volumes:
+                - ${NATIVE_NGINX_CONF:?}:/etc/nginx/conf.d/default.conf:ro
+              networks: [default, ingress]
+              depends_on:
+                backend:
+                  condition: service_healthy
+                frontend:
+                  condition: service_healthy
+          networks:
+            default:
+              internal: true
+              driver_opts:
+                com.docker.network.bridge.gateway_mode_ipv4: isolated
+            ingress: {}
+          YAML
+          cat > "$d/compose" <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          d="$(dirname "$0")"
+          exec docker compose --project-name "miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --env-file "$d/runtime.env" -f "$d/source/ops/compose.staging.yml" -f "$d/native.yml" "$@"
+          SH
+          chmod 700 "$d/compose"
+          touch "$d/ingress.conf"
+          TELEGRAM_BOT_TOKEN=synthetic-marker "$d/compose" config --format json | python3 -c '
+          import json, sys
+          c = json.load(sys.stdin)
+          s = c["services"]
+          assert set(c["networks"]) == {"default", "ingress"}
+          assert c["networks"]["default"]["internal"] is True
+          assert not any(x.get("external") for x in c["networks"].values())
+          assert all(not v.get("network_mode") and not v.get("privileged") for v in s.values())
+          assert s["backend"]["environment"]["TELEGRAM_BOT_TOKEN"] == "synthetic-marker"
+          assert s["backend"]["environment"]["CSRF_ENABLED"] == "1"
+          ports = s["gateway"]["ports"]
+          assert len(ports) == 1
+          assert (ports[0].get("host_ip"), ports[0].get("target"), str(ports[0].get("published")), ports[0].get("protocol")) == ("127.0.0.1", 80, "18086", "tcp")
+          assert set(s["gateway"]["networks"]) == {"default","ingress"}
+          assert len(s["gateway"]["volumes"]) == 1
+          assert s["gateway"]["volumes"][0]["read_only"] is True
+          assert s["gateway"]["volumes"][0]["target"] == "/etc/nginx/conf.d/default.conf"
+          for k in {"backend","frontend","redis","postgres"}:
+              assert not s[k].get("ports")
+              assert set(s[k]["networks"]) == {"default"}
+              assert all(v["type"] == "volume" for v in s[k].get("volumes", []))
+              assert set(s[k].get("depends_on", {})) <= {"backend","frontend","redis","postgres"}
+          assert all("synthetic-marker" not in json.dumps(v) for k, v in s.items() if k != "backend")
+          print("PASS: only the gateway is published on loopback; token is backend-only.")
+          '
+          "$d/compose" pull postgres redis
+          "$d/compose" build backend frontend
+      - name: Start protected synthetic stack with token only in sealed backend
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.native-protected || inputs.native-live || inputs.native-arq)
+        shell: bash
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.STAGING_TELEGRAM_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${TELEGRAM_BOT_TOKEN:-}" || { echo "::error::Protected staging credential unavailable."; exit 1; }
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if ! "$d/compose" up -d --no-build --pull never --wait --wait-timeout 280 postgres redis backend frontend >/dev/null 2>&1; then
+            echo "::error::Protected staging failed to start; runtime logs were not collected."
+            exit 1
+          fi
+          unset TELEGRAM_BOT_TOKEN
+          "$d/compose" exec -T backend sh -ec 'test -n "${TELEGRAM_BOT_TOKEN:-}"'
+      - name: Verify Mini App revision and reject out-of-scope requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          sha=$REVIEWED_SHA
+          host=miniapp-staging.finalclinic.fyi
+          patient=/telegram/mini-app/patient
+          cabinet="$patient?section=cabinet"
+          "$d/compose" exec -T postgres psql -XAt --set ON_ERROR_STOP=on \
+            -U miniapp_synthetic -d miniapp_synthetic -c 'select count(*) from patients' | grep -Fxq 0
+          "$d/compose" exec -T backend python -c "import urllib.request,json; assert json.load(urllib.request.urlopen('http://127.0.0.1:18000/', timeout=10))['version'] == '$sha'"
+          "$d/compose" exec -T frontend grep -Fq "const BUILD_VERSION = '$sha';" /usr/share/nginx/html/sw.js
+          "$d/compose" exec -T frontend find /usr/share/nginx/html/assets -type f > "$d/asset-list"
+          python3 - "$d" "$RUN_ARQ_ACCEPTANCE" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          d = Path(sys.argv[1])
+          root = "/usr/share/nginx/html"
+          assets = sorted({p.removeprefix(root) for p in (d / "asset-list").read_text().splitlines()})
+          assert 0 < len(assets) <= 1000
+          assert all(re.fullmatch(r"/assets/[A-Za-z0-9._-]+", p) for p in assets)
+          prefix = "/api/v1/telegram/mini-app/"
+          exact_api = ("auth/exchange", "auth/refresh", "auth/logout", "sessions/list",
+                       "sessions/revoke-all", "patient/manifest", "cabinet/summary")
+          if sys.argv[2] == "true":
+              exact_api = ("auth/exchange", "patient/manifest", "cabinet/summary", "onboarding/requests")
+          routes = [
+              '    "GET:/telegram/mini-app/patient" static;',
+              '    "GET:/telegram/mini-app/patient?section=cabinet" static;',
+              '    "GET:/favicon.svg" static;',
+              '    "GET:/api/v1/auth/csrf-token" api;',
+              *[f'    "GET:{path}" static;' for path in assets],
+              *[f'    "POST:{prefix}{path}" api;' for path in exact_api],
+          ]
+          if sys.argv[2] == "true":
+              routes.append('    "GET:/telegram/mini-app/patient?section=appointments" static;')
+          else:
+              routes.append('    ~^POST:/api/v1/telegram/mini-app/sessions/[a-f0-9-][a-f0-9-]*/revoke$ api;')
+          conf = r"""
+          map_hash_bucket_size 256;
+          map_hash_max_size 4096;
+          map "$request_method:$request_uri" $destination {
+              default denied;
+          ROUTES
+          }
+          map $destination $upstream_name {
+              default "";
+              static frontend:80;
+              api backend:18000;
+          }
+          server {
+              listen 80 default_server;
+              server_name miniapp-staging.finalclinic.fyi;
+              access_log off;
+              error_log /dev/null;
+              client_max_body_size 32k;
+              resolver 127.0.0.11 ipv6=off;
+              if ($http_host != miniapp-staging.finalclinic.fyi) { return 404; }
+              if ($destination = denied) { return 404; }
+              location / {
+                  proxy_pass http://$upstream_name$request_uri;
+                  proxy_set_header Host miniapp-staging.finalclinic.fyi;
+                  proxy_set_header X-Forwarded-Proto https;
+                  proxy_set_header X-Forwarded-Host miniapp-staging.finalclinic.fyi;
+                  proxy_set_header X-Forwarded-For "";
+                  proxy_set_header Upgrade "";
+                  proxy_set_header Connection close;
+                  proxy_hide_header Cache-Control;
+                  add_header Cache-Control "no-store, private" always;
+              }
+          }
+          """
+          (d / "ingress.conf").write_text(conf.replace("ROUTES", "\n".join(routes)))
+          PY
+          "$d/compose" up -d --no-deps --no-build --pull never gateway
+          ready=false
+          status=000
+          for _ in {1..30}; do
+            status="$(curl -sS --max-time 3 -H "Host: $host" -D "$d/headers" -o "$d/page" -w '%{http_code}' "http://127.0.0.1:18086$cabinet" 2>/dev/null || true)"
+            if [[ "$status" == 200 ]]; then ready=true; break; fi
+            sleep 1
+          done
+          if [[ "$ready" != true ]]; then
+            echo "::error::Loopback Cabinet did not become ready (HTTP $status)."
+            "$d/compose" logs --no-color --tail 15 gateway || true
+            exit 1
+          fi
+          grep -iE '^content-security-policy:.*https://telegram\.org/js/telegram-web-app\.js' "$d/headers" >/dev/null
+          grep -iE '^cache-control:.*no-store' "$d/headers" >/dev/null
+          grep -qiE '^cross-origin-embedder-policy: require-corp' "$d/headers"
+          script_path="$(sed -nE 's@.*src="(/assets/[A-Za-z0-9._-]+\.js)".*@\1@p' "$d/page" | head -n1)"
+          test -n "$script_path"
+          curl -fsS --max-time 10 -H "Host: $host" "http://127.0.0.1:18086$script_path" -o "$d/bundle.js"
+          expected_hash="$("$d/compose" exec -T frontend sha256sum "/usr/share/nginx/html$script_path" | cut -d' ' -f1)"
+          test "$(sha256sum "$d/bundle.js" | cut -d' ' -f1)" = "$expected_hash"
+          for denied in / /docs /openapi.json /api/v1/auth/me /api/v1/patients /sw.js /assets/not-built.js "$patient?not=allowed"; do
+            test "$(curl -sS --max-time 5 -H "Host: $host" -o /dev/null -w '%{http_code}' "http://127.0.0.1:18086$denied")" = 404
+          done
+          test "$(curl -sS --max-time 5 -H 'Host: unrelated.invalid' -o /dev/null -w '%{http_code}' "http://127.0.0.1:18086$patient")" = 404
+          test "$(curl -sS --max-time 5 -H "Host: $host" -X POST -o /dev/null -w '%{http_code}' "http://127.0.0.1:18086$patient")" = 404
+          status="$(curl -sS --max-time 5 -H "Host: $host" -H 'Content-Type: application/json' --data '{}' -o "$d/csrf.json" -w '%{http_code}' "http://127.0.0.1:18086/api/v1/telegram/mini-app/auth/exchange")"
+          test "$status" = 403
+          python3 -c 'import json, sys; assert json.load(open(sys.argv[1]))["reason"] == "missing_cookie"' "$d/csrf.json"
+          curl -fsS --max-time 5 -H "Host: $host" "http://127.0.0.1:18086/api/v1/auth/csrf-token" -o "$d/bootstrap.json"
+          python3 -c 'import json, sys; assert json.load(open(sys.argv[1]))["csrf_token"]' "$d/bootstrap.json"
+          test "$("$d/compose" ps --services --status running | sort)" = $'backend\nfrontend\ngateway\npostgres\nredis'
+          printf 'Loopback Mini App ingress and CSRF: PASS at `%s`. This step checks loopback only.\n' "$sha" >> "$GITHUB_STEP_SUMMARY"
+      - name: Seed one approved synthetic Mini App identity
+        if: inputs.native-live || inputs.native-arq
+        shell: bash
+        env:
+          STAGING_TELEGRAM_CHAT_ID: ${{ secrets.STAGING_TELEGRAM_CHAT_ID }}
+          STAGING_TELEGRAM_BOT_TOKEN: ${{ inputs.native-arq && secrets.STAGING_TELEGRAM_BOT_TOKEN || '' }}
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if [[ ! "$STAGING_TELEGRAM_CHAT_ID" =~ ^[1-9][0-9]{0,15}$ ]]; then
+            echo '::error::A verified private STAGING_TELEGRAM_CHAT_ID is required in staging-integrations.'
+            exit 1
+          fi
+          if [[ "$RUN_ARQ_ACCEPTANCE" == true ]]; then
+            python3 - <<'PY'
+          import http.client
+          import json
+          import os
+          from urllib.parse import urlencode
+
+          try:
+              token = os.environ["STAGING_TELEGRAM_BOT_TOKEN"]
+              chat_id = int(os.environ["STAGING_TELEGRAM_CHAT_ID"])
+              assert token and 0 < chat_id < 2**52
+              for method, data in (("getMe", {}), ("getChat", {"chat_id": chat_id})):
+                  conn = http.client.HTTPSConnection("api.telegram.org", timeout=8)
+                  try:
+                      conn.request("POST", f"/bot{token}/{method}", urlencode(data),
+                                   {"Content-Type": "application/x-www-form-urlencoded"})
+                      response = conn.getresponse()
+                      assert response.status == 200
+                      payload = json.loads(response.read(65536))
+                      assert payload["ok"] is True
+                      result = payload["result"]
+                      if method == "getMe":
+                          assert result["is_bot"] is True and result["username"].lower() == "kosmed_staging_bot"
+                      else:
+                          assert result["type"] == "private" and result["id"] == chat_id
+                  finally:
+                      conn.close()
+          except Exception:
+              raise SystemExit("Protected staging bot or approved private chat verification failed.") from None
+          print("PASS: verified staging bot and private test chat; no message sent.")
+          PY
+            unset STAGING_TELEGRAM_BOT_TOKEN
+            if ! printf '%s\n' "$STAGING_TELEGRAM_CHAT_ID" | "$d/compose" exec -T backend \
+              python -c "$(cat "$d/arq-check.py")" seed "$REVIEWED_SHA" >/dev/null 2>&1; then
+              echo '::error::The reviewed synthetic reminder fixture could not be seeded.'
+              exit 1
+            fi
+            exit 0
+          fi
+          seed=$(cat <<'PY'
+          import os
+          import sys
+
+          from sqlalchemy import func, select, text
+
+          from app.db.session import SessionLocal
+          from app.models.patient import Patient
+          from app.models.telegram_config import TelegramUser
+
+          chat_id = int(sys.stdin.readline())
+          assert 0 < chat_id < 2**52
+          assert os.environ.get("ENV") == "staging"
+          with SessionLocal() as db:
+              assert db.get_bind().url.host == "postgres"
+              assert db.execute(text("select current_database(), current_user")).one() == (
+                  "miniapp_synthetic", "miniapp_synthetic",
+              )
+              for model in (Patient, TelegramUser):
+                  assert db.scalar(select(func.count()).select_from(model)) == 0
+              patient = Patient(first_name="SYNTHETIC", last_name="MINIAPP-STAGING")
+              db.add(patient)
+              db.flush()
+              db.add(TelegramUser(
+                  patient_id=patient.id,
+                  chat_id=chat_id,
+                  active=True,
+                  blocked=False,
+                  notifications_enabled=False,
+                  appointment_reminders=False,
+                  lab_notifications=False,
+              ))
+              db.commit()
+          PY
+          )
+          if ! printf '%s\n' "$STAGING_TELEGRAM_CHAT_ID" | "$d/compose" exec -T backend \
+              python -c "$seed" >/dev/null 2>&1; then
+            echo '::error::Synthetic identity could not be seeded in the isolated database.'
+            exit 1
+          fi
+
+      - name: Expose only the verified Mini App gateway and await session evidence
+        if: inputs.native-live || inputs.native-arq
+        shell: bash
+        env:
+          TUNNEL_TOKEN: ${{ secrets.STAGING_MINIAPP_TUNNEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          host=miniapp-staging.finalclinic.fyi
+          origin="https://$host"
+          patient=/telegram/mini-app/patient
+          test -n "${TUNNEL_TOKEN:-}" || {
+            echo '::error::Dedicated STAGING_MINIAPP_TUNNEL_TOKEN is required in staging-integrations.'
+            exit 1
+          }
+          token=$TUNNEL_TOKEN
+          unset TUNNEL_TOKEN
+
+          http_status() {
+            curl --noproxy '*' --silent --max-time 5 --proto '=https' \
+              --output /dev/null --write-out '%{http_code}' "$origin$1" || true
+          }
+          offline() {
+            [[ "$(http_status "$patient")" =~ ^(404|502|503|525|530)$ ]]
+          }
+          offline || { echo '::error::Staging hostname is already serving the Mini App.'; exit 1; }
+          curl --fail --silent --show-error --location --max-time 40 \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64 \
+            --output "$d/cloudflared"
+          (cd "$d"; printf '%s  cloudflared\n' 1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872 | sha256sum --check -)
+          chmod 700 "$d/cloudflared"
+
+          connector=
+          cleanup_connector() {
+            local result=$? stopped=false
+            trap - EXIT
+            if [[ -n "$connector" ]]; then
+              kill -TERM "$connector" 2>/dev/null || true
+              for _ in {1..10}; do
+                kill -0 "$connector" 2>/dev/null || break
+                sleep 0.2
+              done
+              if kill -0 "$connector" 2>/dev/null; then kill -KILL "$connector" || result=1; fi
+              wait "$connector" 2>/dev/null || true
+              for _ in {1..8}; do
+                if offline; then stopped=true; break; fi
+                sleep 1
+              done
+              printf 'Public ingress stopped: %s.\n' "$stopped" >> "$GITHUB_STEP_SUMMARY"
+              [[ "$stopped" == true ]] || result=1
+            fi
+            exit "$result"
+          }
+          trap cleanup_connector EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          TUNNEL_TOKEN="$token" "$d/cloudflared" tunnel --no-autoupdate --protocol http2 \
+            --metrics 127.0.0.1:20246 run >/dev/null 2>&1 &
+          connector=$!
+          unset token
+
+          ready=false
+          for _ in {1..30}; do
+            kill -0 "$connector" 2>/dev/null || exit 1
+            if curl --noproxy '*' --fail --silent --max-time 4 --proto '=https' \
+                "$origin$patient?section=cabinet" -D "$d/public.headers" -o "$d/public.html" &&
+                cmp -s "$d/page" "$d/public.html"; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          [[ "$ready" == true ]] || { echo '::error::Public HTTPS did not return the verified Mini App build.'; exit 1; }
+          for denied in / /docs /openapi.json /api/v1/patients /api/v1/auth/me /sw.js /assets/not-built.js; do
+            test "$(http_status "$denied")" = 404
+          done
+          test "$(http_status /api/v1/auth/csrf-token)" = 200
+          grep -iE '^content-security-policy:.*https://telegram\.org/js/telegram-web-app\.js' "$d/public.headers" >/dev/null
+          grep -qiE '^cross-origin-embedder-policy: require-corp' "$d/public.headers"
+          grep -qiE '^cache-control:.*no-store' "$d/public.headers"
+          if [[ "$RUN_ARQ_ACCEPTANCE" == true ]]; then
+            for staff_route in /api/v1/telegram/onboarding/requests /api/v1/telegram/onboarding/requests/1/link-existing; do
+              test "$(http_status "$staff_route")" = 404
+              test "$(curl --noproxy '*' --silent --max-time 5 --proto '=https' -X POST --output /dev/null --write-out '%{http_code}' "$origin$staff_route")" = 404
+            done
+            printf '### Native onboarding ready\n\nOpen the approved staging bot Mini App in Telegram. In Appointments submit the synthetic contact SYNTHETIC staging with phone +998000000000, tomorrow’s date and the default 09:30 time. Return to Cabinet after the request is linked. Window: 25 minutes.\n' >> "$GITHUB_STEP_SUMMARY"
+            printf 'Native onboarding ready. Operator instructions are in the run summary.\n'
+            deadline=$((SECONDS + 1500))
+            for check in link ready; do
+              while :; do
+                kill -0 "$connector" 2>/dev/null || exit 1
+                if "$d/compose" exec -T backend python -c "$(cat "$d/arq-check.py")" "$check" "$REVIEWED_SHA" >/dev/null 2>&1; then
+                  break
+                else
+                  result=$?
+                fi
+                if [[ "$result" != 3 ]] || (( SECONDS >= deadline )); then
+                  echo "::error::Native onboarding phase '$check' did not pass."
+                  exit 1
+                fi
+                sleep 5
+              done
+            done
+            printf 'Native signed onboarding, canonical linkage and cabinet access: PASS on `%s`.\n' "$REVIEWED_SHA" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          printf 'Staging ready at https://%s%s?section=cabinet. Open the verified staging-bot Mini App under the same allowed Telegram account on both devices. Open the session list on A, wait 15 minutes after login without closing A, then refresh the session list on A, revoke B, verify B loses access, and log out on A. The window is 25 minutes.\n' "$host" "$patient"
+
+          # Only a boolean leaves the database, with no patient, session or request data.
+          query=$(cat <<'SQL'
+          SELECT EXISTS (
+            SELECT 1 FROM patient_access_audit_logs login
+            JOIN patient_access_audit_logs refresh ON refresh.session_id = login.session_id
+            JOIN patient_access_audit_logs revoke ON revoke.session_id = login.session_id
+            JOIN patient_access_audit_logs logout ON logout.session_id = login.session_id
+            JOIN patient_access_audit_logs second
+              ON second.subject_patient_id = login.subject_patient_id
+              AND second.session_id <> login.session_id
+            JOIN telegram_mini_app_sessions victim ON victim.id::text = second.session_id
+            WHERE login.resource_type = 'session_management' AND login.action = 'login'
+              AND login.outcome = 'success'
+              AND second.resource_type = 'session_management' AND second.action = 'login'
+              AND second.outcome = 'success' AND second.timestamp < revoke.timestamp
+              AND refresh.resource_type = 'session_management' AND refresh.action = 'refresh'
+              AND refresh.outcome = 'success'
+              AND refresh.timestamp >= login.timestamp + interval '15 minutes'
+              AND revoke.resource_type = 'session_management' AND revoke.action = 'revoke'
+              AND revoke.outcome = 'success' AND revoke.extra_data->>'revoked_count' = '1'
+              AND revoke.timestamp >= refresh.timestamp
+              AND (SELECT count(*) FROM telegram_mini_app_sessions sessions
+                   WHERE sessions.patient_id = login.subject_patient_id) = 2
+              AND victim.patient_id = login.subject_patient_id
+              AND victim.revoked_at BETWEEN refresh.timestamp AND revoke.timestamp
+              AND logout.resource_type = 'session_management' AND logout.action = 'logout'
+              AND logout.outcome = 'success' AND logout.extra_data->>'revoked_count' = '1'
+              AND logout.timestamp > revoke.timestamp
+          );
+          SQL
+          )
+          deadline=$((SECONDS + 1500))
+          while (( SECONDS < deadline )); do
+            kill -0 "$connector" 2>/dev/null || exit 1
+            evidence="$(timeout 10s "$d/compose" exec -T postgres psql -XAt \
+              --set ON_ERROR_STOP=on -U miniapp_synthetic -d miniapp_synthetic -c "$query" 2>/dev/null)"
+            if [[ "$evidence" == t ]]; then
+              printf 'Session audit PASS for 33f35996: two logins, refresh after 15 minutes, one other session revoked, current session logged out. Operator confirmation of the Telegram UI is recorded separately.\n' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 5
+          done
+          printf 'Native acceptance incomplete. Expected session evidence was missing at timeout.\n' >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Process one versioned visit reminder through ARQ and Telegram
+        if: env.RUN_ARQ_ACCEPTANCE == 'true'
+        shell: bash
+        env:
+          ARQ_STAGING_BOT_TOKEN: ${{ secrets.STAGING_TELEGRAM_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          project="miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test -n "$ARQ_STAGING_BOT_TOKEN"
+          token=$ARQ_STAGING_BOT_TOKEN
+          unset ARQ_STAGING_BOT_TOKEN
+
+          # The preceding step verified the public connector shut down. Stop
+          # the local ingress too before granting the isolated worker egress.
+          "$d/compose" stop gateway >/dev/null
+          test "$("$d/compose" ps --services --status running | sort)" = $'backend\nfrontend\npostgres\nredis'
+          test "$(docker image inspect --format '{{.Id}}' "$project-backend")" = \
+            "$(docker inspect --format '{{.Image}}' "$("$d/compose" ps -q backend)")"
+          upstream=$(getent ahostsv4 api.telegram.org | awk '$2 == "STREAM" && !seen++ {print $1}')
+          python3 -c 'import ipaddress, sys; assert ipaddress.IPv4Address(sys.argv[1]).is_global' "$upstream"
+
+          cat > "$d/telegram-relay.py" <<'PY'
+          import selectors
+          import socket
+          import socketserver
+          import sys
+
+          bind, upstream = sys.argv[1:]
+
+          class Relay(socketserver.BaseRequestHandler):
+              def handle(self):
+                  try:
+                      with socket.create_connection((upstream, 443), timeout=8) as telegram, selectors.DefaultSelector() as watch:
+                          self.request.settimeout(10)
+                          watch.register(self.request, selectors.EVENT_READ, telegram)
+                          watch.register(telegram, selectors.EVENT_READ, self.request)
+                          while events := watch.select(timeout=12):
+                              for key, _ in events:
+                                  chunk = key.fileobj.recv(65536)
+                                  if not chunk:
+                                      return
+                                  key.data.sendall(chunk)
+                  except OSError:
+                      return
+
+          with socketserver.ThreadingTCPServer((bind, 443), Relay) as server:
+              server.daemon_threads = True
+              server.serve_forever()
+          PY
+          chmod 444 "$d/telegram-relay.py"
+          cat > "$d/arq.yml" <<YAML
+          services:
+            worker:
+              image: $project-backend
+              build: !reset null
+              cap_drop: [ALL]
+              volumes: !reset []
+              dns: [127.0.0.1]
+              networks: [default, reminder]
+              extra_hosts:
+                api.telegram.org: 172.30.242.2
+              environment:
+                TELEGRAM_BOT_TOKEN: \${ARQ_STAGING_BOT_TOKEN:-}
+            telegram-relay:
+              image: $project-backend
+              entrypoint: [python, /relay.py, 172.30.242.2, "$upstream"]
+              user: "65534:65534"
+              volumes:
+                - $d/telegram-relay.py:/relay.py:ro
+              cap_drop: [ALL]
+              sysctls:
+                net.ipv4.ip_unprivileged_port_start: 443
+              networks:
+                reminder:
+                  ipv4_address: 172.30.242.2
+                ingress: {}
+          networks:
+            reminder:
+              internal: true
+              ipam:
+                config:
+                  - subnet: 172.30.242.0/28
+          YAML
+          ARQ_STAGING_BOT_TOKEN=arq-synthetic-marker "$d/compose" -f "$d/arq.yml" config --format json | python3 -c '
+          import json, sys
+          c = json.load(sys.stdin)
+          s = c["services"]
+          worker, relay = s["worker"], s["telegram-relay"]
+          assert not any(n.get("external") for n in c["networks"].values())
+          assert all(c["networks"][n]["internal"] is True for n in ("default", "reminder"))
+          assert set(worker["networks"]) == {"default", "reminder"}
+          assert set(relay["networks"]) == {"reminder", "ingress"}
+          assert all(not s[n].get("ports") and not s[n].get("privileged") for n in ("worker", "telegram-relay"))
+          assert not worker.get("build") and not worker.get("volumes") and worker["dns"] == ["127.0.0.1"]
+          assert relay["volumes"][0]["read_only"] is True
+          assert worker["environment"]["TELEGRAM_BOT_TOKEN"] == "arq-synthetic-marker"
+          assert all("arq-synthetic-marker" not in json.dumps(v) for k, v in s.items() if k != "worker")
+          '
+
+          "$d/compose" -f "$d/arq.yml" up -d --no-deps --no-build --pull never telegram-relay
+          run_worker=("$d/compose" -f "$d/arq.yml" run --rm --no-deps --pull never -T --entrypoint python worker)
+          "${run_worker[@]}" -c '
+          import os, socket, ssl, time
+          assert not os.environ.get("TELEGRAM_BOT_TOKEN")
+          assert socket.gethostbyname("api.telegram.org") == "172.30.242.2"
+          for attempt in range(8):
+              try:
+                  with socket.create_connection(("api.telegram.org", 443), timeout=5) as tcp:
+                      with ssl.create_default_context().wrap_socket(tcp, server_hostname="api.telegram.org"):
+                          break
+              except OSError:
+                  if attempt == 7:
+                      raise
+                  time.sleep(1)
+          '
+
+          helper=$(cat "$d/arq-check.py")
+          if ! "$d/compose" exec -T backend python -c "$helper" enqueue "$REVIEWED_SHA" >/dev/null 2>&1; then
+            echo '::error::Could not enqueue the single versioned synthetic reminder.'
+            exit 1
+          fi
+          if ! ARQ_STAGING_BOT_TOKEN="$token" "${run_worker[@]}" -c "$helper" worker "$REVIEWED_SHA" >/dev/null 2>&1; then
+            echo '::error::ARQ worker failed or delivery is uncertain; investigate before another attempt.'
+            exit 1
+          fi
+          unset token
+          if ! "$d/compose" exec -T backend python -c "$helper" verify "$REVIEWED_SHA" >/dev/null 2>&1; then
+            echo '::error::ARQ result or PostgreSQL delivery stamp is missing; investigate before retrying.'
+            exit 1
+          fi
+          printf 'ARQ schedule-versioned Telegram reminder and PostgreSQL delivery stamp: PASS on `%s`. Confirm the single synthetic reminder in the approved test chat.\n' "$REVIEWED_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove exactly this isolated stack
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          project="miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          result=PASS
+          if [[ -x "$d/compose" ]]; then
+            overrides=()
+            if [[ -f "$d/arq.yml" ]]; then overrides=(-f "$d/arq.yml"); fi
+            "$d/compose" "${overrides[@]}" down --volumes --remove-orphans --rmi local || result=FAIL
+          fi
+          # The frontend has an explicit project-owned tag; Compose can keep it.
+          if docker image inspect "$project-frontend" >/dev/null 2>&1; then
+            docker image rm "$project-frontend" || result=FAIL
+          fi
+          for type in container network volume image; do
+            opts=(-q)
+            if [[ "$type" == container || "$type" == image ]]; then opts+=(-a); fi
+            if ! remaining="$(docker "$type" ls "${opts[@]}" --filter "label=com.docker.compose.project=$project")" || [[ -n "$remaining" ]]; then
+              result=FAIL
+            fi
+          done
+          if docker image inspect "$project-backend" >/dev/null 2>&1; then result=FAIL; fi
+          rm -rf -- "$d" || result=FAIL
+          printf 'Isolated Mini App teardown: %s.\n' "$result" >> "$GITHUB_STEP_SUMMARY"
+          test "$result" = PASS

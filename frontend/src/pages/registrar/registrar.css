@@ -941,3 +941,46 @@
 .registrar-overflow-item:hover {
   background: var(--mac-bg-tertiary, #f5f5f7);
 }
+
+/* Registrar overview: reuse theme tokens and keep primary controls above the fold. */
+.registrar-welcome-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--mac-spacing-3);
+}
+
+.registrar-welcome-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.registrar-welcome-section {
+  margin-top: var(--mac-spacing-4);
+  min-width: 0;
+}
+
+.registrar-welcome-section form {
+  margin-top: var(--mac-spacing-3);
+}
+
+.registrar-welcome-counts {
+  margin: var(--mac-spacing-2) 0 0;
+}
+
+.registrar-welcome-counts > div {
+  padding: var(--mac-spacing-3);
+  border: 1px solid var(--mac-card-border);
+  border-radius: var(--mac-radius-md);
+  overflow-wrap: anywhere;
+}
+
+.registrar-welcome-counts dd {
+  margin: 0;
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+.registrar-welcome-section summary {
+  cursor: pointer;
+}
