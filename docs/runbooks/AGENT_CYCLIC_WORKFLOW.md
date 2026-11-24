@@ -104,6 +104,9 @@ unchanged blockers instead of preparing what can safely be prepared.
 
 ## Codex review and merge
 
+For an owner-activated manual pilot, coordinate the final sync and merge in the
+[main merge queue](MERGE_QUEUE.md). This does not replace the checks or approval below.
+
 1. Have a Codex agent review the current PR head against the task scope, the
    diff, and validation evidence. Fix blocking findings in the same PR and
    review the new head after any update.
