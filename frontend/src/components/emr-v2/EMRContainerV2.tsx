@@ -12,7 +12,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * - Sticky header
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useId, useRef } from 'react';
 import { useEMR } from '../../hooks/useEMR';
 import { useEMRWorkspace } from '../../hooks/useEMRWorkspace';
 import type { FollowUp } from '../../api/emrWorkspace';
@@ -75,7 +75,7 @@ import './workspace/EMRWorkspace.css';
 import { useConfirm } from '../common/ConfirmDialog';
 // QW-03 (UX audit): replace native alert() in Ghost Mode with notify.warning.
 import notify from '../../services/notify';
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Textarea } from '../ui/macos';
+import { Button, Modal, Textarea } from '../ui/macos';
 import logger from '../../utils/logger';
 
 // QW-04 (UX audit): replace emoji toolbar buttons with lucide-react icons
@@ -350,6 +350,8 @@ export function EMRContainerV2({
     // sanctioned pathway onto the server's signed record).
     const amendAllowed = (isSigned || isAmended || serverFinalized) && !isReadOnly && !isPreparingCompletion && !completionBusy;
     const savedEMRStatus = String(emr?.status ?? '').trim().toLowerCase();
+    const saveActionId = useId();
+    const requiresSave = isDirty || !emr?.id || savedEMRStatus === 'draft';
     const canSignReadOnly = isReadOnly
         && Boolean(emr?.id)
         && savedEMRStatus !== ''
@@ -1136,8 +1138,13 @@ export function EMRContainerV2({
                     {onComplete && !isReadOnly && (
                       <section className="emr-workspace-visit-section" aria-label={t('emr_workspace.readiness')}>
                         <h3>{t('emr_workspace.readiness')}</h3>
-                        <p>{t(isDirty || !emr?.id || savedEMRStatus === 'draft'
-                          ? 'emr_workspace.save_before_finish' : 'emr_workspace.ready_for_finish')}</p>
+                        <p>{t(requiresSave ? 'emr_workspace.save_before_finish' : 'emr_workspace.ready_for_finish')}</p>
+                        {requiresSave && !editingDisabled && !isSaving && !conflict && !accessDenied && (
+                          <a href={`#${saveActionId}`} onClick={event => {
+                            event.preventDefault();
+                            document.getElementById(saveActionId)?.focus();
+                          }}>{t('misc.emr_save_aria')}</a>
+                        )}
                       </section>
                     )}
                     {/* Phase 4+ cognitive load reduction: sections are collapsible.
@@ -1340,6 +1347,7 @@ export function EMRContainerV2({
                 </div>
                 <WorkspaceSidePanel key={workspaceState.scope} workspace={workspace}
                     status={workspaceState.status} reload={workspaceState.reload}
+                    currentVitals={data?.vitals} currentEcho={data?.specialty_data?.echo as Record<string, unknown> | undefined}
                     readOnly={editingDisabled || accessDenied} followUp={followUp}
                     onFollowUpChange={handleFieldChange('follow_up')} />
                 </div>
@@ -1371,6 +1379,7 @@ export function EMRContainerV2({
                     ) : !isSigned && !isAmended && !serverFinalized ? (
                         <>
                             <button
+                                id={saveActionId}
                                 className="emr-v2-btn emr-v2-btn--primary"
                                 onClick={() => saveManually({ isDraft: false })}
                                 disabled={isSaving || (!isDirty && savedEMRStatus !== 'draft') || accessDenied || editingDisabled}
@@ -1443,9 +1452,13 @@ export function EMRContainerV2({
                     onClose={() => setShowPreview(false)} />
             )}
             {showAmendForm && (
-                <Dialog open onClose={() => { if (!isSaving) setShowAmendForm(false); }} fullWidth maxWidth="md">
-                    <DialogTitle>{t('misc.emr_amend')}</DialogTitle>
-                    <DialogContent>
+                <Modal isOpen title={t('misc.emr_amend')} size="large"
+                    onClose={() => { if (!isSaving) setShowAmendForm(false); }} actions={<>
+                      <Button type="button" variant="ghost" disabled={isSaving}
+                          onClick={() => setShowAmendForm(false)}>{t('misc.cancel')}</Button>
+                      <Button type="button" disabled={amendReason.trim().length < 10 || isSaving || !amendAllowed}
+                          onClick={() => void handleAmend()}>{t('common.save')}</Button>
+                    </>}>
                         <label>{t('emr_workspace.amend_field')}
                             <select value={amendField} disabled={isSaving} onChange={event => {
                                 const field = event.target.value as typeof amendField;
@@ -1466,14 +1479,7 @@ export function EMRContainerV2({
                                 rows={3} disabled={isSaving} onChange={event => setAmendReason(event.target.value)} />
                         </label>
                         {amendError && <p role="alert">{t('emr_workspace.save_error')}</p>}
-                    </DialogContent>
-                    <DialogActions>
-                        <Button type="button" variant="ghost" disabled={isSaving}
-                            onClick={() => setShowAmendForm(false)}>{t('misc.cancel')}</Button>
-                        <Button type="button" disabled={amendReason.trim().length < 10 || isSaving || !amendAllowed}
-                            onClick={() => void handleAmend()}>{t('common.save')}</Button>
-                    </DialogActions>
-                </Dialog>
+                </Modal>
             )}
 
             {/* History sidebar */}

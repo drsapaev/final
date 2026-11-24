@@ -21,7 +21,7 @@ import { useDoctorSectionTemplates, SECTION_LABELS } from '../../hooks/useDoctor
 import './DoctorTemplatesPanel.css';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Input, Textarea } from '../ui/macos';
+import { Button, Input, Modal, Textarea } from '../ui/macos';
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 /** EMRTEMPL-FE-001 (audit 3886 round 23): module-level style constant —
@@ -342,18 +342,8 @@ export function DoctorTemplatesPanel({
                     )}
                 </div>
 
-                {preview && <Dialog open onClose={() => setPreview(undefined)} maxWidth="md" fullWidth>
-                    <DialogTitle>{t('emr_workspace.template_preview')}</DialogTitle>
-                    <DialogContent>
-                        <label className="emr-workspace-field">{t('emr_workspace.template_text')}
-                            <Textarea ref={previewTextarea} aria-label={t('emr_workspace.template_text')}
-                                rows={9} value={preview.text} readOnly={!preview.item.reviewed_at}
-                                onChange={event => setPreview({ ...preview, text: event.target.value })} />
-                        </label>
-                        <p>{t(preview.item.reviewed_at ? 'emr_workspace.template_select_help' : 'emr_workspace.template_review_help')}</p>
-                        {reviewFailed && <p role="alert">{t('emr_workspace.save_error')}</p>}
-                    </DialogContent>
-                    <DialogActions>
+                {preview && <Modal isOpen onClose={() => setPreview(undefined)} size="large"
+                    title={t('emr_workspace.template_preview')} actions={<>
                         <Button type="button" size="small" variant="ghost" onClick={() => setPreview(undefined)}>{t('misc.cancel')}</Button>
                         <Button type="button" size="small" variant="outline" disabled={reviewBusy}
                             onClick={() => void handleReview(preview.item)}>
@@ -366,8 +356,15 @@ export function DoctorTemplatesPanel({
                                     ? preview.text.slice(field.selectionStart, field.selectionEnd) : preview.text;
                                 handleApply(preview.item, selection);
                             }}>{t('emr_workspace.template_insert')}</Button>}
-                    </DialogActions>
-                </Dialog>}
+                    </>}>
+                    <label className="emr-workspace-field">{t('emr_workspace.template_text')}
+                        <Textarea ref={previewTextarea} aria-label={t('emr_workspace.template_text')}
+                            rows={9} value={preview.text} readOnly={!preview.item.reviewed_at}
+                            onChange={event => setPreview({ ...preview, text: event.target.value })} />
+                    </label>
+                    <p>{t(preview.item.reviewed_at ? 'emr_workspace.template_select_help' : 'emr_workspace.template_review_help')}</p>
+                    {reviewFailed && <p role="alert">{t('emr_workspace.save_error')}</p>}
+                </Modal>}
 
                 {/* Edit Modal */}
                 {editingTemplate && (

@@ -234,7 +234,7 @@
     margin-bottom: var(--mac-spacing-1, 4px);
 }
 
-.emr-workspace-preview-body {
+.emr-workspace-dialog-body {
     max-block-size: 60vh;
     overflow: auto;
     overscroll-behavior: contain;

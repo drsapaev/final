@@ -4,7 +4,7 @@ import {
   type EMRWorkspaceData, type FollowUp, type HistoryDocument, type HistorySummary, type TransferField,
 } from '@/api/emrWorkspace';
 import { useTranslation } from '@/i18n/useTranslation';
-import { selectEchoMeasurements } from '@/utils/echoMeasurements';
+import { echoMeasurementFacts } from '@/utils/echoMeasurements';
 import { useLabReporting } from '@/hooks/useLabReporting';
 import { Button, Input, Textarea } from '../../ui/macos';
 import { ClinicalSummary } from './ClinicalSummary';
@@ -68,22 +68,31 @@ function measurement(raw: unknown): string {
   return candidate !== '' && Number.isFinite(Number(candidate.replace(',', '.'))) ? candidate : '';
 }
 
-function measurements(item: HistorySummary) {
-  const vitals = item.vitals;
+function measurements({ vitals, echo }: Pick<HistorySummary, 'vitals' | 'echo'>) {
   const pressure = vitals.blood_pressure && typeof vitals.blood_pressure === 'object'
     ? vitals.blood_pressure as Record<string, unknown> : {};
-  const echo = selectEchoMeasurements(item.echo);
-  const measurements = item.echo.measurement_metadata;
-  const metadata = measurements && typeof measurements === 'object' ? measurements as Record<string, unknown> : {};
   const systolic = measurement(vitals.systolic ?? pressure.systolic);
   const diastolic = measurement(vitals.diastolic ?? pressure.diastolic);
+  const ef = echoMeasurementFacts(echo).find(fact => fact.key === 'ef');
   return {
     pressure: systolic || diastolic ? `${systolic || '—'}/${diastolic || '—'}` : '',
     pulse: measurement(vitals.pulse),
     weight: measurement(vitals.weight),
-    ef: measurement(echo.ef),
-    method: typeof metadata.ef_method === 'string' ? metadata.ef_method : '',
+    ef,
   };
+}
+
+function MeasurementValues({ values }: { values: ReturnType<typeof measurements> }) {
+  const { t, language } = useTranslation();
+  return <>
+    {values.pressure && <span>{t('emr_workspace.pressure_value', { value: values.pressure })}</span>}
+    {values.pulse && <span>{t('emr_workspace.pulse_value', { value: values.pulse })}</span>}
+    {values.weight && <span>{t('emr_workspace.weight_value', { value: values.weight })}</span>}
+    {values.ef && <span>{t('emr_workspace.ef_value', {
+      value: new Intl.NumberFormat(language).format(values.ef.value),
+      method: values.ef.method || t('emr_workspace.unknown_method'),
+    })}{values.ef.measuredAt && ` · ${values.ef.measuredAt}`}</span>}
+  </>;
 }
 
 function HistoryDetails({
@@ -92,6 +101,8 @@ function HistoryDetails({
   const { t } = useTranslation();
   const [chosen, setChosen] = useState<TransferField[]>([]);
   const [confirmed, setConfirmed] = useState(false);
+  const followUp = document.data.follow_up as FollowUp | undefined;
+  const values = measurements(document);
   return (
     <div className="emr-workspace-history-document">
       <p>{t('emr_workspace.visit_number', { id: document.visit_id })} · {t('emr_workspace.version', { version: document.version })}</p>
@@ -108,6 +119,13 @@ function HistoryDetails({
           </label>}
         </section>
       ))}
+      {followUpNotes.map(field => typeof followUp?.[field] === 'string' && followUp[field] && (
+        <section key={field} className="emr-workspace-group">
+          <h4>{t(`emr_workspace.${field}`)}</h4>
+          <p className="emr-workspace-document-text">{followUp[field]}</p>
+        </section>
+      ))}
+      {Object.values(values).some(Boolean) && <div className="emr-workspace-entry"><MeasurementValues values={values} /></div>}
       {!disabled && <>
         <label className="emr-workspace-check">
           <input type="checkbox" aria-label={t('emr_workspace.confirm_today')}
@@ -124,7 +142,7 @@ function HistoryDetails({
 }
 
 export function WorkspaceSidePanel({
-  workspace, status, readOnly, reload, followUp, onFollowUpChange,
+  workspace, status, readOnly, reload, followUp, onFollowUpChange, currentVitals, currentEcho,
 }: {
   workspace?: EMRWorkspaceData | undefined;
   status: 'loading' | 'ready' | 'error';
@@ -132,8 +150,10 @@ export function WorkspaceSidePanel({
   reload: () => void;
   followUp: FollowUp;
   onFollowUpChange: (value: FollowUp) => void;
+  currentVitals?: Record<string, unknown> | undefined;
+  currentEcho?: Record<string, unknown> | undefined;
 }) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const labReporting = useLabReporting();
   const [extra, setExtra] = useState<HistorySummary[]>([]);
   const [hasExtra, setHasExtra] = useState<boolean>();
@@ -146,6 +166,11 @@ export function WorkspaceSidePanel({
   const [labDownloadFailed, setLabDownloadFailed] = useState(false);
   const selectionRequest = useRef(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const currentMeasurements = measurements({ vitals: currentVitals ?? {}, echo: currentEcho ?? {} });
+  const history = [...new Map([...(workspace?.history ?? []), ...extra].map(item => [item.id, item])).values()];
+  const historyMeasurements = history.map(item => ({ item, values: measurements(item) }))
+    .filter(({ values }) => Object.values(values).some(Boolean));
+  const hasCurrentMeasurements = Object.values(currentMeasurements).some(Boolean);
 
   async function openHistory(item: HistorySummary, selectedVersion = item.version) {
     if (!workspace) return;
@@ -217,7 +242,7 @@ export function WorkspaceSidePanel({
             {labDownloadFailed && <p role="alert">{t('emr_workspace.load_error')}</p>}
             {workspace.history.length === 0 && <p>{t('emr_workspace.no_history')}</p>}
             <ol className="emr-workspace-list">
-              {[...new Map([...workspace.history, ...extra].map(item => [item.id, item])).values()].map((item, index) => (
+              {history.map((item, index) => (
                 <li key={item.id} className="emr-workspace-entry">
                   <Button type="button" variant="ghost" size="small" onClick={() => void openHistory(item)}>
                     {item.visit_date ?? t('emr_workspace.visit_number', { id: item.visit_id })}
@@ -228,7 +253,8 @@ export function WorkspaceSidePanel({
                     <summary>{t('emr_workspace.previous_labs')}</summary>
                     <ul>
                       {item.laboratory.map((value, index) => <li key={`${value.instance_id}:${index}`}>
-                        <span>{value.name} {value.value} {value.unit} {value.abnormal && t('emr_workspace.lab_abnormal')}</span>
+                        <span>{value.name} {value.value} {value.unit} {value.abnormal && t('emr_workspace.lab_abnormal')}
+                          {value.finalized_at && ` · ${new Date(value.finalized_at).toLocaleDateString(language)}`}</span>
                         <Button type="button" size="small" variant="ghost" onClick={async () => {
                           setLabDownloadFailed(false);
                           try {
@@ -283,21 +309,20 @@ export function WorkspaceSidePanel({
             )}
             <details className="emr-workspace-group">
               <summary>{t('emr_workspace.measurement_history')}</summary>
-              {!workspace.history.some(item => Object.values(measurements(item)).some(Boolean)) && <p>{t('emr_workspace.no_entries')}</p>}
+              {!hasCurrentMeasurements && historyMeasurements.length === 0 && <p>{t('emr_workspace.no_entries')}</p>}
               <ol className="emr-workspace-list">
-                {[...workspace.history, ...extra].map(item => {
-                  const values = measurements(item);
-                  if (!values.pressure && !values.pulse && !values.weight && !values.ef) return null;
-                  return <li key={item.id} className="emr-workspace-entry">
+                {hasCurrentMeasurements && <li className="emr-workspace-entry">
+                  <strong>{t('emr_workspace.today_vitals')} {workspace.visit.date}</strong>
+                  <MeasurementValues values={currentMeasurements} />
+                </li>}
+                {historyMeasurements.map(({ item, values }) => (
+                  <li key={item.id} className="emr-workspace-entry">
                     <Button type="button" variant="ghost" size="small" onClick={() => void openHistory(item)}>
                       {item.visit_date ?? t('emr_workspace.visit_number', { id: item.visit_id })}
                     </Button>
-                    {values.pressure && <span>{t('emr_workspace.pressure_value', { value: values.pressure })}</span>}
-                    {values.pulse && <span>{t('emr_workspace.pulse_value', { value: values.pulse })}</span>}
-                    {values.weight && <span>{t('emr_workspace.weight_value', { value: values.weight })}</span>}
-                    {values.ef && <span>{t('emr_workspace.ef_value', { value: values.ef, method: values.method || t('emr_workspace.unknown_method') })}</span>}
-                  </li>;
-                })}
+                    <MeasurementValues values={values} />
+                  </li>
+                ))}
               </ol>
             </details>
           </section>

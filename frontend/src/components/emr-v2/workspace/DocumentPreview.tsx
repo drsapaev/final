@@ -3,7 +3,7 @@ import { apiClient } from '@/api/client';
 import type { EMRWorkspaceData, FollowUp } from '@/api/emrWorkspace';
 import { useTranslation } from '@/i18n/useTranslation';
 import { echoMeasurementFacts, selectEchoMeasurements } from '@/utils/echoMeasurements';
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from '../../ui/macos';
+import { Button, Modal } from '../../ui/macos';
 import { emrTextValue, emrTreatmentText } from '../emrCompletion';
 
 const noteFields = [
@@ -97,9 +97,10 @@ export function DocumentPreview({
   const medications = Array.isArray(medicationData) ? medicationData.map(asRecord) : [];
 
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>{t('emr_workspace.preview')}</DialogTitle>
-      <DialogContent className="emr-workspace-preview-body">
+    <Modal isOpen onClose={onClose} size="large" title={t('emr_workspace.preview')} actions={<>
+      <Button type="button" variant="ghost" onClick={onClose}>{t('misc.cancel')}</Button>
+      <Button type="button" onClick={printPreview}>{t('emr_workspace.print')}</Button>
+    </>}>
         <article className="emr-workspace-print" data-emr-print ref={previewRef}>
           <header>
             <h2>{t('misc.emr_title')}</h2>
@@ -168,11 +169,6 @@ export function DocumentPreview({
           </section>}
         </article>
         {printFailed && <p role="alert">{t('emr_workspace.print_error')}</p>}
-      </DialogContent>
-      <DialogActions>
-        <Button type="button" variant="ghost" onClick={onClose}>{t('misc.cancel')}</Button>
-        <Button type="button" onClick={printPreview}>{t('emr_workspace.print')}</Button>
-      </DialogActions>
-    </Dialog>
+    </Modal>
   );
 }

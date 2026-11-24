@@ -2062,11 +2062,9 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     goToTab('visit');
   };
 
-  // Keep this dynamic JSX slot as `any`; narrowing its inferred result to a
-  // ReactNode currently makes the legacy parent fail strict child checking.
   const [focusStudy, setFocusStudy] = useState<'ecg' | 'echo'>();
 
-  const cardiologyQueuePanel: any = activeTab === 'queue'
+  const cardiologyQueuePanel = activeTab === 'queue'
     ? createElement(CardiologyQueueTab, {
       onStartVisit: handleDoctorQueueStartVisit,
       onOpenVisit: (entry, completed) => { void handleDoctorQueueOpenVisit(entry, completed); },

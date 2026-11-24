@@ -61,7 +61,8 @@ describe('LabResultsSection icon contract — Track 3-2 forward-guard', () => {
     // labReportingApi.createOrder без подтверждения. Теперь обёрнут в
     // useConfirm() — соответствует Nielsen Heuristic #5 (Error Prevention).
     expect(source).toContain("from '../../common/ConfirmDialog'");
-    expect(source).toContain('useConfirm');
+    expect(source).toContain('const [confirm, orderConfirmation] = useConfirm()');
+    expect(source).toContain('{orderConfirmation}');
 
     // Ищем функцию handleOrder — strict:true added param types.
     const fnStart = source.indexOf('const handleOrder = async (templateId: string | number, templateName: string) => {');
@@ -74,8 +75,9 @@ describe('LabResultsSection icon contract — Track 3-2 forward-guard', () => {
     expect(fnBody).toContain("t('confirm.order_title')");
     expect(fnBody).toContain('if (!ok || contextChanged()) return;');
     // createOrder должен вызываться ПОСЛЕ confirm
-    const confirmIdx = fnBody.indexOf('await (confirm');
+    const confirmIdx = fnBody.indexOf('await confirm(');
     const createIdx = fnBody.indexOf('labReportingApi.createOrder(');
+    expect(confirmIdx).toBeGreaterThan(-1);
     expect(createIdx).toBeGreaterThan(confirmIdx);
   });
 

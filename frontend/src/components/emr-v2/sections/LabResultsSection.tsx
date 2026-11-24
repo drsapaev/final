@@ -122,7 +122,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
   // отмены. Лаборатория сразу видела новый заказ в очереди. Если врач
   // промахивался мимо нужного шаблона — приходилось идти в лабораторию
   // и просить отменить. Соответствует Nielsen Heuristic #5 (Error Prevention).
-  const [confirm] = useConfirm();
+  const [confirm, orderConfirmation] = useConfirm();
 
   // EMRLAB-FE-002 (audit 3886, round 15): epoch-guard — ответы/ошибки
   // superseded-контекста больше не могут перезаписать списки/spinner
@@ -294,7 +294,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
       || requestEpochRef.current !== epoch;
 
     try {
-      const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
+      const ok = await confirm({
         title: t('confirm.order_title'),
         message: t('confirm.order_message', { name: templateName }),
         description: t('confirm.order_description'),
@@ -440,7 +440,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
       {showOrderModal && (
         <Dialog open={showOrderModal} onClose={() => setShowOrderModal(false)} maxWidth="sm" fullWidth>
           <DialogTitle>Заказать анализы</DialogTitle>
-          <DialogContent>
+          <DialogContent className="emr-workspace-dialog-body">
             <div style={{ paddingTop: '8px', display: 'grid', gap: '8px' }}>
               {templatesLoading ? (
                 <div style={{ color: 'var(--mac-text-secondary)' }}>{t('empty.loading_templates')}</div>
@@ -486,6 +486,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
           </DialogActions>
         </Dialog>
       )}
+      {orderConfirmation}
     </>
   );
 }

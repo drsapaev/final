@@ -385,7 +385,7 @@ describe('resolveRegistrarWorklistEmptyScopeKind (RQ-21.a)', () => {
     expect(kind).toBe('queue-empty');
   });
 
-  it('all-departments tab: any loaded appointment → filtered-empty (aggregation cannot lose every patient)', () => {
+  it('all-departments tab with loaded appointments → filtered-empty (aggregation cannot lose every patient)', () => {
     const kind = resolveRegistrarWorklistEmptyScopeKind({
       appointments: asAppointments([
         appt({ id: '1', queue_tag: 'lab', queue_time: '2026-08-29T08:00:00+05:00' }),
