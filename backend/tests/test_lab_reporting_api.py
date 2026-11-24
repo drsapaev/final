@@ -738,7 +738,7 @@ def test_doctor_emr_lab_reads_are_limited_to_own_patients(
         patient_id=own_patient.id,
         visit_id=own_visit.id,
         test_code="hemoglobin",
-        value="130",
+        value="80",
     )
     _create_legacy_lab_result(
         db_session,
@@ -757,6 +757,16 @@ def test_doctor_emr_lab_reads_are_limited_to_own_patients(
     own_payload = own_results.json()
     assert own_payload["patient_id"] == own_patient.id
     assert {item["id"] for item in own_payload["results"]} == {own_result.id}
+
+    own_abnormal_results = client.get(
+        f"/api/v1/emr/lab/patients/{own_patient.id}/abnormal-lab-results",
+        headers=doctor_headers,
+    )
+    assert own_abnormal_results.is_success, own_abnormal_results.text
+    [historical] = own_abnormal_results.json()["abnormal_results"]
+    assert historical["id"] == own_result.id and historical["value"] == "80"
+    assert "deviation" in historical and "severity" in historical
+    assert "source_instance_id" not in historical
 
     other_results = client.get(
         f"/api/v1/emr/lab/patients/{other_patient.id}/lab-results",
@@ -788,7 +798,11 @@ def test_doctor_emr_lab_reads_are_limited_to_own_patients(
 @pytest.mark.integration
 @pytest.mark.parametrize(
     ("value", "evaluation_status", "interpretation", "is_abnormal"),
-    [("<1", "not_evaluated", None, None), ("135", "evaluated", "critical", True)],
+    [
+        ("<1", "not_evaluated", None, None),
+        ("135", "evaluated", "critical", True),
+        ("135", "evaluated", "high", True),
+    ],
 )
 def test_emr_lab_uses_current_frozen_assessment_and_release_date(
     client, db_session, value, evaluation_status, interpretation, is_abnormal
@@ -899,6 +913,38 @@ def test_emr_lab_uses_current_frozen_assessment_and_release_date(
     assert linked["interpretation"] == interpretation
     assert linked["abnormal"] is is_abnormal and linked["is_abnormal"] is is_abnormal
     assert payload["abnormal_count"] == int(is_abnormal is True)
+
+    response = client.get(
+        f"/api/v1/emr/lab/patients/{patient.id}/abnormal-lab-results", headers=headers
+    )
+    assert response.is_success, response.text
+    abnormal = response.json()
+    assert abnormal["total_abnormal"] == int(is_abnormal is True)
+    if is_abnormal:
+        [finding] = abnormal["abnormal_results"]
+        for key in (
+            "id",
+            "value",
+            "unit",
+            "ref_range",
+            "evaluation_status",
+            "interpretation",
+            "source_instance_id",
+            "source_root_instance_id",
+            "supersedes_instance_id",
+            "released_at",
+        ):
+            assert finding[key] == linked[key]
+        severity = "critical" if interpretation == "critical" else "unknown"
+        assert finding["severity"] == severity
+        assert finding["deviation"] == {
+            "deviation_percent": None,
+            "deviation_type": "unknown",
+        }
+        assert abnormal["severity_groups"] == {severity: [finding]}
+    else:
+        assert abnormal["abnormal_results"] == []
+        assert abnormal["severity_groups"] == {}
 
     emr = _create_emr(
         db_session,

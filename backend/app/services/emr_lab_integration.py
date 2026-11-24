@@ -176,35 +176,50 @@ class EMRLabIntegrationService:
     ) -> list[dict[str, Any]]:
         """Получить аномальные лабораторные результаты пациента"""
         try:
-            # Получаем все результаты за период
-            results = lab_result.get_lab_results_by_patient(
+            results = await self.get_patient_lab_results(
                 db, patient_id=patient_id, date_from=date_from
             )
 
             abnormal_results = []
             for result in results:
-                is_abnormal = await self._check_abnormal_value(
-                    result.test_code, result.value, result.unit
-                )
-
-                if is_abnormal:
-                    abnormal_results.append(
-                        {
-                            "id": result.id,
-                            "test_name": result.test_name,
-                            "test_code": result.test_code,
-                            "value": result.value,
-                            "unit": result.unit,
-                            "ref_range": result.ref_range,
-                            "deviation": await self._calculate_deviation(
-                                result.test_code, result.value, result.unit
-                            ),
-                            "created_at": result.created_at,
-                            "severity": await self._assess_severity(
-                                result.test_code, result.value, result.unit
-                            ),
-                        }
+                if result["is_abnormal"] is not True:
+                    continue
+                finding = {
+                    key: result[key]
+                    for key in (
+                        "id",
+                        "test_name",
+                        "test_code",
+                        "value",
+                        "unit",
+                        "ref_range",
+                        "created_at",
                     )
+                }
+                if "source_instance_id" in result:
+                    finding.update(
+                        evaluation_status=result["evaluation_status"],
+                        interpretation=result["interpretation"],
+                        source_instance_id=result["source_instance_id"],
+                        source_root_instance_id=result["source_root_instance_id"],
+                        supersedes_instance_id=result["supersedes_instance_id"],
+                        released_at=result["released_at"],
+                        severity="critical"
+                        if result["interpretation"] == "critical"
+                        else "unknown",
+                        deviation={
+                            "deviation_percent": None,
+                            "deviation_type": "unknown",
+                        },
+                    )
+                else:
+                    finding["deviation"] = await self._calculate_deviation(
+                        result["test_code"], result["value"], result["unit"]
+                    )
+                    finding["severity"] = await self._assess_severity(
+                        result["test_code"], result["value"], result["unit"]
+                    )
+                abnormal_results.append(finding)
 
             return abnormal_results
 
