@@ -15,6 +15,7 @@ Changes:
 3. Configurable rate limit thresholds via env vars (CHAT-10.1 P2).
    Operators can tune limits without code changes.
 """
+
 from __future__ import annotations
 
 import logging
@@ -27,6 +28,8 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from app.core.pii_masker import is_public_site_analytics_ingest_path
+
 logger = logging.getLogger(__name__)
 
 # Read at import-time (reliable because conftest.py now sets TESTING=1 BEFORE
@@ -36,6 +39,7 @@ _TESTING = os.getenv("TESTING", "").lower() in ("1", "true", "yes")
 # ---------------------------------------------------------------------------
 # PR-34: Trusted proxy whitelist for X-Forwarded-For
 # ---------------------------------------------------------------------------
+
 
 def _load_trusted_proxies() -> set[str]:
     """Load trusted proxy IPs from TRUSTED_PROXIES env var.
@@ -71,6 +75,7 @@ def _is_trusted_proxy(peer_ip: str) -> bool:
             if "/" in entry:
                 # CIDR range
                 import ipaddress
+
                 network = ipaddress.ip_network(entry, strict=False)
                 if peer in network:
                     return True
@@ -134,7 +139,12 @@ def get_client_ip(request: Request) -> str:
                     # Validate it's a real IP before any trust decision
                     ip_address(entry)
                 except (ValueError, AddressValueError):
-                    logger.warning("Invalid IP in X-Forwarded-For header: %r", entry)
+                    if is_public_site_analytics_ingest_path(request.scope.get("path")):
+                        logger.warning("Invalid IP in X-Forwarded-For header")
+                    else:
+                        logger.warning(
+                            "Invalid IP in X-Forwarded-For header: %r", entry
+                        )
                     return peer_ip
                 if _is_trusted_proxy(entry):
                     # A hop we operate — its report of the chain is
@@ -152,6 +162,7 @@ def get_client_ip(request: Request) -> str:
 # PR-34: Redis storage backend
 # ---------------------------------------------------------------------------
 
+
 def _get_storage_uri() -> str | None:
     """Return Redis storage URI if REDIS_URL is configured, else None (in-memory)."""
     redis_url = os.getenv("REDIS_URL", "").strip()
@@ -163,6 +174,20 @@ def _get_storage_uri() -> str | None:
 _STORAGE_URI = _get_storage_uri() if not _TESTING else None
 
 
+def _redact_analytics_rate_limit_warning(record: logging.LogRecord) -> bool:
+    """Remove the collector's rate key before any log handler reads it."""
+    args = record.args
+    if (
+        record.msg == "ratelimit %s (%s) exceeded at endpoint: %s"
+        and isinstance(args, tuple)
+        and len(args) == 3
+        and is_public_site_analytics_ingest_path(args[2])
+    ):
+        limit, _, endpoint = args
+        record.args = (limit, "[redacted]", endpoint)
+    return True
+
+
 # PR-34: Use custom get_client_ip instead of slowapi's get_remote_address.
 # Use Redis storage if configured (shared across workers), else in-memory.
 # NOTE: enabled=not _TESTING disables rate limiting in tests at construction
@@ -172,11 +197,13 @@ limiter = Limiter(
     enabled=not _TESTING,
     storage_uri=_STORAGE_URI,
 )
+limiter.logger.addFilter(_redact_analytics_rate_limit_warning)
 
 
 # ---------------------------------------------------------------------------
 # PR-34 / CHAT-10.1 P2: Configurable rate limits via env vars
 # ---------------------------------------------------------------------------
+
 
 def _env_rate_limit(key: str, default: str) -> str:
     """Read a rate limit from env var RATE_LIMIT_<KEY>, fall back to default."""
@@ -215,11 +242,14 @@ def setup_rate_limiting(app: FastAPI) -> None:
     # disabled flag. (Setting app.state.limiter=None alone does NOT stop
     # the decorators from enforcing limits.)
     from app.core.config import get_settings
+
     settings = get_settings()
     if settings.TESTING:
         limiter._enabled = False  # mutate the shared object decorators reference
         app.state.limiter = limiter
-        logger.info("Rate limiting disabled for testing (TESTING=1, limiter._enabled=False)")
+        logger.info(
+            "Rate limiting disabled for testing (TESTING=1, limiter._enabled=False)"
+        )
         return
 
     limiter._enabled = True
@@ -230,14 +260,20 @@ def setup_rate_limiting(app: FastAPI) -> None:
         # PR-34: don't log the full Redis URI — it may contain a password.
         logger.info("Rate limiter using Redis storage (REDIS_URL configured)")
     else:
-        logger.info("Rate limiter using in-memory storage (set REDIS_URL for shared limits)")
+        logger.info(
+            "Rate limiter using in-memory storage (set REDIS_URL for shared limits)"
+        )
     if TRUSTED_PROXIES:
         # PR-34: log only the count, not the actual proxy IPs.
-        logger.info("Rate limiter trusting X-Forwarded-For from %d proxy/ies", len(TRUSTED_PROXIES))
+        logger.info(
+            "Rate limiter trusting X-Forwarded-For from %d proxy/ies",
+            len(TRUSTED_PROXIES),
+        )
 
 
-
-async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+async def _rate_limit_exceeded_handler(
+    request: Request, exc: RateLimitExceeded
+) -> JSONResponse:
     """Custom handler for rate limit exceeded."""
     return JSONResponse(
         status_code=429,

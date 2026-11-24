@@ -59,7 +59,9 @@ describe('DermaPatientsTab', () => {
     expect(searchPatientsMock).not.toHaveBeenCalled();
 
     fireEvent.change(search, { target: { value: 'AB' } });
-    await waitFor(() => expect(searchPatientsMock).toHaveBeenCalledWith('AB'));
+    // DERMAPAT-FE-002: the search request now carries the explicit page-size
+    // option (the truncation at the server page size is visible, not silent).
+    await waitFor(() => expect(searchPatientsMock).toHaveBeenCalledWith('AB', { limit: 100 }));
   });
 
   it('shows a provided birth year as a year and only offers patient history after selection', async () => {

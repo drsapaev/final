@@ -929,7 +929,14 @@ def create_mini_app_appointment_booking(
     appointment_in = appointment_schemas.PatientPortalAppointmentCreate(
         **appointment_create_payload
     )
-    appointment = appointment_crud.create(db=db, obj_in=appointment_in)
+    appointment = appointment_crud.create(
+        db=db,
+        obj_in=appointment_in,
+        slot_conflict=HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"reason": "appointment_time_slot_occupied"},
+        ),
+    )
 
     # M4-P0-1: PHI audit trail — log appointment creation
     from app.services.patient_access_audit import log_patient_access

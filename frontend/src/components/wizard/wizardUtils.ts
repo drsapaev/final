@@ -482,14 +482,9 @@ export const getRemovedQueueEntryIds = (
   );
 };
 
-// REG-FE-084 (follow-up audit 2026-11-02): детектор «удалена ОДНА услуга
-// из СОХРАНЯЕМОЙ записи очереди». Read-модель может нести две услуги на
-// одной записи (общий original_queue_id): buildEditDeltaTargetItems
-// итерирует ТОЛЬКО текущие позиции, getRemovedQueueEntryIds видит запись
-// живой — правка молча терялась, а мастер рапортовал успех. Backend
-// edit-контракт не имеет команды удаления отдельной услуги внутри записи
-// (отдельная операция от отмены записи целиком), поэтому единственный
-// честный исход — громкий отказ до сабмита, а не ложный успех.
+// Detect removed services whose original ticket is still represented in the cart.
+// The edit-delta route sends these as explicit zero targets; the legacy QR
+// route still uses its original guard and does not support partial removal.
 export const detectRemovedServicesWithinRetainedEntries = (
   identity: EditOriginalServiceIdentity,
   cartItems: Array<Record<string, unknown>> = []
@@ -797,7 +792,8 @@ export const buildCartQuoteRequest = (
     .map((item) => {
       const quoteItem: { service_id: number; quantity: number; custom_price?: number; specialist_id?: number; queue_entry_id?: number } = {
         service_id: Number(item.service_id),
-        quantity: Math.max(1, Number(item.quantity || 1)),
+        quantity: options.pricingMode === 'edit_delta' && item.quantity === 0
+          ? 0 : Math.max(1, Number(item.quantity || 1)),
       };
       // Codex R1 #3095 (P2): custom_price зеркалится в квоту (cart-режим)
       const customPrice = (item as { custom_price?: unknown }).custom_price;
@@ -1545,8 +1541,18 @@ export const getWizardServiceTabFilter = (
   };
 };
 
+/** Explicit catalog routing tags can be more specific than a legacy specialty category. */
+export const queueTagToWizardCategory = (value: unknown): 'laboratory' | 'procedures' | null => {
+  const tag = String(value ?? '').trim().toLowerCase();
+  if (tag === 'lab' || tag === 'laboratory') return 'laboratory';
+  if (tag === 'procedures' || tag === 'procedure') return 'procedures';
+  return null;
+};
+
 export const serviceCodeToWizardCategory = (value: unknown): 'laboratory' | 'procedures' | 'specialists' | null => {
-  const prefix = String(value || '').trim().toUpperCase().charAt(0);
+  const code = String(value || '').trim().toUpperCase();
+  if (/^D_PROC\d+$/u.test(code)) return 'procedures';
+  const prefix = code.charAt(0);
   if (prefix === 'L') return 'laboratory';
   if (prefix === 'P' || prefix === 'C') return 'procedures';
   if (prefix === 'K' || prefix === 'D' || prefix === 'S') return 'specialists';
@@ -1573,7 +1579,7 @@ export const resolveInitialServiceCategory = (
   activeTabValue: unknown = ''
 ): 'laboratory' | 'procedures' | 'specialists' => {
   const firstItem = (Array.isArray(items) ? items : []).find(Boolean) as ServiceItemLike | undefined;
-  const itemCategory = serviceCodeToWizardCategory(
+  const itemCategory = queueTagToWizardCategory(firstItem?.queue_tag) ?? serviceCodeToWizardCategory(
     firstItem?.service_code || firstItem?.code || firstItem?._temp_name || firstItem?.service_name
   );
   return itemCategory || activeTabToWizardCategory(activeTabValue);
@@ -1584,10 +1590,10 @@ export const resolveInitialServiceCategory = (
 // =====================================================================
 
 export const categories = [
-  { id: 'specialists', label: 'Специалисты', icon: Stethoscope },
-  { id: 'laboratory', label: 'Лаборатория', icon: FlaskConical },
-  { id: 'procedures', label: 'Процедуры', icon: Syringe },
-  { id: 'other', label: 'Прочее', icon: ClipboardList },
+  { id: 'specialists', labelKey: 'misc.aw_category_specialists', icon: Stethoscope },
+  { id: 'laboratory', labelKey: 'misc.aw_category_laboratory', icon: FlaskConical },
+  { id: 'procedures', labelKey: 'misc.aw_category_procedures', icon: Syringe },
+  { id: 'other', labelKey: 'misc.aw_category_other', icon: ClipboardList },
 ];
 
 // =====================================================================
@@ -2071,6 +2077,20 @@ export const buildEditDeltaTargetItems = (
       queue_entry_id: Number(originalQueueId),
     });
   });
+  for (const removed of detectRemovedServicesWithinRetainedEntries(identity, cartItems)) {
+    const entryId = Number(removed.queueId);
+    if (!Number.isInteger(entryId) || entryId <= 0) {
+      build.unroutable.push({ service_id: removed.serviceId, name: removed.name });
+      continue;
+    }
+    build.hasQuantityChange = true;
+    build.items.push({
+      service_id: removed.serviceId,
+      quantity: 0,
+      specialist_id: null,
+      queue_entry_id: entryId,
+    });
+  }
   return build;
 };
 

@@ -50,6 +50,8 @@ const SYNTHETIC_SERVICES = [
   // Прочее: неклассифицированная услуга без category_code/service_code —
   // обязана оставаться видимой явно (S-05: «неклассифицированное видно»).
   { id: 8, name: 'Синтетическая допуслуга', is_consultation: false, price: 5000 },
+  { id: 10, name: 'SYNTHETIC cryotherapy', category_code: 'D', service_code: 'D_PROC01', queue_tag: 'procedures', doctor_selection_required: false, price: 25000 },
+  { id: 11, name: 'SYNTHETIC physician procedure', category_code: 'D', service_code: 'D_PROC02', queue_tag: 'procedures', doctor_selection_required: true, price: 25000 },
   { id: 9, name: 'Врачебная процедура', category_code: 'P', service_code: 'P09', requires_doctor: true, doctor_selection_required: true, price: 25000 },
 ];
 
@@ -177,4 +179,12 @@ describe('RQ-07: корзинная группировка не зависит �
     render(<CartStepV2 {...buildProps('specialists')} />);
     expect(screen.queryByText(/Будет создано визитов/)).not.toBeInTheDocument();
   });
+});
+
+it('keeps queue-routed dermatology procedures out of Specialists without dropping doctor selection', () => {
+  const specialists = namesFor('specialists');
+  const procedures = namesFor('procedures');
+  expect(specialists.has('SYNTHETIC cryotherapy')).toBe(false);
+  expect(procedures.has('SYNTHETIC cryotherapy')).toBe(true);
+  expect(procedures.has('SYNTHETIC physician procedure')).toBe(true);
 });
