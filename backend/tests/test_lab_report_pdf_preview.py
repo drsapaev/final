@@ -361,5 +361,63 @@ def test_pdf_prefers_canonical_qualified_value_over_raw_numeric() -> None:
     field.update(value_numeric="0.01", value_text="0.01", value_display="<0,01")
 
     template = service.jinja_env.get_template("lab_report_fixed.j2")
-    assert "&lt;0,01" in template.render(**context)
+    html = template.render(**context)
+    assert "&lt;0,01" in html
+    assert '<td class="col-unit">г/л</td>' in html
+    assert "&lt;0,01 г/л" not in html
     assert service._reportlab_value_display(field) == "<0,01"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "mode", ["docx_three_column_mode", "oam_docx_mode", "smear_matrix_mode"]
+)
+def test_compact_pdf_prints_existing_units_with_the_canonical_values(mode, monkeypatch):
+    from reportlab import platypus
+
+    service = LabReportPDFService()
+    context = _preview_context(copy_count=1, **{mode: True})
+    section = context["sections"][0]
+    field = section["fields"][0]
+    section["fields"] = [
+        {**field, "value_display": "<0,01", "value_numeric": "0.01", "unit": "mg/L"},
+        {**field, "value_numeric": 0, "unit": "U/L"},
+        {**field, "value_display": "", "value_numeric": 900, "unit": "EMPTY-UNIT"},
+        {**field, "value_display": "синтетика", "unit": None},
+    ]
+    expected = ["&lt;0,01 mg/L", "0 U/L", "синтетика"]
+    if mode == "oam_docx_mode":
+        context["sections"].append(
+            {
+                **section,
+                "key": "sediment",
+                "fields": [
+                    {
+                        **field,
+                        "value_display": "≥2",
+                        "value_numeric": 2,
+                        "unit": "cells/µL",
+                    }
+                ],
+            }
+        )
+        expected.append("≥2 cells/µL")
+
+    html = service.jinja_env.get_template("lab_report_fixed.j2").render(**context)
+    for value in expected:
+        assert re.search(rf">\s*{re.escape(value)}\s*</td>", html)
+    assert "EMPTY-UNIT" not in html and ">900<" not in html
+
+    paragraph = platypus.Paragraph
+    rendered_cells = []
+
+    def capture_paragraph(text, *args, **kwargs):
+        rendered_cells.append(text)
+        return paragraph(text, *args, **kwargs)
+
+    monkeypatch.setattr(platypus, "Paragraph", capture_paragraph)
+    assert _is_pdf(service._render_reportlab(context))
+    for value in expected:
+        assert value in rendered_cells
+    assert not any("EMPTY-UNIT" in str(cell) for cell in rendered_cells)
+    assert "900" not in rendered_cells

@@ -164,10 +164,8 @@ class DocxMixin(LabReportPDFServiceMixinBase):
                 matrix_row = [para(first_section["fields"][row_index].get("label") or "", "LabSmearCell")]
                 for section in sections:
                     row = (section.get("fields") or [])[row_index]
-                    value_display = self._reportlab_value_display(row)
-                    matrix_row.append(
-                        para(value_display if value_display is not None else "", "LabSmearCell")
-                    )
+                    value_display = self._reportlab_value_display(row, inline_unit=True)
+                    matrix_row.append(para(value_display, "LabSmearCell"))
                 matrix_rows.append(matrix_row)
 
             matrix_table = Table(

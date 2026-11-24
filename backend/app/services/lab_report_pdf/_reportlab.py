@@ -12,11 +12,16 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
     """Reportlab methods."""
 
     @staticmethod
-    def _reportlab_value_display(row: dict[str, Any]) -> str:
+    def _reportlab_value_display(row: dict[str, Any], *, inline_unit: bool = False) -> str:
         if "value_display" in row:
-            return str(row["value_display"] or "")
-        number = row.get("value_numeric")
-        return str(number) if number is not None else str(row.get("value_text") or "")
+            value = row["value_display"]
+        else:
+            value = row.get("value_numeric")
+            if value is None:
+                value = row.get("value_text")
+        display = "" if value is None else str(value)
+        unit = row.get("unit") if inline_unit else None
+        return f"{display} {unit}" if display and unit else display
 
     def _draw_reportlab_watermark(self, canvas, text: str, page_size) -> None:
         """PR8: диагональный watermark «Черновик» на одной странице.
@@ -546,11 +551,11 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
             para("Норма", "LabDocxCenter"),
         ]]
         for row in first_section.get("fields") or []:
-            value_display = self._reportlab_value_display(row)
+            value_display = self._reportlab_value_display(row, inline_unit=True)
             rows.append(
                 [
                     para(row.get("label") or "", "LabDocxCell"),
-                    para(value_display if value_display is not None else "", "LabDocxCell"),
+                    para(value_display, "LabDocxCell"),
                     para(row.get("reference_text") or "", "LabDocxCell"),
                 ]
             )
@@ -755,11 +760,11 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
             ]
         ]
         for row in physical_section.get("fields") or []:
-            value_display = self._reportlab_value_display(row)
+            value_display = self._reportlab_value_display(row, inline_unit=True)
             rows.append(
                 [
                     para(row.get("label") or "", "LabOamCell"),
-                    para(value_display if value_display is not None else "", "LabOamCell"),
+                    para(value_display, "LabOamCell"),
                     para(row.get("reference_text") or "", "LabOamCell"),
                 ]
             )
@@ -775,11 +780,11 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
                 ]
             )
             for row in sediment_section.get("fields") or []:
-                value_display = self._reportlab_value_display(row)
+                value_display = self._reportlab_value_display(row, inline_unit=True)
                 rows.append(
                     [
                         para(row.get("label") or "", "LabOamCell"),
-                        para(value_display if value_display is not None else "", "LabOamCell"),
+                        para(value_display, "LabOamCell"),
                         para(row.get("reference_text") or "", "LabOamCell"),
                     ]
                 )
