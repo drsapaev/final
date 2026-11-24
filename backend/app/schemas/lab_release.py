@@ -23,6 +23,10 @@ class LabReportReasonCommand(LabReportVersionCommand):
         return value.strip() if isinstance(value, str) else value
 
 
+class LabReportReturnCommand(LabReportReasonCommand):
+    unusual_change: bool = Field(default=False, strict=True)
+
+
 class LabReportQCIn(LabReportVersionCommand):
     status: LabQCStatus
     reason: str | None = Field(default=None, max_length=1000)
@@ -62,6 +66,7 @@ class LabReportWorkflowEvidenceOut(BaseModel):
     qc_event_id: int | None = None
     review_event_id: int | None = None
     qc: LabQCEvidenceOut | None = None
+    unusual_change: bool | None = None
 
 
 class LabReportWorkflowEventOut(BaseModel):

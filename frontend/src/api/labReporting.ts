@@ -397,13 +397,17 @@ export const labReportingApi = {
     });
   },
 
-  review(instanceId: string | number, expectedUpdatedAt: string) {
+  review(instanceId: string | number, expectedUpdatedAt: string, reason?: string) {
     return request(`/lab/report-instances/${instanceId}/review`, {
-      method: 'POST', body: JSON.stringify({ expected_updated_at: expectedUpdatedAt }),
+      method: 'POST', body: JSON.stringify({ expected_updated_at: expectedUpdatedAt, reason }),
     });
   },
 
-  returnToDraft(instanceId: string | number, payload: { expected_updated_at: string; reason: string }) {
+  returnToDraft(instanceId: string | number, payload: {
+    expected_updated_at: string;
+    reason: string;
+    unusual_change?: boolean;
+  }) {
     return request(`/lab/report-instances/${instanceId}/return-to-draft`, {
       method: 'POST', body: JSON.stringify(payload),
     });

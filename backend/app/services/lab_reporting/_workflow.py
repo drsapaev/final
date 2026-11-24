@@ -26,6 +26,7 @@ from app.services.service_mapping import normalize_service_code
 
 _MANAGED_DRAFT_STATUSES = {"DRAFT", "IN_PROGRESS"}
 _WORKFLOW_PERMISSIONS = {"lab:review", "lab:release", "lab:qc"}
+MANUAL_REVIEW_HOLDS = frozenset({"instrument_warning", "unusual_change"})
 _DRAFT_EDIT_AUDIT_ACTION = "LAB_REPORT_DRAFT_EDITED"
 _REPORT_AUDIT_ENTITY = "lab_report"
 
@@ -328,6 +329,28 @@ class WorkflowMixin(LabReportingServiceMixinBase):
                 or event.evidence != evidence
             ):
                 holds.append("review_evidence_changed")
+        if instance.status in _MANAGED_DRAFT_STATUSES or instance.status == "IN_REVIEW":
+            holds.extend(self._manual_review_holds(instance))
+        return holds
+
+    def _has_unresolved_unusual_change(self, instance_id: int) -> bool:
+        returned = self._latest_workflow_event(instance_id, "returned")
+        if returned is None or not (returned.evidence or {}).get("unusual_change"):
+            return False
+        reviewed = self._latest_workflow_event(instance_id, "reviewed")
+        return reviewed is None or reviewed.id < returned.id
+
+    def _manual_review_holds(self, instance: LabReportInstance) -> list[str]:
+        holds = []
+        for value in instance.values:
+            if (value.evaluation_snapshot or {}).get("visible") is False:
+                continue
+            origin = (value.result_payload or {}).get("import_origin")
+            if isinstance(origin, dict) and origin.get("instrument_flags"):
+                holds.append("instrument_warning")
+                break
+        if self._has_unresolved_unusual_change(instance.id):
+            holds.append("unusual_change")
         return holds
 
     def _assert_managed_prerequisites(
@@ -392,16 +415,19 @@ class WorkflowMixin(LabReportingServiceMixinBase):
         *,
         actor_user_id: int,
         expected_updated_at: str,
+        reason: str | None = None,
     ) -> LabReportInstance:
         actor = self._workflow_actor(actor_user_id)
         self._require_workflow_permission(actor, "lab:review")
         instance = self._get_locked_instance(instance_id)
         expected_version = self._workflow_expected_version(expected_updated_at)
+        reason = self._workflow_reason(reason) if reason is not None else None
         if self._workflow_request_replayed(
             instance,
             kind="reviewed",
             actor=actor,
             expected_version=expected_version,
+            reason=reason,
         ):
             return instance
         if not instance.managed_release or instance.status != "IN_REVIEW":
@@ -422,6 +448,10 @@ class WorkflowMixin(LabReportingServiceMixinBase):
             raise LabReportingDomainError(
                 409, "Report evidence changed after submission"
             )
+        if reason is None:
+            manual_holds = self._manual_review_holds(instance)
+            if manual_holds:
+                raise LabReportingDomainError(409, ", ".join(manual_holds))
         instance.status = "REVIEWED"
         self._advance_instance_version(instance)
         self._append_workflow_event(
@@ -429,6 +459,7 @@ class WorkflowMixin(LabReportingServiceMixinBase):
             kind="reviewed",
             actor=actor,
             expected_version=expected_version,
+            reason=reason,
             evidence=evidence,
         )
         self.repository.commit()
@@ -441,18 +472,23 @@ class WorkflowMixin(LabReportingServiceMixinBase):
         actor_user_id: int,
         expected_updated_at: str,
         reason: str,
+        unusual_change: bool = False,
     ) -> LabReportInstance:
         actor = self._workflow_actor(actor_user_id)
         self._require_workflow_permission(actor, "lab:review")
         instance = self._get_locked_instance(instance_id)
         expected_version = self._workflow_expected_version(expected_updated_at)
         reason = self._workflow_reason(reason)
+        evidence = None
+        if unusual_change or self._has_unresolved_unusual_change(instance.id):
+            evidence = {"unusual_change": True}
         if self._workflow_request_replayed(
             instance,
             kind="returned",
             actor=actor,
             expected_version=expected_version,
             reason=reason,
+            evidence=evidence,
         ):
             return instance
         if not instance.managed_release or instance.status not in {
@@ -471,6 +507,7 @@ class WorkflowMixin(LabReportingServiceMixinBase):
             actor=actor,
             expected_version=expected_version,
             reason=reason,
+            evidence=evidence,
         )
         self.repository.commit()
         return self.get_instance(instance.id)

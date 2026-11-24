@@ -16,6 +16,7 @@ from app.models.visit import Visit
 from app.schemas.lab_release import (
     LabReportQCIn,
     LabReportReasonCommand,
+    LabReportReturnCommand,
     LabReportVersionCommand,
 )
 from app.schemas.lab_reporting import (
@@ -46,6 +47,7 @@ from app.schemas.lab_reporting import (
 from app.schemas.lab_worklist import LabOrderPriority
 from app.services.lab_report_pdf._context import build_report_pdf_context
 from app.services.lab_report_pdf_service import lab_report_pdf_service
+from app.services.lab_reporting._workflow import MANUAL_REVIEW_HOLDS
 from app.services.lab_reporting_service import (
     LabReportingDomainError,
     LabReportingService,
@@ -192,7 +194,10 @@ def _instance_out(
     available_actions = service.instance_available_actions(instance, actor_user_id)
     release_holds = service.report_release_holds(instance)
     if release_holds:
-        available_actions = [action for action in available_actions if action not in {"review", "finalize"}]
+        blocked_actions = {"finalize"}
+        if any(hold not in MANUAL_REVIEW_HOLDS for hold in release_holds):
+            blocked_actions.add("review")
+        available_actions = [action for action in available_actions if action not in blocked_actions]
     return LabReportInstanceOut(
         id=instance.id,
         order_id=instance.order_id,
@@ -753,7 +758,7 @@ def submit_lab_report_for_review(
 @router.post("/report-instances/{instance_id}/review", response_model=LabReportInstanceOut)
 def review_lab_report(
     instance_id: int,
-    command: LabReportVersionCommand,
+    command: LabReportReasonCommand | LabReportVersionCommand,
     db: Session = Depends(get_db),
     user=Depends(require_active_roles("Admin", "Lab")),
 ):
@@ -761,6 +766,7 @@ def review_lab_report(
     try:
         instance = service.review_report(
             instance_id, actor_user_id=user.id, expected_updated_at=command.expected_updated_at,
+            reason=command.reason if isinstance(command, LabReportReasonCommand) else None,
         )
         return _instance_out(service, instance, user.id)
     except LabReportingDomainError as exc:
@@ -770,7 +776,7 @@ def review_lab_report(
 @router.post("/report-instances/{instance_id}/return-to-draft", response_model=LabReportInstanceOut)
 def return_lab_report_to_draft(
     instance_id: int,
-    command: LabReportReasonCommand,
+    command: LabReportReturnCommand,
     db: Session = Depends(get_db),
     user=Depends(require_active_roles("Admin", "Lab")),
 ):
@@ -778,7 +784,7 @@ def return_lab_report_to_draft(
     try:
         instance = service.return_report_to_draft(
             instance_id, actor_user_id=user.id, expected_updated_at=command.expected_updated_at,
-            reason=command.reason,
+            reason=command.reason, unusual_change=command.unusual_change,
         )
         return _instance_out(service, instance, user.id)
     except LabReportingDomainError as exc:

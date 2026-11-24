@@ -33419,6 +33419,18 @@ export type components = {
             /** Fields */
             fields: components["schemas"]["LabReportRenderedFieldOut"][];
         };
+        /** LabReportReturnCommand */
+        LabReportReturnCommand: {
+            /** Expected Updated At */
+            expected_updated_at: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Unusual Change
+             * @default false
+             */
+            unusual_change: boolean;
+        };
         /** LabReportSectionOut */
         LabReportSectionOut: {
             /** Id */
@@ -33665,6 +33677,8 @@ export type components = {
             /** Review Event Id */
             review_event_id?: number | null;
             qc?: components["schemas"]["LabQCEvidenceOut"] | null;
+            /** Unusual Change */
+            unusual_change?: boolean | null;
         };
         /**
          * LabResultItem
@@ -82382,7 +82396,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["LabReportVersionCommand"];
+                "application/json": components["schemas"]["LabReportReasonCommand"] | components["schemas"]["LabReportVersionCommand"];
             };
         };
         responses: {
@@ -82417,7 +82431,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["LabReportReasonCommand"];
+                "application/json": components["schemas"]["LabReportReturnCommand"];
             };
         };
         responses: {

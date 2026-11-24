@@ -58273,7 +58273,15 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LabReportVersionCommand"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/LabReportReasonCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LabReportVersionCommand"
+                  }
+                ],
+                "title": "Command"
               }
             }
           }
@@ -58331,7 +58339,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LabReportReasonCommand"
+                "$ref": "#/components/schemas/LabReportReturnCommand"
               }
             }
           }
@@ -101880,6 +101888,34 @@
         ],
         "title": "LabReportRenderedSectionOut"
       },
+      "LabReportReturnCommand": {
+        "properties": {
+          "expected_updated_at": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 19,
+            "title": "Expected Updated At"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "unusual_change": {
+            "type": "boolean",
+            "title": "Unusual Change",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_updated_at",
+          "reason"
+        ],
+        "title": "LabReportReturnCommand"
+      },
       "LabReportSectionOut": {
         "properties": {
           "id": {
@@ -102647,6 +102683,17 @@
                 "type": "null"
               }
             ]
+          },
+          "unusual_change": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unusual Change"
           }
         },
         "type": "object",

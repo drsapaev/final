@@ -374,6 +374,79 @@ def test_managed_review_surfaces_qc_and_material_holds(
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(("instrument_warning", "hold"), [
+    (True, "instrument_warning"),
+    (False, "unusual_change"),
+])
+def test_managed_review_requires_a_recorded_disposition_for_manual_findings(
+    client, db_session, test_patient, monkeypatch, instrument_warning, hold,
+):
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", True)
+    entered_by = _staff(db_session, "finding-entry", [])
+    reviewer = _staff(db_session, "finding-review", [
+        Permission(name=code, codename=code) for code in ("lab:review", "lab:qc")
+    ])
+    service = LabReportingService(db_session)
+    template = next(item for item in service.list_templates() if item.code == "cbc_oak")
+    report = service.create_instance(
+        {"patient_id": test_patient.id, "template_id": template.id}, actor_user_id=entered_by.id,
+    )
+    _accepted_specimen(db_session, report, "SYNTHETIC-MANUAL-REVIEW")
+    report, _ = service.bulk_upsert_values(
+        report.id, [{"field_key": "hgb", "value_text": "135"}, {"field_key": "wbc", "value_text": "5.2"}],
+        expected_updated_at=report.updated_at.isoformat(), actor_user_id=entered_by.id,
+    )
+    if instrument_warning:
+        value = next(item for item in report.values if item.field_key == "hgb")
+        value.result_payload = {**value.result_payload, "import_origin": {
+            "source": "csv", "message_id": str(uuid4()), "instrument_flags": ["SYNTHETIC-WARNING"],
+        }}
+        db_session.commit()
+    report = service.record_report_qc(report.id, actor_user_id=reviewer.id, command=LabReportQCIn(
+        expected_updated_at=report.updated_at.isoformat(), status="not_applicable", reason="SYNTHETIC QC",
+    ))
+    report = service.submit_for_review(
+        report.id, actor_user_id=entered_by.id, expected_updated_at=report.updated_at.isoformat(),
+    )
+    path = f"/api/v1/lab/report-instances/{report.id}"
+    headers = _auth(reviewer)
+    if not instrument_warning:
+        for unusual_change in (True, False):
+            returned = client.post(f"{path}/return-to-draft", headers=headers, json={
+                "expected_updated_at": report.updated_at.isoformat(),
+                "reason": "SYNTHETIC manual observation",
+                "unusual_change": unusual_change,
+            })
+            assert returned.status_code == 200, returned.text
+            assert returned.json()["release_holds"] == [hold]
+            assert returned.json()["workflow_events"][-1]["evidence"]["unusual_change"] is True
+            report = service.submit_for_review(
+                report.id, actor_user_id=entered_by.id, expected_updated_at=returned.json()["updated_at"],
+            )
+
+    response = client.get(path, headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["release_holds"] == [hold]
+    assert "review" in response.json()["available_actions"]
+    command = {"expected_updated_at": response.json()["updated_at"]}
+    denied = client.post(f"{path}/review", headers=headers, json=command)
+    assert denied.status_code == 409, denied.text
+    assert denied.json()["detail"] == hold
+
+    reviewed_command = {**command, "reason": "SYNTHETIC disposition of the manual finding"}
+    reviewed = client.post(f"{path}/review", headers=headers, json=reviewed_command)
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["status"] == "REVIEWED"
+    assert reviewed.json()["release_holds"] == []
+    event = reviewed.json()["workflow_events"][-1]
+    assert event["actor_user_id"] == reviewer.id
+    assert event["reason"] == reviewed_command["reason"]
+    replay = client.post(f"{path}/review", headers=headers, json=reviewed_command)
+    assert replay.status_code == 200
+    assert replay.json()["workflow_events"] == reviewed.json()["workflow_events"]
+
+
+@pytest.mark.unit
 def test_managed_submission_accepts_documented_absence_for_required_results(
     db_session, test_patient, monkeypatch,
 ):

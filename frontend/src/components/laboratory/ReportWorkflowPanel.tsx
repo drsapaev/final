@@ -26,6 +26,9 @@ export default function ReportWorkflowPanel({
   const holds = (report.release_holds as string[] | undefined) || [];
   const events = (report.workflow_events as LabWorkflowEvent[] | undefined) || [];
   const qc = events.filter((event) => event.kind === 'qc_recorded').at(-1)?.evidence?.qc;
+  const canReview = hasLabReportAction(report, 'review');
+  const requiresNote = holds.some(isManualReviewHold);
+  const blocksReview = holds.some(hold => !isManualReviewHold(hold));
   const canReturnToDraft = hasLabReportAction(report, 'return_to_draft');
   const canRecordQc = hasLabReportAction(report, 'record_qc');
   const canEdit = hasLabReportAction(report, 'edit');
@@ -51,6 +54,10 @@ export default function ReportWorkflowPanel({
         return hold === 'qc_missing' ? 'record_qc' : 'review_qc';
       case 'review_evidence_changed':
         return returnStep;
+      case 'instrument_warning':
+      case 'unusual_change':
+        if (blocksReview) return null;
+        return canReview ? 'document_findings' : 'request_findings_review';
       default:
         return null;
     }
@@ -59,6 +66,7 @@ export default function ReportWorkflowPanel({
     specimens: t('labWorkspace.specimens'),
     recordQc: t('workbench.workflow_record_qc'),
     returnToDraft: t('workbench.workflow_return_to_draft'),
+    review: t('workbench.workflow_review'),
   };
 
   return (
@@ -76,8 +84,11 @@ export default function ReportWorkflowPanel({
         {hasLabReportAction(report, 'submit_review') && (
           <Button disabled={disabled || !canSubmit} onClick={() => onReview('submit_review')}>{t('workbench.workflow_submit_review')}</Button>
         )}
-        {hasLabReportAction(report, 'review') && (
-          <Button disabled={disabled || holds.length > 0} onClick={() => onReview('review')}>{t('workbench.workflow_review')}</Button>
+        {canReview && (
+          <Button disabled={disabled || blocksReview} onClick={(event) => {
+            if (requiresNote) onPrompt('review', event.currentTarget);
+            else onReview('review');
+          }}>{guidanceLabels.review}</Button>
         )}
         {canReturnToDraft && (
           <Button variant="outline" disabled={disabled} onClick={(event) => onPrompt('return_to_draft', event.currentTarget)}>{t('workbench.workflow_return_to_draft')}</Button>
@@ -99,13 +110,18 @@ export default function ReportWorkflowPanel({
   );
 }
 
-export type LabWorkflowPrompt = 'revise' | 'return_to_draft' | 'record_qc';
+function isManualReviewHold(hold: string) {
+  return hold === 'instrument_warning' || hold === 'unusual_change';
+}
+
+export type LabWorkflowPrompt = 'revise' | 'return_to_draft' | 'record_qc' | 'review';
 
 type QCStatus = 'accepted' | 'rejected' | 'not_applicable';
 
 export interface LabWorkflowDetails {
   status?: QCStatus;
   reason: string;
+  unusual_change?: boolean;
   method?: string;
   instrument_ref?: string;
   series_ref?: string;
@@ -121,6 +137,7 @@ export function ReportWorkflowDialog({
 }) {
   const { t } = useTranslation();
   const [reason, setReason] = useState('');
+  const [unusualChange, setUnusualChange] = useState(false);
   const [status, setStatus] = useState<QCStatus | ''>('');
   const [method, setMethod] = useState('');
   const [series, setSeries] = useState('');
@@ -139,11 +156,20 @@ export function ReportWorkflowDialog({
         if (!canSubmit || saving) return;
         onSubmit({
           reason: reason.trim(),
+          ...(unusualChange ? { unusual_change: true } : {}),
           ...(status ? { status } : {}),
           ...(requiresSeries ? { method: method.trim(), series_ref: series.trim(), instrument_ref: instrument.trim() || undefined } : {}),
         });
       }}>
         {action === 'revise' && <p>{t('confirm.revise_message')} {t('confirm.revise_description')}</p>}
+        {action === 'review' && <p>{t('workbench.workflow_review_note_help')}</p>}
+        {action === 'return_to_draft' && (
+          <label>
+            <input type="checkbox" checked={unusualChange} disabled={saving}
+              onChange={(event) => setUnusualChange(event.target.checked)} />
+            {t('workbench.workflow_mark_unusual_change')}
+          </label>
+        )}
         {isQC && (
           <label>
             {t('workbench.workflow_qc_outcome')}

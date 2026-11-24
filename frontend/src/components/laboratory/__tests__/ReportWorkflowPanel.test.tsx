@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ThemeProvider } from '../../../contexts/ThemeContext';
 import i18n from '../../../i18n';
-import ReportWorkflowPanel from '../ReportWorkflowPanel';
+import ReportWorkflowPanel, { ReportWorkflowDialog } from '../ReportWorkflowPanel';
 
 function renderWorkflow(report: Record<string, unknown>) {
   const onReview = vi.fn();
@@ -95,6 +96,41 @@ describe('managed report hold guidance', () => {
 
     expect(screen.getByText(/Источник измерения не совпадает с принятой пробой/)).toBeVisible();
     expect(screen.getByText(/Сверьте привязку в разделе «Пробы»/)).toBeVisible();
+  });
+
+  it.each(['instrument_warning', 'unusual_change'])(
+    'offers the reviewer a documented resolution for %s', hold => {
+      const { onReview, onPrompt } = renderWorkflow({
+        status: 'IN_REVIEW', release_holds: [hold], available_actions: ['review', 'return_to_draft'],
+      });
+      expect(screen.getByText(/укажите, что проверили и какое решение приняли/)).toBeVisible();
+      const review = screen.getByRole('button', { name: 'Подтвердить проверку' });
+      expect(review).toBeEnabled();
+      fireEvent.click(review);
+      expect(onPrompt).toHaveBeenCalledWith('review', review);
+      expect(onReview).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps QC prerequisites in force when a reviewer needs to document a finding', () => {
+    renderWorkflow({ status: 'IN_REVIEW', release_holds: ['instrument_warning', 'qc_missing'],
+      available_actions: ['review', 'return_to_draft'] });
+    expect(screen.getByRole('button', { name: 'Подтвердить проверку' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Вернуть в черновик' })).toBeEnabled();
+  });
+
+  it('submits a flagged unusual change with the documented return reason', () => {
+    const onSubmit = vi.fn();
+    render(<ThemeProvider>
+      <ReportWorkflowDialog action="return_to_draft" saving={false} onClose={vi.fn()} onSubmit={onSubmit} />
+    </ThemeProvider>);
+
+    const submit = screen.getByRole('button', { name: 'Вернуть в черновик' });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Отметить необычную динамику' }));
+    expect(submit).toBeDisabled();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Причина' }), { target: { value: '  SYNTHETIC finding  ' } });
+    fireEvent.click(submit);
+    expect(onSubmit).toHaveBeenCalledWith({ reason: 'SYNTHETIC finding', unusual_change: true });
   });
 
   it('keeps unknown reasons visible and skips managed controls for legacy reports', () => {

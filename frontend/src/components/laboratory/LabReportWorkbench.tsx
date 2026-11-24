@@ -987,7 +987,7 @@ export default function LabReportWorkbench({
   }
 
   async function handleWorkflowCommand(
-    action: 'submit_review' | 'review' | LabWorkflowPrompt,
+    action: 'submit_review' | LabWorkflowPrompt,
     details?: LabWorkflowDetails,
   ) {
     if (!activeInstance || saving || draftSaveInFlightRef.current || isDirty || saveFailure || instanceTransitionPending) return;
@@ -1009,11 +1009,13 @@ export default function LabReportWorkbench({
           response = await labReportingApi.submitReview(id, version);
           break;
         case 'review':
-          response = await labReportingApi.review(id, version);
+          response = await labReportingApi.review(id, version, details?.reason);
           break;
         case 'return_to_draft':
           if (!details?.reason) return;
-          response = await labReportingApi.returnToDraft(id, { expected_updated_at: version, reason: details.reason });
+          response = await labReportingApi.returnToDraft(id, {
+            expected_updated_at: version, reason: details.reason, unusual_change: details.unusual_change,
+          });
           break;
         case 'record_qc':
           if (!details?.status) return;
