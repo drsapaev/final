@@ -29,8 +29,8 @@ const LAB_TAB_MAP = {
 
 export function isLabShortcutBlockedByControl(event: KeyboardEvent): boolean {
   if (event.defaultPrevented || event.isComposing) return true;
-  // Dialogs own shortcuts even before initial focus moves into the modal.
-  if (document.querySelector('[role="dialog"], [role="alertdialog"], dialog[open]')) return true;
+  // Native dialogs may stay mounted while closed, even with an explicit ARIA role.
+  if (document.querySelector('dialog[open], [role="dialog"]:not(dialog), [role="alertdialog"]:not(dialog)')) return true;
   return event.target instanceof Element
     && Boolean(event.target.closest('select, [role="combobox"], [role="listbox"]'));
 }
