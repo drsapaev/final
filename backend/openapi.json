@@ -98590,7 +98590,8 @@
             "type": "array",
             "maxItems": 100,
             "minItems": 1,
-            "title": "Rows"
+            "title": "Rows",
+            "description": "Rows are validated individually and outcomes follow the input order."
           }
         },
         "additionalProperties": false,
@@ -98626,7 +98627,8 @@
           },
           "report_instance_id": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
             "title": "Report Instance Id"
           },
           "specimen_barcode": {
@@ -98701,13 +98703,35 @@
       },
       "LabImportRowOut": {
         "properties": {
+          "row_index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Row Index",
+            "description": "Zero-based index in the submitted batch."
+          },
           "message_id": {
-            "type": "string",
-            "format": "uuid",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Message Id"
           },
           "report_instance_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2147483647.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Report Instance Id"
           },
           "status": {
@@ -98763,7 +98787,8 @@
                   "unit_mismatch",
                   "invalid_value",
                   "message_conflict",
-                  "values_exist"
+                  "values_exist",
+                  "invalid_row"
                 ]
               },
               {
@@ -98775,6 +98800,7 @@
         },
         "type": "object",
         "required": [
+          "row_index",
           "message_id",
           "report_instance_id",
           "status"
@@ -98997,6 +99023,13 @@
             "type": "integer",
             "title": "Rejected Samples"
           },
+          "rejected_samples_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Rejected Samples By Reason"
+          },
           "held_samples": {
             "type": "integer",
             "title": "Held Samples"
@@ -99032,6 +99065,7 @@
           "actionable",
           "overdue",
           "rejected_samples",
+          "rejected_samples_by_reason",
           "held_samples",
           "turnaround_pairs",
           "average_turnaround_minutes",
@@ -102015,6 +102049,16 @@
             ],
             "title": "Reason"
           },
+          "reason_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabSpecimenRejectionReasonCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "visit_service_ids": {
             "items": {
               "type": "integer"
@@ -102256,6 +102300,18 @@
         ],
         "title": "LabSpecimenOut"
       },
+      "LabSpecimenRejectionReasonCode": {
+        "type": "string",
+        "enum": [
+          "label_mismatch",
+          "container_mismatch",
+          "insufficient_quantity",
+          "specimen_quality",
+          "transport_issue",
+          "other"
+        ],
+        "title": "LabSpecimenRejectionReasonCode"
+      },
       "LabSpecimenScan": {
         "properties": {
           "barcode": {
@@ -102319,6 +102375,16 @@
               }
             ],
             "title": "Reason"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabSpecimenRejectionReasonCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,

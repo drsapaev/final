@@ -32434,7 +32434,10 @@ export type components = {
              * @enum {string}
              */
             source: "manual" | "csv";
-            /** Rows */
+            /**
+             * Rows
+             * @description Rows are validated individually and outcomes follow the input order.
+             */
             rows: components["schemas"]["LabImportRow"][];
         };
         /** LabImportBatchOut */
@@ -32470,12 +32473,14 @@ export type components = {
         /** LabImportRowOut */
         LabImportRowOut: {
             /**
-             * Message Id
-             * Format: uuid
+             * Row Index
+             * @description Zero-based index in the submitted batch.
              */
-            message_id: string;
+            row_index: number;
+            /** Message Id */
+            message_id: string | null;
             /** Report Instance Id */
-            report_instance_id: number;
+            report_instance_id: number | null;
             /**
              * Status
              * @enum {string}
@@ -32491,7 +32496,7 @@ export type components = {
              */
             existing_values: number;
             /** Error Code */
-            error_code?: ("report_not_found" | "report_locked" | "stale_report" | "specimen_mismatch" | "method_mismatch" | "unknown_analyte" | "duplicate_analyte" | "unit_mismatch" | "invalid_value" | "message_conflict" | "values_exist") | null;
+            error_code?: ("report_not_found" | "report_locked" | "stale_report" | "specimen_mismatch" | "method_mismatch" | "unknown_analyte" | "duplicate_analyte" | "unit_mismatch" | "invalid_value" | "message_conflict" | "values_exist" | "invalid_row") | null;
         };
         /** LabImportValue */
         LabImportValue: {
@@ -32549,6 +32554,10 @@ export type components = {
             overdue: number;
             /** Rejected Samples */
             rejected_samples: number;
+            /** Rejected Samples By Reason */
+            rejected_samples_by_reason: {
+                [key: string]: number;
+            };
             /** Held Samples */
             held_samples: number;
             /** Turnaround Pairs */
@@ -33550,6 +33559,7 @@ export type components = {
             happened_at: string;
             /** Reason */
             reason: string | null;
+            reason_code?: components["schemas"]["LabSpecimenRejectionReasonCode"] | null;
             /** Visit Service Ids */
             visit_service_ids: number[];
             /** Report Instance Ids */
@@ -33612,6 +33622,11 @@ export type components = {
             /** Events */
             events: components["schemas"]["LabSpecimenEventOut"][];
         };
+        /**
+         * LabSpecimenRejectionReasonCode
+         * @enum {string}
+         */
+        LabSpecimenRejectionReasonCode: "label_mismatch" | "container_mismatch" | "insufficient_quantity" | "specimen_quality" | "transport_issue" | "other";
         /** LabSpecimenScan */
         LabSpecimenScan: {
             /** Barcode */
@@ -33635,6 +33650,7 @@ export type components = {
             action: "collect" | "receive" | "accept" | "hold" | "reject";
             /** Reason */
             reason?: string | null;
+            reason_code?: components["schemas"]["LabSpecimenRejectionReasonCode"] | null;
         };
         /** LabTemplateResolutionIn */
         LabTemplateResolutionIn: {
