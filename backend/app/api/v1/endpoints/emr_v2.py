@@ -118,7 +118,20 @@ def get_current_active_doctor(db: Session, current_user: User) -> Doctor | None:
     )
 
 
-def ensure_emr_visit_access(db: Session, visit_id: int, current_user: User) -> None:
+def lock_emr_visit(db: Session, visit_id: int) -> Visit | None:
+    """Read the current visit while serializing clinical writes and reassignment."""
+    return (
+        db.query(Visit)
+        .filter(Visit.id == visit_id)
+        .populate_existing()
+        .with_for_update(of=Visit)
+        .one_or_none()
+    )
+
+
+def ensure_emr_visit_access(
+    db: Session, visit_id: int, current_user: User, *, for_update: bool = False
+) -> None:
     """Prevent doctor-profile users from opening another doctor's visit EMR.
 
     EMR-AUDIT-28 P0-1: ранее non-doctor roles (Lab) bypassed ownership check
@@ -130,6 +143,8 @@ def ensure_emr_visit_access(db: Session, visit_id: int, current_user: User) -> N
 
     if staff_authorization_service.has_permission(current_user, "emr:read"):
         if staff_authorization_service.has_permission(current_user, "emr:delete") or current_user.is_superuser:
+            if for_update:
+                lock_emr_visit(db, visit_id)
             return  # Admin/superuser — full access
 
     # Non-admin: must be a doctor with ownership
@@ -137,7 +152,11 @@ def ensure_emr_visit_access(db: Session, visit_id: int, current_user: User) -> N
     if not doctor:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    visit = (
+        lock_emr_visit(db, visit_id)
+        if for_update
+        else db.query(Visit).filter(Visit.id == visit_id).first()
+    )
     if not visit:
         raise HTTPException(status_code=404, detail="Visit not found")
     if visit.doctor_id != doctor.id:
@@ -211,7 +230,7 @@ async def get_doctor_history(
     search_text: str | None = Query(None, description="Search text for similarity"),
     limit: int = Query(10, ge=1, le=50, description="Max entries"),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Get doctor's previous EMR entries for a specific field.
@@ -250,7 +269,7 @@ async def get_emr(
     visit_id: int,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Get current EMR for visit.
@@ -320,7 +339,7 @@ async def get_emr_history(
     request: Request,
     limit: int = Query(50, ge=1, le=200, description="Maximum revisions to return"),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Get revision history for EMR.
@@ -363,7 +382,7 @@ async def get_emr_version(
     version: int,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Get specific version of EMR.
@@ -398,7 +417,7 @@ async def compare_versions(
     v1: int = Query(..., ge=1, description="First version number"),
     v2: int = Query(..., ge=1, description="Second version number"),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Compare two EMR versions.
@@ -432,7 +451,7 @@ async def get_patient_emrs(
     request: Request,
     limit: int = Query(100, ge=1, le=500, description="Maximum EMRs to return"),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Get all EMRs for a patient.
@@ -470,7 +489,7 @@ async def save_emr(
     payload: EMRSaveRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_WRITE_ROLES)),
 ):
     """
     Save EMR with versioning.
@@ -487,7 +506,7 @@ async def save_emr(
     - Finalized records (signed/amended) are rejected with 409 — use the
       reasoned amend endpoint instead.
     """
-    ensure_emr_visit_access(db, visit_id, current_user)
+    ensure_emr_visit_access(db, visit_id, current_user, for_update=True)
 
     try:
         existing_emr = emr_v2_service.get_by_visit(db, visit_id)
@@ -561,7 +580,7 @@ async def sign_emr(
     payload: EMRSignRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_WRITE_ROLES)),
 ):
     """
     Sign and finalize EMR.
@@ -569,7 +588,7 @@ async def sign_emr(
     Changes status to 'signed' and records signing timestamp.
     After signing, EMR can only be modified via the amend endpoint.
     """
-    ensure_emr_visit_access(db, visit_id, current_user)
+    ensure_emr_visit_access(db, visit_id, current_user, for_update=True)
 
     try:
         emr = emr_v2_service.sign(
@@ -646,7 +665,7 @@ async def amend_emr(
     payload: EMRAmendRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_WRITE_ROLES)),
 ):
     """
     Amend a signed EMR.
@@ -654,7 +673,7 @@ async def amend_emr(
     Creates a new version with amendment, requires a reason (min 10 chars).
     Only available for EMRs with status 'signed'.
     """
-    ensure_emr_visit_access(db, visit_id, current_user)
+    ensure_emr_visit_access(db, visit_id, current_user, for_update=True)
 
     try:
         emr = emr_v2_service.amend(
@@ -690,7 +709,7 @@ async def restore_emr(
     payload: EMRRestoreRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_WRITE_ROLES)),
 ):
     """
     Restore EMR to a specific version.
@@ -702,7 +721,7 @@ async def restore_emr(
     finalized (signed/amended) records, requires an explicit reason and
     honors optimistic locking via the caller's current row_version.
     """
-    ensure_emr_visit_access(db, visit_id, current_user)
+    ensure_emr_visit_access(db, visit_id, current_user, for_update=True)
 
     try:
         emr = emr_v2_service.restore(
@@ -748,7 +767,7 @@ async def get_emr_mobile_alias(
     visit_id: int,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """Mobile contract (Android client): GET /api/v1/emr/{visit_id}.
 
@@ -766,7 +785,7 @@ async def save_emr_mobile_alias(
     payload: EMRSaveRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
+    current_user: User = Depends(deps.require_active_roles(*EMR_V2_WRITE_ROLES)),
 ):
     """Mobile contract (Android client): POST /api/v1/emr/{visit_id}.
 

@@ -622,6 +622,63 @@ def test_emr_lifecycle_writes_lock_visit_before_record(db_session):
     assert locking_reads == ["visits", "emr_records"] * 5
 
 
+@pytest.mark.parametrize("operation", ("save", "mobile_save", "sign", "amend", "restore"))
+def test_emr_write_checks_current_visit_owner(client, db_session, operation):
+    visit, user = _mk_visit(db_session, f"reassigned_{operation}")
+    visit_id = visit.id
+    headers = _login(client, user.username)
+    initial = {"notes": "SYNTHETIC-ORIGINAL"}
+    saved = _save(client, headers, visit_id, initial, 0, "reassignment")
+    assert saved.status_code == 200, saved.text
+    if operation == "amend":
+        saved = _sign(client, headers, visit_id, initial, saved.json()["row_version"], "reassignment")
+        assert saved.status_code == 200, saved.text
+    row_version = saved.json()["row_version"]
+
+    db_session.refresh(visit)
+    db_session.execute(Visit.__table__.update().where(Visit.id == visit_id).values(doctor_id=None))
+    assert visit.doctor_id is not None
+
+    url = f"/api/v1/v2/emr/{visit_id}"
+    payload = {"data": {"notes": "SYNTHETIC-EDIT"}, "row_version": row_version}
+    if operation == "mobile_save":
+        url = f"/api/v1/emr/{visit_id}"
+    elif operation != "save":
+        url += f"/{operation}"
+    if operation in {"amend", "restore"}:
+        payload["reason"] = "SYNTHETIC reason for correction"
+    if operation == "restore":
+        payload = {"target_version": 1, "row_version": row_version, "reason": payload["reason"]}
+
+    response = client.post(url, headers=headers, json=payload)
+    assert response.status_code == 403, response.text
+    current = emr_v2_service.get_by_visit(db_session, visit_id)
+    assert current.row_version == row_version
+    assert current.data["notes"] == initial["notes"]
+
+
+def test_inactive_emr_account_cannot_use_canonical_or_mobile_route(client, db_session):
+    visit, user = _mk_visit(db_session, "inactive_account")
+    visit_id = visit.id
+    headers = _login(client, user.username)
+    payload = {"data": {"notes": "SYNTHETIC-ORIGINAL"}, "row_version": 0}
+    saved = client.post(f"/api/v1/v2/emr/{visit_id}", headers=headers, json=payload)
+    assert saved.status_code == 200, saved.text
+    payload["row_version"] = saved.json()["row_version"]
+    payload["data"]["notes"] = "SYNTHETIC-EDIT"
+
+    user.is_active = False
+    db_session.commit()
+    for prefix in ("/api/v1/v2/emr", "/api/v1/emr"):
+        url = f"{prefix}/{visit_id}"
+        assert client.get(url, headers=headers).status_code == 403
+        assert client.post(url, headers=headers, json=payload).status_code == 403
+
+    current = emr_v2_service.get_by_visit(db_session, visit_id)
+    assert current.row_version == saved.json()["row_version"]
+    assert current.data["notes"] == "SYNTHETIC-ORIGINAL"
+
+
 def test_cross_session_stale_write_still_conflicts(client, db_session):
     """EMRLOCK-FE-001 control: cross-session stale writes were already
     rejected; they must stay rejected (regression guard)."""
