@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES
 from app.models.clinic import Doctor
 from app.models.lab import (
     FINAL_INSTANCE_STATUSES,
@@ -521,11 +522,19 @@ class LabNotificationService:
             LabResult.unit == result.unit,
         ).with_for_update(of=LabResult).first() is not None
 
-    def _delivery_visit(self, visit_id: int, *, lock: bool) -> Visit | None:
-        query = self.db.query(Visit).filter(Visit.id == visit_id)
-        if lock:
-            query = query.with_for_update(read=True, of=Visit).populate_existing()
-        return query.first()
+    def _lock_linked_recipient_id(
+        self, result: LabResult, source: LabReportInstance, visit_id: int,
+    ) -> int | None:
+        from app.services.lab_critical_communication import _active_visit_doctor_query
+
+        # Take the projection lock before the same ownership locks used by
+        # managed critical communication (Visit, Doctor, User).
+        if not self._lock_projected_release(result, source):
+            return None
+        query = _active_visit_doctor_query(
+            visit_id, source.patient_id, eligible_roles=DOCTOR_FAMILY_GATE_ROLES,
+        )
+        return self.db.scalar(query.with_for_update(read=True, of=(Visit, Doctor, User)))
 
     async def _notify_doctor_critical_value(
         self,
@@ -539,24 +548,22 @@ class LabNotificationService:
         order = self.db.query(LabOrder).filter(LabOrder.id == result.order_id).first()
         if not order:
             return
-        if source is not None and not self._lock_projected_release(result, source):
-            return
-
-        visit = None
         visit_id = order.visit_id or (source.visit_id if source else None)
-        if visit_id:
-            visit = self._delivery_visit(visit_id, lock=source is not None)
-        if not visit or not visit.doctor_id:
+        if visit_id is None:
             return
-        if source is not None and visit.patient_id != source.patient_id:
-            return
-
-        doctor = self.db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
-        if not doctor or not doctor.user_id:
-            return
-
-        # Отправляем врачу в защищённый inbox.
-        doctor_user = self.db.query(User).filter(User.id == doctor.user_id).first()
+        if source is not None:
+            recipient_id = self._lock_linked_recipient_id(result, source, visit_id)
+            if recipient_id is None:
+                return
+        else:
+            visit = self.db.get(Visit, visit_id)
+            if not visit or not visit.doctor_id:
+                return
+            doctor = self.db.get(Doctor, visit.doctor_id)
+            if not doctor or not doctor.user_id:
+                return
+            recipient_id = doctor.user_id
+        doctor_user = self.db.get(User, recipient_id, populate_existing=source is not None)
         if not doctor_user:
             logger.warning(
                 "Critical value alert skipped: doctor account missing for result %s",
@@ -586,7 +593,7 @@ class LabNotificationService:
         display_value = metadata.get("value_display", value)
         canonical_recorded = self._lab_inbox_delivery_exists(
             event_type="lab_critical_result",
-            recipient_id=doctor_user.id,
+            recipient_id=recipient_id,
             entity_id=result.id,
             expected_value=value,
             source=source,
@@ -612,23 +619,19 @@ class LabNotificationService:
                 "[FIX:NOTIFICATIONS] lab_critical_result canonical delivery failed",
                 extra={
                     "result_id": result.id,
-                    "doctor_user_id": doctor_user.id,
+                    "doctor_user_id": recipient_id,
                     "order_id": result.order_id,
                 },
             )
             return
 
-        # The canonical inbox sender commits its transaction. Reacquire the
-        # projection before sending the companion event.
-        if source is not None:
-            if not self._lock_projected_release(result, source):
-                return
-            visit = self._delivery_visit(visit_id, lock=True)
-            if not visit or visit.doctor_id != doctor.id or visit.patient_id != source.patient_id:
-                return
+        # The inbox sender commits. The companion event needs fresh release
+        # and ownership locks, and the exact same recipient account.
+        if source is not None and self._lock_linked_recipient_id(result, source, visit_id) != recipient_id:
+            return
         finding_recorded = self._lab_inbox_delivery_exists(
             event_type="lab_critical_finding",
-            recipient_id=doctor_user.id,
+            recipient_id=recipient_id,
             entity_id=result.id,
             expected_value=value,
             source=source,
@@ -648,7 +651,7 @@ class LabNotificationService:
                 "[FIX:NOTIFICATIONS] lab_critical_finding canonical delivery failed",
                 extra={
                     "result_id": result.id,
-                    "doctor_user_id": doctor_user.id,
+                    "doctor_user_id": recipient_id,
                     "order_id": result.order_id,
                 },
             )

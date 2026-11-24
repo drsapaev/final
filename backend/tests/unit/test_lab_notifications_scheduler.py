@@ -292,26 +292,65 @@ async def test_scheduler_adopts_prior_delivery_and_deduplicates_identical_correc
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("interleaved_change", ["correction", "reassignment"])
+@pytest.mark.parametrize("interleaved_change", [
+    "correction", "reassignment", "doctor_rebound", "doctor_retired",
+    "account_deactivated", "account_role_changed",
+])
 async def test_scheduler_rechecks_release_and_route_after_inbox_commit(
-    db_session, released_result, test_visit, monkeypatch, interleaved_change,
+    db_session, released_result, test_visit, test_doctor, test_doctor_user,
+    cardio_user, monkeypatch, interleaved_change,
 ):
     projection, source = released_result()
+    original_recipient_id = cardio_user.id
 
     async def send_and_commit(**kwargs):
         assert kwargs["event_type"] == "lab_critical_result"
+        assert kwargs["recipient"].id == original_recipient_id
         if interleaved_change == "correction":
             released_result(
                 previous=source, projection=projection, interpretation="normal",
             )
-        else:
+        elif interleaved_change == "reassignment":
             test_visit.doctor_id = None
+        elif interleaved_change == "doctor_rebound":
+            test_doctor.user_id = test_doctor_user.id
+        elif interleaved_change == "doctor_retired":
+            test_doctor.active = False
+        elif interleaved_change == "account_deactivated":
+            cardio_user.is_active = False
+        else:
+            cardio_user.role = "Registrar"
         db_session.commit()
+        if interleaved_change != "reassignment":
+            assert test_visit.doctor_id == test_doctor.id
         return True
 
     sender = AsyncMock(side_effect=send_and_commit)
     monkeypatch.setattr(mod.notification_sender_service, "send_lab_event_notification", sender)
 
-    await mod.LabNotificationService(db_session).check_critical_values()
+    outcome = await mod.LabNotificationService(db_session).check_critical_values()
 
+    assert outcome["critical_found"] == 1
     sender.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ineligible", ["doctor_retired", "account_deactivated", "account_role_changed"])
+async def test_scheduler_skips_linked_results_with_ineligible_recipient(
+    db_session, released_result, test_doctor, cardio_user, monkeypatch, ineligible,
+):
+    released_result()
+    if ineligible == "doctor_retired":
+        test_doctor.active = False
+    elif ineligible == "account_deactivated":
+        cardio_user.is_active = False
+    else:
+        cardio_user.role = "Registrar"
+    db_session.flush()
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(mod.notification_sender_service, "send_lab_event_notification", sender)
+
+    outcome = await mod.LabNotificationService(db_session).check_critical_values()
+
+    assert outcome["critical_found"] == 1
+    sender.assert_not_awaited()

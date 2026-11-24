@@ -16,7 +16,9 @@ from app.models.visit import Visit
 from app.services.lab_reporting import LabReportingDomainError
 
 
-def _active_visit_doctor_query(visit_id, patient_id):
+def _active_visit_doctor_query(
+    visit_id, patient_id, *, eligible_roles: tuple[str, ...] = ("doctor",),
+):
     return (
         select(User.id)
         .join(Doctor, Doctor.user_id == User.id)
@@ -25,7 +27,7 @@ def _active_visit_doctor_query(visit_id, patient_id):
             Visit.id == visit_id,
             Visit.patient_id == patient_id,
             User.is_active.is_(True),
-            func.lower(func.trim(User.role)) == "doctor",
+            func.lower(func.trim(User.role)).in_(eligible_roles),
             Doctor.active.is_(True),
         )
     )
