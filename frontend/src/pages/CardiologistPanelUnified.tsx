@@ -250,7 +250,9 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     interpretation: ''
   } as Record<string, unknown>);
 
-  const [showForm, setShowForm] = useState({ open: false, type: 'blood' } as Record<string, unknown>);
+  const [showForm, setShowForm] = useState<{ open: boolean; type?: 'blood' | 'ecg' }>({
+    open: false, type: 'blood',
+  });
   const [ecgResults, setEcgResults] = useState<Record<string, unknown>[]>([]);
   const [bloodTests, setBloodTests] = useState<Record<string, unknown>[]>([]);
   const [patientFiles, setPatientFiles] = useState<Record<string, unknown>[]>([]);
@@ -2167,7 +2169,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
           {/* RETRO-3941-01: keyed by the canonical patient+visit identity so
               a selection switch can never reuse the previous patient's
               local form state under the new patient's props. */}
-          {Boolean(showForm.open) && showForm.type === 'ecg' && (
+          {showForm.open && showForm.type === 'ecg' && (
             <ManualEcgForm
               key={`manual-ecg-${((selectedPatient?.patient?.id || selectedPatient?.patient_id) ?? 'none')}-${(selectedPatient?.visit_id ?? 'none')}`}
               patientId={((selectedPatient?.patient?.id || selectedPatient?.patient_id) as string | number | null | undefined) ?? null}
