@@ -3,7 +3,7 @@
  * E2E test: UX Audit Registrar — new interactions added in UX audit cycle.
  *
  * Covers 4 features:
- * 1. Overflow menu "Ещё" in WelcomeView toolbar (R-1.1)
+ * 1. WelcomeView primary actions, archive date and filtered export
  * 2. ARIA radiogroup for gender field in PatientStepV2 (R-2.4)
  * 3. Confirm dialogs for critical actions in context menu (R-1.2)
  * 4. Payment badge in status column (R-4.4)
@@ -175,46 +175,61 @@ test.describe('UX Audit Registrar — new interactions', () => {
   });
 
   // ========================================================================
-  // Test 1: Overflow menu "Ещё" in WelcomeView toolbar (R-1.1)
+  // Test 1: primary registrar actions and archives
   // ========================================================================
-  test('overflow menu "Ещё" contains secondary actions', async ({ page }) => {
-    // WelcomeView (with overflow menu) is at /registrar/welcome, not /registrar.
-    // /registrar shows the worklist view (currentView === null).
+  test('puts new appointment, patient search and queue before overview statistics', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 820 });
     await page.goto('/registrar/welcome');
-    await page.waitForTimeout(2000);
 
-    // "Ещё" button should be visible in toolbar
-    const moreButton = page.locator('summary.registrar-overflow-trigger, [aria-label="Дополнительные фильтры и действия"]').first();
-    await expect(moreButton).toBeVisible({ timeout: 10000 });
-
-    // Click to open dropdown
-    await moreButton.click();
-    await page.waitForTimeout(500);
-
-    // Dropdown popover should be visible with menu items
-    const popover = page.locator('.registrar-overflow-popover').first();
-    await expect(popover).toBeVisible();
-
-    // Verify secondary actions are present in dropdown
-    await expect(page.locator('.registrar-overflow-item').filter({ hasText: 'Активная очередь' })).toBeVisible();
-    await expect(page.locator('.registrar-overflow-item').filter({ hasText: 'Ожидают оплаты' })).toBeVisible();
-    await expect(page.locator('.registrar-overflow-item').filter({ hasText: 'Онлайн-очередь' })).toBeVisible();
-    await expect(page.locator('.registrar-overflow-item').filter({ hasText: 'Обновить данные' })).toBeVisible();
+    const actions = page.locator('.registrar-welcome-actions').first().getByRole('button');
+    await expect(actions).toHaveText(['Новая запись', 'Найти пациента', 'Открыть очередь']);
+    await expect(actions.first()).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Обновить данные' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 
-  test('overflow menu items have role="menuitem"', async ({ page }) => {
-    // WelcomeView (with overflow menu) is at /registrar/welcome.
-    await page.goto('/registrar/welcome');
-    await page.waitForTimeout(2000);
+  test('a collapsed archive keeps its date; table search controls one date-stamped CSV', async ({ page }) => {
+    const archiveDate = '2026-10-30';
+    const other = {
+      ...sampleQueueEntry,
+      data: { ...sampleQueueEntry.data, id: 1002, patient_id: 102, visit_id: 502, patient_fio: 'SYNTHETIC OTHER' },
+    };
+    await page.route('**/api/v1/registrar/queues/today?*', route => {
+      const requested = new URL(route.request().url()).searchParams.get('target_date');
+      const entries = [sampleQueueEntry, other].map(entry => ({
+        ...entry, data: { ...entry.data, appointment_date: archiveDate },
+      }));
+      return route.fulfill(queuesTodayResponse(requested === archiveDate ? entries : []));
+    });
+    await page.goto(`/registrar/welcome?date=${archiveDate}`);
+    await expect(page.locator(`time[datetime="${archiveDate}"]`)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Выбрать дату' })).toHaveAttribute('aria-expanded', 'false');
 
-    const moreButton = page.locator('summary.registrar-overflow-trigger').first();
-    await moreButton.click();
-    await page.waitForTimeout(500);
+    const table = page.locator('.enhanced-table');
+    await expect(table.getByText('SYNTHETIC OTHER', { exact: true })).toBeVisible();
+    await table.getByRole('textbox').fill('Иванов');
+    await expect(table.getByText('SYNTHETIC OTHER', { exact: true })).toHaveCount(0);
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Скачать CSV по фильтрам' }).click(),
+    ]);
+    expect(download.suggestedFilename()).toBe(`appointments_${archiveDate}.csv`);
+    const stream = await download.createReadStream();
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    const csv = Buffer.concat(chunks).toString('utf8');
+    expect(csv).toContain('Иванов Иван Иванович');
+    expect(csv).not.toContain('SYNTHETIC OTHER');
+    expect(csv).not.toContain('+998900000000');
+    expect(csv).not.toContain('Адрес');
 
-    // All items should have role="menuitem" for a11y
-    const menuItems = page.locator('.registrar-overflow-popover [role="menuitem"]');
-    const count = await menuItems.count();
-    expect(count).toBeGreaterThanOrEqual(4);
+    await page.getByRole('button', { name: 'Выбрать дату' }).click();
+    await expect(page.getByLabel('Дата записей')).toHaveValue(archiveDate);
+    await page.getByLabel('Дата записей').fill('2026-10-29');
+    await page.getByRole('button', { name: 'Показать за дату' }).click();
+    await expect(page).toHaveURL(/date=2026-10-29/);
+    await expect(page.getByText('На выбранную дату нет записей')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Скачать CSV по фильтрам' })).toHaveCount(0);
   });
 
   // ========================================================================
