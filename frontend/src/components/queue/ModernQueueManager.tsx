@@ -18,6 +18,7 @@ import {
 import { getLocalDateString } from '../../utils/dateUtils';
 import { useQueueManager } from '../../hooks/useQueueManager';
 import type { QueueActionResponse } from '../../types/domain/queue';
+import { queueService } from '../../services/queue';
 // UX Audit Stage 3 (Queue issue 7.1):
 // WebSocket подписка для мгновенных обновлений очереди вместо 30s polling.
 import { useQueueWebSocket } from '../../hooks/useQueueWebSocket';
@@ -55,7 +56,9 @@ export interface ModernQueueManagerProps {
   selectedDoctor?: string | number;
   /** Called when the queue snapshot needs to be reloaded. */
   onQueueUpdate?: () => void | Promise<void>;
-  /** Called after a doctor explicitly starts a patient returned by call-next. */
+  /** Specialty of the authenticated doctor queue for visit actions. */
+  doctorQueueSpecialty?: string;
+  /** Called when a doctor explicitly starts a server-confirmed called entry. */
   onStartVisit?: (patient: NonNullable<QueueActionResponse['patient']>) => boolean | void | Promise<boolean | void>;
   /** Active UI language. */
   language?: string;
@@ -78,6 +81,18 @@ export interface ModernQueueManagerProps {
 // effect on every render for consumers that omit the prop.
 const EMPTY_DOCTORS: ModernQueueManagerDoctor[] = [];
 
+interface DoctorQueueActionSnapshot {
+  doctor?: { id?: number };
+  date?: string;
+  entries?: Array<{
+    id?: unknown;
+    status?: unknown;
+    can_start_visit?: unknown;
+    patient_name?: unknown;
+    number?: unknown;
+  }>;
+}
+
 const ModernQueueManager = ({
   mode,
   selectedDate = getLocalDateString(),
@@ -87,6 +102,7 @@ const ModernQueueManager = ({
   // "controlled mode" where the prop is authoritative.
   selectedDoctor,
   onQueueUpdate,
+  doctorQueueSpecialty,
   onStartVisit,
   language = 'ru',
   // PR-3856 review follow-up: a stable module-level default — a fresh `[]`
@@ -124,27 +140,20 @@ const ModernQueueManager = ({
   const effectiveDate = selectedDate !== undefined && selectedDate !== '' ? selectedDate : internalDate;
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [calledPatients, setCalledPatients] = useState<NonNullable<QueueActionResponse['patient']>[]>([]);
-  const [startingQueueEntryId, setStartingQueueEntryId] = useState<string | number | null>(null);
-  // QMAN-FE-001 (audit 3886): a failed load of the CURRENT selection must be
-  // visible and recoverable — the previous selection's queue is no longer
-  // presented as current (the hook clears it fail-closed).
+  const actionSpecialty = !isRegistrarMode && onStartVisit ? doctorQueueSpecialty : undefined;
+  const selectionKey = JSON.stringify([effectiveDoctor, effectiveDate, actionSpecialty]);
+  const selectionKeyRef = useRef(selectionKey);
+  selectionKeyRef.current = selectionKey;
+  const loadEpoch = useRef(0);
+  const startingRef = useRef(false);
+  const [starting, setStarting] = useState(false);
+  const [actionSnapshot, setActionSnapshot] = useState<{
+    selectionKey: string;
+    patients: NonNullable<QueueActionResponse['patient']>[];
+  } | null>(null);
+  // Never render a previous doctor's or date's clinical actions while loading.
+  const calledPatients = actionSnapshot?.selectionKey === selectionKey ? actionSnapshot.patients : [];
   const [queueLoadError, setQueueLoadError] = useState<string | null>(null);
-  // QMAN-FE-002 (audit 3886): the live doctor/date selection must be
-  // reachable from a ref so a pending call-next response for a superseded
-  // selection can be dropped before it appends to the new selection's
-  // called list.
-  const selectionIdentityRef = useRef({ specialistId: effectiveDoctor, targetDate: effectiveDate });
-  selectionIdentityRef.current = { specialistId: effectiveDoctor, targetDate: effectiveDate };
-
-  // QMAN-FE-002 (audit 3886): called entries belong to ONE doctor/date
-  // selection. A selection transition invalidates the local called list —
-  // entries called under the previous selection must not expose Start
-  // Visit actions under the new one (backend authorization stays the
-  // SSOT; this only stops presenting stale local state as actionable).
-  useEffect(() => {
-    setCalledPatients([]);
-  }, [effectiveDoctor, effectiveDate]);
 
   // RQ-11 (F-10): классификация срока из серверного expires_at (valid/expired/
   // unspecified). Пересчитывается при открытии диалога, чтобы истекший код
@@ -206,14 +215,41 @@ const ModernQueueManager = ({
       (candidate) => String(candidate.id) === String(effectiveDoctor)
     );
 
+    if (selectionKeyRef.current !== selectionKey) return;
+    const epoch = ++loadEpoch.current;
+    const isCurrent = () => selectionKeyRef.current === selectionKey && loadEpoch.current === epoch;
     try {
-      await loadQueueSnapshot({
-        specialistId: effectiveDoctor,
-        targetDate: effectiveDate,
-        doctor
-      });
+      // Registrar snapshots can substitute Visit IDs and statuses. Only the
+      // authenticated doctor read model owns entry identities and start flags.
+      const [, snapshot] = await Promise.all([
+        loadQueueSnapshot({ specialistId: effectiveDoctor, targetDate: effectiveDate, doctor }),
+        actionSpecialty && effectiveDoctor ? queueService.getTodayQueue(actionSpecialty) : null,
+      ]);
+      if (!isCurrent()) return;
+      if (actionSpecialty && effectiveDoctor) {
+        const queue = snapshot as DoctorQueueActionSnapshot | null;
+        if (!queue || !Array.isArray(queue.entries) || queue.date !== effectiveDate
+          || String(queue.doctor?.id) !== effectiveDoctor) {
+          throw new Error('');
+        }
+        const seen = new Set<number>();
+        const patients = queue.entries.flatMap((entry) => {
+          if (!entry || entry.status !== 'called' || entry.can_start_visit !== true
+            || typeof entry.id !== 'number' || !Number.isSafeInteger(entry.id)
+            || entry.id <= 0 || seen.has(entry.id)) return [];
+          seen.add(entry.id);
+          return [{
+            id: entry.id,
+            name: typeof entry.patient_name === 'string' ? entry.patient_name : undefined,
+            number: typeof entry.number === 'number' ? entry.number : undefined,
+          }];
+        });
+        setActionSnapshot({ selectionKey, patients });
+      }
       setQueueLoadError(null);
     } catch (error) {
+      if (!isCurrent()) return;
+      setActionSnapshot(null);
       // QMAN-FE-001 (audit 3886): a failed load of the CURRENT selection is
       // surfaced as a recoverable error with a retry — the hook has already
       // cleared the previous selection's data, so nothing stale is
@@ -235,7 +271,7 @@ const ModernQueueManager = ({
     // The translation is locale-pure for a fixed key — a stale closure only
     // means the previous locale's text for one error message.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveDoctor, effectiveDate, doctors, loadQueueSnapshot]);
+  }, [effectiveDoctor, effectiveDate, doctors, loadQueueSnapshot, actionSpecialty, selectionKey]);
 
   // Автоматическая загрузка при изменении врача или даты
   useEffect(() => {
@@ -274,14 +310,15 @@ const ModernQueueManager = ({
       const detail = (event as CustomEvent).detail as { action?: string } | undefined;
       logger.log('[ModernQueueManager] Получено событие queueUpdated:', detail);
       // Обновляем очередь при любом событии добавления
-      if (detail?.action === 'refreshAll' || detail?.action === 'entryAdded') {
+      if (detail?.action === 'refreshAll' || detail?.action === 'entryAdded'
+        || (actionSpecialty && (detail?.action === 'nextPatientCalled' || detail?.action === 'patientCalled'))) {
         loadQueue();
       }
     };
 
     window.addEventListener('queueUpdated', handleQueueUpdate);
     return () => window.removeEventListener('queueUpdated', handleQueueUpdate);
-  }, [loadQueue]);
+  }, [actionSpecialty, loadQueue]);
 
   // Генерация QR кода для одного специалиста
   const generateQR = async () => {
@@ -420,35 +457,14 @@ const ModernQueueManager = ({
       return;
     }
 
-    // QMAN-FE-002 (audit 3886): snapshot the selection identity this call
-    // belongs to; a response that resolves after the selection moved to
-    // another doctor/date must not append to the new selection's list.
-    const callIdentity = { specialistId: effectiveDoctor, targetDate: effectiveDate };
-
     try {
       const result = await callNextPatientInQueue({
         specialistId: effectiveDoctor,
         targetDate: effectiveDate
       });
-
-      const selectionMoved =
-        String(selectionIdentityRef.current.specialistId) !== String(callIdentity.specialistId) ||
-        String(selectionIdentityRef.current.targetDate) !== String(callIdentity.targetDate);
+      if (selectionKeyRef.current !== selectionKey) return;
 
       if (result?.success && result?.patient) {
-        if (onStartVisit && result.patient.id !== null && result.patient.id !== undefined) {
-          if (selectionMoved) {
-            // The call succeeded for the PREVIOUS selection — report it but
-            // never expose its Start Visit action under the new selection.
-            logger.warn('[ModernQueueManager] call-next resolved for a superseded selection — dropping the local called entry');
-          } else {
-            setCalledPatients((current) => current.some((patient) => String(patient.id) === String(result.patient?.id))
-              ? current
-              : [...current, result.patient!]);
-          }
-        } else if (onStartVisit) {
-          toast.error(t('dental.dental_panel_start_visit_failed'));
-        }
         toast.success(
           t('misc.mqm_patient_called', { name: result.patient.name, number: result.patient.number })
         );
@@ -458,23 +474,26 @@ const ModernQueueManager = ({
 
       await loadQueue();
     } catch (error) {
-      toast.error(getErrorMessage(error) || t('misc.mqm_call_patient_error'));
+      if (selectionKeyRef.current === selectionKey) {
+        toast.error(getErrorMessage(error) || t('misc.mqm_call_patient_error'));
+      }
     }
   };
 
   const startCalledPatientVisit = async (patient: NonNullable<QueueActionResponse['patient']>) => {
-    if (!onStartVisit || patient.id === null || patient.id === undefined) return;
+    if (!onStartVisit || patient.id == null || startingRef.current
+      || selectionKeyRef.current !== selectionKey) return;
 
-    setStartingQueueEntryId(patient.id);
+    startingRef.current = true;
+    setStarting(true);
     try {
-      const started = await onStartVisit(patient);
-      if (started !== false) {
-        setCalledPatients((current) => current.filter((candidate) => String(candidate.id) !== String(patient.id)));
-      }
+      await onStartVisit(patient);
     } catch {
-      toast.error(t('dental.dental_panel_start_visit_failed'));
+      if (selectionKeyRef.current === selectionKey) toast.error(t('dental.dental_panel_start_visit_failed'));
     } finally {
-      setStartingQueueEntryId(null);
+      if (selectionKeyRef.current === selectionKey) await loadQueue();
+      startingRef.current = false;
+      setStarting(false);
     }
   };
 
@@ -856,7 +875,7 @@ const ModernQueueManager = ({
                       size="default"
                       className="mqm-button-icon"
                       aria-label={t('dental.dental_panel_start_visit_for', { name: patientName, number: ticketNumber })}
-                      disabled={startingQueueEntryId !== null}
+                      disabled={starting}
                       onClick={() => { void startCalledPatientVisit(patient); }}
                     >
                       {t('dental.dental_panel_start_visit')}
