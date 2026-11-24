@@ -15,13 +15,15 @@ from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, text
+from fastapi import HTTPException
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
 from app.api.v1.endpoints.lab_reporting import (
     bulk_save_lab_report_values,
+    finalize_lab_report,
     update_lab_report_instance,
 )
 from app.db.base_class import Base
@@ -33,10 +35,11 @@ from app.models.lab import (
     LabReportTemplateVersion,
     LabReportValue,
 )
-from app.models.lab_release import LabDraftMutationReceipt
+from app.models.lab_release import LabDraftMutationReceipt, LabReportWorkflowEvent
 from app.models.patient import Patient
 from app.models.user import User
 from app.repositories.lab_reporting_api_repository import LabReportingApiRepository
+from app.schemas.lab_release import LabReportVersionCommand
 from app.schemas.lab_reporting import LabReportInstanceUpdate, LabReportValueIn
 from app.services.lab_reporting_service import (
     LabReportingDomainError,
@@ -399,3 +402,80 @@ def test_finalize_blocks_a_late_draft_save(
         assert stored is not None
         assert stored.status == "FINALIZED"
         assert [(value.field_key, value.value_text) for value in stored.values] == [("wbc", "7.1")]
+
+
+def test_stale_finalize_after_second_save_preserves_latest_draft(
+    lab_lock_engine,
+    lab_instance_version,
+):
+    instance_id, original = lab_instance_version
+    with Session(lab_lock_engine) as setup:
+        actors = [
+            User(
+                username=f"synthetic_lab_{suffix}_{uuid4().hex[:8]}",
+                full_name=f"SYNTHETIC Lab Staff {suffix}",
+                hashed_password="synthetic-unused",
+                role="Lab",
+            )
+            for suffix in ("first", "second")
+        ]
+        setup.add_all(actors)
+        setup.flush()
+        first_actor_id, second_actor_id = (actor.id for actor in actors)
+        setup.commit()
+
+    # Hold both PostgreSQL backends throughout the sequence, even after commit.
+    with (
+        lab_lock_engine.connect() as first_connection,
+        lab_lock_engine.connect() as second_connection,
+        Session(first_connection) as first,
+        Session(second_connection) as second,
+    ):
+        assert first.scalar(text("SELECT pg_backend_pid()")) != second.scalar(
+            text("SELECT pg_backend_pid()")
+        )
+        first_save = bulk_save_lab_report_values(
+            instance_id=instance_id,
+            payload=[LabReportValueIn(field_key="wbc", value_text="5.2")],
+            expected_updated_at=original.isoformat(),
+            draft_request_id=uuid4(),
+            db=first,
+            user=first.get(User, first_actor_id),
+        )
+        first_version = first_save.instance.updated_at
+        assert first_version > original
+
+        second_save = bulk_save_lab_report_values(
+            instance_id=instance_id,
+            payload=[LabReportValueIn(field_key="wbc", value_text="9.9")],
+            expected_updated_at=first_version.isoformat(),
+            draft_request_id=uuid4(),
+            db=second,
+            user=second.get(User, second_actor_id),
+        )
+        latest_version = second_save.instance.updated_at
+        assert latest_version > first_version
+
+        with pytest.raises(HTTPException) as stale:
+            finalize_lab_report(
+                instance_id=instance_id,
+                command=LabReportVersionCommand(expected_updated_at=first_version.isoformat()),
+                db=first,
+                user=first.get(User, first_actor_id),
+            )
+        assert stale.value.status_code == 409
+        assert "Бланк был изменён другим пользователем" in stale.value.detail
+
+    with Session(lab_lock_engine) as verification:
+        stored = verification.get(LabReportInstance, instance_id)
+        assert stored is not None
+        assert stored.status == "IN_PROGRESS"
+        assert stored.finalized_at is None
+        assert stored.updated_at == latest_version
+        assert [(value.field_key, value.value_text) for value in stored.values] == [("wbc", "9.9")]
+        events = verification.execute(
+            select(LabReportWorkflowEvent.kind, LabReportWorkflowEvent.actor_user_id)
+            .where(LabReportWorkflowEvent.instance_id == instance_id)
+            .order_by(LabReportWorkflowEvent.id)
+        ).all()
+        assert events == [("entered", first_actor_id), ("entered", second_actor_id)]
