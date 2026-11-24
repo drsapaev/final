@@ -252,12 +252,47 @@ def test_editing_a_reviewed_template_requires_review_of_the_new_version(
     )
     assert response.status_code == 200, response.text
     assert response.json()["reviewed_at"]
+    shortcut = client.put(
+        path,
+        headers=auth_headers,
+        json={
+            "new_text": item.template_text,
+            "shortcut": "синт-qa",
+            "expected_revision": revision,
+        },
+    )
+    assert shortcut.status_code == 200, shortcut.text
+    assert shortcut.json()["shortcut"] == "синт-qa"
+    assert shortcut.json()["template_revision"] == revision
+    assert shortcut.json()["reviewed_at"] == response.json()["reviewed_at"]
+    listing = client.get(
+        "/api/v1/section-templates/recommendations", headers=auth_headers
+    )
+    assert listing.status_code == 200, listing.text
+    assert listing.json()["templates"][0]["shortcut"] == "синт-qa"
+    invalid_shortcut = client.put(
+        path,
+        headers=auth_headers,
+        json={"new_text": item.template_text, "shortcut": "two words"},
+    )
+    assert invalid_shortcut.status_code == 422, invalid_shortcut.text
     updated = client.put(
         path, headers=auth_headers, json={"new_text": "SYNTHETIC changed generic text"}
     )
     assert updated.status_code == 200, updated.text
     assert updated.json()["template_revision"] == revision + 1
     assert updated.json()["reviewed_at"] is None
+    assert updated.json()["shortcut"] == "синт-qa"
+    stale_edit = client.put(
+        path,
+        headers=auth_headers,
+        json={
+            "new_text": "SYNTHETIC generic text",
+            "shortcut": "qa",
+            "expected_revision": revision,
+        },
+    )
+    assert stale_edit.status_code == 409, stale_edit.text
     assert (
         client.post(
             f"{path}/review", headers=auth_headers, json={"expected_revision": revision}

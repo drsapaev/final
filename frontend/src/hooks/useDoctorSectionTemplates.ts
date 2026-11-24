@@ -592,18 +592,22 @@ export function useDoctorSectionTemplates({
      * @param {string} newText
      * @param {'replace'|'save_as_new'} mode
      */
-    const updateTemplate = useCallback(async (templateId: string, newText: string, mode: 'replace' | 'save_as_new' = 'replace') => {
+    const updateTemplate = useCallback(async (
+        templateId: string, newText: string, mode: 'replace' | 'save_as_new' = 'replace', shortcut?: string,
+        expectedRevision?: number,
+    ) => {
         try {
             const response = await apiClient.put(
                 `/section-templates/${section}/${templateId}`,
-                { new_text: newText, mode }
+                { new_text: newText, mode, shortcut, expected_revision: expectedRevision }
             );
             // RETRO-3995-01: refresh the LIVE context, never the captured one.
             await liveFetchRef.current?.(true);
             return { success: true, template: response.data };
         } catch (err: unknown) {
             logger.error('[useDoctorSectionTemplates] Update error:', err);
-            return { success: false, error: (err as Error).message };
+            return { success: false, error: (err as Error).message,
+                status: (err as { response?: { status?: number } })?.response?.status };
         }
     }, [section]);
 

@@ -2065,10 +2065,10 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   const [focusStudy, setFocusStudy] = useState<'ecg' | 'echo'>();
 
   const cardiologyQueuePanel = activeTab === 'queue'
-    ? (<CardiologyQueueTab
+    ? <CardiologyQueueTab
         onStartVisit={handleDoctorQueueStartVisit}
         onOpenVisit={(entry, completed) => { void handleDoctorQueueOpenVisit(entry, completed); }}
-      /> as React.ReactElement)
+      />
     : null;
 
   const tabLoadingFallback = (
@@ -2167,7 +2167,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
           {/* RETRO-3941-01: keyed by the canonical patient+visit identity so
               a selection switch can never reuse the previous patient's
               local form state under the new patient's props. */}
-          {showForm.open && showForm.type === 'ecg' && (
+          {Boolean(showForm.open) && showForm.type === 'ecg' && (
             <ManualEcgForm
               key={`manual-ecg-${((selectedPatient?.patient?.id || selectedPatient?.patient_id) ?? 'none')}-${(selectedPatient?.visit_id ?? 'none')}`}
               patientId={((selectedPatient?.patient?.id || selectedPatient?.patient_id) as string | number | null | undefined) ?? null}

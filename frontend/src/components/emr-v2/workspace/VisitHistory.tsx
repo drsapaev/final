@@ -8,6 +8,7 @@ import { echoMeasurementFacts } from '@/utils/echoMeasurements';
 import { useLabReporting } from '@/hooks/useLabReporting';
 import { Button, Input, Textarea } from '../../ui/macos';
 import { ClinicalSummary } from './ClinicalSummary';
+import { DocumentPreview } from './DocumentPreview';
 
 const copyFields: TransferField[] = ['complaints', 'diagnosis', 'treatment', 'recommendations'];
 const followUpNotes = ['changes', 'actual_treatment', 'prior_plan_follow_through', 'new_results'] as const;
@@ -96,16 +97,21 @@ function MeasurementValues({ values }: { values: ReturnType<typeof measurements>
 }
 
 function HistoryDetails({
-  document, disabled, accept,
-}: { document: HistoryDocument; disabled: boolean; accept: (fields: TransferField[], confirmed: boolean) => void }) {
+  document, patient, disabled, accept,
+}: { document: HistoryDocument; patient: EMRWorkspaceData['patient']; disabled: boolean;
+  accept: (fields: TransferField[], confirmed: boolean) => void }) {
   const { t } = useTranslation();
   const [chosen, setChosen] = useState<TransferField[]>([]);
   const [confirmed, setConfirmed] = useState(false);
+  const [preview, setPreview] = useState(false);
   const followUp = document.data.follow_up as FollowUp | undefined;
   const values = measurements(document);
   return (
     <div className="emr-workspace-history-document">
       <p>{t('emr_workspace.visit_number', { id: document.visit_id })} · {t('emr_workspace.version', { version: document.version })}</p>
+      <Button type="button" variant="outline" size="small" onClick={() => setPreview(true)}>
+        {t('emr_workspace.history_preview')}
+      </Button>
       {copyFields.filter(field => document[field].trim()).map(field => (
         <section key={field} className="emr-workspace-group">
           <h4>{t(`emr_workspace.${field}`)}</h4>
@@ -137,6 +143,10 @@ function HistoryDetails({
           {t('emr_workspace.transfer')}
         </Button>
       </>}
+      {preview && <DocumentPreview visitId={document.visit_id} patientId={patient.id}
+        workspace={{ patient, visit: { id: document.visit_id, date: document.visit_date, status: document.status } }}
+        version={document.version} signedAt={document.signed_at} status={document.status}
+        data={document.data} dirty={false} onClose={() => setPreview(false)} />}
     </div>
   );
 }
@@ -303,7 +313,7 @@ export function WorkspaceSidePanel({
                 {historyStatus === 'loading' && <p role="status">{t('emr_workspace.loading')}</p>}
                 {historyStatus === 'error' && <p role="alert">{t('emr_workspace.history_error')}</p>}
                 {transferLimit && <p role="alert">{t('emr_workspace.transfer_limit')}</p>}
-                {document && <HistoryDetails key={`${document.id}:${document.version}`} document={document}
+                {document && <HistoryDetails key={`${document.id}:${document.version}`} document={document} patient={workspace.patient}
                   disabled={readOnly} accept={transfer} />}
               </div>
             )}

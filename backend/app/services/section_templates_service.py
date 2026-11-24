@@ -35,6 +35,7 @@ MAX_PINNED_PER_SECTION = 3
 STALE_MONTHS = 12
 FREQUENCY_THRESHOLD_HIGH = 5
 FREQUENCY_THRESHOLD_LOW = 2
+TEMPLATE_REVISION_CONFLICT = "Шаблон изменён. Откройте актуальную версию."
 
 
 class DoctorSectionTemplatesService:
@@ -244,6 +245,7 @@ class DoctorSectionTemplatesService:
                 created_at=t.created_at,
                 reviewed_at=t.reviewed_at,
                 template_revision=t.template_revision,
+                shortcut=t.shortcut,
             )
             for t in templates
         ]
@@ -386,6 +388,9 @@ class DoctorSectionTemplatesService:
         template_id: str,
         new_text: str,
         mode: str = "replace",  # "replace" | "save_as_new"
+        *,
+        shortcut: str | None = None,
+        expected_revision: int | None = None,
     ) -> tuple[DoctorSectionTemplate | None, str]:
         """
         Обновить или создать новый шаблон.
@@ -417,6 +422,11 @@ class DoctorSectionTemplatesService:
 
             if not original:
                 return None, "Шаблон не найден"
+            if (
+                expected_revision is not None
+                and original.template_revision != expected_revision
+            ):
+                return None, TEMPLATE_REVISION_CONFLICT
 
             new_hash = DoctorSectionTemplate.compute_hash(new_text)
 
@@ -427,6 +437,8 @@ class DoctorSectionTemplatesService:
                     original.reviewed_at = None
                 original.template_text = new_text.strip()
                 original.template_hash = new_hash
+                if shortcut is not None:
+                    original.shortcut = shortcut or None
                 original.last_used_at = datetime.now(UTC)
                 self.db.commit()
                 self.db.refresh(original)
@@ -460,6 +472,7 @@ class DoctorSectionTemplatesService:
                     icd10_code=original.icd10_code,
                     template_text=new_text.strip(),
                     template_hash=new_hash,
+                    shortcut=shortcut or None,
                     usage_count=1,
                     is_pinned=False,
                     last_used_at=datetime.now(UTC),

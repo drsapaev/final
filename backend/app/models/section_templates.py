@@ -23,7 +23,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
@@ -71,6 +71,7 @@ class DoctorSectionTemplate(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     template_revision = Column(Integer, default=1, nullable=False)
+    shortcut = Column(String(16), nullable=True)
 
     # Relationship
     doctor = relationship("User", backref="section_templates")
@@ -116,6 +117,21 @@ class DoctorSectionTemplateUpdate(BaseModel):
     """Schema for updating template"""
     new_text: str
     mode: Literal["replace", "save_as_new"] = "replace"
+    shortcut: str | None = Field(
+        default=None, max_length=16, description="Use an empty string to clear the shortcut."
+    )
+    expected_revision: int | None = Field(default=None, gt=0)
+
+    @field_validator("shortcut")
+    @classmethod
+    def validate_shortcut(cls, value: str | None) -> str | None:
+        if value is not None and any(
+            not (char.isalnum() or char in "_-") for char in value
+        ):
+            raise ValueError(
+                "Use letters, numbers, hyphens or underscores in the shortcut"
+            )
+        return value
 
 
 class DoctorSectionTemplateResponse(BaseModel):
@@ -132,6 +148,7 @@ class DoctorSectionTemplateResponse(BaseModel):
     created_at: datetime | None = None
     reviewed_at: datetime | None = None
     template_revision: int = 1
+    shortcut: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -24,7 +24,10 @@ from app.models.section_templates import (
     SectionType,
 )
 from app.models.user import User
-from app.services.section_templates_service import DoctorSectionTemplatesService
+from app.services.section_templates_service import (
+    TEMPLATE_REVISION_CONFLICT,
+    DoctorSectionTemplatesService,
+)
 
 router = APIRouter(
     prefix="/section-templates",
@@ -159,6 +162,7 @@ async def unpin_template(
     "/{section_type}/{template_id}",
     response_model=DoctorSectionTemplateResponse,
     summary="Update template",
+    responses={409: {"description": "The selected template revision has changed"}},
 )
 async def update_template(
     section_type: str,
@@ -180,23 +184,17 @@ async def update_template(
         template_id=template_id,
         new_text=body.new_text,
         mode=body.mode,
+        shortcut=body.shortcut,
+        expected_revision=body.expected_revision,
     )
 
     if not template:
-        raise HTTPException(status_code=400, detail=message)
+        raise HTTPException(
+            status_code=409 if message == TEMPLATE_REVISION_CONFLICT else 400,
+            detail=message,
+        )
 
-    return DoctorSectionTemplateResponse(
-        id=template.id,
-        section_type=template.section_type,
-        icd10_code=template.icd10_code,
-        template_text=template.template_text,
-        usage_count=template.usage_count,
-        is_pinned=template.is_pinned,
-        last_used_at=template.last_used_at,
-        created_at=template.created_at,
-        reviewed_at=template.reviewed_at,
-        template_revision=template.template_revision,
-    )
+    return DoctorSectionTemplateResponse.model_validate(template)
 
 
 @router.delete(

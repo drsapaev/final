@@ -550,7 +550,7 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
         )
 
     # The fixture must reach the current repository head.
-    assert revision == "0106_emr_template_review"
+    assert revision == "0107_emr_template_shortcut"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",

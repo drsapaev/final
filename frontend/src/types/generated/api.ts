@@ -29366,6 +29366,8 @@ export type components = {
              * @default 1
              */
             template_revision: number;
+            /** Shortcut */
+            shortcut?: string | null;
         };
         /**
          * DoctorSectionTemplateUpdate
@@ -29380,6 +29382,13 @@ export type components = {
              * @enum {string}
              */
             mode: "replace" | "save_as_new";
+            /**
+             * Shortcut
+             * @description Use an empty string to clear the shortcut.
+             */
+            shortcut?: string | null;
+            /** Expected Revision */
+            expected_revision?: number | null;
         };
         /**
          * DoctorSectionTemplatesListResponse
@@ -55068,6 +55077,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DoctorSectionTemplateResponse"];
                 };
+            };
+            /** @description The selected template revision has changed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

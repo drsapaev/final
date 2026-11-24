@@ -330,7 +330,7 @@ def test_0088_backfill_skips_rejected_and_amended_0087_allows_retry() -> None:
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar_one()
                 # The fixture must reach the current repository head.
-                assert version == "0106_emr_template_review", version
+                assert version == "0107_emr_template_shortcut", version
 
                 def _claims(payment_id: int) -> list[tuple]:
                     return conn.execute(

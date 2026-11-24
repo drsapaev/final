@@ -24,7 +24,7 @@ export function DocumentPreview({
   visitId, patientId, patientName, workspace, version, data, signedAt, signedBy, status, dirty, onClose,
 }: {
   visitId: string | number; patientId?: string | number | null; patientName?: string;
-  workspace?: EMRWorkspaceData; version?: number | null; data: Record<string, unknown>;
+  workspace?: Pick<EMRWorkspaceData, 'patient' | 'visit'>; version?: number | null; data: Record<string, unknown>;
   signedAt?: string | null; signedBy?: number | null; status?: string; dirty: boolean; onClose: () => void;
 }) {
   const { t, language } = useTranslation();
