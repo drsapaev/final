@@ -219,6 +219,7 @@ def post_workspace_prescription(
             authorize_visit=lambda locked_id: ensure_emr_visit_access(
                 db, locked_id, current_user
             ),
+            reviewed_text=payload.reviewed_text,
         )
         db.commit()
     except WorkspaceError as error:

@@ -41,7 +41,7 @@ const MEDICAL_PII_KEYS = [
   'insurance_number', 'card_number', 'cvv', 'payment_method',
   // Medical
   'diagnosis', 'diagnoses', 'icd10', 'icd10_codes', 'complaints', 'complaint',
-  'examination', 'prescription', 'medications', 'allergies',
+  'examination', 'prescription', 'instructions', 'reviewed_text', 'medications', 'allergies',
   'clinical_entries', 'clinical_details', 'legacy_allergies', 'legacy_conditions',
   'follow_up', 'transferred_fields', 'next_action', 'laboratory',
   'medical_history', 'symptoms', 'treatment', 'lab_results', 'blood_type',

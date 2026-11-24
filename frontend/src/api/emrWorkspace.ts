@@ -157,6 +157,15 @@ export interface WorkspacePrescription {
   visit_id: number;
   emr_version: number | null;
   is_draft: boolean;
+  instructions?: string | null;
+  doctor_notes?: string | null;
+  review_token?: string | null;
+}
+
+export interface ReviewedPrescriptionText {
+  expected_token: string;
+  instructions: string | null;
+  doctor_notes: string | null;
 }
 
 export async function getWorkspacePrescription(visitId: number, patientId: number, signal: AbortSignal) {
@@ -166,9 +175,12 @@ export async function getWorkspacePrescription(visitId: number, patientId: numbe
   return data;
 }
 
-export async function issueWorkspacePrescription(visitId: number, patientId: number, rowVersion: number) {
+export async function issueWorkspacePrescription(
+  visitId: number, patientId: number, rowVersion: number, reviewedText?: ReviewedPrescriptionText,
+) {
   const { data } = await apiClient.post<WorkspacePrescription>(`${emrWorkspacePath(visitId)}/prescription`, {
     patient_id: patientId, expected_row_version: rowVersion,
+    reviewed_text: reviewedText,
   }, { silent: true });
   return data;
 }

@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import { EMRContainerV2 } from '../EMRContainerV2';
@@ -90,6 +90,10 @@ const legacyMedications = [
   { drug: 'SYNTHETIC medication 1', dosage: '1 test unit', freq: 'test interval', duration: 'test course', reference: 'SYNTHETIC origin' },
   { drug: 'SYNTHETIC medication 2', dosage: '2 test units', freq: 'test interval', duration: 'test course' },
 ];
+const legacyPrescription = {
+  id: 5, visit_id: 11, emr_version: null, is_draft: false, review_token: 'original-review-token',
+  instructions: 'SYNTHETIC existing instructions', doctor_notes: 'SYNTHETIC existing notes',
+};
 type EditorOptions = Pick<ComponentProps<typeof EMRContainerV2>, 'isReadOnly' | 'completionBusy'>;
 async function renderEditor(options: EditorOptions = {}) {
   await act(async () => {
@@ -123,7 +127,73 @@ describe('Legacy medications in the EMR', () => {
     await act(async () => { fireEvent.click(issue); });
     expect(mocks.issuePrescription).toHaveBeenCalledOnce();
     expect(mocks.issuePrescription).toHaveBeenCalledWith(11, 22, 19);
-    expect(screen.getByText('Оформлен рецепт №5, версия ЭМК 7')).toBeVisible();
+    expect(screen.getByText('Рецепт №5 оформлен. Препараты из ЭМК, версия 7.')).toBeVisible();
+  });
+
+  it('requires an explicit review of the old prescription text before issuing', async () => {
+    mocks.getPrescription.mockResolvedValue(legacyPrescription);
+    await renderEditor();
+
+    const issue = screen.getByRole('button', { name: /Оформить рецепт/ });
+    fireEvent.click(issue);
+    let dialog = within(screen.getByRole('dialog', { name: 'Проверка инструкций рецепта' }));
+    expect(dialog.getByRole('textbox', { name: 'Инструкции к рецепту' })).toHaveValue(legacyPrescription.instructions);
+    expect(dialog.getByRole('textbox', { name: 'Заметки врача' })).toHaveValue(legacyPrescription.doctor_notes);
+    fireEvent.click(dialog.getByRole('button', { name: 'Отмена' }));
+    expect(mocks.issuePrescription).not.toHaveBeenCalled();
+
+    fireEvent.click(issue);
+    dialog = within(screen.getByRole('dialog', { name: 'Проверка инструкций рецепта' }));
+    fireEvent.change(dialog.getByRole('textbox', { name: 'Инструкции к рецепту' }), {
+      target: { value: 'SYNTHETIC reviewed instructions' },
+    });
+    fireEvent.change(dialog.getByRole('textbox', { name: 'Заметки врача' }), { target: { value: '' } });
+    expect(mocks.issuePrescription).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.click(dialog.getByRole('button', { name: 'Подтвердить и оформить' })); });
+
+    expect(mocks.issuePrescription).toHaveBeenCalledExactlyOnceWith(11, 22, 19, {
+      expected_token: legacyPrescription.review_token,
+      instructions: 'SYNTHETIC reviewed instructions',
+      doctor_notes: null,
+    });
+    expect(screen.queryByRole('dialog', { name: 'Проверка инструкций рецепта' })).toBeNull();
+  });
+
+  it('blocks issuance until the current prescription can be checked', async () => {
+    mocks.getPrescription.mockResolvedValueOnce({ ...legacyPrescription, review_token: undefined })
+      .mockResolvedValueOnce({ ...legacyPrescription, review_token: null, instructions: null, doctor_notes: null });
+    await renderEditor();
+
+    const issue = screen.getByRole('button', { name: /Оформить рецепт/ });
+    expect(issue).toBeDisabled();
+    fireEvent.click(issue);
+    expect(mocks.issuePrescription).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Повторить' })); });
+    expect(issue).toBeEnabled();
+  });
+
+  it('reloads a changed prescription and requires a fresh explicit review', async () => {
+    const changed = { ...legacyPrescription, instructions: 'SYNTHETIC concurrent update', review_token: 'new-review-token' };
+    mocks.getPrescription.mockResolvedValueOnce(legacyPrescription).mockResolvedValueOnce(changed);
+    mocks.issuePrescription.mockRejectedValueOnce({
+      response: { status: 409, data: { detail: { code: 'PRESCRIPTION_TEXT_REVIEW_REQUIRED' } } },
+    });
+    await renderEditor();
+
+    const issue = screen.getByRole('button', { name: /Оформить рецепт/ });
+    fireEvent.click(issue);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Подтвердить и оформить' })); });
+    expect(screen.getByRole('alert')).toHaveTextContent('Инструкции рецепта изменились');
+    expect(mocks.getPrescription).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('dialog', { name: 'Проверка инструкций рецепта' })).toBeNull();
+
+    fireEvent.click(issue);
+    expect(screen.getByRole('textbox', { name: 'Инструкции к рецепту' })).toHaveValue(changed.instructions);
+    expect(mocks.issuePrescription).toHaveBeenCalledOnce();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Подтвердить и оформить' })); });
+    expect(mocks.issuePrescription).toHaveBeenLastCalledWith(11, 22, 19, {
+      expected_token: changed.review_token, instructions: changed.instructions, doctor_notes: changed.doctor_notes,
+    });
   });
 
   it('preserves medication entries when editing the legacy list or its treatment note', async () => {
@@ -164,7 +234,7 @@ describe('Legacy medications in the EMR', () => {
     expect(issue).toBeEnabled();
     await act(async () => { fireEvent.click(issue); });
     expect(mocks.issuePrescription).toHaveBeenCalledExactlyOnceWith(11, 22, 19);
-    expect(screen.getByText('Оформлен рецепт №5, версия ЭМК 7')).toBeVisible();
+    expect(screen.getByText('Рецепт №5 оформлен. Препараты из ЭМК, версия 7.')).toBeVisible();
     expect({ emr: mocks.emr, data: mocks.data }).toEqual(before);
     expect(mocks.setField).not.toHaveBeenCalled();
     expect(mocks.saveEMR).not.toHaveBeenCalled();
