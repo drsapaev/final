@@ -664,6 +664,7 @@ test.describe('Lab full-path (final gate, mocked)', () => {
       ...record,
       critical_findings: [{
         section_key: record.sections[0].key,
+        section_title: 'SYNTHETIC-SECTION',
         field_key: fields[0].field_key,
         label: fields[0].label,
         value_display: fields[0].value_text,
@@ -690,6 +691,9 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     };
 
     await expect(critical).toBeVisible();
+    await expect(critical).toContainText(
+      /Критические показатели\s*\.\s*SYNTHETIC-RESULT-1\s*\.\s*SYNTHETIC-SECTION\s*\.\s*24\.0 SYNTHETIC-UNIT\s*\.\s*> 12\.0\s*\./,
+    );
     await page.setViewportSize({ width: 375, height: 600 });
     await expect(appFrame).toHaveCSS('overflow', 'auto');
 

@@ -77,6 +77,8 @@ const TELEGRAM_FEEDBACK_KEYS = {
   unconfirmed: 'errors.notify_failed',
 };
 
+const criticalFindingSeparator = <span className="sr-only">. </span>;
+
 interface DraftSaveScope {
   instanceId: string | number;
   patientId: unknown;
@@ -1872,7 +1874,13 @@ export default function LabReportWorkbench({
                 <Alert severity="error" role="alert">  {/* PR-59: role=alert for screen readers */}
                   <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                     <strong>{t('workbench.critical_findings')}</strong>
-                    {isDirty && <span>{t('workbench.critical_saved_snapshot')}</span>}
+                    {criticalFindingSeparator}
+                    {isDirty && (
+                      <>
+                        <span>{t('workbench.critical_saved_snapshot')}</span>
+                        {criticalFindingSeparator}
+                      </>
+                    )}
                     {(activeInstance.critical_findings as Array<Record<string, unknown>>).map((finding: Record<string, unknown>) => (
                       <div
                         key={`${String(finding.section_key ?? '')}-${String(finding.field_key ?? '')}`}
@@ -1880,20 +1888,27 @@ export default function LabReportWorkbench({
                       >
                         <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)' }}>
                           <strong>{String(finding.label ?? '')}</strong>
+                          {criticalFindingSeparator}
                           <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>
                             {String(finding.section_title ?? finding.section_key ?? '')}
                           </span>
+                          {criticalFindingSeparator}
                         </div>
                         <div>
-                          {String(finding.value_display ?? '')}
-                          {finding.unit ? ` ${String(finding.unit)}` : ''}
+                          <span>
+                            {String(finding.value_display ?? '')}
+                            {finding.unit ? ` ${String(finding.unit)}` : ''}
+                          </span>
+                          {criticalFindingSeparator}
                         </div>
                         <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>
-                          {String(finding.threshold_display ?? finding.reference_text ?? '—')}
+                          <span>{String(finding.threshold_display ?? finding.reference_text ?? '—')}</span>
+                          {criticalFindingSeparator}
                         </div>
-                          <Badge variant={flagVariant(String(finding.resolved_flag ?? ''), (finding.resolved_flag_severity as number | null) ?? null)}>
-                            {t(getEvaluationLabelKey(finding))}
-                          </Badge>
+                        <Badge variant={flagVariant(String(finding.resolved_flag ?? ''), (finding.resolved_flag_severity as number | null) ?? null)}>
+                          {t(getEvaluationLabelKey(finding))}
+                        </Badge>
+                        {criticalFindingSeparator}
                       </div>
                     ))}
                   </div>
