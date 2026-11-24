@@ -4068,7 +4068,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PublicSiteServiceOut"
+                  "$ref": "#/components/schemas/PublicSiteServiceDetailOut"
                 }
               }
             }
@@ -4447,6 +4447,89 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/public-site/analytics/events": {
+      "post": {
+        "tags": [
+          "public-site-analytics"
+        ],
+        "summary": "Record Public Site Analytics Event",
+        "operationId": "record_public_site_analytics_event",
+        "requestBody": {
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string",
+                "enum": [
+                  "site_view",
+                  "phone_click",
+                  "booking_form_open"
+                ],
+                "maxLength": 17
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Invalid event or unexpected request data."
+          },
+          "403": {
+            "description": "Missing or disallowed browser origin."
+          },
+          "413": {
+            "description": "Event token exceeds the fixed byte limit."
+          },
+          "415": {
+            "description": "Expected an unencoded text/plain event token."
+          },
+          "429": {
+            "description": "Too many requests."
+          },
+          "503": {
+            "description": "Collection is disabled or temporarily unavailable."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/public-site/analytics": {
+      "get": {
+        "tags": [
+          "public-site-analytics"
+        ],
+        "summary": "Admin Get Public Site Analytics",
+        "operationId": "admin_get_public_site_analytics",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSiteAnalyticsReportOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required."
+          },
+          "403": {
+            "description": "Administrator role required."
+          },
+          "503": {
+            "description": "Report temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/admin/public-booking-requests": {
@@ -11214,7 +11297,7 @@
           "qr-queue"
         ],
         "summary": "Restore Entry To Next",
-        "description": "Восстанавливает пациента no_show как следующего в очереди\nУстанавливает priority=1 для приоритетной обработки",
+        "description": "Возвращает пациента в очередь с действующим приоритетом восстановления\nУстанавливает priority=1 для приоритетной обработки",
         "operationId": "restore_entry_to_next_api_v1_queue_entry__entry_id__restore_next_post",
         "security": [
           {
@@ -77518,7 +77601,6 @@
           },
           "total_original_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Original Amount"
           },
           "doctor_name": {
@@ -83221,7 +83303,7 @@
           },
           "quantity": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 0.0,
             "title": "Quantity",
             "default": 1
           },
@@ -83231,8 +83313,7 @@
                 "type": "number"
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -83281,7 +83362,6 @@
           },
           "unit_price": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Unit Price"
           },
           "quantity": {
@@ -83294,7 +83374,6 @@
           },
           "final_price": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Final Price"
           }
         },
@@ -83379,7 +83458,6 @@
           },
           "total_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount"
           },
           "approval_status": {
@@ -83481,7 +83559,6 @@
           },
           "total_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount"
           },
           "queue_numbers": {
@@ -83535,43 +83612,36 @@
         "properties": {
           "total_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount",
             "description": "Валовые поступления: исходные суммы paid/completed, БЕЗ вычета возвратов"
           },
           "cash_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Cash Amount",
             "description": "Валовые поступления наличными (gross, без вычета возвратов)"
           },
           "card_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Card Amount",
             "description": "Валовые поступления картой (gross, без вычета возвратов)"
           },
           "refunded_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Refunded Amount",
             "description": "Сумма возвратов по платежам, входящим в gross (частичные возвраты при статусе paid/completed)"
           },
           "net_total_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Net Total Amount",
             "description": "Поступления за вычетом возвратов: total_amount − refunded_amount"
           },
           "net_cash_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Net Cash Amount",
             "description": "Наличные за вычетом возвратов"
           },
           "net_card_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Net Card Amount",
             "description": "Карта за вычетом возвратов"
           },
@@ -83581,7 +83651,6 @@
           },
           "pending_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Pending Amount",
             "description": "Ожидаемая задолженность; с CSH-FE-028 (#3814) считается за вычетом возвратов"
           },
@@ -84644,8 +84713,7 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "Amount",
@@ -84676,8 +84744,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -84693,8 +84760,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -84770,8 +84836,7 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "Amount",
@@ -84802,8 +84867,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -84819,8 +84883,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -85236,8 +85299,7 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "New Price"
@@ -85290,14 +85352,12 @@
           },
           "original_price": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Original Price"
           },
           "visit_price_before": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -85307,7 +85367,6 @@
           },
           "new_price": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "New Price"
           },
           "reason": {
@@ -85679,8 +85738,7 @@
                 "type": "number"
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -85939,8 +85997,7 @@
                 "type": "number"
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -88294,8 +88351,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -89587,8 +89643,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -91846,7 +91901,6 @@
           },
           "total_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount",
             "default": "0"
           },
@@ -91912,7 +91966,7 @@
           },
           "quantity": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 0.0,
             "title": "Quantity",
             "default": 1
           },
@@ -92289,8 +92343,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -92367,8 +92420,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -92450,8 +92502,7 @@
           "cost": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -92602,8 +92653,7 @@
           "cost": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -92836,8 +92886,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -95271,17 +95320,14 @@
           },
           "amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
           },
           "remaining_before": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining Before"
           },
           "remaining_after": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining After"
           }
         },
@@ -95304,7 +95350,6 @@
           },
           "amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
           },
           "method": {
@@ -95373,7 +95418,6 @@
           },
           "amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
           }
         },
@@ -96777,8 +96821,7 @@
           "low": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -96789,8 +96832,7 @@
           "high": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -96801,8 +96843,7 @@
           "warning_low": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -96813,8 +96854,7 @@
           "warning_high": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -96825,8 +96865,7 @@
           "critical_low": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -96837,8 +96876,7 @@
           "critical_high": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -96958,8 +96996,7 @@
           "value_numeric": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -98167,8 +98204,7 @@
           "value_numeric": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -98813,8 +98849,7 @@
                 "type": "number"
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -99511,8 +99546,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -99647,8 +99681,7 @@
           "cost": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -99843,8 +99876,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -100400,8 +100432,7 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -106941,7 +106972,6 @@
           },
           "amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
           },
           "method": {
@@ -108868,19 +108898,16 @@
           },
           "original_price": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Original Price"
           },
           "new_price": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "New Price"
           },
           "visit_price_before": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -108891,8 +108918,7 @@
           "visit_price_difference": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -108979,8 +109005,7 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "New Price"
@@ -109028,14 +109053,12 @@
           },
           "original_price": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Original Price"
           },
           "visit_price_before": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -109045,7 +109068,6 @@
           },
           "new_price": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "New Price"
           },
           "reason": {
@@ -111337,6 +111359,39 @@
             "type": "string",
             "title": "Doctor Slug"
           },
+          "service_name_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Name Ru"
+          },
+          "service_name_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Name Uz"
+          },
+          "doctor_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Display Name"
+          },
           "appointment_date": {
             "type": "string",
             "format": "date",
@@ -112025,6 +112080,67 @@
         "title": "PublicDirectionStartResponse",
         "description": "Short-lived session opened through the permanent public address.\n\nThe ``session_token`` drives the EXISTING QueueJoin flow\n(``/queue/join/:token`` semantics preserved); the internal\ndirection-scoped QR token is deliberately NOT returned."
       },
+      "PublicSiteAnalyticsDayOut": {
+        "properties": {
+          "clinic_day": {
+            "type": "string",
+            "format": "date",
+            "title": "Clinic Day"
+          },
+          "site_views": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Site Views"
+          },
+          "phone_clicks": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Phone Clicks"
+          },
+          "booking_form_opens": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Booking Form Opens"
+          },
+          "booking_requests_submitted": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Booking Requests Submitted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clinic_day",
+          "site_views",
+          "phone_clicks",
+          "booking_form_opens",
+          "booking_requests_submitted"
+        ],
+        "title": "PublicSiteAnalyticsDayOut"
+      },
+      "PublicSiteAnalyticsReportOut": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Whether new browser events are accepted."
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/PublicSiteAnalyticsDayOut"
+            },
+            "type": "array",
+            "title": "Days",
+            "description": "Daily totals for the latest 30 Tashkent calendar days, oldest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "days"
+        ],
+        "title": "PublicSiteAnalyticsReportOut"
+      },
       "PublicSiteCategoryOut": {
         "properties": {
           "name": {
@@ -112339,6 +112455,93 @@
         ],
         "title": "PublicSiteNotFoundOut"
       },
+      "PublicSiteRelatedDoctorOut": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "maxLength": 160,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slug",
+          "name"
+        ],
+        "title": "PublicSiteRelatedDoctorOut"
+      },
+      "PublicSiteServiceDetailOut": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price",
+            "description": "Null means the localized site should display 'price on request'."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "related_doctors": {
+            "items": {
+              "$ref": "#/components/schemas/PublicSiteRelatedDoctorOut"
+            },
+            "type": "array",
+            "title": "Related Doctors"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "description",
+          "price"
+        ],
+        "title": "PublicSiteServiceDetailOut"
+      },
       "PublicSiteServiceOut": {
         "properties": {
           "slug": {
@@ -112356,8 +112559,7 @@
           "price": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -115741,8 +115943,7 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "Amount",
@@ -115909,17 +116110,14 @@
           },
           "original_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Original Amount"
           },
           "refunded_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Refunded Amount"
           },
           "remaining_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining Amount"
           },
           "reason": {
@@ -116388,17 +116586,14 @@
         "properties": {
           "total_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount"
           },
           "paid_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Paid Amount"
           },
           "remaining_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining Amount"
           },
           "payment_status": {
@@ -116624,8 +116819,7 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -116899,17 +117093,14 @@
           },
           "total_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount"
           },
           "paid_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Paid Amount"
           },
           "remaining_amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining Amount"
           },
           "payment_status": {
@@ -119448,8 +119639,7 @@
                 "type": "number"
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -119600,8 +119790,7 @@
                 "type": "number"
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -120338,8 +120527,7 @@
                 "type": "number"
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -121082,8 +121270,7 @@
                 "type": "number"
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -129804,7 +129991,6 @@
           },
           "amount": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
           },
           "method": {
@@ -130933,8 +131119,7 @@
           "price_default": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"

@@ -19,6 +19,7 @@ from app.crud.queue_owner_policy import (
     single_active_service_doctor,
 )
 from app.crud.queue_resource_routing import (
+    effective_queue_cabinet,
     find_active_tag_queue,
     lock_queue_tag_claim_scope,
     resolve_tag_resource,
@@ -52,12 +53,15 @@ class MorningAssignmentCreateBranchHandoff:
     create_entry_kwargs: dict[str, Any]
 
     def build_assigned_payload(self, *, number: int) -> dict[str, Any]:
-        return {
+        assignment = {
             "queue_tag": self.queue_tag,
             "queue_id": self.daily_queue.id,
             "number": number,
             "status": "assigned",
         }
+        if cabinet := effective_queue_cabinet(self.daily_queue):
+            assignment["queue_cabinet"] = cabinet
+        return assignment
 
 
 @dataclass(frozen=True)
@@ -1033,12 +1037,14 @@ class MorningAssignmentService:
                 "Active queue entry already exists for queue %s",
                 queue_tag,
             )
+            cabinet = effective_queue_cabinet(daily_queue)
             return MorningAssignmentPreparedQueueAssignment(
                 assignment={
                     "queue_tag": queue_tag,
                     "queue_id": daily_queue.id,
                     "number": existing_entry.number,
                     "status": "existing",
+                    **({"queue_cabinet": cabinet} if cabinet else {}),
                 },
                 reused_entry_binding=reused_entry_binding,
             )

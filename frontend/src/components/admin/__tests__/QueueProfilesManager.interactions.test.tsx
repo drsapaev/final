@@ -202,9 +202,9 @@ describe('QueueProfilesManager interactions', () => {
     expect(qrCheckbox).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByText('Новые профили создаются без публикации на QR. После создания откройте «Редактировать», включите показ на QR и сохраните профиль.')).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText('Уникальный ключ вкладки очереди'), 'synthetic_new');
-    await user.type(screen.getByLabelText('Название вкладки очереди на английском'), 'Synthetic new direction');
-    await user.type(screen.getByLabelText('Название вкладки очереди на русском'), 'Синтетическое новое направление');
+    fireEvent.change(screen.getByLabelText('Уникальный ключ вкладки очереди'), { target: { value: 'synthetic_new' } });
+    fireEvent.change(screen.getByLabelText('Название вкладки очереди на английском'), { target: { value: 'Synthetic new direction' } });
+    fireEvent.change(screen.getByLabelText('Название вкладки очереди на русском'), { target: { value: 'Синтетическое новое направление' } });
     await user.click(within(dialog).getByRole('button', { name: 'Создать вкладку очереди' }));
 
     await waitFor(() => {

@@ -15,7 +15,7 @@
  * a superseded request (e.g. a previous calendar date) must not overwrite
  * a newer sample (S-19).
  */
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../api/client', () => ({ api: { get: vi.fn() } }));
@@ -28,6 +28,7 @@ vi.mock('../../../utils/logger', () => ({
 }));
 
 import { api } from '../../../api/client';
+import { getLocalDateString } from '../../../utils/dateUtils';
 import {
   initialWorklistDataState,
   useRegistrarWorklistData,
@@ -806,6 +807,30 @@ describe('useRegistrarWorklistData — PR #3851 review (P2): loadedDate binds to
     const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
     return { promise, resolve, reject };
   };
+
+  it('loads a direct archive URL once with calendar closed, ignores non-date filters, and reloads when the URL returns to today', async () => {
+    vi.mocked(api.get).mockClear();
+    vi.mocked(api.get).mockResolvedValue({ data: { queues: [] } });
+    const { result, rerender } = renderHook(
+      ({ query, showCalendar }) => useRegistrarWorklistData({
+        ...stableDeps, showCalendar, historyDate: HIST,
+        searchParams: new URLSearchParams(query),
+      }),
+      { initialProps: { query: `date=${HIST}`, showCalendar: false } },
+    );
+    await waitFor(() => expect(result.current.loadedDate).toBe(HIST));
+    expect(result.current.selectedDate).toBe(HIST);
+    expect(api.get).toHaveBeenCalledExactlyOnceWith('/registrar/queues/today', { params: { target_date: HIST } });
+
+    rerender({ query: `date=${HIST}&q=synthetic`, showCalendar: true });
+    expect(api.get).toHaveBeenCalledTimes(1);
+
+    rerender({ query: 'q=synthetic', showCalendar: false });
+    const clinicToday = getLocalDateString();
+    await waitFor(() => expect(result.current.loadedDate).toBe(clinicToday));
+    expect(result.current.selectedDate).toBe(clinicToday);
+    expect(api.get).toHaveBeenCalledTimes(2);
+  });
 
   it('history → today with a DELAYED today-load: loadedDate stays the history day until the response lands', async () => {
     const todayRequest = deferred<{ data: { queues: unknown[] } }>();
