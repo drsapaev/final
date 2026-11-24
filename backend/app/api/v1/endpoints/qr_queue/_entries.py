@@ -294,8 +294,35 @@ def mark_entry_incomplete(
             detail=f"Incomplete можно установить только для called/in_service/diagnostics, текущий: {entry.status}"
         )
 
-    entry.status = "incomplete"
-    entry.incomplete_reason = request.reason
+    # The legacy command closes only the queue row. With a resumable
+    # clinical visit, that would leave the doctor's visit active but stranded.
+    # Pause/resume locks the same Visit before changing the queue row.
+    if entry.status == "diagnostics" and lock_active_doctor_visit(db, entry, entry.queue) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="У пациента активный приём. Возобновите и завершите его в карточке приёма.",
+        )
+
+    changed = (
+        db.query(OnlineQueueEntry)
+        .filter(
+            OnlineQueueEntry.id == entry_id,
+            OnlineQueueEntry.queue_id == entry.queue_id,
+            OnlineQueueEntry.visit_id == entry.visit_id,
+            OnlineQueueEntry.patient_id == entry.patient_id,
+            OnlineQueueEntry.status == entry.status,
+            OnlineQueueEntry.diagnostics_started_at == entry.diagnostics_started_at,
+        )
+        .update(
+            {
+                OnlineQueueEntry.status: "incomplete",
+                OnlineQueueEntry.incomplete_reason: request.reason,
+            },
+            synchronize_session=False,
+        )
+    )
+    if changed != 1:
+        raise HTTPException(status_code=409, detail="Состояние очереди уже изменилось")
     db.commit()
 
     logger.info(

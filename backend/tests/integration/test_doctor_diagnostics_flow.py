@@ -175,3 +175,63 @@ def test_same_specialty_doctor_cannot_resume_another_doctors_visit(
     assert response.status_code == 403
     db_session.refresh(entry)
     assert entry.status == "diagnostics"
+
+
+def test_incomplete_cannot_strand_a_paused_doctor_visit(
+    client, db_session, test_doctor_user, test_patient,
+):
+    db = db_session
+    entry, visit, headers = _fixture(client, db, test_doctor_user, test_patient)
+    target_visit_id = visit.id
+    assert client.post(
+        f"/api/v1/queue/entry/{entry.id}/diagnostics", headers=headers,
+    ).status_code == 200
+    db.refresh(entry)
+    diagnostic_start = entry.diagnostics_started_at
+
+    response = client.post(
+        f"/api/v1/queue/entry/{entry.id}/incomplete",
+        json={"reason": "SYNTHETIC UNFINISHED"},
+        headers=headers,
+    )
+    assert response.status_code == 409
+    db.refresh(entry)
+    db.refresh(visit)
+    assert entry.status == "diagnostics"
+    assert entry.diagnostics_started_at == diagnostic_start
+    assert entry.incomplete_reason is None
+    assert visit.status == "in_progress"
+
+    resume = client.post(
+        f"/api/v1/doctor/queue/{entry.id}/start-visit", headers=headers,
+    )
+    assert resume.status_code == 200
+    assert resume.json()["visit_id"] == target_visit_id
+
+
+def test_only_exact_active_diagnostics_omits_queue_only_incomplete_action(
+    client, db_session, test_doctor_user, test_patient,
+):
+    db = db_session
+    entry, _, headers = _fixture(
+        client, db, test_doctor_user, test_patient, entry_status="diagnostics",
+    )
+    url = "/api/v1/doctor/general/queue/today"
+    exact = client.get(url, headers=headers).json()["entries"][0]
+    assert exact["can_mark_incomplete"] is False
+    assert "mark_incomplete" not in exact["available_actions"]
+    assert exact["can_start_visit"] is True
+    assert exact["can_complete"] is True
+
+    entry.visit_id = None
+    db.commit()
+    legacy = client.get(url, headers=headers).json()["entries"][0]
+    assert legacy["can_mark_incomplete"] is True
+    assert legacy["can_start_visit"] is False
+    response = client.post(
+        f"/api/v1/queue/entry/{entry.id}/incomplete",
+        json={"reason": "SYNTHETIC LEGACY"},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["new_status"] == "incomplete"

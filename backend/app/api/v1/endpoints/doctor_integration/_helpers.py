@@ -154,7 +154,8 @@ def _doctor_queue_available_actions(
         if status_value == "in_progress":
             return [*actions, "send_to_diagnostics"]
         if status_value == "diagnostics":
-            return [*actions, "start_visit"]
+            # A live clinical visit must not be stranded by legacy queue-only closure.
+            return [*(action for action in actions if action != "mark_incomplete"), "start_visit"]
     return actions
 
 
