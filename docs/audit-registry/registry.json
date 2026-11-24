@@ -4317,34 +4317,49 @@
       "merge_sha": null
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "PATPORTAL-FE-001",
       "priority": "P1",
       "source": "#3892 follow-up review comments, rounds 6–28",
       "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6739106445",
-      "status": "UNVERIFIED",
-      "fix_pr": null,
-      "merge_sha": null
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": 4273,
+      "merge_sha": "122d37df263a04dcc6fbfedd2de2d708d9832ffc",
+      "root_cause": "Results cards read title and date fields absent from LabOrderOut, producing blank rows. PR #4273 renders the actual created date and status. The appointment half was already correct.",
+      "test_before": "Owner recorded 2/3 failing home-card regression cases on main 58a20bbbe.",
+      "test_after": "PatientPanel.homeCards.test.tsx passed on main 122d37df; PR #4273 CI run 45405911429 succeeded.",
+      "reviewer": "Source and regression review on main 122d37df",
+      "date": "2026-11-24"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "PATPORTAL-FE-002",
       "priority": "P2/P3",
       "source": "#3892 follow-up review comments, rounds 6–28",
       "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6739106445",
-      "status": "UNVERIFIED",
-      "fix_pr": null,
-      "merge_sha": null
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": 4273,
+      "merge_sha": "122d37df263a04dcc6fbfedd2de2d708d9832ffc",
+      "root_cause": "Non-scheduled appointments were shown as completed. PR #4273 maps each supported status to an appropriate label and variant.",
+      "test_before": "Owner recorded cancelled appointments incorrectly rendered as completed before PR #4273.",
+      "test_after": "PatientPanel.homeCards.test.tsx passed on main 122d37df; PR #4273 CI run 45405911429 succeeded.",
+      "reviewer": "Source and regression review on main 122d37df",
+      "date": "2026-11-24"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "PATPORTAL-FE-003",
       "priority": "P3",
       "source": "#3892 follow-up review comments, rounds 6–28",
       "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6739106445",
-      "status": "UNVERIFIED",
-      "fix_pr": null,
-      "merge_sha": null
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": 4273,
+      "merge_sha": "122d37df263a04dcc6fbfedd2de2d708d9832ffc",
+      "root_cause": "The results card contained a nonfunctional action with no destination. PR #4273 removes the inactive button.",
+      "test_before": "Owner recorded a result action with no click handler before PR #4273.",
+      "test_after": "PatientPanel.homeCards.test.tsx passed on main 122d37df; PR #4273 CI run 45405911429 succeeded.",
+      "reviewer": "Source and regression review on main 122d37df",
+      "date": "2026-11-24"
     },
     {
       "checked": false,
