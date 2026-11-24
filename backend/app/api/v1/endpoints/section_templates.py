@@ -51,7 +51,7 @@ def review_section_template(
     section_type: SectionType,
     template_id: str,
     payload: TemplateReviewRequest,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_user),
     db: Session = Depends(deps.get_db),
 ):
     service = DoctorSectionTemplatesService(db)
@@ -72,7 +72,7 @@ async def get_section_templates(
     section_type: str,
     icd10_code: str | None = Query(None, description="ICD-10 code for filtering"),
     limit: int = Query(10, ge=1, le=50),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_user),
     db: Session = Depends(deps.get_db),
 ):
     """
@@ -113,7 +113,7 @@ async def get_section_templates(
 async def pin_template(
     section_type: str,
     template_id: str,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_user),
     db: Session = Depends(deps.get_db),
 ):
     """
@@ -142,7 +142,7 @@ async def pin_template(
 async def unpin_template(
     section_type: str,
     template_id: str,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_user),
     db: Session = Depends(deps.get_db),
 ):
     """Открепить шаблон."""
@@ -168,7 +168,7 @@ async def update_template(
     section_type: str,
     template_id: str,
     body: DoctorSectionTemplateUpdate,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_user),
     db: Session = Depends(deps.get_db),
 ):
     """
@@ -205,7 +205,7 @@ async def update_template(
 async def delete_template(
     section_type: str,
     template_id: str,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_user),
     db: Session = Depends(deps.get_db),
 ):
     """Удалить шаблон."""
