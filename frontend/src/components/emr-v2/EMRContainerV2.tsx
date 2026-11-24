@@ -12,7 +12,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * - Sticky header
  */
 
-import React, { useState, useCallback, useEffect, useId, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useId, useRef, useSyncExternalStore } from 'react';
 import { useEMR } from '../../hooks/useEMR';
 import { useEMRWorkspace } from '../../hooks/useEMRWorkspace';
 import type { FollowUp } from '../../api/emrWorkspace';
@@ -32,6 +32,7 @@ import EMRDiffViewer from './EMRDiffViewer';
 import EMRConflictDialog from './EMRConflictDialog';
 import EMRHelpDialog from './EMRHelpDialog';
 import { useAppData } from '../../contexts/AppDataContext';
+import { getState as getAuthState, subscribe as subscribeAuth } from '../../stores/auth';
 // ADR-0015: use useMcpClient hook instead of importing api/mcpClient directly.
 import { useMcpClient } from '../../hooks/useMcpClient';
 import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecialty';
@@ -162,6 +163,12 @@ function getSavedRowVersion(value: unknown): number | null {
     if (result.status === 'draft') return null;
     const rowVersion = Number(result.row_version);
     return Number.isInteger(rowVersion) && rowVersion > 0 ? rowVersion : null;
+}
+
+function getLabReviewerId(): number | null {
+    const { token, profile } = getAuthState();
+    const id = profile?.id;
+    return token && typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
 export async function persistEMRAndRefresh(
@@ -389,6 +396,7 @@ export function EMRContainerV2({
     // Get current user (doctor) for history/AI suggestions
     const { currentUser } = useAppData() as { currentUser?: { id?: string | number | null } };
     const doctorId = currentUser?.id;
+    const labReviewerId = useSyncExternalStore(subscribeAuth, getLabReviewerId, () => null);
 
     // Autosave setup
     const { lastAutosave, config: autosaveConfig, suppressOnDiscard } = useEMRAutosave({
@@ -1354,11 +1362,11 @@ export function EMRContainerV2({
                         Collapsible (defaultOpen=false when no results, true when
                         results exist). Read-only — doctors view, don't edit. */}
                     <LabResultsSection
-                        key={`labs:${workspaceState.scope}`}
+                        key={`labs:${workspaceState.scope}:${labReviewerId ?? 'no-reviewer'}`}
                         patientId={patientId}
                         visitId={visitId}
                         disabled={editingDisabled}
-                        reviewerId={accessDenied ? null : doctorId}
+                        reviewerId={accessDenied ? null : labReviewerId}
                     />
                 </div>
                 <WorkspaceSidePanel key={workspaceState.scope} workspace={workspace}

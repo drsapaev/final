@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
 import { act, fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { setProfile } from '../../../stores/auth';
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import { EMRContainerV2 } from '../EMRContainerV2';
 
@@ -55,7 +56,11 @@ vi.mock('../../../api/emrWorkspace', () => ({
 }));
 vi.mock('../workspace/VisitHistory', () => ({ FollowUpEditor: mocks.noOp, WorkspaceSidePanel: mocks.noOp }));
 vi.mock('../workspace/FieldDictation', () => ({ FieldDictation: mocks.noOp }));
-vi.mock('../sections/LabResultsSection', () => ({ default: mocks.noOp }));
+vi.mock('../sections/LabResultsSection', () => ({
+  default: ({ reviewerId }: { reviewerId: number | null }) => (
+    <output aria-label="Laboratory reviewer">{reviewerId}</output>
+  ),
+}));
 vi.mock('../sections', () => ({
   ComplaintsSection: mocks.noOp,
   AnamnesisMorbiSection: mocks.noOp,
@@ -110,6 +115,30 @@ beforeEach(() => {
   mocks.amendEMR.mockReset();
   mocks.getPrescription.mockReset().mockResolvedValue(null);
   mocks.issuePrescription.mockReset().mockResolvedValue({ id: 5, visit_id: 11, emr_version: 7, is_draft: false });
+});
+
+it('uses the active session for laboratory review and clears the reviewer on logout', async () => {
+  await renderEditor();
+  expect(screen.getByLabelText('Laboratory reviewer')).toBeEmptyDOMElement();
+
+  try {
+    act(() => {
+      sessionStorage.setItem('auth_token', 'SYNTHETIC-session');
+      setProfile({ id: 42 });
+    });
+    expect(screen.getByLabelText('Laboratory reviewer')).toHaveTextContent('42');
+
+    act(() => {
+      sessionStorage.removeItem('auth_token');
+      setProfile({ id: 42 });
+    });
+    expect(screen.getByLabelText('Laboratory reviewer')).toBeEmptyDOMElement();
+  } finally {
+    act(() => {
+      sessionStorage.removeItem('auth_token');
+      setProfile(null);
+    });
+  }
 });
 
 describe('Legacy medications in the EMR', () => {
