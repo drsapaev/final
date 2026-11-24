@@ -5,14 +5,17 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_active_roles
 from app.api.v1.endpoints.lab_reporting import _doctor_allowed_visit_ids
 from app.core.roles import normalize_role_value
 from app.models.lab import LabReportInstance
-from app.models.lab_critical_communication import LabCriticalCommunication
+from app.models.lab_critical_communication import (
+    LabCriticalCommunication,
+    LabCriticalCommunicationEvent,
+)
 from app.models.user import User
 from app.services.audit_service import log_audit_event
 from app.services.lab_critical_communication import (
@@ -55,7 +58,9 @@ class CommunicationOut(BaseModel):
     )
 
 
-def _out(task: LabCriticalCommunication, user: User) -> CommunicationOut:
+def _out(
+    task: LabCriticalCommunication, user: User, doctor_attempts: int,
+) -> CommunicationOut:
     actions = []
     if task.state not in {"acknowledged", "superseded"}:
         if user.is_superuser or normalize_role_value(user.role) == "admin":
@@ -65,8 +70,27 @@ def _out(task: LabCriticalCommunication, user: User) -> CommunicationOut:
         elif user.id == task.recipient_user_id:
             actions.append("acknowledge")
     return CommunicationOut.model_validate(task).model_copy(
-        update={"available_actions": actions}
+        update={"available_actions": actions, "attempts": task.attempts + doctor_attempts}
     )
+
+
+def _out_many(
+    db: Session, tasks: list[LabCriticalCommunication], user: User,
+) -> list[CommunicationOut]:
+    if not tasks:
+        return []
+    counts = dict(db.execute(
+        select(
+            LabCriticalCommunicationEvent.communication_id,
+            func.count(LabCriticalCommunicationEvent.id),
+        )
+        .where(
+            LabCriticalCommunicationEvent.communication_id.in_([task.id for task in tasks]),
+            LabCriticalCommunicationEvent.event_type == "doctor_attempted",
+        )
+        .group_by(LabCriticalCommunicationEvent.communication_id)
+    ).all())
+    return [_out(task, user, counts.get(task.id, 0)) for task in tasks]
 
 
 @router.get("", response_model=list[CommunicationOut])
@@ -109,13 +133,14 @@ def list_communications(
             action="view",
         )
     response.headers["Cache-Control"] = "private, no-store"
-    return [_out(row, user) for row in rows]
+    return _out_many(db, rows, user)
 
 
 @router.post("/{task_id}/assign", response_model=CommunicationOut)
 def assign_communication(task_id: int, db: Db, user: Admin):
     try:
-        return _out(assign_responsible_doctor(db, task_id, actor_user_id=user.id), user)
+        task = assign_responsible_doctor(db, task_id, actor_user_id=user.id)
+        return _out_many(db, [task], user)[0]
     except LabReportingDomainError as exc:
         raise HTTPException(exc.status_code, exc.detail) from exc
 
@@ -123,7 +148,8 @@ def assign_communication(task_id: int, db: Db, user: Admin):
 @router.post("/{task_id}/escalate", response_model=CommunicationOut)
 def escalate_communication(task_id: int, db: Db, user: Admin):
     try:
-        return _out(escalate(db, task_id, actor_user_id=user.id), user)
+        task = escalate(db, task_id, actor_user_id=user.id)
+        return _out_many(db, [task], user)[0]
     except LabReportingDomainError as exc:
         raise HTTPException(exc.status_code, exc.detail) from exc
 
@@ -131,6 +157,7 @@ def escalate_communication(task_id: int, db: Db, user: Admin):
 @router.post("/{task_id}/acknowledge", response_model=CommunicationOut)
 def acknowledge_communication(task_id: int, db: Db, user: Doctor):
     try:
-        return _out(acknowledge(db, task_id, actor_user_id=user.id), user)
+        task = acknowledge(db, task_id, actor_user_id=user.id)
+        return _out_many(db, [task], user)[0]
     except LabReportingDomainError as exc:
         raise HTTPException(exc.status_code, exc.detail) from exc

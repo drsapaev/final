@@ -617,7 +617,184 @@ def test_critical_route_rejects_ineligible_configured_admin(
 
 
 @pytest.mark.unit
-def test_escalation_is_delivered_before_a_changed_doctor_is_notified(
+@pytest.mark.parametrize("admin_failure", ["inactive", "delivery_failed"])
+@pytest.mark.parametrize("manual_assignment", [False, True])
+def test_changed_doctor_is_not_blocked_by_unavailable_escalation_recipient(
+    db_session, test_patient, test_visit, client, auth_headers, monkeypatch,
+    admin_failure, manual_assignment,
+):
+    admin = synthetic_user(db_session, "Admin")
+    doctors = [synthetic_user(db_session, "Doctor") for _ in range(2)]
+    profiles = [Doctor(user_id=user.id, specialty="cardiology", active=True) for user in doctors]
+    db_session.add_all(profiles)
+    db_session.flush()
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    monkeypatch.setattr(settings, "TENANT_SCOPE_ENFORCE_WRITES", False)
+    test_visit.doctor_id = profiles[0].id
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+
+    admin_available = [False]
+
+    async def send(**kwargs):
+        return kwargs["recipient"].id != admin.id or admin_available[0]
+
+    sender = AsyncMock(side_effect=send)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    assert run(dispatch_pending(db_session)) == 1
+    assert task.state == "inbox_recorded"
+    escalate(db_session, task.id, actor_user_id=admin.id)
+    if admin_failure == "inactive":
+        admin.is_active = False
+    test_visit.doctor_id = profiles[1].id
+    db_session.commit()
+    route = "/api/v1/lab/critical-communications"
+    if manual_assignment:
+        assigned = client.post(f"{route}/{task.id}/assign", headers=auth_headers)
+        assert assigned.status_code == 200
+        assert assigned.json()["state"] == "escalated"
+        repeated = client.post(f"{route}/{task.id}/assign", headers=auth_headers)
+        assert repeated.status_code == 200
+        assert repeated.json()["state"] == "escalated"
+
+    assert run(dispatch_pending(db_session)) == 1
+    assert task.state == "escalated" and task.recipient_user_id == doctors[1].id
+    assert task.inbox_recorded_at is not None and task.acknowledged_at is None
+    assert [call.kwargs["recipient"].id for call in sender.await_args_list].count(doctors[1].id) == 1
+    response = client.get(route, params={"visit_id": test_visit.id}, headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json()[0]["attempts"] == task.attempts + 1
+    replay = client.post(f"{route}/{task.id}/escalate", headers=auth_headers)
+    assert replay.status_code == 200
+    assert replay.json()["attempts"] == task.attempts + 1
+    with pytest.raises(LabReportingDomainError):
+        acknowledge(db_session, task.id, actor_user_id=doctors[0].id)
+    db_session.rollback()
+
+    admin.is_active = True
+    admin_available[0] = True
+    task.next_attempt_at = datetime.now(UTC)
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 1
+    assert run(dispatch_pending(db_session)) == 0
+    assert task.state == "escalated" and task.recipient_user_id == doctors[1].id
+    assert [call.kwargs["recipient"].id for call in sender.await_args_list].count(doctors[1].id) == 1
+    assert acknowledge(db_session, task.id, actor_user_id=doctors[1].id).state == "acknowledged"
+    events = list(db_session.scalars(
+        select(LabCriticalCommunicationEvent.event_type)
+        .where(LabCriticalCommunicationEvent.communication_id == task.id)
+        .order_by(LabCriticalCommunicationEvent.id)
+    ))
+    assert events.count("escalated") == events.count("escalation_notified") == 1
+    assert events.count("inbox_recorded") == 2
+    assert events.count("assigned") == 1
+
+
+@pytest.mark.unit
+def test_escalated_doctor_delivery_keeps_shared_tenant_admin_disabled(
+    db_session, test_patient, test_visit, monkeypatch,
+):
+    admin = synthetic_user(db_session, "Admin")
+    doctors = [synthetic_user(db_session, "Doctor") for _ in range(2)]
+    profiles = [Doctor(user_id=user.id, specialty="cardiology", active=True) for user in doctors]
+    db_session.add_all(profiles)
+    db_session.flush()
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    monkeypatch.setattr(settings, "TENANT_SCOPE_ENFORCE_WRITES", True)
+    test_visit.doctor_id = profiles[0].id
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    assert run(dispatch_pending(db_session)) == 1
+    escalate(db_session, task.id, actor_user_id=admin.id)
+    test_visit.doctor_id = profiles[1].id
+    db_session.commit()
+
+    assert run(dispatch_pending(db_session)) == 1
+    assert run(dispatch_pending(db_session)) == 0
+    assert task.state == "escalated" and task.recipient_user_id == doctors[1].id
+    assert [call.kwargs["recipient"].id for call in sender.await_args_list] == [
+        doctors[0].id, doctors[1].id,
+    ]
+    assert acknowledge(db_session, task.id, actor_user_id=doctors[1].id).state == "acknowledged"
+
+
+@pytest.mark.unit
+def test_escalated_doctor_delivery_retries_without_duplicate_attempts(
+    db_session, test_patient, test_visit, monkeypatch,
+):
+    admin = synthetic_user(db_session, "Admin")
+    doctors = [synthetic_user(db_session, "Doctor") for _ in range(2)]
+    profiles = [Doctor(user_id=user.id, specialty="cardiology", active=True) for user in doctors]
+    db_session.add_all(profiles)
+    db_session.flush()
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    monkeypatch.setattr(settings, "TENANT_SCOPE_ENFORCE_WRITES", False)
+    test_visit.doctor_id = profiles[0].id
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+
+    doctor_available = [False]
+
+    async def send(**kwargs):
+        return kwargs["recipient"].id != doctors[1].id or doctor_available[0]
+
+    sender = AsyncMock(side_effect=send)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    assert run(dispatch_pending(db_session)) == 1
+    escalate(db_session, task.id, actor_user_id=admin.id)
+    admin.is_active = False
+    test_visit.doctor_id = profiles[1].id
+    db_session.commit()
+
+    assert run(dispatch_pending(db_session)) == 0
+    assert run(dispatch_pending(db_session)) == 0
+    assert task.state == "escalated" and task.recipient_user_id == doctors[1].id
+    assert task.inbox_recorded_at is None
+    assert [call.kwargs["recipient"].id for call in sender.await_args_list].count(doctors[1].id) == 1
+
+    attempt = db_session.scalar(
+        select(LabCriticalCommunicationEvent)
+        .where(
+            LabCriticalCommunicationEvent.communication_id == task.id,
+            LabCriticalCommunicationEvent.event_type == "doctor_attempted",
+        )
+        .order_by(LabCriticalCommunicationEvent.id.desc())
+    )
+    attempt.occurred_at = datetime.now(UTC) - timedelta(minutes=2)
+    doctor_available[0] = True
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 1
+    assert run(dispatch_pending(db_session)) == 0
+    assert task.inbox_recorded_at is not None and task.acknowledged_at is None
+    assert [call.kwargs["recipient"].id for call in sender.await_args_list].count(doctors[1].id) == 2
+    assert acknowledge(db_session, task.id, actor_user_id=doctors[1].id).state == "acknowledged"
+
+
+@pytest.mark.unit
+def test_escalation_reaches_admin_when_changed_doctor_delivery_fails(
     db_session, test_patient, test_visit, monkeypatch,
 ):
     admin = synthetic_user(db_session, "Admin")
@@ -643,18 +820,30 @@ def test_escalation_is_delivered_before_a_changed_doctor_is_notified(
     monkeypatch.setattr(
         notification_sender_service, "send_canonical_notification_to_user", sender,
     )
-    assert run(dispatch_pending(db_session)) == 0
-    assert task.state == "escalated" and task.recipient_user_id == doctors[0].id
-    task.next_attempt_at = datetime.now(UTC)
+    assert run(dispatch_pending(db_session, limit=1)) == 0
+    assert sender.await_count == 1
+    assert run(dispatch_pending(db_session, limit=1)) == 1
+    assert task.state == "escalated" and task.recipient_user_id == doctors[1].id
+    assert task.inbox_recorded_at is None
+    attempt = db_session.scalar(
+        select(LabCriticalCommunicationEvent)
+        .where(
+            LabCriticalCommunicationEvent.communication_id == task.id,
+            LabCriticalCommunicationEvent.event_type == "doctor_attempted",
+        )
+        .order_by(LabCriticalCommunicationEvent.id.desc())
+    )
+    attempt.occurred_at = datetime.now(UTC) - timedelta(minutes=2)
     db_session.commit()
-    assert run(dispatch_pending(db_session)) == 2
+    assert run(dispatch_pending(db_session)) == 1
     assert run(dispatch_pending(db_session)) == 0
-    assert task.state == "inbox_recorded" and task.recipient_user_id == doctors[1].id
+    assert task.state == "escalated" and task.recipient_user_id == doctors[1].id
+    assert task.inbox_recorded_at is not None
     assert [call.kwargs["recipient"].id for call in sender.await_args_list] == [
-        admin.id, admin.id, doctors[1].id,
+        doctors[1].id, admin.id, doctors[1].id,
     ]
     assert [call.kwargs["entity_type"] for call in sender.await_args_list] == [
-        "lab_critical_escalation", "lab_critical_escalation", "lab_critical_communication",
+        "lab_critical_communication", "lab_critical_escalation", "lab_critical_communication",
     ]
 
 
@@ -684,7 +873,7 @@ def test_escalated_critical_task_follows_changed_visit_doctor(
     monkeypatch.setattr(
         notification_sender_service, "send_canonical_notification_to_user", sender,
     )
-    assert run(dispatch_pending(db_session)) == 1
+    assert run(dispatch_pending(db_session)) == (1 if change == "assigned" else 2)
     assert sender.await_args.kwargs["entity_type"] == "lab_critical_escalation"
     assert task.state == "escalated"
 
@@ -698,7 +887,7 @@ def test_escalated_critical_task_follows_changed_visit_doctor(
         assert sender.await_args.kwargs["recipient"].id == admin.id
         assert sender.await_args.kwargs["entity_type"] == "lab_critical_assignment"
     else:
-        assert task.state == "inbox_recorded" and task.recipient_user_id == doctors[1].id
+        assert task.state == "escalated" and task.recipient_user_id == doctors[1].id
         assert sender.await_args.kwargs["recipient"].id == doctors[1].id
         with pytest.raises(LabReportingDomainError):
             acknowledge(db_session, task.id, actor_user_id=doctors[0].id)
@@ -768,6 +957,7 @@ def test_recorded_critical_task_follows_current_doctor(
     before = client.get(route, params=params, headers=doctor_headers(doctors[0]))
     assert before.status_code == 200
     assert before.json()[0]["available_actions"] == ["acknowledge"]
+    assert before.json()[0]["attempts"] == 1
     admin = client.get(route, params=params, headers=auth_headers)
     assert admin.status_code == 200
     assert "assign" in admin.json()[0]["available_actions"]
@@ -793,6 +983,7 @@ def test_recorded_critical_task_follows_current_doctor(
     assert after.status_code == 200
     assert after.json()[0]["id"] == task_id
     assert after.json()[0]["available_actions"] == ["acknowledge"]
+    assert after.json()[0]["attempts"] == 2
 
     locked_sql = []
     scalar = db_session.scalar
@@ -894,9 +1085,10 @@ def test_critical_release_without_doctor_remains_accessible_and_correction_has_o
     test_visit.doctor_id = profile.id
     db_session.commit()
     assigned = client.post(f"{route}/{task.id}/assign", headers=auth_headers)
-    assert assigned.status_code == 200 and assigned.json()["state"] == "pending"
+    assert assigned.status_code == 200 and assigned.json()["state"] == "escalated"
     assert run(dispatch_pending(db_session)) == 1
-    assert task.state == "inbox_recorded" and task.acknowledged_at is None
+    assert task.state == "escalated" and task.acknowledged_at is None
+    assert task.inbox_recorded_at is not None
 
     revision = service.revise(report.id)
     revision.values[0].evaluation_snapshot = {

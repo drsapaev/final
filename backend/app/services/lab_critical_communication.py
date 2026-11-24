@@ -177,6 +177,9 @@ def _set_task_recipient(
 ) -> None:
     task.recipient_user_id = recipient_id
     task.inbox_recorded_at = None
+    if task.state == "escalated" and recipient_id is not None:
+        _event(db, task.id, "assigned", actor_user_id=actor_user_id)
+        return
     task.state = "pending" if recipient_id is not None else "needs_assignment"
     task.next_attempt_at = _first_attempt_at(recipient_id)
     _event(
@@ -205,6 +208,7 @@ def assign_responsible_doctor(
     if task.recipient_user_id == recipient_id and task.state in {
         "pending",
         "inbox_recorded",
+        "escalated",
     }:
         return task
     _set_task_recipient(db, task, recipient_id, actor_user_id=actor_user_id)
@@ -303,7 +307,11 @@ def _reconcile_doctor_assignments(db: Session, *, limit: int) -> None:
         .where(
             or_(
                 LabCriticalCommunication.state.in_(("needs_assignment", "inbox_recorded")),
-                escalated_ready,
+                and_(
+                    LabCriticalCommunication.state == "escalated",
+                    current_owner.is_not(None),
+                ),
+                and_(escalated_ready, current_owner.is_(None)),
             ),
             LabCriticalCommunication.recipient_user_id.is_distinct_from(current_owner),
         )
@@ -324,6 +332,127 @@ def _reconcile_doctor_assignments(db: Session, *, limit: int) -> None:
         db.commit()
 
 
+async def _dispatch_escalated_doctors(db: Session, *, limit: int) -> tuple[int, int]:
+    """Retry the doctor's inbox independently of the escalation recipient."""
+    from app.services.notifications import notification_sender_service
+
+    route_event = aliased(LabCriticalCommunicationEvent)
+    latest_route = (
+        select(func.max(route_event.id))
+        .where(
+            route_event.communication_id == LabCriticalCommunication.id,
+            route_event.event_type.in_(("created", "assigned", "needs_assignment", "escalated")),
+        )
+        .correlate(LabCriticalCommunication)
+        .scalar_subquery()
+    )
+    current_owner = (
+        _active_visit_doctor_query(
+            LabReportInstance.visit_id, LabReportInstance.patient_id
+        )
+        .correlate(LabReportInstance)
+        .scalar_subquery()
+    )
+    recorded = 0
+    processed = 0
+    for _ in range(limit):
+        retry_after = datetime.now(UTC) - timedelta(minutes=1)
+        recent_attempt = (
+            select(LabCriticalCommunicationEvent.id)
+            .where(
+                LabCriticalCommunicationEvent.communication_id == LabCriticalCommunication.id,
+                LabCriticalCommunicationEvent.event_type == "doctor_attempted",
+                LabCriticalCommunicationEvent.id > func.coalesce(latest_route, 0),
+                LabCriticalCommunicationEvent.occurred_at >= retry_after,
+            )
+            .correlate(LabCriticalCommunication)
+            .exists()
+        )
+        task = db.scalar(
+            select(LabCriticalCommunication)
+            .join(
+                LabReportInstance,
+                LabReportInstance.id == LabCriticalCommunication.report_instance_id,
+            )
+            .where(
+                LabCriticalCommunication.state == "escalated",
+                LabCriticalCommunication.recipient_user_id == current_owner,
+                LabCriticalCommunication.inbox_recorded_at.is_(None),
+                ~recent_attempt,
+            )
+            .order_by(LabCriticalCommunication.id)
+            .limit(1)
+            .with_for_update(of=LabCriticalCommunication, skip_locked=True)
+            .execution_options(populate_existing=True)
+        )
+        if task is None:
+            db.rollback()
+            break
+        processed += 1
+        instance = db.get(LabReportInstance, task.report_instance_id)
+        doctor_id = _responsible_user_id(db, instance, lock_ownership=True)
+        if doctor_id != task.recipient_user_id:
+            db.rollback()
+            _reconcile_doctor_assignments(db, limit=limit)
+            continue
+
+        task_id = task.id
+        actor_id = task.released_by_id
+        is_correction = task.supersedes_communication_id is not None
+        _event(db, task_id, "doctor_attempted", channel="in_app_inbox")
+        db.commit()
+
+        task = _locked_task(db, task_id)
+        instance = db.get(LabReportInstance, task.report_instance_id)
+        if (
+            task.state != "escalated"
+            or task.recipient_user_id != doctor_id
+            or task.inbox_recorded_at is not None
+            or _responsible_user_id(db, instance, lock_ownership=True) != doctor_id
+        ):
+            db.rollback()
+            continue
+        recipient = db.get(User, doctor_id, populate_existing=True)
+        title = (
+            "Исправлен критический лабораторный результат"
+            if is_correction else "Критический результат анализа"
+        )
+        delivered = await notification_sender_service.send_canonical_notification_to_user(
+            db=db,
+            recipient=recipient,
+            event_type="lab_critical_result",
+            title=title,
+            message="Откройте выпущенный отчёт и подтвердите получение.",
+            source_module="lab",
+            severity="critical",
+            priority="urgent",
+            actor_id=actor_id,
+            entity_type="lab_critical_communication",
+            entity_id=task_id,
+            deep_link="/doctor",
+            metadata={"communication_id": task_id},
+        )
+        db.rollback()
+        task = _locked_task(db, task_id)
+        instance = db.get(LabReportInstance, task.report_instance_id)
+        if (
+            task.state != "escalated"
+            or task.recipient_user_id != doctor_id
+            or task.inbox_recorded_at is not None
+            or _responsible_user_id(db, instance, lock_ownership=True) != doctor_id
+        ):
+            db.rollback()
+            continue
+        if delivered:
+            task.inbox_recorded_at = datetime.now(UTC)
+            _event(db, task_id, "inbox_recorded", channel="in_app_inbox")
+            recorded += 1
+        else:
+            _event(db, task_id, "doctor_delivery_failed", channel="in_app_inbox")
+        db.commit()
+    return recorded, processed
+
+
 async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
     """Deliver due tasks to inbox via the canonical producer.
 
@@ -333,8 +462,8 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
     from app.services.notifications import notification_sender_service
 
     _reconcile_doctor_assignments(db, limit=limit)
-    recorded = 0
-    for _ in range(limit):
+    recorded, processed = await _dispatch_escalated_doctors(db, limit=limit)
+    for _ in range(limit - processed):
         now = datetime.now(UTC)
         due = LabCriticalCommunication.next_attempt_at <= now
         if _configured_operations_admin_id() is not None:
@@ -372,6 +501,7 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
         if task is None:
             db.rollback()
             break
+        processed += 1
         delivery_state = task.state
         doctor_id, recipient_id = _current_delivery_recipient(db, task)
         if doctor_id != task.recipient_user_id or (
@@ -474,4 +604,8 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
         db.commit()
         if delivered and delivery_state == "escalated":
             _reconcile_doctor_assignments(db, limit=limit)
+    if processed < limit:
+        _reconcile_doctor_assignments(db, limit=limit - processed)
+        additional, _ = await _dispatch_escalated_doctors(db, limit=limit - processed)
+        recorded += additional
     return recorded
