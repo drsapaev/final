@@ -1631,6 +1631,36 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(trigger).toBeEnabled();
   });
 
+  it('keeps the draft shortcut in the result input and leaves choice controls and dialogs in control', async () => {
+    const section = reopenedDraftInstance.sections[0];
+    const activeInstance = {
+      ...reopenedDraftInstance,
+      managed_release: true,
+      available_actions: ['edit', 'save_draft', 'record_qc'],
+      sections: [{ ...section, fields: [section.fields[0], {
+        ...section.fields[1],
+        value_type: 'choice',
+        choice_options: ['140', '141'],
+      }] }],
+    };
+    renderWithActiveInstance({ activeInstance });
+    const choice = screen.getByRole('combobox', { name: 'Результат: Гемоглобин' });
+    expect(fireEvent.keyDown(choice, { key: 's', ctrlKey: true, cancelable: true })).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Записать контроль качества' }));
+    const dialog = within(screen.getByRole('dialog'));
+    const reason = dialog.getByRole('textbox', { name: 'Причина' });
+    expect(fireEvent.keyDown(reason, { key: 's', metaKey: true, cancelable: true })).toBe(true);
+    expect(mockedApi.bulkSaveValues).not.toHaveBeenCalled();
+    fireEvent.click(dialog.getByRole('button', { name: 'Отмена' }));
+
+    mockedApi.bulkSaveValues.mockResolvedValueOnce(activeInstance);
+    const value = screen.getByRole('textbox', { name: 'Результат: Лейкоциты' });
+    fireEvent.change(value, { target: { value: '6.6' } });
+    expect(fireEvent.keyDown(value, { key: 's', ctrlKey: true, cancelable: true })).toBe(false);
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(1));
+  });
+
   it.each([
     ['ru', 'Пациент #444', 'Визит: без визита | Отчёт #77', 'исправленная версия отчёта #76'],
     ['uz-Cyrl', 'Бемор #444', 'Ташриф: ташрифсиз | Ҳисобот #77', 'ҳисоботнинг тузатилган версияси #76'],

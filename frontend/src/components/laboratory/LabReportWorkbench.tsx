@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from '../ui/macos';
 // ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
 import { useLabReporting } from '../../hooks/useLabReporting';
+import { isLabShortcutBlockedByControl } from '../../hooks/useLabHotkeys';
 import { api } from '../../api/client';
 import { printService } from '../../services/print';
 import logger from '../../utils/logger';
@@ -449,6 +450,7 @@ export default function LabReportWorkbench({
     if (!canSaveDraft || instanceTransitionPending) return;
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        if (isLabShortcutBlockedByControl(e)) return;
         e.preventDefault();
         if (!saving && saveFailure !== 'conflict' && handleSaveDraftRef.current) {
           // PR3: attemptSaveDraft бросает исключение при неудаче — показываем
