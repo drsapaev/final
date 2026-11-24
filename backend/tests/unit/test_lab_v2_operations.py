@@ -10,11 +10,13 @@ from sqlalchemy.dialects import postgresql
 
 from app.models.audit import AuditLog
 from app.models.clinic import Doctor
-from app.models.lab import LabOrder, LabReportValue
+from app.models.lab import LabOrder, LabReportInstance, LabReportValue
 from app.models.lab_critical_communication import LabCriticalCommunicationEvent
 from app.models.lab_import import LabImportReceipt
+from app.models.lab_release import LabReportCreationReceipt
 from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment
 from app.models.user import User
+from app.models.visit import Visit
 from app.schemas.lab_import import LabImportBatch
 from app.services.authentication_service import authentication_service
 from app.services.lab_critical_communication import (
@@ -102,6 +104,39 @@ def test_standalone_does_not_attach_to_old_order(db_session, test_patient, test_
                 "order_id": orphan.id,
             }
         )
+
+
+@pytest.mark.unit
+def test_report_creation_rejects_same_patient_order_from_different_visit(
+    client, db_session, admin_auth_headers, test_patient, test_visit
+):
+    other_visit = Visit(patient_id=test_patient.id, visit_date=test_visit.visit_date)
+    order = LabOrder(
+        patient_id=test_patient.id, visit_id=test_visit.id, status="ordered"
+    )
+    db_session.add_all([other_visit, order])
+    db_session.commit()
+    service = LabReportingService(db_session)
+    template = next(item for item in service.list_templates() if item.code == "cbc_oak")
+
+    response = client.post(
+        "/api/v1/lab/report-instances",
+        headers={**admin_auth_headers, "Idempotency-Key": str(uuid4())},
+        json={
+            "patient_id": test_patient.id,
+            "visit_id": other_visit.id,
+            "order_id": order.id,
+            "template_id": template.id,
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"] == "Lab order does not belong to selected visit"
+    assert db_session.execute(select(LabOrder.id, LabOrder.visit_id)).all() == [
+        (order.id, test_visit.id)
+    ]
+    assert db_session.scalar(select(LabReportInstance.id)) is None
+    assert db_session.scalar(select(LabReportCreationReceipt.instance_id)) is None
 
 
 @pytest.mark.unit
