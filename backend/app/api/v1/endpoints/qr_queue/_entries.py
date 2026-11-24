@@ -21,7 +21,7 @@ async def restore_entry_to_next(
     current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
 ):
     """
-    Восстанавливает пациента no_show как следующего в очереди
+    Возвращает пациента в очередь с действующим приоритетом восстановления
     Устанавливает priority=1 для приоритетной обработки
     """
     from app.models.online_queue import OnlineQueueEntry
@@ -77,13 +77,13 @@ async def restore_entry_to_next(
                 ),
             )
 
-    # Восстанавливаем с приоритетом "следующий"
+    # Приоритет 1 не обходит более высокий приоритет и порядок внутри группы.
     entry.status = "waiting"
-    entry.priority = 1  # Следующий в очереди
+    entry.priority = 1
     db.commit()
 
     logger.info(
-        "[restore_entry_to_next] Запись %d восстановлена следующей по запросу пользователя %d",
+        "[restore_entry_to_next] Запись %d возвращена в очередь с приоритетом по запросу пользователя %d",
         entry_id,
         current_user.id
     )
@@ -117,7 +117,7 @@ async def restore_entry_to_next(
 
     return {
         "success": True,
-        "message": "Пациент восстановлен как следующий в очереди",
+        "message": "Пациент возвращён в очередь с приоритетом",
         "entry_id": entry_id,
         "new_status": "waiting",
         "priority": 1
