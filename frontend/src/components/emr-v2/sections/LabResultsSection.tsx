@@ -47,6 +47,7 @@ interface LabReportInstance {
   id: string | number;
   visit_id?: string | number | null;
   patient_id?: string | number;
+  template?: { name: string; code: string } | null;
   template_name?: string;
   template_code?: string;
   finalized_at?: string;
@@ -345,6 +346,8 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
           )}</h4>}
           {group.map((instance) => {
             const details = reportDetails.get(Number(instance.id));
+            const reportTitle = instance.template?.name || instance.template?.code || details?.template_name
+              || instance.template_name || instance.template_code || t('emr_workspace.lab_report', { id: instance.id });
             return <div key={instance.id} className="emr-workspace-group">
           <div
             style={{
@@ -362,7 +365,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
               <TestTube2 size={16} aria-hidden="true" style={{ color: 'var(--mac-text-secondary)' }} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 500, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
-                  {instance.template_name || instance.template_code || 'Лабораторный отчёт'}
+                  {reportTitle}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
                   {formatDate(instance.finalized_at || instance.updated_at)}
@@ -386,7 +389,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
                 variant="outline"
                 size="small"
                 onClick={() => handleDownload(instance.id)}
-                aria-label={`Скачать PDF: ${instance.template_name || 'лабораторный отчёт'}`}>
+                aria-label={t('emr_workspace.lab_download_pdf_aria', { name: reportTitle })}>
                 <Download size={14} style={{ marginRight: 4 }} aria-hidden="true" />
                 PDF
               </Button>

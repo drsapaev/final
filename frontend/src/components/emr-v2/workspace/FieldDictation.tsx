@@ -53,14 +53,19 @@ function abortRecognition(recognition: LocalRecognition | null) {
 }
 
 function DictationControls({
-  lang, disabled, onInsert,
-}: { lang: string; disabled: boolean; onInsert: (text: string) => void }) {
+  lang, disabled, draft, onDraftChange, onInsert,
+}: {
+  lang: string;
+  disabled: boolean;
+  draft: string;
+  onDraftChange: (text: string) => void;
+  onInsert: (text: string) => void;
+}) {
   const { t } = useTranslation();
   const [available, setAvailable] = useState<boolean>();
   const [canInstall, setCanInstall] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [phase, setPhase] = useState<'idle' | 'recording' | 'stopping' | 'error'>('idle');
-  const [draft, setDraft] = useState('');
   const active = useRef<LocalRecognition | null>(null);
 
   useEffect(() => {
@@ -133,7 +138,7 @@ function DictationControls({
           .filter(result => result.isFinal)
           .map(result => result[0].transcript.trim())
           .filter(Boolean).join(' ');
-        setDraft([previous, spoken].filter(Boolean).join(' '));
+        onDraftChange([previous, spoken].filter(Boolean).join(' '));
       };
       recognition.onend = () => {
         if (active.current !== recognition) return;
@@ -178,15 +183,15 @@ function DictationControls({
       {draft && <>
         <label className="emr-workspace-field">{t('emr_workspace.dictation_review')}
           <Textarea aria-label={t('emr_workspace.dictation_review')} value={draft} rows={3} maxLength={5000}
-            readOnly={recording || disabled} onChange={event => setDraft(event.target.value)} />
+            readOnly={recording || disabled} onChange={event => onDraftChange(event.target.value)} />
         </label>
         <div className="emr-workspace-controls">
           <Button type="button" size="small" disabled={recording || !draft.trim() || disabled}
-            onClick={() => { onInsert(draft.trim()); setDraft(''); }}>
+            onClick={() => { onInsert(draft.trim()); onDraftChange(''); }}>
             {t('emr_workspace.dictation_insert')}
           </Button>
           <Button type="button" size="small" variant="ghost" disabled={recording}
-            onClick={() => setDraft('')}>{t('misc.cancel')}</Button>
+            onClick={() => onDraftChange('')}>{t('misc.cancel')}</Button>
         </div>
       </>}
     </div>
@@ -196,6 +201,7 @@ function DictationControls({
 export function FieldDictation({ disabled, onInsert }: { disabled: boolean; onInsert: (text: string) => void }) {
   const { t, language } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
   if (disabled || import.meta.env.VITE_EMR_DICTATION_DISABLED === 'true') return null;
   const lang = language.startsWith('uz') ? 'uz-UZ' : language.startsWith('ru') ? 'ru-RU' : '';
   return (
@@ -203,7 +209,8 @@ export function FieldDictation({ disabled, onInsert }: { disabled: boolean; onIn
       <summary>{t('emr_workspace.dictation')}</summary>
       {open && (microphoneBlocked()
         ? <p role="status">{t('emr_workspace.dictation_microphone_blocked')}</p>
-        : <DictationControls key={lang} lang={lang} disabled={disabled} onInsert={onInsert} />)}
+        : <DictationControls key={lang} lang={lang} disabled={disabled} draft={draft}
+            onDraftChange={setDraft} onInsert={onInsert} />)}
     </details>
   );
 }

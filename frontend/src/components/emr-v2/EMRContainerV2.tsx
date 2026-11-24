@@ -339,6 +339,14 @@ export function EMRContainerV2({
     const signingScopeRef = useRef<object | null>(null);
     const completionScopeRef = useRef({ visitId, patientId, active: true });
     const editingDisabled = isReadOnly || isSigned || isAmended || isPreparingCompletion || completionBusy || isSigning || accessDenied;
+    // Issuing a separate prescription does not edit the signed document.
+    const prescriptionBlocked = isSigned || isAmended
+        ? isReadOnly || isPreparingCompletion || completionBusy || isSigning || accessDenied
+            || isLoading || serverFinalized || !workspace || !emr?.id || !version || version <= 0
+            || workspace.visit.id !== emr.visit_id || workspace.patient.id !== emr.patient_id
+            || String(workspace.visit.id) !== String(visitId) || String(workspace.patient.id) !== String(patientId)
+            || (workspace.visit.status !== 'open' && workspace.visit.status !== 'in_progress')
+        : editingDisabled;
     // EMRAMEND-FE-001 (audit 3886 round 17): the amendment workflow must be
     // REACHABLE on the very records it exists for (signed, and — after round
     // 16 — amended ones eligible for a repeat reasoned correction). The old
@@ -933,7 +941,7 @@ export function EMRContainerV2({
         canRedo: canRedo && !editingDisabled,
         canSave: isDirty && !isSaving && !editingDisabled,
         canSign: !isDirty && !isSaving && !isSigned && (!isReadOnly || canSignReadOnly) && !completionBusy,
-        enabled: (!isReadOnly || canSignReadOnly) && !isPreparingCompletion && !completionBusy,
+        enabled: (!isReadOnly || canSignReadOnly) && !isPreparingCompletion && !completionBusy && !conflict,
     });
 
     if (!visitId) {
@@ -1249,7 +1257,7 @@ export function EMRContainerV2({
                             patientId={workspace.patient.id} rowVersion={rowVersion}
                             hasMedications={medications.length > 0}
                             isCurrentSaved={!isDirty && !isSaving && rowVersion > 0 && savedEMRStatus !== 'draft'}
-                            readOnly={editingDisabled || accessDenied || Boolean(conflict)} />
+                            readOnly={prescriptionBlocked || Boolean(conflict)} />
                     )}
 
                     {/* Recommendations is reused in TreatmentSection above, or separate?
@@ -1520,7 +1528,7 @@ export function EMRContainerV2({
             )}
 
             {/* Conflict dialog */}
-            {!isReadOnly && Boolean(conflict) && (
+            {!isReadOnly && Boolean(conflict) && !showAmendForm && !(showDiff && selectedVersion) && (
                 <EMRConflictDialog
                     conflict={conflict as Record<string, unknown> | null}
                     isSigned={isSigned}

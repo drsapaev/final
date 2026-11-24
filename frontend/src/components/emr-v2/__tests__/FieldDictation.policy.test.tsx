@@ -3,8 +3,9 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FieldDictation } from '../workspace/FieldDictation';
 
+const locale = vi.hoisted(() => ({ language: 'ru' }));
 vi.mock('@/i18n/useTranslation', () => ({
-  useTranslation: () => ({ language: 'ru', t: (key: string) => key }),
+  useTranslation: () => ({ language: locale.language, t: (key: string) => key }),
 }));
 
 const policyNames = ['permissionsPolicy', 'featurePolicy'] as const;
@@ -19,6 +20,7 @@ class LocalRecognition {
   private useLocalEngine = false;
 
   onresult: ((event: { results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null = null;
+  onend: (() => void) | null = null;
   onerror: (() => void) | null = null;
   start = vi.fn();
   stop = vi.fn();
@@ -36,11 +38,12 @@ function setPolicy(name: typeof policyNames[number], policy?: { allowsFeature: (
   Object.defineProperty(document, name, { value: policy, configurable: true });
 }
 
-function expandDictation() {
+function toggleDictation() {
   fireEvent.click(screen.getByText('emr_workspace.dictation'));
 }
 
 beforeEach(() => {
+  locale.language = 'ru';
   available.mockReset().mockResolvedValue('available');
   install.mockClear();
   construct.mockReset();
@@ -66,7 +69,7 @@ describe('FieldDictation local recording controls', () => {
     const onInsert = vi.fn();
     render(<FieldDictation disabled={false} onInsert={onInsert} />);
 
-    expandDictation();
+    toggleDictation();
 
     expect(await screen.findByRole('status')).toHaveTextContent('emr_workspace.dictation_microphone_blocked');
     expect(allowsFeature).toHaveBeenCalledWith('microphone');
@@ -84,7 +87,7 @@ describe('FieldDictation local recording controls', () => {
     available.mockResolvedValue(state);
     render(<FieldDictation disabled={false} onInsert={vi.fn()} />);
 
-    expandDictation();
+    toggleDictation();
 
     expect(await screen.findByRole('button', { name: label })).toBeInTheDocument();
     expect(available).toHaveBeenCalledWith({ langs: ['ru-RU'], processLocally: true });
@@ -99,7 +102,7 @@ describe('FieldDictation local recording controls', () => {
     available.mockReturnValue(new Promise(resolve => { finishAvailability = resolve; }));
     const onInsert = vi.fn();
     const { rerender } = render(<FieldDictation disabled={false} onInsert={onInsert} />);
-    expandDictation();
+    toggleDictation();
     await waitFor(() => expect(available).toHaveBeenCalledTimes(1));
 
     allowsFeature.mockReturnValue(false);
@@ -115,7 +118,7 @@ describe('FieldDictation local recording controls', () => {
   it('keeps the transcript editable and allows a fresh local session after an error without an end event', async () => {
     const onInsert = vi.fn();
     render(<FieldDictation disabled={false} onInsert={onInsert} />);
-    expandDictation();
+    toggleDictation();
 
     fireEvent.click(await screen.findByRole('button', { name: 'emr_workspace.dictation_start' }));
     const first = construct.mock.calls[0][0];
@@ -135,5 +138,54 @@ describe('FieldDictation local recording controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'emr_workspace.dictation_start' }));
     expect(construct).toHaveBeenCalledTimes(2);
     expect(construct.mock.calls[1][0].start).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the transcript when closing the panel and stops the old session', async () => {
+    const onInsert = vi.fn();
+    render(<FieldDictation disabled={false} onInsert={onInsert} />);
+    toggleDictation();
+    fireEvent.click(await screen.findByRole('button', { name: 'emr_workspace.dictation_start' }));
+    const session = construct.mock.calls[0][0];
+    act(() => session.onresult?.({ results: [{ isFinal: true, 0: { transcript: 'SYNTHETIC transcript' } }] }));
+
+    toggleDictation();
+    await waitFor(() => expect(session.abort).toHaveBeenCalledOnce());
+    act(() => session.onresult?.({ results: [{ isFinal: true, 0: { transcript: 'SYNTHETIC late callback' } }] }));
+    toggleDictation();
+
+    expect(await screen.findByRole('textbox')).toHaveValue('SYNTHETIC transcript');
+    expect(construct).toHaveBeenCalledOnce();
+    expect(onInsert).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'emr_workspace.dictation_insert' }));
+    expect(onInsert).toHaveBeenCalledExactlyOnceWith('SYNTHETIC transcript');
+  });
+
+  it('keeps edited text through a locale change but clears it for a different visit', async () => {
+    const onInsert = vi.fn();
+    const { rerender } = render(<FieldDictation key="visit-a" disabled={false} onInsert={onInsert} />);
+    toggleDictation();
+    fireEvent.click(await screen.findByRole('button', { name: 'emr_workspace.dictation_start' }));
+    const session = construct.mock.calls[0][0];
+    act(() => {
+      session.onresult?.({ results: [{ isFinal: true, 0: { transcript: 'SYNTHETIC transcript' } }] });
+      session.onend?.();
+    });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'SYNTHETIC reviewed' } });
+
+    locale.language = 'uz-Latn';
+    available.mockResolvedValue('unavailable');
+    rerender(<FieldDictation key="visit-a" disabled={false} onInsert={onInsert} />);
+
+    expect(await screen.findByText('emr_workspace.dictation_unavailable')).toBeInTheDocument();
+    expect(available).toHaveBeenLastCalledWith({ langs: ['uz-UZ'], processLocally: true });
+    expect(screen.getByRole('textbox')).toHaveValue('SYNTHETIC reviewed');
+    expect(screen.queryByRole('button', { name: 'emr_workspace.dictation_start' })).not.toBeInTheDocument();
+    expect(onInsert).not.toHaveBeenCalled();
+
+    rerender(<FieldDictation key="visit-b" disabled={false} onInsert={onInsert} />);
+    toggleDictation();
+    expect(await screen.findByText('emr_workspace.dictation_unavailable')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(onInsert).not.toHaveBeenCalled();
   });
 });

@@ -227,6 +227,40 @@ describe('EMRLAB-FE-003: server-side status filtering before the limit', () => {
 });
 
 describe('EMRLAB-FE-004: read-only does not revoke read access', () => {
+  it('uses canonical nested template names to identify each signed report and its PDF', async () => {
+    const rows = [
+      {
+        id: 44, patient_id: 5, visit_id: 9, status: 'FINALIZED',
+        finalized_at: '2026-07-02T11:00:00Z', template: { name: 'SYNTHETIC blood count', code: 'CBC' },
+      },
+      {
+        id: 45, patient_id: 5, visit_id: 9, status: 'PRINTED',
+        finalized_at: '2026-07-01T11:00:00Z', template: { name: 'SYNTHETIC glucose', code: 'GLU' },
+      },
+      {
+        id: 46, patient_id: 5, visit_id: 9, status: 'FINALIZED',
+        finalized_at: '2026-07-01T10:00:00Z', template: { name: '', code: 'SYNTHETIC_CODE' },
+      },
+      { id: 47, patient_id: 5, visit_id: 9, status: 'FINALIZED' },
+    ];
+    listInstancesMock.mockImplementation(async ({ status }) => rows.filter(row => row.status === status));
+    render(<ThemeProvider><LabResultsSection patientId={5} visitId={9} disabled /></ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+
+    expect(await screen.findByText('SYNTHETIC blood count')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Скачать PDF: SYNTHETIC blood count' })).toBeVisible();
+    expect(screen.getByText('SYNTHETIC glucose')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Скачать PDF: SYNTHETIC glucose' })).toBeVisible();
+    expect(screen.getByText('SYNTHETIC_CODE')).toBeVisible();
+    expect(screen.getByText('Бланк №47')).toBeVisible();
+    await act(async () => { await i18n.changeLanguage('uz-Latn'); });
+    expect(screen.getByText('47-blank')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'PDF faylini yuklab olish: SYNTHETIC blood count' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'PDF faylini yuklab olish: 47-blank' })).toBeVisible();
+    await act(async () => { await i18n.changeLanguage('uz-Cyrl'); });
+    expect(screen.getByRole('button', { name: 'PDF файлини юклаб олиш: 47-бланк' })).toBeVisible();
+  });
+
   it('a signed/read-only section still shows the PDF action and expands', async () => {
     listInstancesMock.mockResolvedValue([finalized(44, 'Гемоглобин', 2)]);
     render(
