@@ -14,6 +14,8 @@ const LOCALES = [
     lang: 'uz-Latn',
     prefix: '',
     skipLink: 'Asosiy mazmunga o‘tish',
+    bookingTitle: 'Onlayn yozilish',
+    bookingLogin: 'Bemor sifatida kirish',
     navigation: 'Sayt navigatsiyasi',
     languageSwitch: 'RU — Rus tiliga o‘tish',
     doctorName: 'Sintetik sinov profili',
@@ -24,6 +26,8 @@ const LOCALES = [
     lang: 'ru',
     prefix: '/ru',
     skipLink: 'Перейти к основному содержимому',
+    bookingTitle: 'Онлайн-запись',
+    bookingLogin: 'Войти как пациент',
     navigation: 'Навигация сайта',
     languageSwitch: 'O‘Z — Перейти на узбекский',
     doctorName: 'Синтетический тестовый профиль',
@@ -560,7 +564,7 @@ async function solidContrastRatio(target: Locator, kind: 'text' | 'outline') {
 }
 
 test.describe('public-site accessibility', () => {
-  test('Vite public footer stays usable after the notification prompt delay', async ({ page, request }) => {
+  test('Vite public footer and booking controls stay usable after the notification prompt delay', async ({ page, request }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 320, height: 900 });
     await page.clock.install();
@@ -578,6 +582,25 @@ test.describe('public-site accessibility', () => {
       });
     }, VITE_ORIGIN);
     await installSyntheticApi(page, request);
+    await page.route((url) => url.pathname === '/api/v1/public-site/booking-options', (route) =>
+      route.fulfill(jsonResponse({
+        available: true,
+        mode: 'registrar_request',
+        settings_version: 1,
+        booking_horizon_days: 90,
+        services: [{ slug: 'synthetic-service', name: 'SYNTHETIC service' }],
+        doctors: [{ slug: 'synthetic-profile', name: 'SYNTHETIC doctor' }],
+        compatible_pairs: [{ service_slug: 'synthetic-service', doctor_slug: 'synthetic-profile' }],
+      })),
+    );
+    await page.route((url) => url.pathname === '/api/v1/public-site/availability', (route) =>
+      route.fulfill(jsonResponse({
+        date: new URL(route.request().url()).searchParams.get('date'),
+        timezone: 'Asia/Tashkent',
+        settings_version: 1,
+        slots: ['09:00:00'],
+      })),
+    );
 
     const prompt = page.locator('.notification-prompt');
     for (const [theme, color] of [['light', 'rgb(0, 81, 213)'], ['dark', 'rgb(90, 200, 250)']] as const) {
@@ -600,6 +623,29 @@ test.describe('public-site accessibility', () => {
       }
     }
 
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: width === 320 ? 700 : 844 });
+      for (const locale of LOCALES) {
+        await test.step(`${locale.lang} booking sign-in at ${width}px`, async () => {
+          await page.goto(VITE_ORIGIN + locale.prefix + '/booking');
+          await expect(page.getByRole('heading', { level: 1, name: locale.bookingTitle, exact: true })).toBeVisible();
+          await page.locator('#public-booking-service').selectOption('synthetic-service');
+          await page.locator('#public-booking-doctor').selectOption('synthetic-profile');
+          const date = page.locator('#public-booking-date');
+          const firstBookableDate = await date.getAttribute('min');
+          if (!firstBookableDate) throw new Error('Expected the earliest bookable date');
+          await date.fill(firstBookableDate);
+          await page.getByRole('radio', { name: '09:00', exact: true }).check();
+
+          await page.clock.runFor(6_000);
+          await expect(prompt).toHaveCount(0);
+          const signIn = page.getByRole('button', { name: locale.bookingLogin, exact: true });
+          await signIn.evaluate((button) => button.scrollIntoView({ block: 'end', behavior: 'instant' }));
+          await signIn.click({ trial: true });
+        });
+      }
+    }
+
     await page.goto(VITE_ORIGIN + '/login');
     await expect(page).toHaveURL(VITE_ORIGIN + '/login');
     await expect(page.locator('input[autocomplete="username"]')).toBeVisible();
@@ -610,6 +656,17 @@ test.describe('public-site accessibility', () => {
     await navigateInApp(page, '/ru/services');
     await expect(page.getByRole('heading', { level: 1, name: SERVICE_TITLES.ru, exact: true })).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('data-notification-prompt-test', 'same-document');
+    await expect(prompt).toHaveCount(0);
+
+    await navigateInApp(page, '/login');
+    await expect(page.locator('input[autocomplete="username"]')).toBeVisible();
+    await page.clock.runFor(6_000);
+    await expect(prompt).toBeVisible();
+
+    await navigateInApp(page, '/ru/booking');
+    await expect(page.locator('#public-booking-service')).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-notification-prompt-test', 'same-document');
+    await page.clock.runFor(6_000);
     await expect(prompt).toHaveCount(0);
   });
 
