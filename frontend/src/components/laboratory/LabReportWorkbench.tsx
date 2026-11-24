@@ -1793,32 +1793,35 @@ export default function LabReportWorkbench({
                     listStyle: 'none',
                   }}
                 >
-                  Подписи
+                  {t('workbench.signatures')}
                   {!canEditActiveInstance && (
                     <span style={{ marginLeft: 'var(--mac-spacing-2)', fontWeight: 400, fontSize: '0.85em', opacity: 0.7 }}>
-                      (только для чтения — отчёт утверждён)
+                      ({t('workbench.signatures_readonly_hint')})
                     </span>
                   )}
                 </summary>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--mac-spacing-3)', paddingTop: 'var(--mac-spacing-2)' }}>
-                  {(['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'] as Array<keyof typeof signerFieldLabels>).map((key) => (
-                    <label key={key} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
-                      <span>{signerFieldLabels[key] || key}</span>
-                      <Input
-                        className="macos-input"
-                        aria-label={signerFieldLabels[key] || key}
-                        value={String(signerSnapshot?.[key] ?? '')}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          editSequenceRef.current += 1;
-                          setSignerSnapshot((prev) => ({ ...prev, [key]: value }));
-                        }}
-                        // WF-09 fix: signer fields должны блокироваться на FINALIZED/PRINTED,
-                        // иначе persistDraft вызовет updateInstance → 409 Conflict (silent failure).
-                        disabled={!canEditVisibleInstance}
-                      />
-                    </label>
-                  ))}
+                  {(['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'] as Array<keyof typeof signerFieldLabels>).map((key) => {
+                    const label = t(`workbench.signer_${key}`, { defaultValue: signerFieldLabels[key] });
+                    return (
+                      <label key={key} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
+                        <span>{label}</span>
+                        <Input
+                          className="macos-input"
+                          aria-label={label}
+                          value={String(signerSnapshot?.[key] ?? '')}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            editSequenceRef.current += 1;
+                            setSignerSnapshot((prev) => ({ ...prev, [key]: value }));
+                          }}
+                          // WF-09 fix: signer fields должны блокироваться на FINALIZED/PRINTED,
+                          // иначе persistDraft вызовет updateInstance → 409 Conflict (silent failure).
+                          disabled={!canEditVisibleInstance}
+                        />
+                      </label>
+                    );
+                  })}
                 </div>
               </details>
 

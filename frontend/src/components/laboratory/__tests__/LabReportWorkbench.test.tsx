@@ -321,9 +321,9 @@ describe('LabReportWorkbench', () => {
 
     // Должен быть <details> с подсказкой "Подписи"
     expect(source).toContain('<details open={!canEditActiveInstance}>');
-    expect(source).toContain('Подписи');
+    expect(source).toContain('t(\'workbench.signatures\')');
     // Подсказка "только для чтения" когда не editable
-    expect(source).toContain('только для чтения — отчёт утверждён');
+    expect(source).toContain('t(\'workbench.signatures_readonly_hint\')');
     // Все 4 signer поля внутри details
     expect(source).toContain("'lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'");
   });
@@ -562,6 +562,41 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       expect(reviseDialog.getByRole('button', { name: labels.reviseConfirm })).toBeDisabled();
       fireEvent.click(reviseDialog.getByRole('button', { name: labels.cancel }));
       expect(screen.queryByRole('dialog', { name: labels.reviseTitle })).not.toBeInTheDocument();
+    } finally {
+      cleanup();
+      await i18n.changeLanguage('ru');
+    }
+  });
+
+  it.each([
+    ['ru', 'Подписи', 'только для чтения', 'Подпись лаборанта', 'ФИО лаборанта', 'Подпись утверждающего', 'ФИО утверждающего'],
+    ['uz-Cyrl', 'Имзолар', 'фақат ўқиш учун', 'Лаборант имзоси', 'Лаборантнинг Ф.И.Ш.', 'Тасдиқловчи ходимнинг имзоси', 'Тасдиқловчи ходимнинг Ф.И.Ш.'],
+    ['uz-Latn', 'Imzolar', 'faqat o\'qish uchun', 'Laborant imzosi', 'Laborantning F.I.Sh.', 'Tasdiqlovchi xodimning imzosi', 'Tasdiqlovchi xodimning F.I.Sh.'],
+  ])('localizes locked signer fields on a report in review in %s', async (language, title, readOnly, technician, technicianName, approver, approverName) => {
+    await i18n.changeLanguage(language);
+    try {
+      renderWithActiveInstance({
+        activeInstance: {
+          ...reopenedDraftInstance,
+          managed_release: true,
+          status: 'IN_REVIEW',
+          available_actions: ['preview'],
+          signer_snapshot: {
+            lab_technician_label: 'SYNTHETIC-TECHNICIAN-LABEL',
+            lab_technician_name: 'SYNTHETIC-TECHNICIAN',
+            approver_label: 'SYNTHETIC-APPROVER-LABEL',
+            approver_name: 'SYNTHETIC-APPROVER',
+          },
+        },
+      });
+
+      expect(screen.getByText(title)).toBeVisible();
+      expect(screen.getByText(`(${readOnly})`)).toBeVisible();
+      for (const label of [technician, technicianName, approver, approverName]) {
+        expect(screen.getByRole('textbox', { name: label })).toBeDisabled();
+      }
+      expect(screen.getByRole('textbox', { name: technicianName })).toHaveValue('SYNTHETIC-TECHNICIAN');
+      expect(screen.getByRole('textbox', { name: approverName })).toHaveValue('SYNTHETIC-APPROVER');
     } finally {
       cleanup();
       await i18n.changeLanguage('ru');

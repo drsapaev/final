@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import i18n from '@/i18n';
 import ReportSaveStatus from '../ReportSaveStatus';
 
 const serverReport = {
@@ -80,4 +81,28 @@ describe('draft conflict comparison keyboard focus', () => {
     expect(screen.getByRole('region', { name: 'Изменения в бланке' })).toBeVisible();
     expect(nextControl).toHaveFocus();
   });
+});
+
+it.each([
+  ['ru', 'ФИО лаборанта', 'Подпись утверждающего'],
+  ['uz-Cyrl', 'Лаборантнинг Ф.И.Ш.', 'Тасдиқловчи ходимнинг имзоси'],
+  ['uz-Latn', 'Laborantning F.I.Sh.', 'Tasdiqlovchi xodimning imzosi'],
+])('names signer field differences in %s', async (language, technicianName, approver) => {
+  await i18n.changeLanguage(language);
+  try {
+    const { rerender } = renderConflict();
+    rerender({
+      language,
+      current: { values: { hgb: '140' }, signer: { lab_technician_name: 'SYNTHETIC-LOCAL' }, studyDate: '' },
+      comparison: { ...serverReport, signer_snapshot: { approver_label: 'SYNTHETIC-SERVER' } },
+    });
+
+    expect(screen.getByRole('rowheader', { name: technicianName })).toBeVisible();
+    expect(screen.getByRole('rowheader', { name: approver })).toBeVisible();
+    expect(screen.getByRole('cell', { name: 'SYNTHETIC-LOCAL' })).toBeVisible();
+    expect(screen.getByRole('cell', { name: 'SYNTHETIC-SERVER' })).toBeVisible();
+  } finally {
+    cleanup();
+    await i18n.changeLanguage('ru');
+  }
 });

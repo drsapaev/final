@@ -78,7 +78,9 @@ export default function ReportSaveStatus({
       compare(`${field.field_key}__comment`, `${label} · ${t('workbench.comment_label')}`, 'values');
       compare(`${field.field_key}__absence_reason`, `${label} · ${t('workbench.result_absence')}`, 'values');
     }
-    for (const [key, label] of Object.entries(signerFieldLabels)) compare(key, label, 'signer');
+    for (const [key, fallback] of Object.entries(signerFieldLabels)) {
+      compare(key, t(`workbench.signer_${key}`, { defaultValue: fallback }), 'signer');
+    }
   }
 
   return (
