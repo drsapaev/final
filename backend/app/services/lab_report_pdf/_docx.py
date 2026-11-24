@@ -164,9 +164,7 @@ class DocxMixin(LabReportPDFServiceMixinBase):
                 matrix_row = [para(first_section["fields"][row_index].get("label") or "", "LabSmearCell")]
                 for section in sections:
                     row = (section.get("fields") or [])[row_index]
-                    value_display = row.get("value_text") or ""
-                    if row.get("value_numeric") is not None:
-                        value_display = row.get("value_numeric")
+                    value_display = self._reportlab_value_display(row)
                     matrix_row.append(
                         para(value_display if value_display is not None else "", "LabSmearCell")
                     )
@@ -202,7 +200,7 @@ class DocxMixin(LabReportPDFServiceMixinBase):
                 story.append(PageBreak())
 
         self._build_reportlab_doc(
-            doc, story, watermark_text=context.get("watermark_text")
+            doc, story, context=context
         )
         return buffer.getvalue()
 
@@ -493,7 +491,7 @@ body {{
         # поэтому многостраничные бланки остаются помеченными целиком.
         if watermark_text:
             css += """
-.pdf-watermark {{
+.pdf-watermark {
   position: fixed;
   top: 45%;
   left: 50%;
@@ -507,7 +505,7 @@ body {{
   z-index: 9999;
   pointer-events: none;
   user-select: none;
-}}
+}
 """
         return css
 

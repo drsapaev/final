@@ -6,19 +6,29 @@ from __future__ import annotations
 
 from app.services.lab_reporting._base import *  # noqa: F401, F403
 from app.services.lab_reporting._base import LabReportingServiceMixinBase
+from app.services.lab_reporting._result_values import (
+    COMPARATOR_LABELS,
+    qualitative_code,
+)
 
 
 class RuleEngineMixin(LabReportingServiceMixinBase):
     """Rule_Engine methods for LabReportingService."""
 
     def _extract_effective_value(self, value: LabReportValue) -> Any:
+        if (value.result_payload or {}).get("kind") == "qualified_numeric":
+            return self._format_result_display(value)
         return value.value_numeric if value.value_numeric is not None else value.value_text
 
 
     def _build_rule_context(
         self, patient_snapshot: dict[str, Any], field_values: dict[str, Any]
     ) -> dict[str, Any]:
-        return {"patient": patient_snapshot, "field": field_values}
+        patient = dict(patient_snapshot or {})
+        if isinstance(patient.get("sex"), str):
+            sex = patient["sex"].strip().upper()
+            patient["sex"] = sex if sex in {"M", "F", "X"} else None
+        return {"patient": patient, "field": field_values}
 
 
     def _lookup_context_value(self, source: str | None, context: dict[str, Any]) -> Any:
@@ -36,18 +46,33 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
 
 
     def _evaluate_condition(
-        self, condition: dict[str, Any] | None, context: dict[str, Any]
+        self, condition: dict[str, Any] | None, context: dict[str, Any],
+        *, evaluate_qualitative: bool = False,
     ) -> bool:
         if not condition:
             return True
         if "all" in condition:
-            return all(self._evaluate_condition(item, context) for item in condition["all"])
+            return all(
+                self._evaluate_condition(item, context, evaluate_qualitative=evaluate_qualitative)
+                for item in condition["all"]
+            )
         if "any" in condition:
-            return any(self._evaluate_condition(item, context) for item in condition["any"])
+            return any(
+                self._evaluate_condition(item, context, evaluate_qualitative=evaluate_qualitative)
+                for item in condition["any"]
+            )
 
-        left = self._lookup_context_value(condition.get("source"), context)
+        source = condition.get("source")
+        left = self._lookup_context_value(source, context)
         op = condition.get("op", "exists")
         right = condition.get("value")
+        if evaluate_qualitative and source and source.startswith("field.") and op in {"eq", "neq", "ieq", "ineq"}:
+            expected_code = qualitative_code(right)
+            if expected_code is not None:
+                actual_code = qualitative_code(left)
+                if op in {"eq", "ieq"}:
+                    return actual_code == expected_code
+                return {actual_code, expected_code} == {"negative", "positive"}
         if op == "exists":
             return left is not None and left != ""
         if op == "eq":
@@ -62,16 +87,20 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
             if left is None or right is None:
                 return left != right
             return str(left).strip().casefold() != str(right).strip().casefold()
-        if op == "gt":
-            return left is not None and left > right
-        if op == "gte":
-            return left is not None and left >= right
-        if op == "lt":
-            return left is not None and left < right
-        if op == "lte":
-            return left is not None and left <= right
-        if op == "between":
-            return left is not None and condition.get("min") <= left <= condition.get("max")
+        if op in {"gt", "gte", "lt", "lte", "between"}:
+            left = self._coerce_decimal(left)
+            right = self._coerce_decimal(right)
+            if left is None:
+                return False
+            if op == "between":
+                minimum = self._coerce_decimal(condition.get("min"))
+                maximum = self._coerce_decimal(condition.get("max"))
+                return minimum is not None and maximum is not None and minimum <= left <= maximum
+            if right is None:
+                return False
+            return {
+                "gt": left > right, "gte": left >= right, "lt": left < right, "lte": left <= right,
+            }[op]
         if op == "in":
             return left in (condition.get("values") or [])
         return False
@@ -82,11 +111,26 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
     ) -> dict[str, Any]:
         if not rule:
             return {}
-        for case in rule.get("cases") or []:
-            if self._evaluate_condition(case.get("when"), context):
+        cases = rule.get("cases") or []
+        for case in cases:
+            if self._evaluate_condition(case.get("when"), context, evaluate_qualitative=True):
                 return case
+        if any(self._missing_age_context(case.get("when"), context) for case in cases):
+            return {}
         default = rule.get("default")
         return default if isinstance(default, dict) else {}
+
+    def _missing_age_context(self, condition: dict[str, Any] | None, context: dict[str, Any]) -> bool:
+        if not condition:
+            return False
+        source = condition.get("source")
+        if source in {"patient.age_days", "patient.age_months", "patient.age_years"}:
+            return self._lookup_context_value(source, context) is None
+        return any(
+            self._missing_age_context(child, context)
+            for combinator in ("all", "any")
+            for child in condition.get(combinator) or []
+        )
 
 
     def _resolve_reference(
@@ -96,8 +140,9 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
             return self._resolve_catalog_reference(field_def, context)
         if field_def.reference_mode == "rule_based":
             payload = self._resolve_rule_payload(field_def.reference_rule, context)
+            fallback_text = (field_def.reference_text or "") if payload or not context.get("patient") else ""
             return {
-                "text": payload.get("text") or field_def.reference_text or "",
+                "text": payload.get("text") or fallback_text,
                 "low": payload.get("low"),
                 "high": payload.get("high"),
                 "warning_low": payload.get("warning_low"),
@@ -111,6 +156,7 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
                 "critical_low_flag": payload.get("critical_low_flag"),
                 "critical_high_flag": payload.get("critical_high_flag"),
                 "flag": payload.get("flag"),
+                "provenance": {"mode": "template_rule", "rule": self._json_safe_value(payload)},
             }
         return {
             "text": field_def.reference_text or "",
@@ -138,7 +184,8 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
         if value in (None, ""):
             return None
         try:
-            return Decimal(str(value))
+            parsed = Decimal(str(value).strip().replace(",", "."))
+            return parsed if parsed.is_finite() else None
         except (InvalidOperation, ValueError):
             return None
 
@@ -161,6 +208,12 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
         if value_numeric is not None:
             return self._format_decimal_display(value_numeric) or ""
         return value_text or ""
+
+    def _format_result_display(self, value: LabReportValue) -> str:
+        comparator = (value.result_payload or {}).get("comparator")
+        if comparator in COMPARATOR_LABELS and value.value_numeric is not None:
+            return f"{COMPARATOR_LABELS[comparator]}{self._format_decimal_display(value.value_numeric)}"
+        return self._value_display(value.value_numeric, value.value_text)
 
 
     def _flag_direction(self, flag: str | None) -> str | None:
@@ -207,7 +260,7 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
             "reference_text": reference_text,
             "reference_mode": field_def.reference_mode,
             "analyte_code": field_def.analyte_code,
-            "unit_code": field_def.unit_code,
+            "unit_code": self._resolve_field_unit_code(field_def),
             "effective_value": self._json_safe_value(effective_value),
             "severity_rank": severity_rank,
             "direction": direction,
@@ -260,50 +313,26 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
             threshold = self._coerce_decimal(payload.get(threshold_key))
             if threshold is None:
                 continue
-            if comparison == "lt" and numeric_value < threshold:
-                flag = str(payload.get(flag_key) or default_flag)
-                severity_rank = self._flag_severity_rank(flag)
-                return {
-                    "flag": flag,
-                    "source": source,
-                    "severity_rank": severity_rank,
-                    "meta": self._flag_meta(
-                        field_def=field_def,
-                        effective_value=effective_value,
-                        payload=payload,
-                        source=source,
-                        reference_text=reference_text,
-                        direction=direction,
-                        matched_threshold={
-                            "key": threshold_key,
-                            "operator": comparison,
-                            "value": threshold,
-                        },
-                        severity_rank=severity_rank,
-                    ),
-                }
-            if comparison == "gt" and numeric_value > threshold:
-                flag = str(payload.get(flag_key) or default_flag)
-                severity_rank = self._flag_severity_rank(flag)
-                return {
-                    "flag": flag,
-                    "source": source,
-                    "severity_rank": severity_rank,
-                    "meta": self._flag_meta(
-                        field_def=field_def,
-                        effective_value=effective_value,
-                        payload=payload,
-                        source=source,
-                        reference_text=reference_text,
-                        direction=direction,
-                        matched_threshold={
-                            "key": threshold_key,
-                            "operator": comparison,
-                            "value": threshold,
-                        },
-                        severity_rank=severity_rank,
-                    ),
-                }
+            matches = numeric_value < threshold if comparison == "lt" else numeric_value > threshold
+            if not matches:
+                continue
+            flag = str(payload.get(flag_key) or default_flag)
+            severity_rank = self._flag_severity_rank(flag)
+            return {
+                "flag": flag,
+                "source": source,
+                "severity_rank": severity_rank,
+                "meta": self._flag_meta(
+                    field_def=field_def,
+                    effective_value=effective_value,
+                    payload=payload,
+                    source=source,
+                    reference_text=reference_text,
+                    direction=direction,
+                    matched_threshold={"key": threshold_key, "operator": comparison, "value": threshold},
+                    severity_rank=severity_rank,
+                ),
+            }
         return None
 
 
@@ -315,7 +344,9 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
         context: dict[str, Any],
         reference: dict[str, Any],
     ) -> dict[str, Any]:
-        if effective_value in (None, ""):
+        if effective_value in (None, "") or (
+            field_def.value_type == "numeric" and self._coerce_decimal(effective_value) is None
+        ):
             return {
                 "flag": None,
                 "source": None,
@@ -324,23 +355,7 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
             }
         numeric_value = self._coerce_decimal(effective_value)
 
-        rule = field_def.highlight_rule or {}
-        mode = rule.get("mode")
-        payload: dict[str, Any]
-        source: str | None
-        if mode == "range":
-            payload = rule
-            source = "range_rule"
-        elif mode == "rule_based_reference":
-            payload = reference
-            source = f"{field_def.reference_mode}_reference"
-        elif rule:
-            payload = self._resolve_rule_payload(rule, context)
-            source = "highlight_rule"
-        else:
-            payload = {}
-            source = None
-
+        payload, source = self._flag_rule(field_def, context, reference)
         threshold_flag = self._resolve_threshold_flag(
             numeric_value=numeric_value,
             payload=payload,
@@ -375,5 +390,134 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
             "severity_rank": None,
             "meta": None,
         }
+
+    def _flag_rule(
+        self, field_def: LabReportFieldDef, context: dict[str, Any], reference: dict[str, Any],
+    ) -> tuple[dict[str, Any], str | None]:
+        rule = field_def.highlight_rule or {}
+        mode = rule.get("mode")
+        if mode == "range":
+            return rule, "range_rule"
+        if mode == "rule_based_reference":
+            return reference, f"{field_def.reference_mode}_reference"
+        if rule:
+            return self._resolve_rule_payload(rule, context), "highlight_rule"
+        return {}, None
+
+    def _refresh_result_evaluation(
+        self, instance: LabReportInstance, *, validate_existing: bool = False,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Refresh every saved field against the same packet and specimen context."""
+        field_map = self._field_map(instance.template_version)
+        self._normalize_existing_results(instance, field_map, strict=validate_existing)
+        current_values = {
+            value.field_key: self._extract_effective_value(value) for value in instance.values
+        }
+        specimen_context = self._refresh_reference_context(instance)
+        context = {
+            **self._build_rule_context(instance.patient_snapshot, current_values),
+            "specimen": specimen_context,
+        }
+        for value in instance.values:
+            field_def = field_map.get(value.field_key)
+            if field_def is None:
+                continue
+            self._evaluate_saved_result(instance, field_def, value, context)
+        return current_values, context
+
+    def _normalize_existing_results(
+        self, instance: LabReportInstance, field_map: dict[str, LabReportFieldDef], *, strict: bool,
+    ) -> None:
+        updates = []
+        for value in instance.values:
+            field_def = field_map.get(value.field_key)
+            if field_def is None or (value.result_payload and not strict):
+                continue
+            payload = dict(value.result_payload or {})
+            payload.update({
+                "result_kind": payload.pop("kind", None),
+                "value_text": value.value_text,
+                "value_numeric": value.value_numeric,
+                "comment": value.comment,
+            })
+            try:
+                normalized = self._normalize_value_payload(payload, field_def)
+            except LabReportingDomainError:
+                if strict:
+                    raise
+                continue
+            updates.append((value, normalized))
+        for value, normalized in updates:
+            value.value_text = normalized["value_text"]
+            value.value_numeric = normalized["value_numeric"]
+            value.result_payload = normalized["result_payload"]
+
+    def _evaluate_saved_result(
+        self, instance: LabReportInstance, field_def: LabReportFieldDef, value: LabReportValue,
+        context: dict[str, Any],
+    ) -> None:
+        result = value.result_payload or {}
+        field_context = {**context, "method_code": result.get("method_code")}
+        visible = self._is_visible(field_def.visibility_rule, field_context)
+        reference = self._resolve_reference(field_def, field_context) if visible else {}
+        effective_value = field_context["field"].get(value.field_key)
+        flag = self._resolve_flag(
+            field_def=field_def,
+            effective_value=effective_value if visible and result else None,
+            context=field_context,
+            reference=reference,
+        )
+        value.resolved_reference_text = reference.get("text")
+        value.resolved_flag = flag["flag"]
+        value.resolved_flag_source = flag["source"]
+        value.resolved_flag_severity = flag["severity_rank"]
+        value.resolved_flag_meta = flag["meta"]
+        rule, rule_source = self._flag_rule(field_def, field_context, reference)
+        status, interpretation = self._evaluation_outcome(result, effective_value, visible, flag, rule)
+        value.evaluation_snapshot = self._json_safe_value({
+            "status": status,
+            "interpretation": interpretation,
+            "visible": visible,
+            "template_version_id": instance.template_version_id,
+            "analyte_code": field_def.analyte_code,
+            "unit": self._resolve_field_unit(field_def),
+            "unit_code": self._resolve_field_unit_code(field_def),
+            "material_code": field_context["specimen"].get("material_code"),
+            "method_code": result.get("method_code"),
+            "age_at_date": instance.patient_snapshot.get("age_at_date"),
+            "age_days": instance.patient_snapshot.get("age_days"),
+            "reference_date_source": instance.patient_snapshot.get("age_date_source"),
+            "reference": reference.get("provenance"),
+            "rule_source": rule_source,
+            "thresholds": self._threshold_snapshot(rule),
+        })
+
+    def _evaluation_outcome(
+        self, result: dict[str, Any], effective_value: Any, visible: bool,
+        flag: dict[str, Any], rule: dict[str, Any],
+    ) -> tuple[str, str | None]:
+        if not visible or result.get("kind") == "absent":
+            return "not_applicable", None
+        if effective_value in (None, ""):
+            return "missing", None
+        if not result or result.get("kind") == "qualified_numeric":
+            return "not_evaluated", None
+        if flag.get("flag"):
+            interpretation = flag["flag"]
+            if interpretation not in {"normal", "low", "high", "warning", "abnormal", "critical", "negative", "positive", "indeterminate"}:
+                interpretation = "abnormal"
+            return "evaluated", interpretation
+        qualitative = result.get("qualitative_code")
+        if qualitative in {"positive", "negative"}:
+            return "evaluated", qualitative
+        if qualitative == "indeterminate":
+            return "not_evaluated", qualitative
+        if result.get("kind") == "text" and rule:
+            return "not_evaluated", None
+        if result.get("kind") == "numeric" and any(
+            self._coerce_decimal(rule.get(key)) is not None for key in ("low", "high")
+        ):
+            return "evaluated", "normal"
+        return "not_applicable", None
 
 

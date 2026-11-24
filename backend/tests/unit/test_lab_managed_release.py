@@ -1,0 +1,292 @@
+"""The managed path never publishes a version the reviewer did not inspect."""
+
+from datetime import UTC, datetime
+from uuid import uuid4
+
+import pytest
+
+from app.core.config import settings
+from app.models.lab import LabOrderTest
+from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment
+from app.models.role_permission import Permission, Role, user_roles_table
+from app.models.service import Service
+from app.models.user import User
+from app.models.visit import VisitService
+from app.schemas.lab_release import LabReportQCIn
+from app.services.authentication_service import authentication_service
+from app.services.lab_reporting_service import (
+    LabReportingDomainError,
+    LabReportingService,
+)
+
+
+def _staff(db, name, permissions):
+    actor = User(
+        username=f"SYNTHETIC-{name}",
+        full_name=f"SYNTHETIC {name}",
+        hashed_password=f"unusable-{uuid4()}",
+        role="Lab",
+        is_active=True,
+    )
+    db.add(actor)
+    db.flush()
+    if permissions:
+        role = Role(
+            name=f"synthetic-{name}",
+            display_name=f"SYNTHETIC {name}",
+            permissions=permissions,
+        )
+        db.add(role)
+        db.flush()
+        db.execute(user_roles_table.insert().values(user_id=actor.id, role_id=role.id))
+    return actor
+
+
+def _auth(actor):
+    token = authentication_service.create_access_token(
+        {
+            "sub": str(actor.id),
+            "username": actor.username,
+            "role": actor.role,
+            "is_active": actor.is_active,
+            "is_superuser": actor.is_superuser,
+        }
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.mark.unit
+def test_managed_release_versions_permissions_and_correction_history(
+    db_session, test_patient, monkeypatch
+):
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", True)
+    monkeypatch.setattr(settings, "LAB_RELEASE_REQUIRE_DISTINCT_REVIEWER", True)
+    permissions = [
+        Permission(name=code, codename=code)
+        for code in ("lab:review", "lab:release", "lab:qc")
+    ]
+    entrant = _staff(db_session, "lab-entered", [permissions[0]])
+    reviewer = _staff(db_session, "lab-reviewed", permissions)
+    no_grant = _staff(db_session, "lab-no-grant", [])
+    db_session.commit()
+
+    service = LabReportingService(db_session)
+    template = next(item for item in service.list_templates() if item.code == "cbc_oak")
+    report = service.create_instance(
+        {"patient_id": test_patient.id, "template_id": template.id},
+        actor_name=entrant.full_name,
+        actor_user_id=entrant.id,
+    )
+    assert report.managed_release
+    report_id = report.id
+    actor_id = entrant.id
+    reviewer_id = reviewer.id
+    no_grant_id = no_grant.id
+    initial_version = report.updated_at.isoformat()
+    with pytest.raises(
+        LabReportingDomainError, match="requires a reviewed report"
+    ) as premature:
+        service.finalize(
+            report_id, actor_user_id=reviewer_id, expected_updated_at=initial_version
+        )
+    assert premature.value.status_code == 409
+
+    report, _ = service.bulk_upsert_values(
+        report_id,
+        [
+            {"field_key": "hgb", "value_text": "100"},
+            {"field_key": "wbc", "value_text": "5.2"},
+        ],
+        expected_updated_at=initial_version,
+        actor_user_id=actor_id,
+    )
+    assert service.report_release_holds(report) == ["specimen_required", "qc_missing"]
+    draft_token = report.updated_at.isoformat()
+    report = service.record_report_qc(
+        report_id,
+        actor_user_id=reviewer_id,
+        command=LabReportQCIn(
+            expected_updated_at=draft_token,
+            status="accepted",
+            method="SYNTHETIC",
+            series_ref="SYNTHETIC-QC",
+        ),
+    )
+    specimen = LabSpecimen(
+        order_id=report.order_id,
+        barcode="SYNTHETIC-RELEASE",
+        material_code="synthetic-blood",
+        container_code="synthetic-tube",
+        status="accepted",
+        revision=4,
+        create_request_id=str(uuid4()),
+        created_at=datetime.now(UTC),
+    )
+    db_session.add(specimen)
+    db_session.flush()
+    db_session.add(
+        LabSpecimenAssignment(specimen_id=specimen.id, report_instance_id=report_id)
+    )
+    db_session.commit()
+
+    report = service.submit_for_review(
+        report_id,
+        actor_user_id=actor_id,
+        expected_updated_at=report.updated_at.isoformat(),
+    )
+    assert report.status == "IN_REVIEW"
+    submitted_version = report.updated_at.isoformat()
+    assert "review" not in service.instance_available_actions(report, actor_id)
+    assert "review" not in service.instance_available_actions(report, no_grant_id)
+    assert "review" in service.instance_available_actions(report, reviewer_id)
+    with pytest.raises(LabReportingDomainError, match="workflow permission required"):
+        service.review_report(
+            report_id, actor_user_id=no_grant_id, expected_updated_at=submitted_version
+        )
+    with pytest.raises(LabReportingDomainError, match="reviewer who did not enter"):
+        service.review_report(
+            report_id, actor_user_id=actor_id, expected_updated_at=submitted_version
+        )
+    with pytest.raises(LabReportingDomainError, match="Return the report to draft"):
+        service.bulk_upsert_values(
+            report_id, [], expected_updated_at=submitted_version, actor_user_id=actor_id
+        )
+
+    report = service.review_report(
+        report_id, actor_user_id=reviewer_id, expected_updated_at=submitted_version
+    )
+    assert report.status == "REVIEWED"
+    reviewed_version = report.updated_at.isoformat()
+    with pytest.raises(LabReportingDomainError) as stale:
+        service.finalize(
+            report_id, actor_user_id=reviewer_id, expected_updated_at=submitted_version
+        )
+    assert stale.value.status_code == 409
+
+    # Accepted can change after review without the report token changing.
+    specimen.revision += 1
+    db_session.commit()
+    with pytest.raises(LabReportingDomainError, match="Specimen or QC changed"):
+        service.finalize(
+            report_id, actor_user_id=reviewer_id, expected_updated_at=reviewed_version
+        )
+
+    report = service.return_report_to_draft(
+        report_id,
+        actor_user_id=reviewer_id,
+        expected_updated_at=reviewed_version,
+        reason="SYNTHETIC specimen evidence changed",
+    )
+    report = service.submit_for_review(
+        report_id,
+        actor_user_id=actor_id,
+        expected_updated_at=report.updated_at.isoformat(),
+    )
+    report = service.review_report(
+        report_id,
+        actor_user_id=reviewer_id,
+        expected_updated_at=report.updated_at.isoformat(),
+    )
+    token = report.updated_at.isoformat()
+    released = service.finalize(
+        report_id, actor_user_id=reviewer_id, expected_updated_at=token
+    )
+    assert released.status == "FINALIZED"
+    assert released.signer_snapshot["lab_technician_name"] == entrant.full_name
+    assert released.signer_snapshot["approver_name"] == reviewer.full_name
+    released_version = released.updated_at.isoformat()
+    repeated = service.finalize(
+        report_id, actor_user_id=reviewer_id, expected_updated_at=token
+    )
+    assert repeated.updated_at.isoformat() == released_version
+    events = service.workflow_history(report_id)
+    assert [item.actor_user_id for item in events if item.kind == "finalized"] == [
+        reviewer_id
+    ]
+
+    with pytest.raises(LabReportingDomainError, match="Provide a reason"):
+        service.revise(
+            report_id, actor_user_id=actor_id, expected_updated_at=released_version
+        )
+    revision = service.revise(
+        report_id,
+        actor_user_id=actor_id,
+        expected_updated_at=released_version,
+        reason="SYNTHETIC correction",
+    )
+    assert revision.supersedes_instance_id == report_id
+    assert revision.status == "DRAFT"
+    assert service.workflow_history(revision.id)[0].reason == "SYNTHETIC correction"
+    same_revision = service.revise(
+        report_id,
+        actor_user_id=actor_id,
+        expected_updated_at=released_version,
+        reason="SYNTHETIC correction",
+    )
+    assert same_revision.id == revision.id
+    assert service.get_instance(report_id).status == "FINALIZED"
+
+
+@pytest.mark.unit
+def test_managed_draft_is_hidden_from_assigned_doctor(
+    db_session,
+    test_patient,
+    test_visit,
+    test_doctor,
+    client,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", True)
+    operator = _staff(db_session, "lab-access", [])
+    doctor = db_session.get(User, test_doctor.user_id)
+    doctor.role = "doctor"
+    test_patient.first_name = "SYNTHETIC"
+    catalog_entry = Service(code="L01", name="SYNTHETIC CBC", queue_tag="laboratory")
+    db_session.add(catalog_entry)
+    db_session.flush()
+    ordered_line = VisitService(
+        visit_id=test_visit.id,
+        service_id=catalog_entry.id,
+        code="L01",
+        name="SYNTHETIC CBC",
+    )
+    db_session.add(ordered_line)
+    db_session.commit()
+
+    service = LabReportingService(db_session)
+    template = next(item for item in service.list_templates() if item.code == "cbc_oak")
+    response = client.post(
+        "/api/v1/lab/report-instances",
+        headers=_auth(operator),
+        json={
+            "patient_id": test_patient.id,
+            "visit_id": test_visit.id,
+            "template_id": template.id,
+            "visit_service_ids": [ordered_line.id],
+        },
+    )
+    assert response.status_code == 200, response.json()
+    report = response.json()
+    assert report["managed_release"] is True
+    assert report["available_actions"] == [
+        "preview",
+        "edit",
+        "save_draft",
+        "submit_review",
+    ]
+    allocation = (
+        db_session.query(LabOrderTest).filter_by(visit_service_id=ordered_line.id).one()
+    )
+    assert allocation.report_instance_id == report["id"]
+
+    response = client.get(
+        f"/api/v1/lab/report-instances/{report['id']}", headers=_auth(doctor)
+    )
+    assert response.status_code == 404
+    response = client.get(
+        "/api/v1/lab/report-instances",
+        params={"visit_ids": test_visit.id},
+        headers=_auth(doctor),
+    )
+    assert response.status_code == 200
+    assert response.json() == []

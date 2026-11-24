@@ -4,8 +4,15 @@ Split from lab_reporting_service.py.
 """
 from __future__ import annotations
 
+from zoneinfo import ZoneInfo
+
+from sqlalchemy import select
+
+from app.crud.clinic import get_queue_settings
+from app.repositories.lab_specimen_repository import SpecimenRepository
 from app.services.lab_reporting._base import *  # noqa: F401, F403
 from app.services.lab_reporting._base import LabReportingServiceMixinBase
+from app.services.lab_reporting._result_values import age_components
 
 
 class ContextMixin(LabReportingServiceMixinBase):
@@ -159,18 +166,27 @@ class ContextMixin(LabReportingServiceMixinBase):
             order = self.repository.get_order(order_id)
             if not order:
                 raise LabReportingDomainError(404, "Lab order not found")
+            if order.status in {"canceled", "cancelled"}:
+                raise LabReportingDomainError(409, "Lab order is canceled")
             self._assert_order_belongs_to_context(
                 order=order,
                 patient_id=patient_id,
                 visit_id=visit_id,
             )
             return order, False
-        order = self.repository.find_order_by_visit_and_patient(
-            visit_id=visit_id,
-            patient_id=patient_id,
-        )
-        if order:
-            return order, False
+        if visit_id is not None:
+            # Collection may provision the same order before a report exists.
+            self.db.execute(
+                select(Visit.id).where(Visit.id == visit_id).with_for_update(key_share=True)
+            )
+            orders = self.repository.find_active_orders_by_visit_and_patient(
+                visit_id=visit_id,
+                patient_id=patient_id,
+            )
+            if len(orders) > 1:
+                raise LabReportingDomainError(409, "Select a lab order explicitly")
+            if orders:
+                return orders[0], False
         logger.info(
             "[LAB] creating synthetic lab order has_visit_context=%s",
             visit_id is not None,
@@ -227,25 +243,15 @@ class ContextMixin(LabReportingServiceMixinBase):
                 visit_id=int(order.visit_id),
                 patient_id=int(patient_id),
             )
-        if (
-            visit_id is not None
-            and order.visit_id is not None
-            and int(order.visit_id) != int(visit_id)
-        ):
+        if order.visit_id != visit_id:
             raise LabReportingDomainError(
                 409, "Lab order does not belong to selected visit"
             )
 
 
-    def _build_patient_snapshot(self, patient) -> dict[str, Any]:
-        today = date.today()
-        age_years = None
-        age_months = None
-        if patient.birth_date:
-            age_years = today.year - patient.birth_date.year - (
-                (today.month, today.day) < (patient.birth_date.month, patient.birth_date.day)
-            )
-            age_months = max(age_years * 12 + today.month - patient.birth_date.month, 0)
+    def _build_patient_snapshot(self, patient, *, study_date: date | None = None) -> dict[str, Any]:
+        if study_date is not None and patient.birth_date is not None and study_date < patient.birth_date:
+            raise LabReportingDomainError(400, "Study date cannot precede birth date")
         return {
             "patient_id": patient.id,
             "full_name": patient.short_name() if hasattr(patient, "short_name") else patient.first_name,
@@ -254,11 +260,52 @@ class ContextMixin(LabReportingServiceMixinBase):
             "middle_name": patient.middle_name,
             "birth_date": patient.birth_date.isoformat() if patient.birth_date else None,
             "sex": patient.sex,
-            "age_years": age_years,
-            "age_months": age_months,
+            "study_date": study_date.isoformat() if study_date else None,
+            "age_at_date": study_date.isoformat() if study_date else None,
+            "age_date_source": "study_date" if study_date else None,
+            **age_components(patient.birth_date, study_date),
             "phone": patient.phone,
             "address": patient.address,
         }
+
+    def _set_report_study_date(self, instance: LabReportInstance, study_date: date | None) -> None:
+        snapshot = dict(instance.patient_snapshot or {})
+        birth_date = date.fromisoformat(snapshot["birth_date"]) if snapshot.get("birth_date") else None
+        if study_date is not None and birth_date is not None and study_date < birth_date:
+            raise LabReportingDomainError(400, "Study date cannot precede birth date")
+        snapshot["study_date"] = study_date.isoformat() if study_date else None
+        instance.patient_snapshot = snapshot
+
+    def _refresh_reference_context(self, instance: LabReportInstance) -> dict[str, Any]:
+        snapshot = dict(instance.patient_snapshot or {})
+        study_date = date.fromisoformat(snapshot["study_date"]) if snapshot.get("study_date") else None
+        birth_date = date.fromisoformat(snapshot["birth_date"]) if snapshot.get("birth_date") else None
+        specimens = SpecimenRepository(self.db).list_for_report(instance.id)
+        if any(specimen.status == "rejected" for specimen in specimens):
+            specimens = []
+        materials = {specimen.material_code for specimen in specimens}
+        material_code = next(iter(materials)) if len(materials) == 1 else None
+        reference_date = study_date
+        date_source = "study_date" if study_date else None
+        collected_times = [specimen.collected_at for specimen in specimens]
+        if study_date is None and collected_times and all(timestamp is not None for timestamp in collected_times):
+            timezone = ZoneInfo(get_queue_settings(self.db)["timezone"])
+            collected_dates = {
+                (timestamp if timestamp.tzinfo else timestamp.replace(tzinfo=UTC)).astimezone(timezone).date()
+                for timestamp in collected_times if timestamp is not None
+            }
+            if len(collected_dates) == 1:
+                reference_date = next(iter(collected_dates))
+                date_source = "specimen_collection"
+        snapshot.update({
+            "study_date": study_date.isoformat() if study_date else None,
+            "age_at_date": reference_date.isoformat() if reference_date else None,
+            "age_date_source": date_source,
+            "reference_material_code": material_code,
+            **age_components(birth_date, reference_date),
+        })
+        instance.patient_snapshot = snapshot
+        return {"material_code": material_code}
 
 
     def _build_branding_snapshot(

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.lab import (
+    FINAL_INSTANCE_STATUSES,
     LabCatalogAnalyte,
     LabCatalogReferenceRange,
     LabCatalogUnit,
@@ -51,14 +52,20 @@ class LabReportingApiRepository:
     def get_order(self, order_id: int) -> LabOrder | None:
         return self.db.get(LabOrder, order_id)
 
-    def find_order_by_visit_and_patient(
-        self, *, visit_id: int | None, patient_id: int
-    ) -> LabOrder | None:
-        stmt = select(LabOrder).where(LabOrder.patient_id == patient_id)
-        if visit_id:
-            stmt = stmt.where(LabOrder.visit_id == visit_id)
-        stmt = stmt.order_by(LabOrder.id.desc()).limit(1)
-        return self.db.execute(stmt).scalars().first()
+    def find_active_orders_by_visit_and_patient(
+        self, *, visit_id: int, patient_id: int,
+    ) -> list[LabOrder]:
+        stmt = (
+            select(LabOrder)
+            .where(
+                LabOrder.patient_id == patient_id,
+                LabOrder.visit_id == visit_id,
+                LabOrder.status.notin_(("canceled", "cancelled")),
+            )
+            .order_by(LabOrder.id)
+            .limit(2)
+        )
+        return list(self.db.scalars(stmt))
 
     def add_order(self, order: LabOrder) -> LabOrder:
         self.db.add(order)
@@ -288,6 +295,7 @@ class LabReportingApiRepository:
         status: str | None,
         limit: int,
         offset: int,
+        hide_managed_drafts: bool = False,
     ) -> list[LabReportInstance]:
         stmt = (
             select(LabReportInstance)
@@ -308,6 +316,11 @@ class LabReportingApiRepository:
             stmt = stmt.where(LabReportInstance.visit_id.in_(visit_ids))
         if status:
             stmt = stmt.where(LabReportInstance.status == status)
+        if hide_managed_drafts:
+            stmt = stmt.where(or_(
+                LabReportInstance.managed_release.is_(False),
+                LabReportInstance.status.in_(FINAL_INSTANCE_STATUSES),
+            ))
         return self.db.execute(stmt).scalars().unique().all()
 
     def get_instance(self, instance_id: int) -> LabReportInstance | None:

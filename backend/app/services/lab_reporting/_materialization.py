@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from app.services.lab_reporting._base import *  # noqa: F401, F403
 from app.services.lab_reporting._base import LabReportingServiceMixinBase
+from app.services.lab_reporting._result_values import qualitative_code
 
 
 class MaterializationMixin(LabReportingServiceMixinBase):
@@ -17,33 +18,68 @@ class MaterializationMixin(LabReportingServiceMixinBase):
             field_key: self._extract_effective_value(value)
             for field_key, value in value_map.items()
         }
-        context = self._build_rule_context(instance.patient_snapshot, current_values)
+        context = {
+            **self._build_rule_context(instance.patient_snapshot, current_values),
+            "specimen": {"material_code": instance.patient_snapshot.get("reference_material_code")},
+        }
         sections: list[dict[str, Any]] = []
         for section in sorted(instance.template_version.sections, key=lambda item: item.sort_order):
             rows = []
             for field_def in sorted(section.fields, key=lambda item: item.sort_order):
-                if not self._is_visible(field_def.visibility_rule, context):
-                    continue
-                reference = self._resolve_reference(field_def, context)
                 value = value_map.get(field_def.field_key)
+                result = (value.result_payload or {}) if value else {}
+                field_context = {**context, "method_code": result.get("method_code")}
+                evaluation = value.evaluation_snapshot if value else None
+                if instance.status in FINAL_INSTANCE_STATUSES and evaluation is not None and "visible" in evaluation:
+                    visible = evaluation["visible"]
+                else:
+                    visible = self._is_visible(field_def.visibility_rule, field_context)
+                if not visible:
+                    continue
+                if evaluation is not None:
+                    unit = evaluation.get("unit")
+                    unit_code = evaluation.get("unit_code")
+                else:
+                    unit = self._resolve_field_unit(field_def)
+                    unit_code = self._resolve_field_unit_code(field_def)
+                reference_text = value.resolved_reference_text if value else None
+                if reference_text is None and evaluation is None:
+                    if instance.status not in FINAL_INSTANCE_STATUSES:
+                        reference_text = self._resolve_reference(field_def, field_context).get("text")
+                    elif field_def.reference_mode == "static_text":
+                        reference_text = field_def.reference_text
                 rows.append(
                     {
                         "id": field_def.id,
                         "analyte_code": field_def.analyte_code,
-                        "unit_code": field_def.unit_code,
+                        "unit_code": unit_code,
                         "field_key": field_def.field_key,
                         "label": field_def.label,
                         "value_type": field_def.value_type,
-                        "unit": self._resolve_field_unit(field_def),
+                        "unit": unit,
                         "required": field_def.required,
                         "reference_mode": field_def.reference_mode,
-                        "reference_text": value.resolved_reference_text
-                        if value and value.resolved_reference_text is not None
-                        else reference.get("text"),
+                        "reference_text": reference_text,
                         "visibility_rule": field_def.visibility_rule,
                         "highlight_rule": field_def.highlight_rule,
+                        "choice_options": field_def.choice_options,
+                        "choice_option_codes": (
+                            [qualitative_code(option) for option in field_def.choice_options]
+                            if field_def.choice_options is not None else None
+                        ),
                         "value_text": value.value_text if value else None,
                         "value_numeric": value.value_numeric if value else None,
+                        "result_kind": result.get("kind"),
+                        "comparator": result.get("comparator"),
+                        "qualitative_code": result.get("qualitative_code"),
+                        "absence_reason": result.get("absence_reason"),
+                        "method_code": result.get("method_code"),
+                        "value_display": self._format_result_display(value) if value else "",
+                        "evaluation_status": evaluation["status"] if evaluation else (
+                            "unknown" if value and self._extract_effective_value(value) not in (None, "") else "missing"
+                        ),
+                        "interpretation": evaluation.get("interpretation") if evaluation else None,
+                        "evaluation_snapshot": deepcopy(evaluation),
                         "comment": value.comment if value else None,
                         "resolved_flag": value.resolved_flag if value else None,
                         "resolved_flag_source": value.resolved_flag_source if value else None,
@@ -144,10 +180,7 @@ class MaterializationMixin(LabReportingServiceMixinBase):
                         "unit": field.get("unit"),
                         "value_text": field.get("value_text"),
                         "value_numeric": field.get("value_numeric"),
-                        "value_display": self._value_display(
-                            field.get("value_numeric"),
-                            field.get("value_text"),
-                        ),
+                        "value_display": field.get("value_display") or "",
                         "reference_text": field.get("reference_text"),
                         "resolved_flag": field["resolved_flag"],
                         "resolved_flag_source": field.get("resolved_flag_source"),

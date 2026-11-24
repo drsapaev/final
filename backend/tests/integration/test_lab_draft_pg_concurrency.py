@@ -27,6 +27,7 @@ from app.models.lab import (
     LabReportSection,
     LabReportTemplate,
     LabReportTemplateVersion,
+    LabReportValue,
 )
 from app.models.patient import Patient
 from app.repositories.lab_reporting_api_repository import LabReportingApiRepository
@@ -129,6 +130,9 @@ def lab_instance_version(lab_lock_engine):
             updated_at=datetime(2026, 9, 20, 9, 30, 0, 123456, tzinfo=UTC),
         )
         session.add(instance)
+        session.flush()
+        version.status = "PUBLISHED"
+        version.published_at = datetime(2026, 9, 20, 9, 0, tzinfo=UTC)
         session.commit()
         return instance.id, instance.updated_at
 
@@ -244,6 +248,9 @@ def test_finalize_blocks_a_late_draft_save(
     lab_instance_version,
 ):
     instance_id, original = lab_instance_version
+    with Session(lab_lock_engine) as setup:
+        setup.add(LabReportValue(instance_id=instance_id, field_key="wbc", value_text="7.1"))
+        setup.commit()
     locked = threading.Event()
     release = threading.Event()
     save_ready = threading.Event()
@@ -309,4 +316,4 @@ def test_finalize_blocks_a_late_draft_save(
         stored = verification.get(LabReportInstance, instance_id)
         assert stored is not None
         assert stored.status == "FINALIZED"
-        assert stored.values == []
+        assert [(value.field_key, value.value_text) for value in stored.values] == [("wbc", "7.1")]

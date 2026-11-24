@@ -6,6 +6,9 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from sqlalchemy import select
+
+from app.core.config import settings
 from app.services.lab_reporting._base import *  # noqa: F401, F403
 from app.services.lab_reporting._base import LabReportingServiceMixinBase
 
@@ -21,6 +24,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
         status: str | None,
         limit: int,
         offset: int,
+        hide_managed_drafts: bool = False,
     ) -> list[LabReportInstance]:
         logger.info(
             "[LAB] list_instances has_patient_filter=%s visit_filter_count=%s status=%s limit=%s offset=%s",
@@ -36,6 +40,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
             status=status,
             limit=limit,
             offset=offset,
+            hide_managed_drafts=hide_managed_drafts,
         )
 
 
@@ -56,6 +61,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
         payload: dict[str, Any],
         *,
         actor_name: str | None = None,
+        actor_user_id: int | None = None,
     ) -> LabReportInstance:
         logger.info(
             "[LAB] create_instance has_appointment_context=%s has_visit_context=%s has_template_version=%s",
@@ -63,6 +69,8 @@ class InstancesMixin(LabReportingServiceMixinBase):
             payload.get("visit_id") is not None,
             payload.get("template_version_id") is not None,
         )
+        if settings.LAB_MANAGED_RELEASE_ENABLED:
+            self._workflow_actor(actor_user_id)
         patient = self.repository.get_patient(payload["patient_id"])
         if not patient:
             raise LabReportingDomainError(404, "Patient not found")
@@ -79,6 +87,13 @@ class InstancesMixin(LabReportingServiceMixinBase):
             appointment_id=appointment_id,
             create_if_missing=True,
         )
+        if visit_id is None and payload.get("order_id"):
+            explicit_order = self.repository.get_order(payload["order_id"])
+            if explicit_order is not None:
+                self._assert_order_belongs_to_context(
+                    order=explicit_order, patient_id=patient.id, visit_id=explicit_order.visit_id,
+                )
+                visit_id = explicit_order.visit_id
         if visit_id:
             self._assert_visit_belongs_to_patient(
                 visit_id=int(visit_id),
@@ -101,6 +116,20 @@ class InstancesMixin(LabReportingServiceMixinBase):
             patient_id=patient.id,
             visit_id=visit_id,
         )
+        if order is not None:
+            due_at = payload.get("order_due_at")
+            priority = payload.get("order_priority")
+            if due_at is not None:
+                current_due = order.due_at
+                if current_due is not None and current_due.tzinfo is None:
+                    current_due = current_due.replace(tzinfo=UTC)
+                if current_due is not None and current_due != due_at:
+                    raise LabReportingDomainError(409, "Lab order already has a different due date")
+                order.due_at = due_at.astimezone(UTC)
+            if priority is not None:
+                if order.priority is not None and order.priority != priority:
+                    raise LabReportingDomainError(409, "Lab order already has a different priority")
+                order.priority = priority
 
         signer_overrides = payload.get("signer_overrides") or {}
         branding_overrides = payload.get("branding_overrides") or {}
@@ -111,7 +140,8 @@ class InstancesMixin(LabReportingServiceMixinBase):
             template_id=template.id,
             template_version_id=version.id,
             status="DRAFT",
-            patient_snapshot=self._build_patient_snapshot(patient),
+            managed_release=settings.LAB_MANAGED_RELEASE_ENABLED,
+            patient_snapshot=self._build_patient_snapshot(patient, study_date=payload.get("study_date")),
             branding_snapshot=self._build_branding_snapshot(version, branding_overrides),
             signer_snapshot=self._build_signer_snapshot(
                 version,
@@ -120,6 +150,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
             ),
         )
         self.repository.add_instance(instance)
+        self._claim_ordered_services(instance, payload.get("visit_service_ids") or [], template.code)
         self.repository.commit()
         if created_new_order and order is not None:
             self._emit_lab_new_study_notification(
@@ -132,11 +163,15 @@ class InstancesMixin(LabReportingServiceMixinBase):
 
 
     def update_instance(
-        self, instance_id: int, payload: dict[str, Any], expected_updated_at: str | None = None
+        self, instance_id: int, payload: dict[str, Any], expected_updated_at: str | None = None,
+        *, actor_user_id: int | None = None,
     ) -> LabReportInstance:
         logger.info("[LAB] update_instance instance_id=%s", instance_id)
         instance = self._get_locked_instance(instance_id)
-        self._assert_instance_editable(instance)
+        self._assert_instance_mutable_draft(instance)
+        if instance.managed_release:
+            self._workflow_actor(actor_user_id)
+            self._workflow_expected_version(expected_updated_at)
         self._assert_not_concurrently_modified(instance, expected_updated_at)
         changed = False
         if "signer_snapshot" in payload and payload["signer_snapshot"] is not None:
@@ -145,8 +180,13 @@ class InstancesMixin(LabReportingServiceMixinBase):
         if "branding_snapshot" in payload and payload["branding_snapshot"] is not None:
             instance.branding_snapshot = payload["branding_snapshot"]
             changed = True
+        if "study_date" in payload:
+            self._set_report_study_date(instance, payload["study_date"])
+            self._refresh_result_evaluation(instance)
+            changed = True
         if changed:
             self._advance_instance_version(instance)
+            self._record_report_value_entry(instance, actor_user_id)
         self.repository.commit()
         return self.get_instance(instance.id)
 
@@ -154,6 +194,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
     def bulk_upsert_values(
         self, instance_id: int, values_payload: list[dict[str, Any]],
         expected_updated_at: str | None = None,
+        *, actor_user_id: int | None = None, commit: bool = True,
     ) -> tuple[LabReportInstance, list[LabReportValue]]:
         logger.info(
             "[LAB] bulk_upsert_values instance_id=%s items=%s",
@@ -161,32 +202,25 @@ class InstancesMixin(LabReportingServiceMixinBase):
             len(values_payload),
         )
         instance = self._get_locked_instance(instance_id)
-        self._assert_instance_editable(instance)
+        self._assert_instance_mutable_draft(instance)
+        if instance.managed_release:
+            self._workflow_actor(actor_user_id)
+            self._workflow_expected_version(expected_updated_at)
         self._assert_not_concurrently_modified(instance, expected_updated_at)
         field_map = self._field_map(instance.template_version)
         existing_by_key = {value.field_key: value for value in instance.values}
-        current_values = {
-            value.field_key: self._extract_effective_value(value)
-            for value in instance.values
-        }
-
-        updated_values: list[LabReportValue] = []
+        normalized_by_key = {}
         for item in values_payload:
             field_key = item["field_key"]
             field_def = field_map.get(field_key)
             if not field_def:
                 raise LabReportingDomainError(404, f"Field '{field_key}' not found in template")
-            normalized = self._normalize_value_payload(item, field_def)
-            current_values[field_key] = normalized["effective_value"]
-            context = self._build_rule_context(instance.patient_snapshot, current_values)
-            reference = self._resolve_reference(field_def, context)
-            flag = self._resolve_flag(
-                field_def=field_def,
-                effective_value=normalized["effective_value"],
-                context=context,
-                reference=reference,
-            )
+            if field_key in normalized_by_key:
+                raise LabReportingDomainError(400, f"Duplicate value for {field_key}")
+            normalized_by_key[field_key] = self._normalize_value_payload(item, field_def)
 
+        updated_values: list[LabReportValue] = []
+        for field_key, normalized in normalized_by_key.items():
             lab_value = existing_by_key.get(field_key)
             if lab_value is None:
                 lab_value = LabReportValue(instance_id=instance.id, field_key=field_key)
@@ -196,16 +230,18 @@ class InstancesMixin(LabReportingServiceMixinBase):
             lab_value.value_text = normalized["value_text"]
             lab_value.value_numeric = normalized["value_numeric"]
             lab_value.comment = normalized["comment"]
-            lab_value.resolved_reference_text = reference.get("text")
-            lab_value.resolved_flag = flag["flag"]
-            lab_value.resolved_flag_source = flag["source"]
-            lab_value.resolved_flag_severity = flag["severity_rank"]
-            lab_value.resolved_flag_meta = flag["meta"]
+            lab_value.result_payload = normalized["result_payload"]
             updated_values.append(lab_value)
 
+        self._refresh_result_evaluation(instance)
         if instance.status == "DRAFT" and updated_values:
             instance.status = "IN_PROGRESS"
         self._advance_instance_version(instance)
+        if updated_values and actor_user_id is not None:
+            self._record_report_value_entry(instance, actor_user_id)
+        if not commit:
+            self.repository.flush()
+            return instance, updated_values
         self.repository.commit()
         return self.get_instance(instance.id), updated_values
 
@@ -214,6 +250,8 @@ class InstancesMixin(LabReportingServiceMixinBase):
         logger.info("[LAB] mark_ready instance_id=%s", instance_id)
         instance = self._get_locked_instance(instance_id)
         self._assert_instance_editable(instance)
+        if instance.managed_release:
+            raise LabReportingDomainError(409, "Use the managed review workflow")
         instance.status = "READY"
         self._advance_instance_version(instance)
         self.repository.commit()
@@ -224,11 +262,37 @@ class InstancesMixin(LabReportingServiceMixinBase):
     # ============================================================
 
 
-    def revise(self, instance_id: int) -> LabReportInstance:
+    def revise(
+        self, instance_id: int, *, actor_user_id: int | None = None,
+        expected_updated_at: str | None = None, reason: str | None = None,
+    ) -> LabReportInstance:
         logger.info("[LAB] revise instance_id=%s", instance_id)
-        source = self.get_instance(instance_id)
+        source = self._get_locked_instance(instance_id)
         if source.status not in FINAL_INSTANCE_STATUSES:
             raise LabReportingDomainError(409, "Only finalized instances can be revised")
+        managed = source.managed_release or settings.LAB_MANAGED_RELEASE_ENABLED
+        actor = self._workflow_actor(actor_user_id) if managed or actor_user_id is not None else None
+        expected_version = None
+        if managed:
+            reason = self._workflow_reason(reason)
+            expected_version = self._workflow_expected_version(expected_updated_at)
+            existing_id = self.db.scalar(select(LabReportInstance.id).where(
+                LabReportInstance.supersedes_instance_id == source.id,
+            ).order_by(LabReportInstance.id).limit(1))
+            if existing_id is not None:
+                event = self._latest_workflow_event(existing_id, "revision_created")
+                if (
+                    event
+                    and event.actor_user_id == actor.id
+                    and event.reason == reason
+                    and event.expected_version
+                    and self._normalized_version(event.expected_version) == expected_version
+                ):
+                    return self.get_instance(existing_id)
+                raise LabReportingDomainError(409, "A correction already exists for this report version")
+        elif reason is not None:
+            reason = self._workflow_reason(reason)
+        self._assert_not_concurrently_modified(source, expected_updated_at)
 
         revision = LabReportInstance(
             order_id=source.order_id,
@@ -237,6 +301,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
             template_id=source.template_id,
             template_version_id=source.template_version_id,
             status="DRAFT",
+            managed_release=managed,
             patient_snapshot=deepcopy(source.patient_snapshot),
             branding_snapshot=deepcopy(source.branding_snapshot),
             signer_snapshot=deepcopy(source.signer_snapshot),
@@ -249,6 +314,8 @@ class InstancesMixin(LabReportingServiceMixinBase):
                     field_key=value.field_key,
                     value_text=value.value_text,
                     value_numeric=value.value_numeric,
+                    result_payload=deepcopy(value.result_payload),
+                    evaluation_snapshot=deepcopy(value.evaluation_snapshot),
                     resolved_reference_text=value.resolved_reference_text,
                     resolved_flag=value.resolved_flag,
                     resolved_flag_source=value.resolved_flag_source,
@@ -258,6 +325,11 @@ class InstancesMixin(LabReportingServiceMixinBase):
                     else None,
                     comment=value.comment,
                 )
+            )
+        if actor is not None:
+            self._append_workflow_event(
+                revision, kind="revision_created", actor=actor,
+                expected_version=expected_version, reason=reason,
             )
         self.repository.commit()
         return self.get_instance(revision.id)
@@ -275,7 +347,11 @@ class InstancesMixin(LabReportingServiceMixinBase):
         return self.get_instance(instance.id)
 
 
-    def instance_available_actions(self, instance: LabReportInstance) -> list[str]:
+    def instance_available_actions(
+        self, instance: LabReportInstance, actor_user_id: int | None = None,
+    ) -> list[str]:
+        if instance.managed_release:
+            return self.managed_workflow_actions(instance, actor_user_id)
         actions: list[str] = []
         if instance.status not in FINAL_INSTANCE_STATUSES:
             # PR8: preview — серверный A4-рендер сохранённых значений без
@@ -286,8 +362,13 @@ class InstancesMixin(LabReportingServiceMixinBase):
         return actions
 
 
-    def instance_action_flags(self, instance: LabReportInstance) -> dict[str, bool]:
-        actions = set(self.instance_available_actions(instance))
+    def instance_action_flags(
+        self, instance: LabReportInstance, actor_user_id: int | None = None,
+        *, available_actions: list[str] | None = None,
+    ) -> dict[str, bool]:
+        actions = set(available_actions) if available_actions is not None else set(
+            self.instance_available_actions(instance, actor_user_id)
+        )
         return {
             "can_edit": "edit" in actions,
             "can_save_draft": "save_draft" in actions,

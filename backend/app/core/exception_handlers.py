@@ -33,7 +33,12 @@ logger = logging.getLogger(__name__)
 _VALIDATION_INPUT_PREVIEW_LEN = 256
 
 
-def _sanitize_validation_errors(errors: list, *, sensitive_verification: bool = False) -> list:
+def _sanitize_validation_errors(
+    errors: list,
+    *,
+    sensitive_verification: bool = False,
+    sensitive_lab: bool = False,
+) -> list:
     """Scrub rejected raw inputs out of RequestValidationError details.
 
     Pydantic v2 embeds the offending value under the "input" key of each
@@ -59,6 +64,19 @@ def _sanitize_validation_errors(errors: list, *, sensitive_verification: bool = 
             sanitized.append(item)
             continue
         loc = item.get("loc") or ()
+        if sensitive_lab:
+            # Lab bodies carry free-text reasons and measurements. A
+            # validation error must never echo the rejected specimen or
+            # result, including an arbitrary key or custom error message.
+            item.pop("input", None)
+            item.pop("ctx", None)
+            if item.get("type") in {
+                "extra_forbidden", "value_error", "assertion_error", "invalid_key",
+            }:
+                item["loc"] = loc[:1]
+                item["msg"] = "Invalid laboratory request"
+            sanitized.append(item)
+            continue
         loc_tail = str(loc[-1]).lower().replace("-", "_") if loc else ""
         if loc_tail in SECRET_FIELD_PATTERNS:
             if "input" in item:
@@ -283,7 +301,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         into logs and the 422 response. Sanitized before both uses.
         """
         safe_errors = _sanitize_validation_errors(
-            exc.errors(), sensitive_verification=is_sensitive_verification_path(request.url.path)
+            exc.errors(),
+            sensitive_verification=is_sensitive_verification_path(request.url.path),
+            sensitive_lab=request.url.path.startswith("/api/v1/lab/"),
         )
         logger.warning(
             "RequestValidationError: %s (path: %s)",

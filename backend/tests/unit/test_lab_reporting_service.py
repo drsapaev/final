@@ -436,6 +436,7 @@ class TestLabReportingService:
             {
                 "patient_id": test_patient.id,
                 "template_id": ige_template.id,
+                "study_date": today,
             }
         )
 

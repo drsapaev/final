@@ -17,6 +17,9 @@ class CatalogHelpersMixin(LabReportingServiceMixinBase):
             payload.get("sex"),
             payload.get("age_min_months"),
             payload.get("age_max_months"),
+            payload.get("material_code"),
+            payload.get("method_code"),
+            payload.get("unit_code"),
             payload.get("sort_order", 0),
         )
 
@@ -38,6 +41,14 @@ class CatalogHelpersMixin(LabReportingServiceMixinBase):
         analyte = self._get_catalog_analyte(field_def.analyte_code)
         if analyte and analyte.default_unit is not None:
             return analyte.default_unit.symbol
+        return None
+
+    def _resolve_field_unit_code(self, field_def: LabReportFieldDef) -> str | None:
+        if field_def.unit_code:
+            return field_def.unit_code
+        analyte = self._get_catalog_analyte(field_def.analyte_code)
+        if analyte and analyte.default_unit is not None and field_def.unit in (None, "", analyte.default_unit.symbol):
+            return analyte.default_unit.code
         return None
 
 
@@ -94,6 +105,17 @@ class CatalogHelpersMixin(LabReportingServiceMixinBase):
             "critical_low_flag": None,
             "critical_high_flag": None,
             "flag": None,
+            "provenance": {
+                "mode": "catalog",
+                "reference_range_id": reference_range.id,
+                "analyte_code": reference_range.analyte_code,
+                "sex": reference_range.sex,
+                "age_min_months": reference_range.age_min_months,
+                "age_max_months": reference_range.age_max_months,
+                "material_code": reference_range.material_code,
+                "method_code": reference_range.method_code,
+                "unit_code": reference_range.unit_code,
+            },
         }
 
 
@@ -103,9 +125,20 @@ class CatalogHelpersMixin(LabReportingServiceMixinBase):
         patient = context.get("patient", {})
         patient_sex = patient.get("sex")
         age_months = patient.get("age_months")
+        specimen = context.get("specimen", {})
+        unit_code = self._resolve_field_unit_code(field_def)
+        analyte = self._get_catalog_analyte(field_def.analyte_code)
+        default_unit_code = analyte.default_unit_code if analyte else None
         matched: list[LabCatalogReferenceRange] = []
         for reference_range in self._get_catalog_reference_ranges(field_def.analyte_code):
             if not reference_range.is_active:
+                continue
+            if reference_range.material_code and reference_range.material_code != specimen.get("material_code"):
+                continue
+            if reference_range.method_code and reference_range.method_code != context.get("method_code"):
+                continue
+            reference_unit_code = reference_range.unit_code or default_unit_code
+            if reference_unit_code != unit_code or (unit_code is None and field_def.unit):
                 continue
             if reference_range.sex and patient_sex and reference_range.sex != patient_sex:
                 continue
@@ -125,7 +158,7 @@ class CatalogHelpersMixin(LabReportingServiceMixinBase):
 
         if not matched:
             return {
-                "text": field_def.reference_text or "",
+                "text": (field_def.reference_text or "") if not patient else "",
                 "low": None,
                 "high": None,
                 "warning_low": None,
@@ -143,11 +176,13 @@ class CatalogHelpersMixin(LabReportingServiceMixinBase):
 
         matched.sort(
             key=lambda item: (
+                -sum(bool(code) for code in (item.material_code, item.method_code, item.unit_code)),
                 0 if item.sex else 1,
                 0
                 if item.age_min_months is not None or item.age_max_months is not None
                 else 1,
-                (item.age_max_months or 10**9) - (item.age_min_months or 0),
+                (item.age_max_months if item.age_max_months is not None else 10**9)
+                - (item.age_min_months or 0),
                 item.sort_order,
                 item.id,
             )

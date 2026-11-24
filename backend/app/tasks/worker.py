@@ -864,6 +864,14 @@ async def generate_scheduled_report(
     logger.info("job.generate_scheduled_report complete (stub)")
 
 
+async def run_lab_critical_communications(ctx) -> None:
+    from app.db.session import SessionLocal
+    from app.services.lab_critical_communication import dispatch_pending
+
+    with SessionLocal() as db:
+        await dispatch_pending(db)
+
+
 async def run_lab_follow_up_reminders(ctx) -> None:
     """Send lab follow-up reminders. See lab_notification_service.send_follow_up_reminders.
 
@@ -953,6 +961,7 @@ class WorkerSettings:
         run_public_booking_request_notification_outbox,
         generate_scheduled_report,
         run_lab_follow_up_reminders,
+        run_lab_critical_communications,
         run_visit_reminder_sweep,
     ]
 
@@ -981,6 +990,7 @@ class WorkerSettings:
             minute=set(range(60)),  # every minute, lease-safe across workers
         ),
         cron(run_lab_follow_up_reminders, hour=8, minute=0),  # Daily 08:00 UTC
+        cron(run_lab_critical_communications, minute=set(range(60))),
         cron(
             run_visit_reminder_sweep,
             minute=set(range(0, 60, 5)),  # every 5 minutes

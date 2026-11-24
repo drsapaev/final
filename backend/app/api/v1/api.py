@@ -73,7 +73,11 @@ from app.api.v1.endpoints import (
     force_majeure,
     global_search,
     group_permissions,
+    lab_critical_communication,
+    lab_imports,
     lab_reporting,
+    lab_specimens,
+    lab_worklist,
     medical_equipment,
     messages,
     mobile_api,
@@ -495,8 +499,12 @@ api_router.include_router(cardio.router, tags=["cardio"])
 api_router.include_router(derma.router, tags=["derma"])
 api_router.include_router(dental.router, tags=["dental"])
 api_router.include_router(lab_reporting.router, tags=["lab-reporting"])
+api_router.include_router(lab_specimens.router)
+api_router.include_router(lab_worklist.router)
+api_router.include_router(lab_critical_communication.router)
+api_router.include_router(lab_imports.router)
 # Legacy /lab CRUD and placeholder routers are intentionally not published.
-# The lab reporting template workflow is the only supported public contract.
+# The supported lab contract lives in these lab reporting workflow routers.
 api_router.include_router(
     appointment_flow.router, prefix="/appointments", tags=["appointment_flow"]
 )

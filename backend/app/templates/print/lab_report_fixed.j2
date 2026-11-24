@@ -9,6 +9,15 @@
   <div class="pdf-watermark">{{ watermark_text }}</div>
   {% endif %}
   <div class="page">
+    {% if report_document_label %}
+    <p class="muted">{{ report_document_label }}</p>
+    {% endif %}
+    {% if report_release_label %}
+    <p class="muted">{{ report_release_label }}</p>
+    {% endif %}
+    {% if report_correction_reason %}
+    <p class="muted">{{ report_correction_reason }}</p>
+    {% endif %}
     {% if oam_docx_mode %}
     {% set physical_section = sections[0] if sections else none %}
     {% set sediment_section = sections[1] if sections|length > 1 else none %}
@@ -70,7 +79,8 @@
           <tr>
             <td>{{ row.label }}</td>
             <td class="col-result {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">
-              {% if row.value_numeric is not none %}
+              {% if row.value_display is defined %}{{ row.value_display or '' }}
+              {% elif row.value_numeric is not none %}
                 {{ row.value_numeric }}
               {% else %}
                 {{ row.value_text or '' }}
@@ -88,7 +98,8 @@
           <tr>
             <td>{{ row.label }}</td>
             <td class="col-result {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">
-              {% if row.value_numeric is not none %}
+              {% if row.value_display is defined %}{{ row.value_display or '' }}
+              {% elif row.value_numeric is not none %}
                 {{ row.value_numeric }}
               {% else %}
                 {{ row.value_text or '' }}
@@ -167,7 +178,8 @@
         <tr>
           <td>{{ row.label }}</td>
           <td class="col-result">
-            {% if row.value_numeric is not none %}
+            {% if row.value_display is defined %}{{ row.value_display or '' }}
+              {% elif row.value_numeric is not none %}
               {{ row.value_numeric }}
             {% else %}
               {{ row.value_text or '' }}
@@ -253,7 +265,8 @@
             {% for section in sections %}
               {% set row = section.fields[row_index] %}
               <td class="smear-site-cell {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">
-                {% if row.value_numeric is not none %}
+                {% if row.value_display is defined %}{{ row.value_display or '' }}
+              {% elif row.value_numeric is not none %}
                   {{ row.value_numeric }}
                 {% else %}
                   {{ row.value_text or '' }}
@@ -375,7 +388,8 @@
         <tr>
           <td>{{ row.label }}</td>
           <td class="col-result">
-            {% if row.value_numeric is not none %}
+            {% if row.value_display is defined %}{{ row.value_display or '' }}
+              {% elif row.value_numeric is not none %}
               {{ row.value_numeric }}
             {% else %}
               {{ row.value_text or '' }}

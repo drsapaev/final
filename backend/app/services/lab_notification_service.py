@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
-from app.models.lab import LabOrder, LabResult
+from app.models.lab import LabOrder, LabReportInstance, LabResult
 from app.models.notification import (
     NotificationDelivery,
     NotificationEvent,
@@ -302,7 +302,17 @@ class LabNotificationService:
             # Находим результаты за последние 24 часа
             yesterday = datetime.now(UTC) - timedelta(hours=24)
 
-            recent_results = self.db.query(LabResult).filter(LabResult.created_at >= yesterday).all()
+            recent_results = (
+                self.db.query(LabResult)
+                .outerjoin(
+                    LabReportInstance, LabReportInstance.id == LabResult.source_instance_id,
+                )
+                .filter(
+                    LabResult.created_at >= yesterday,
+                    LabReportInstance.managed_release.is_not(True),
+                )
+                .all()
+            )
 
             critical_found = []
 

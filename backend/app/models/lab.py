@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -16,6 +17,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     event,
+    false,
     inspect,
     select,
     text,
@@ -30,6 +32,12 @@ IMMUTABLE_TEMPLATE_VERSION_STATUSES = {"PUBLISHED", "ARCHIVED"}
 
 class LabOrder(Base):
     __tablename__ = "lab_orders"
+    __table_args__ = (
+        CheckConstraint(
+            "priority IS NULL OR priority IN ('routine', 'urgent')",
+            name="ck_lab_orders_priority",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     visit_id: Mapped[int | None] = mapped_column(
@@ -50,10 +58,43 @@ class LabOrder(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    priority: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     report_instances: Mapped[list[LabReportInstance]] = relationship(
         back_populates="order"
     )
+
+
+class LabOrderTest(Base):
+    """Explicit allocation of a canonical visit service to a lab order/report."""
+
+    __tablename__ = "lab_order_tests"
+    __table_args__ = (
+        UniqueConstraint("visit_service_id", name="uq_lab_order_tests_visit_service"),
+        CheckConstraint(
+            "(canceled_at IS NULL AND canceled_by_user_id IS NULL AND cancel_reason IS NULL) OR "
+            "(canceled_at IS NOT NULL AND canceled_by_user_id IS NOT NULL "
+            "AND cancel_reason IS NOT NULL AND report_instance_id IS NULL)",
+            name="ck_lab_order_tests_cancellation",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("lab_orders.id", ondelete="RESTRICT"), index=True, nullable=False
+    )
+    visit_service_id: Mapped[int] = mapped_column(
+        ForeignKey("visit_services.id", ondelete="RESTRICT"), nullable=False
+    )
+    report_instance_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lab_report_instances.id", ondelete="RESTRICT"), index=True
+    )
+    canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    canceled_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    cancel_reason: Mapped[str | None] = mapped_column(String(300))
 
 
 class LabResult(Base):
@@ -140,13 +181,31 @@ class LabCatalogAnalyte(Base):
 class LabCatalogReferenceRange(Base):
     __tablename__ = "lab_catalog_reference_ranges"
     __table_args__ = (
-        UniqueConstraint(
+        Index(
+            "uq_lab_catalog_reference_range_scope",
             "analyte_code",
             "sex",
             "age_min_months",
             "age_max_months",
             "sort_order",
-            name="uq_lab_catalog_reference_range_scope",
+            unique=True,
+            postgresql_where=text("material_code IS NULL AND method_code IS NULL AND unit_code IS NULL"),
+            sqlite_where=text("material_code IS NULL AND method_code IS NULL AND unit_code IS NULL"),
+        ),
+        Index(
+            "uq_lab_catalog_reference_range_dimensions",
+            "analyte_code",
+            "sex",
+            "age_min_months",
+            "age_max_months",
+            "material_code",
+            "method_code",
+            "unit_code",
+            "sort_order",
+            unique=True,
+            postgresql_where=text("material_code IS NOT NULL OR method_code IS NOT NULL OR unit_code IS NOT NULL"),
+            postgresql_nulls_not_distinct=True,
+            sqlite_where=text("material_code IS NOT NULL OR method_code IS NOT NULL OR unit_code IS NOT NULL"),
         ),
     )
 
@@ -159,6 +218,9 @@ class LabCatalogReferenceRange(Base):
     sex: Mapped[str | None] = mapped_column(String(1), nullable=True, index=True)
     age_min_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
     age_max_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    material_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    method_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    unit_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     text: Mapped[str | None] = mapped_column(String(255), nullable=True)
     low: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     high: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
@@ -393,7 +455,10 @@ class LabReportInstance(Base):
     )
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="DRAFT", index=True
-    )  # DRAFT|IN_PROGRESS|READY|FINALIZED|PRINTED
+    )  # DRAFT|IN_PROGRESS|READY|IN_REVIEW|REVIEWED|FINALIZED|PRINTED
+    managed_release: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     patient_snapshot: Mapped[dict[str, Any]] = mapped_column(
         JSON, nullable=False, default=dict
     )
@@ -456,6 +521,8 @@ class LabReportValue(Base):
     value_numeric: Mapped[Decimal | None] = mapped_column(
         Numeric(18, 4), nullable=True
     )
+    result_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    evaluation_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True), nullable=True)
     resolved_reference_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     resolved_flag: Mapped[str | None] = mapped_column(String(32), nullable=True)
     resolved_flag_source: Mapped[str | None] = mapped_column(String(32), nullable=True)

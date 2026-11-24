@@ -79,6 +79,8 @@ class Settings(BaseSettings):
         description="Secret key for JWT refresh token. Defaults to SECRET_KEY when unset.",
     )
     TESTING: bool = False
+    LAB_MANAGED_RELEASE_ENABLED: bool = False
+    LAB_RELEASE_REQUIRE_DISTINCT_REVIEWER: bool = True
     ENABLE_FALLBACK_AUTH: bool = Field(
         default=False,
         description="Enable legacy/fallback auth login endpoints. Keep false outside explicit break-glass/dev use.",

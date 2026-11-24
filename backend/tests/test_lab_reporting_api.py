@@ -389,6 +389,7 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
         json={
             "patient_id": test_patient.id,
             "template_id": ige_template["id"],
+            "study_date": "2026-11-24",
         },
     )
     assert ige_instance_response.status_code == 200
@@ -411,6 +412,9 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert ige_field["reference_text"] == "< 130 МЕ/мл"
     assert ige_field["resolved_flag"] == "high"
     assert ige_field["resolved_flag_source"] == "catalog_reference"
+    assert ige_field["result_kind"] == "numeric"
+    assert ige_field["evaluation_status"] == "evaluated"
+    assert ige_field["interpretation"] == "high"
 
     # /mark-ready endpoint was removed (L-2 fix: it was functionally empty —
     # backend allows the same actions for DRAFT/IN_PROGRESS/READY statuses).
@@ -1680,10 +1684,16 @@ def test_draft_report_preview_renders_saved_values_inline_for_lab(
         patient_id=patient.id,
         visit_id=visit.id,
     )
+    invalid_numeric = client.post(
+        f"/api/v1/lab/report-instances/{instance['id']}/bulk-values",
+        headers=lab_headers,
+        json=[{"field_key": "hgb", "value_text": "SYNTHETIC_INVALID_NUMBER"}],
+    )
+    assert invalid_numeric.status_code == 400
     bulk_response = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/bulk-values",
         headers=lab_headers,
-        json=[{"field_key": "hgb", "value_text": "SYNTHETIC_PREVIEW_VALUE"}],
+        json=[{"field_key": "hgb", "value_text": "123.45"}],
     )
     assert bulk_response.status_code == 200, bulk_response.text
     # bulk-values переводит бланк DRAFT -> IN_PROGRESS (существующая
@@ -1740,7 +1750,7 @@ def test_draft_report_preview_passes_watermark_and_saved_values(
     bulk_response = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/bulk-values",
         headers=lab_headers,
-        json=[{"field_key": "hgb", "value_text": "SYNTHETIC_WM_135"}],
+        json=[{"field_key": "hgb", "value_text": "≥135,25"}],
     )
     assert bulk_response.status_code == 200, bulk_response.text
 
@@ -1761,7 +1771,8 @@ def test_draft_report_preview_passes_watermark_and_saved_values(
         for field in section.get("fields") or []
         if field.get("field_key") == "hgb"
     ]
-    assert rendered_values and rendered_values[0]["value_text"] == "SYNTHETIC_WM_135"
+    assert rendered_values and rendered_values[0]["value_display"] == "≥135.25"
+    assert rendered_values[0]["comparator"] == "gte"
 
     # FINALIZED instance preview: watermark не ставится (утверждённый
     # результат уже имеет финальный вид; печать — отдельное действие).
