@@ -91,6 +91,8 @@ interface ReportEditorProps {
   reportHistory?: LabReportHistoryEntry[];
 }
 
+const assessmentBadgeStyle = { whiteSpace: 'normal' };
+
 export default function ReportEditor({
   activeInstance,
   draftValues,
@@ -349,11 +351,11 @@ export default function ReportEditor({
                     </div>
                     <div className="lab-result-assessment">
                       {isValueDirty ? (
-                        <Badge variant="outline" title={t('workbench.flag_unsaved_title')}>
+                        <Badge variant="outline" style={assessmentBadgeStyle} title={t('workbench.flag_unsaved_title')}>
                           {t('workbench.flag_unsaved')}
                         </Badge>
                       ) : (
-                        <Badge variant={flagVariant(field.interpretation || field.resolved_flag || '', field.resolved_flag_severity ?? null)}>
+                        <Badge style={assessmentBadgeStyle} variant={flagVariant(field.interpretation || field.resolved_flag || '', field.resolved_flag_severity ?? null)}>
                           {t(getEvaluationLabelKey(field))}
                         </Badge>
                       )}

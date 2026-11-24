@@ -342,7 +342,7 @@ describe('LabReportWorkbench', () => {
     expect(source).toContain("t('confirm.finalize_description')");
     expect(source).toContain("t('confirm.finalize_confirm')");
 
-    const revisionDialog = fs.readFileSync(path.resolve(__dirname, '../ReportWorkflowDialog.tsx'), 'utf8');
+    const revisionDialog = fs.readFileSync(path.resolve(__dirname, '../ReportWorkflowPanel.tsx'), 'utf8');
     expect(revisionDialog).toContain("t('confirm.revise_title')");
     expect(revisionDialog).toContain("t('confirm.revise_message')");
     expect(revisionDialog).toContain("t('confirm.revise_description')");

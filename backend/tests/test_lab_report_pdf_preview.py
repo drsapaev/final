@@ -351,3 +351,15 @@ def test_render_weasyprint_output_contains_watermark_text_stream() -> None:
     # наличие PDF-байтов и отсутствие исключения. Если текст найден —
     # бонус-пин; не делаем тест хрупким.
     assert _is_pdf(payload)
+
+
+@pytest.mark.integration
+def test_pdf_prefers_canonical_qualified_value_over_raw_numeric() -> None:
+    service = LabReportPDFService()
+    context = _preview_context()
+    field = context["sections"][0]["fields"][0]
+    field.update(value_numeric="0.01", value_text="0.01", value_display="<0,01")
+
+    template = service.jinja_env.get_template("lab_report_fixed.j2")
+    assert "&lt;0,01" in template.render(**context)
+    assert service._reportlab_value_display(field) == "<0,01"

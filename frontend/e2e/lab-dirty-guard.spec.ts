@@ -2701,7 +2701,9 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     ));
     await page.getByRole('tab').first().click();
     await queueRefreshed;
-    const loadMoreButton = page.locator('#lab-panel-tabpanel-queue').getByRole('button', { name: /Загрузить ещё записи/ });
+    const queuePanel = page.locator('#lab-panel-tabpanel-queue');
+    await expect(queuePanel.getByRole('button', { name: 'Обновить' })).toBeEnabled();
+    const loadMoreButton = queuePanel.getByRole('button', { name: /Загрузить ещё записи/ });
     await expect(loadMoreButton).toBeVisible();
 
     // Gate: запрос второй страницы; программный клик без scroll-событий —

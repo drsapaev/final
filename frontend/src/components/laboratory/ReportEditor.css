@@ -1,42 +1,42 @@
 .lab-result-editor {
   container-type: inline-size;
   display: grid;
-  gap: var(--mac-spacing-4);
+  gap: var(--mac-spacing-4, 1rem);
   min-width: 0;
 }
 
 .lab-result-section {
-  background: var(--mac-bg-primary);
-  border: 1px solid var(--mac-border);
-  border-radius: var(--mac-radius-lg);
+  background: var(--mac-bg-primary, Canvas);
+  border: 1px solid var(--mac-border, GrayText);
+  border-radius: var(--mac-radius-lg, 0.75rem);
 }
 
 .lab-result-section-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--mac-spacing-2);
+  gap: var(--mac-spacing-2, 0.5rem);
   width: 100%;
   min-height: 44px;
-  padding: var(--mac-spacing-2) var(--mac-spacing-3);
-  color: var(--mac-text-primary);
-  background: var(--mac-bg-tertiary);
+  padding: var(--mac-spacing-2, 0.5rem) var(--mac-spacing-3, 0.75rem);
+  color: var(--mac-text-primary, CanvasText);
+  background: var(--mac-bg-tertiary, Canvas);
   border: 0;
-  border-radius: var(--mac-radius-lg);
+  border-radius: var(--mac-radius-lg, 0.75rem);
   cursor: pointer;
   font: inherit;
-  font-weight: var(--mac-font-weight-semibold);
+  font-weight: var(--mac-font-weight-semibold, 600);
   text-align: start;
 }
 
 .lab-result-section-toggle:focus-visible,
 .lab-result-details summary:focus-visible {
-  outline: 2px solid var(--mac-accent);
+  outline: 2px solid var(--mac-accent, Highlight);
   outline-offset: 2px;
 }
 
 .lab-result-fields {
-  padding: 0 var(--mac-spacing-3);
+  padding: 0 var(--mac-spacing-3, 0.75rem);
 }
 
 .lab-result-row {
@@ -46,20 +46,20 @@
     'name input unit reference assessment previous'
     'details details details details details details';
   align-items: start;
-  gap: var(--mac-spacing-2);
-  padding: var(--mac-spacing-3) 0;
+  gap: var(--mac-spacing-2, 0.5rem);
+  padding: var(--mac-spacing-3, 0.75rem) 0;
   overflow-wrap: anywhere;
 }
 
 .lab-result-row + .lab-result-row {
-  border-top: 1px solid var(--mac-border);
+  border-top: 1px solid var(--mac-border, GrayText);
 }
 
 .lab-result-name {
   grid-area: name;
   display: grid;
-  gap: var(--mac-spacing-1);
-  font-weight: var(--mac-font-weight-semibold);
+  gap: var(--mac-spacing-1, 0.25rem);
+  font-weight: var(--mac-font-weight-semibold, 600);
 }
 
 .lab-result-input {
@@ -79,7 +79,7 @@
 .lab-result-reference {
   grid-area: reference;
   display: grid;
-  gap: var(--mac-spacing-1);
+  gap: var(--mac-spacing-1, 0.25rem);
 }
 
 .lab-result-required,
@@ -87,13 +87,13 @@
 .lab-result-reference,
 .lab-result-previous,
 .lab-result-details {
-  color: var(--mac-text-secondary);
-  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-secondary, CanvasText);
+  font-size: var(--mac-font-size-xs, 0.75rem);
 }
 
 .lab-result-error {
-  color: var(--mac-error);
-  font-size: var(--mac-font-size-xs);
+  color: var(--mac-error, CanvasText);
+  font-size: var(--mac-font-size-xs, 0.75rem);
 }
 
 .lab-result-details {
@@ -102,19 +102,18 @@
 
 .lab-result-details summary {
   width: fit-content;
-  padding: var(--mac-spacing-1) 0;
+  padding: var(--mac-spacing-1, 0.25rem) 0;
   cursor: pointer;
 }
 
 .lab-result-details[open] label {
   display: grid;
-  gap: var(--mac-spacing-1);
-  margin-top: var(--mac-spacing-2);
+  gap: var(--mac-spacing-1, 0.25rem);
+  margin-top: var(--mac-spacing-2, 0.5rem);
 }
 
 .lab-result-assessment .mac-badge {
   max-width: 100%;
-  white-space: normal !important;
 }
 
 @container (max-width: 750px) {
@@ -141,36 +140,36 @@
 
 .lab-save-status {
   display: grid;
-  gap: var(--mac-spacing-2);
-  padding: var(--mac-spacing-2) 0;
-  color: var(--mac-text-secondary);
-  font-size: var(--mac-font-size-sm);
+  gap: var(--mac-spacing-2, 0.5rem);
+  padding: var(--mac-spacing-2, 0.5rem) 0;
+  color: var(--mac-text-secondary, CanvasText);
+  font-size: var(--mac-font-size-sm, 0.875rem);
 }
 
 .lab-save-status[data-failure] {
-  color: var(--mac-text-primary);
-  border-block-start: 2px solid var(--mac-warning);
+  color: var(--mac-text-primary, CanvasText);
+  border-block-start: 2px solid var(--mac-warning, CanvasText);
 }
 
 .lab-save-status-line {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--mac-spacing-2);
+  gap: var(--mac-spacing-2, 0.5rem);
 }
 
 .lab-save-comparison-scroll { overflow-x: auto; }
 
 .lab-save-comparison-table {
   width: 100%;
-  margin-bottom: var(--mac-spacing-2);
+  margin-bottom: var(--mac-spacing-2, 0.5rem);
   border-collapse: collapse;
   overflow-wrap: anywhere;
 }
 
 .lab-save-comparison-table :is(caption, th, td) {
-  padding: var(--mac-spacing-2);
-  border-bottom: 1px solid var(--mac-border);
+  padding: var(--mac-spacing-2, 0.5rem);
+  border-bottom: 1px solid var(--mac-border, GrayText);
   text-align: start;
   vertical-align: top;
 }
@@ -181,15 +180,15 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
   align-items: start;
-  gap: var(--mac-spacing-2);
+  gap: var(--mac-spacing-2, 0.5rem);
   overflow-wrap: anywhere;
 }
 
 .lab-report-study-date {
   display: grid;
-  gap: var(--mac-spacing-1);
+  gap: var(--mac-spacing-1, 0.25rem);
   max-width: 15rem;
-  font-size: var(--mac-font-size-sm);
+  font-size: var(--mac-font-size-sm, 0.875rem);
 }
 
 .lab-workflow-panel,
@@ -197,18 +196,18 @@
 .lab-workflow-form label,
 .lab-visit-assignment {
   display: grid;
-  gap: var(--mac-spacing-2);
+  gap: var(--mac-spacing-2, 0.5rem);
 }
 
 .lab-visit-assignment {
   min-width: 0;
-  padding: var(--mac-spacing-2);
-  border: 1px solid var(--mac-border);
-  border-radius: var(--mac-radius-md);
+  padding: var(--mac-spacing-2, 0.5rem);
+  border: 1px solid var(--mac-border, GrayText);
+  border-radius: var(--mac-radius-md, 0.5rem);
 }
 
 .lab-visit-assignment label {
   display: flex;
-  gap: var(--mac-spacing-2);
+  gap: var(--mac-spacing-2, 0.5rem);
   align-items: center;
 }

@@ -41,9 +41,9 @@ import ReportSidebar from './ReportSidebar';
 import { hasDraftDifference, useLabReportState } from './hooks/useLabReportState';
 import type { LabReportInstance, ReportDraftSnapshot } from './hooks/useLabReportState';
 import ReportSaveStatus from './ReportSaveStatus';
-import ReportWorkflowPanel from './ReportWorkflowPanel';
-import ReportWorkflowDialog from './ReportWorkflowDialog';
-import type { LabWorkflowDetails, LabWorkflowPrompt } from './ReportWorkflowDialog';
+import ReportWorkflowPanel, {
+  ReportWorkflowDialog, type LabWorkflowDetails, type LabWorkflowPrompt,
+} from './ReportWorkflowPanel';
 // STRAT#9: t() для i18n — confirm dialogs мигрированы на translation keys.
 import { useTranslation } from '../../i18n/useTranslation';
 import { getErrorMessage } from '../../utils/type-guards';
@@ -193,11 +193,14 @@ export default function LabReportWorkbench({
   // its ownership (mounted mirror + attempt invalidation) and its reserved
   // blank tab is closed — a late blob response must never navigate a
   // departed report's document into a popup nobody is watching.
-  useEffect(() => () => {
-    previewMountedRef.current = false;
-    previewAttemptRef.current += 1;
-    previewReservedRef.current?.close();
-    previewReservedRef.current = null;
+  useEffect(() => {
+    previewMountedRef.current = true;
+    return () => {
+      previewMountedRef.current = false;
+      previewAttemptRef.current += 1;
+      previewReservedRef.current?.close();
+      previewReservedRef.current = null;
+    };
   }, []);
   const captureOperationContext = useCallback(
     () => getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT,
