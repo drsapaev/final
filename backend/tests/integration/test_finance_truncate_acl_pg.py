@@ -876,3 +876,93 @@ def test_payment_evidence_keeps_original_identity_and_amount(
             **original,
             "status": "processed",
         }
+
+
+def test_payment_webhook_preserves_original_payload_signature_and_time(
+    payment_evidence_scope, monkeypatch
+):
+    scope = payment_evidence_scope
+    table = scope.qualified("payment_webhooks")
+    migration = _migration("0166_payment_webhook_evidence.py")
+    monkeypatch.setattr(migration, "_GATEWAY_ROLES", (scope.gateway,))
+    webhook_scope = replace(scope, migration=migration)
+    original_payload = '{"receipt": "synthetic\\u0000", "attempt": 1}'
+    received = "2030-01-02 11:12:13"
+    insert_receipt = text(f"""
+        INSERT INTO {table} (id, status, raw_data, signature, created_at)
+        VALUES (:id, 'pending', CAST(:payload AS json), :signature, CAST(:received AS timestamp))
+    """)
+    read_receipt = text(f"""
+        SELECT raw_data::text, signature, created_at::text, status, processed_at::text, error_message
+        FROM {table}
+        WHERE id = 1
+        FOR UPDATE
+    """)
+    first_receipt = {"id": 1, "payload": original_payload, "signature": "synthetic", "received": received}
+    function = text("SELECT pg_catalog.to_regprocedure(:function)")
+
+    with scope.engine.begin() as connection:
+        schema = connection.dialect.identifier_preparer.quote_schema(scope.schema)
+        function_name = f"{schema}.reject_payment_webhook_evidence_change()"
+        connection.exec_driver_sql(f"""
+            ALTER TABLE {table} ADD COLUMN raw_data json NOT NULL,
+            ADD COLUMN signature varchar(500), ADD COLUMN created_at timestamp NOT NULL,
+            ADD COLUMN processed_at timestamp, ADD COLUMN error_message text
+        """)
+        connection.exec_driver_sql(
+            f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} "
+            f"GRANT EXECUTE ON FUNCTIONS TO {scope.gateway}"
+        )
+        connection.execute(insert_receipt, first_receipt)
+        _migrate(scope, connection)
+        _migrate(webhook_scope, connection)
+        assert not connection.scalar(
+            text("SELECT pg_catalog.has_function_privilege(:role, :function, 'EXECUTE')"),
+            {"role": scope.gateway, "function": function_name},
+        )
+
+        connection.exec_driver_sql(f"SET LOCAL ROLE {scope.gateway}")
+        assert tuple(connection.execute(read_receipt).one()) == (
+            original_payload, "synthetic", received, "pending", None, None,
+        )
+        connection.execute(insert_receipt, {**first_receipt, "id": 2, "signature": None})
+        processed = "2030-01-02 11:13:00"
+        connection.execute(
+            text(f"""
+                UPDATE {table}
+                SET status = 'processed', processed_at = CAST(:processed AS timestamp),
+                    error_message = NULL, raw_data = raw_data
+                WHERE id = 1
+            """),
+            {"processed": processed},
+        )
+        for assignment, value, evidence_id in (
+            ("raw_data = CAST(:value AS json)", '{"receipt":"synthetic_updated"}', 1),
+            ("signature = :value", None, 1),
+            ("signature = :value", "synthetic_added", 2),
+            ("created_at = CAST(:value AS timestamp)", "2030-01-03 11:12:13", 1),
+        ):
+            with (
+                pytest.raises(IntegrityError, match="Stored payment webhook evidence is immutable"),
+                connection.begin_nested(),
+            ):
+                connection.execute(
+                    text(f"UPDATE {table} SET {assignment}, status = 'failed' WHERE id = :id"),
+                    {"value": value, "id": evidence_id},
+                )
+        assert tuple(connection.execute(read_receipt).one()) == (
+            original_payload, "synthetic", received, "processed", processed, None,
+        )
+        assert tuple(
+            connection.execute(text(f"SELECT signature, status FROM {table} WHERE id = 2")).one()
+        ) == (None, "pending")
+
+    with scope.engine.begin() as connection:
+        _migrate(webhook_scope, connection, downgrade=True)
+        assert connection.scalar(function, {"function": function_name}) is None
+        assert not _has(connection, scope, scope.gateway, "payment_webhooks", "DELETE")
+        _migrate(webhook_scope, connection)
+        assert connection.scalar(function, {"function": function_name}) is not None
+        assert tuple(connection.execute(read_receipt).one()) == (
+            original_payload, "synthetic", received, "processed", processed, None,
+        )
