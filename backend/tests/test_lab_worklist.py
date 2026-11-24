@@ -107,6 +107,104 @@ def test_worklist_searches_before_cursor_and_counts_the_entire_scope(db_session)
         _search(db_session, cursor=anchor.next_cursor)
 
 
+def test_same_name_patients_keep_distinct_worklist_rows_and_report_history(
+    client, db_session, auth_headers
+):
+    lab, _ = _catalog(db_session)
+    first_patient, first_visit, _ = _new_visit(db_session, "HOMONYM", lab)
+    second_patient, second_visit, _ = _new_visit(
+        db_session, "HOMONYM", lab, day=TODAY
+    )
+    display_name = first_patient.short_name()
+    assert first_patient.id != second_patient.id
+    assert display_name == second_patient.short_name()
+
+    template = LabReportTemplate(
+        code="SYNTHETIC-LONG-HISTORY", name="SYNTHETIC-LONG-HISTORY", family="SYNTHETIC"
+    )
+    db_session.add(template)
+    db_session.flush()
+    version = LabReportTemplateVersion(
+        template_id=template.id,
+        version_no=1,
+        layout_preset="default",
+        status="PUBLISHED",
+        published_at=NOW,
+    )
+    db_session.add(version)
+    db_session.flush()
+
+    reports = []
+    for patient, history_length in ((first_patient, 52), (second_patient, 1)):
+        order = LabOrder(patient_id=patient.id, status="done", completed_at=NOW)
+        db_session.add(order)
+        db_session.flush()
+        reports.extend(
+            LabReportInstance(
+                order_id=order.id,
+                patient_id=patient.id,
+                template_id=template.id,
+                template_version_id=version.id,
+                patient_snapshot={"patient_id": patient.id, "full_name": display_name},
+                status="FINALIZED",
+                created_at=NOW,
+                finalized_at=NOW,
+            )
+            for _ in range(history_length)
+        )
+    db_session.add_all(reports)
+    db_session.commit()
+
+    worklist_url = "/api/v1/lab/worklist/search"
+    name_matches = client.post(
+        worklist_url, headers=auth_headers, json={"q": display_name}
+    )
+    assert name_matches.status_code == 200, name_matches.text
+    name_page = name_matches.json()
+    matching_rows = name_page["entries"]
+    assert name_page["total"] == len(matching_rows) == 2
+    assert {row["patient_fio"] for row in matching_rows} == {display_name}
+    assert {(row["patient_id"], row["visit_id"]) for row in matching_rows} == {
+        (first_patient.id, first_visit.id),
+        (second_patient.id, second_visit.id),
+    }
+    exact_match = client.post(
+        worklist_url, headers=auth_headers, json={"q": f"patient:{second_patient.id}"}
+    )
+    assert exact_match.status_code == 200, exact_match.text
+    assert [row["id"] for row in exact_match.json()["entries"]] == [
+        f"visit:{second_visit.id}"
+    ]
+
+    history_url = "/api/v1/lab/report-instances"
+    # Identical creation timestamps exercise the ID tie-breaker across pages.
+    first_patient_report_ids = [report.id for report in reversed(reports[:-1])]
+    expected_pages = (
+        (0, first_patient_report_ids[:50]),
+        (50, first_patient_report_ids[50:]),
+    )
+    for offset, expected_ids in expected_pages:
+        first_history = client.get(
+            history_url,
+            headers=auth_headers,
+            params={"patient_id": first_patient.id, "limit": 50, "offset": offset},
+        )
+        assert first_history.status_code == 200, first_history.text
+        first_rows = first_history.json()
+        assert [row["id"] for row in first_rows] == expected_ids
+        assert {row["patient_id"] for row in first_rows} == {first_patient.id}
+
+    second_history = client.get(
+        history_url,
+        headers=auth_headers,
+        params={"patient_id": second_patient.id, "limit": 50},
+    )
+    assert second_history.status_code == 200, second_history.text
+    assert [(row["id"], row["patient_id"]) for row in second_history.json()] == [
+        (reports[-1].id, second_patient.id)
+    ]
+
+
 def test_worklist_preserves_release_across_correction_and_scans_exact_specimen(
     db_session,
 ):
