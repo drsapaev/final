@@ -68,3 +68,56 @@ to the owner without reducing required checks or granting general bypass. Before
 - [ ] A timeout, cancelled run or uncertain merge has a safe, duplicate-free recovery.
 - [ ] Shared staging evidence is from the reviewed revision; ordinary CI has no dependency on the merge slot.
 - [ ] Existing required checks, exact App review and applicable gate all remain enforced.
+
+## Opt-in coordinator for `final`
+
+The protected [Codex PR App](../../.github/workflows/codex-pr-app.yml) is the
+submission interface. Until the owner turns on the repository Actions variable
+`FINAL_MERGE_QUEUE_ENABLED=true`, the original per-PR path remains in effect.
+
+When enabled:
+
+1. After preliminary review and branch CI, submit `operation=merge` from
+   `main` with the PR number and its **current full head SHA**. Do not
+   repeatedly sync a waiting PR and do not submit it again while a run exists.
+   Submit dependencies first and wait for their verified merge before
+   submitting dependants. The run queues by arrival at the shared Actions slot.
+2. The active run checks for competing GitHub auto-merges and pins the current
+   `main`. If necessary, it asks GitHub to update a same-repository PR branch
+   once, with a lease on the submitted SHA. A changed head while waiting,
+   external fork, conflict, or unverified sync stops that run without merging.
+3. Read **Prepare the active slot** in the run summary. If the head changed,
+   review the resulting exact diff, run required repository gate checks on the
+   exact head and record evidence in the PR. Submit `operation=approve` at
+   that SHA. Approval has a separate slot, so it can run while the merge waits.
+   A run never auto-approves or treats an older gate or review as current.
+4. The slot waits for GitHub to mark the PR clean and for the exact dedicated
+   App approval, then performs the existing exact-head protected squash merge.
+   Ordinary CI still runs independently. A canceled/failed/expired request is
+   a visible terminal Actions run. Inspect the failure, correct the PR and
+   requeue explicitly. A main change outside the slot invalidates that run.
+5. Dependabot keeps its existing allowlist when the variable is off. When on,
+   it no longer arms native auto-merge and verifies existing auto-merge is
+   disarmed when the PR event is processed. An agent reviews and submits an
+   eligible ready Dependabot PR via the same App. This does not give the bot
+   access to the App credentials or automatically admit all bot PRs.
+
+Activation is a separate owner-controlled operation, not a side effect of
+merging this change. First check that no old workflow or native auto-merge is
+in flight, including existing Dependabot requests. Confirm that all agents,
+including anyone using the GitHub UI, will submit through the same App. Branch
+protection and required checks stay on. Test three nonproduction requests
+(one active, two waiting); keep both waiting requests and verify new-base
+revalidation after each. Also test a rejected request and a stale revision.
+Do not enable the queue if the App cannot synchronize the scoped test head
+without increasing permissions. Do not add bypass or downgrade checks.
+
+Direct/admin merges are not technically disabled by the variable. Any
+separate change to allowed writers or branch protection needs an explicit
+owner decision and independent review. Before disabling the flag, pause new
+requests, reconcile or cancel waiting runs and finish or cancel the active
+one; do not rerun old workflow attempts across the cutover. A full queue
+(up to 100 pending in Actions) rejects new runs visibly; check the terminal
+result and resubmit once space returns. The built-in slot stops after 75
+minutes waiting for approval/checks; cancel a known failed run sooner to
+unblock independent work.
