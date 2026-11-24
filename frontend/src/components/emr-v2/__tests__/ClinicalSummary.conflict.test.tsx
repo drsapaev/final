@@ -49,20 +49,20 @@ it('preserves a conflicting draft and submits it against the displayed revision 
   const reload = vi.fn();
   const { rerender } = render(<ClinicalSummary workspace={workspace} readOnly={false} reload={reload} />);
 
-  fireEvent.click(screen.getByRole('button', { name: 'Edit', exact: true }));
-  const dose = screen.getByRole('textbox', { name: 'Dose', exact: true });
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  const dose = screen.getByRole('textbox', { name: 'Dose' });
   fireEvent.change(dose, { target: { value: '3' } });
-  const save = screen.getByRole('button', { name: i18n.t('common.save'), exact: true });
+  const save = screen.getByRole('button', { name: i18n.t('common.save') });
   fireEvent.click(save);
 
   await screen.findByText('This entry changed. Compare the server version with your draft.');
   expect(save).toBeDisabled();
-  fireEvent.click(screen.getByRole('button', { name: 'Open version', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Open version' }));
   await screen.findByText('Unable to load the information');
   expect(dose).toHaveValue('3');
   expect(reload).not.toHaveBeenCalled();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Open version', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Open version' }));
   await screen.findByText('Server version 2');
   expect(screen.getByText('SYNTHETIC updated medication')).toBeInTheDocument();
   expect(dose).toHaveValue('3');
@@ -70,7 +70,7 @@ it('preserves a conflicting draft and submits it against the displayed revision 
   expect(save).toBeDisabled();
 
   rerender(<ClinicalSummary workspace={{ ...workspace, clinical_entries: [latest] }} readOnly={false} reload={reload} />);
-  const edit = screen.getByRole('button', { name: 'Edit', exact: true });
+  const edit = screen.getByRole('button', { name: 'Edit' });
   expect(edit).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Add entry for Current therapy' })).toBeDisabled();
   fireEvent.click(edit);
@@ -80,7 +80,7 @@ it('preserves a conflicting draft and submits it against the displayed revision 
   const form = dose.closest('form')!;
   fireEvent.submit(form);
   expect(saveClinicalEntry).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByRole('button', { name: 'Save my version', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save my version' }));
   await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
   expect(saveClinicalEntry).toHaveBeenLastCalledWith(501, 101, entry.entry_id, 2,
     expect.objectContaining({ name: 'SYNTHETIC medication', dose: '3' }), 'clinician', false);
