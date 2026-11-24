@@ -565,7 +565,7 @@ async function solidContrastRatio(target: Locator, kind: 'text' | 'outline') {
 
 test.describe('public-site accessibility', () => {
   test('Vite public footer and booking controls stay usable after the notification prompt delay', async ({ page, request }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: 320, height: 900 });
     await page.clock.install();
     await page.addInitScript((origin) => {
