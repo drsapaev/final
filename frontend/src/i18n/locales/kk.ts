@@ -1549,6 +1549,7 @@ const kk = {
     derma_panel_patients_search_placeholder: 'Аты-жөні, телефон немесе ID',
     derma_panel_patients_search_minimum: 'Кемінде 2 таңба енгізіңіз',
     derma_panel_patients_search_empty: 'Науқастар табылмады',
+    derma_panel_patients_search_load_more_failed: 'Нәтижелердің келесі бетін жүктеу сәтсіз аяқталды — тек жүктелген сәйкестіктер көрсетілген. Қайталап көріңіз.',
     derma_panel_patients_search_error: 'Іздеу орындалмады. Қайталап көріңіз.',
     derma_panel_patients_search_results: 'Науқастарды іздеу нәтижелері',
     derma_panel_patients_select: 'Таңдау',

@@ -1548,6 +1548,7 @@ const uzLatn = {
     derma_panel_patients_search_placeholder: "F.I.Sh., telefon yoki ID",
     derma_panel_patients_search_minimum: "Kamida 2 ta belgi kiriting",
     derma_panel_patients_search_empty: "Bemorlar topilmadi",
+    derma_panel_patients_search_load_more_failed: "Natijalarning keyingi sahifasini yuklash amalga oshmadi — faqat yuklangan mosliklar ko‘rsatilgan. Qaytadan urinib ko‘ring.",
     derma_panel_patients_search_error: "Qidiruv amalga oshmadi. Qayta urinib ko‘ring.",
     derma_panel_patients_search_results: "Bemorlarni qidirish natijalari",
     derma_panel_patients_select: "Tanlash",
