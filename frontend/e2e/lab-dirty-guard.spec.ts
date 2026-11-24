@@ -89,6 +89,7 @@ const INSTANCE_B = {
   ...INSTANCE_A,
   id: 89,
   patient_id: 102,
+  visit_id: 702,
   patient_snapshot: { patient_id: 102, full_name: 'Пациент Два' },
 };
 
@@ -109,11 +110,26 @@ const INSTANCE_CREATED = {
 };
 
 const QUEUE_ENTRIES = [
-  { id: 1, appointment_id: 'a-1', patient_id: 101, patient_fio: 'Пациент Один', patient_phone: '', status: 'waiting', report_instance_id: 88, services: [], service_codes: [], service_details: [] },
-  { id: 2, appointment_id: 'a-2', patient_id: 102, patient_fio: 'Пациент Два', patient_phone: '', status: 'waiting', report_instance_id: 89, services: [], service_codes: [], service_details: [] },
-  { id: 3, appointment_id: 'a-3', patient_id: 103, patient_fio: 'Пациент Без Бланка', patient_phone: '', status: 'waiting', report_instance_id: null, services: [], service_codes: [], service_details: [] },
-  { id: 4, appointment_id: 'a-4', patient_id: 103, patient_fio: 'Пациент Без Бланка Повтор', patient_phone: '', status: 'waiting', report_instance_id: null, services: [], service_codes: [], service_details: [] },
+  { id: 'visit:701', appointment_id: 'a-1', visit_id: 701, patient_id: 101, patient_fio: 'Пациент Один', work_date: '2026-09-12', status: 'in_progress', report_instance_id: 88, services: [], service_codes: [], service_details: [] },
+  { id: 'visit:702', appointment_id: 'a-2', visit_id: 702, patient_id: 102, patient_fio: 'Пациент Два', work_date: '2026-09-12', status: 'in_progress', report_instance_id: 89, services: [], service_codes: [], service_details: [] },
+  { id: 'visit:703', appointment_id: 'a-3', visit_id: 703, patient_id: 103, patient_fio: 'Пациент Без Бланка', work_date: '2026-09-13', status: 'pending', report_instance_id: null, services: [], service_codes: [], service_details: [] },
+  { id: 'visit:704', appointment_id: 'a-4', visit_id: 704, patient_id: 103, patient_fio: 'Пациент Без Бланка Повтор', work_date: '2026-09-13', status: 'pending', report_instance_id: null, services: [], service_codes: [], service_details: [] },
 ];
+
+const WORKLIST_ROUTE = '**/api/v1/lab/worklist/search';
+const WORKLIST_PATH = '/api/v1/lab/worklist/search';
+const NEXT_WORKLIST_CURSOR = 'next-worklist-page';
+
+function worklistPage(entries: typeof QUEUE_ENTRIES, total = entries.length, nextCursor: string | null = null) {
+  return {
+    entries,
+    total,
+    counts: { actionable: total, today: 2, overdue: 0, awaiting_specimen: 0, in_review: 0, ready: 0 },
+    next_cursor: nextCursor,
+    date: '2026-09-13',
+    timezone: 'Asia/Tashkent',
+  };
+}
 
 let templateCreatePostCount = 0;
 let reportInstanceCreatePostCount = 0;
@@ -304,12 +320,7 @@ async function installApiMocks(page: Page) {
     body: JSON.stringify(payload),
   });
 
-  await page.route('**/api/v1/lab/queue/today**', (route) => json(route, {
-    entries: QUEUE_ENTRIES,
-    total: QUEUE_ENTRIES.length,
-    date: '2026-09-13',
-    timezone: 'Asia/Tashkent',
-  }));
+  await page.route(WORKLIST_ROUTE, (route) => json(route, worklistPage(QUEUE_ENTRIES)));
   await page.route('**/api/v1/lab/templates/5', async (route) => {
     template5GetCount += 1;
     if (template5GetCount === 1 && template5FirstResponseGate) {
@@ -551,11 +562,9 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // Ждём подтверждения dirty-state (isDirtyRef обновляется в effect).
     await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
 
-    // Возвращаемся в очередь (вкладка скрылась при открытии отчёта).
-    await page.getByRole('tab').first().click();
-
-    // Клик по другому пациенту очереди -> guard-диалог.
-    await page.getByRole('button', { name: /Пациент Два/ }).first().dispatchEvent('click');
+    // На широком экране кликаем по соседнему пациенту, не уходя из редактора.
+    await expect(page.locator('#lab-panel-tabpanel-queue')).toBeVisible();
+    await queuePatientButton(page, 'Пациент Два').click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
 
@@ -576,8 +585,8 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await fieldInput.fill('6.5');
     await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
 
-    await page.getByRole('tab').first().click();
-    await page.getByRole('button', { name: /Пациент Два/ }).first().dispatchEvent('click');
+    await expect(page.locator('#lab-panel-tabpanel-queue')).toBeVisible();
+    await queuePatientButton(page, 'Пациент Два').click();
     // Вложенного guard быть не должно: РОВНО один диалог на переход.
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -587,7 +596,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // Согласованный контекст: пациент Два И его отчёт #89 (не отчёт A).
     await expect.poll(() => instance89GetCount).toBeGreaterThan(0);
     expect(instance88GetCount).toBe(1);
-    await expect(page.getByText('Пациент Два').first()).toBeVisible();
+    await expect(page.locator('#lab-panel-tabpanel-reports').getByRole('heading', { name: 'Пациент Два' })).toBeVisible();
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     // Диалог закрыт, повторного подтверждения нет.
     await expect(dialog).toHaveCount(0);
@@ -801,9 +810,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
 
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
-    const breadcrumb = page.getByRole('navigation', { name: 'Навигация' });
-    await expect(breadcrumb).toContainText('Пациент Два');
-    await expect(breadcrumb).not.toContainText('Пациент Один');
+    await expect(page.locator('#lab-order-title')).toHaveText('Пациент Два');
     await page.waitForTimeout(300);
     await expect(page.getByText('Отчёт #88')).toHaveCount(0);
     expect(instance88GetCount).toBe(1);
@@ -2560,7 +2567,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // Cold deep-link ?instance=88: бланк открывается из URL, загрузка очереди
     // привязывает запись пациента (report_instance_id=88, первая страница) —
     // карточка выбирается, контекст пациента попадает в адрес.
-    const queueLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
+    const queueLoaded = page.waitForResponse((response) => response.url().endsWith(WORKLIST_PATH));
     const instanceLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/report-instances/88'));
     await page.goto('/lab?instance=88');
     await queueLoaded;
@@ -2585,21 +2592,12 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // У записи очереди пациента Один report_instance_id=88 — ДРУГОЙ бланк
     // того же визита 701. Прямого совпадения по id нет: привязка проходит
     // только по visit_id-фолбэку appointmentMatchesInstance (patient+visit).
-    const SIBLING_QUEUE_ENTRIES = [
-      { id: 1, appointment_id: 'a-1', visit_id: 701, patient_id: 101, patient_fio: 'Пациент Один', patient_phone: '', status: 'waiting', report_instance_id: 88, services: [], service_codes: [], service_details: [] },
-      { id: 2, appointment_id: 'a-2', visit_id: 702, patient_id: 102, patient_fio: 'Пациент Два', patient_phone: '', status: 'waiting', report_instance_id: 89, services: [], service_codes: [], service_details: [] },
-    ];
-    await page.route('**/api/v1/lab/queue/today**', (route) => apiJson(route, {
-      entries: SIBLING_QUEUE_ENTRIES,
-      total: SIBLING_QUEUE_ENTRIES.length,
-      date: '2026-09-13',
-      timezone: 'Asia/Tashkent',
-    }));
+    await page.route(WORKLIST_ROUTE, (route) => apiJson(route, worklistPage(QUEUE_ENTRIES.slice(0, 2))));
     // Сиблинг-бланк #91: тот же пациент 101 и тот же визит 701, что и #88.
     const INSTANCE_SIBLING = { ...INSTANCE_A, id: 91 };
     await page.route('**/api/v1/lab/report-instances/91', (route) => apiJson(route, INSTANCE_SIBLING));
 
-    const queueLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
+    const queueLoaded = page.waitForResponse((response) => response.url().endsWith(WORKLIST_PATH));
     const siblingLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/report-instances/91'));
     await page.goto('/lab?instance=91');
     await queueLoaded;
@@ -2622,7 +2620,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // intent /lab (без параметров) освобождает ОБОИХ одновременно; повторная
     // загрузка очереди (возврат на вкладку queue) не должна воскрешать
     // ни привязку, ни resolve-цепочку контекста.
-    const queueLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
+    const queueLoaded = page.waitForResponse((response) => response.url().endsWith(WORKLIST_PATH));
     await page.goto('/lab?instance=88');
     await queueLoaded;
     await expect(page.getByText('Отчёт #88').first()).toBeVisible();
@@ -2634,7 +2632,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // проверяться ПОСЛЕ фактической доставки и применения ответа.
     // waitForRequest доказывает только отправку запроса — ответ мог бы
     // примениться уже после ассертов, и воскрешение осталось бы незамеченным.
-    const queueRefreshed = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
+    const queueRefreshed = page.waitForResponse((response) => response.url().endsWith(WORKLIST_PATH));
     await page.evaluate(() => {
       window.history.pushState({}, '', '/lab');
       window.dispatchEvent(new PopStateEvent('popstate'));
@@ -2661,34 +2659,29 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // странице: до load-more привязки нет; «Показать ещё» догружает страницу
     // 2 — и привязка закрывается отложенно, ровно одним запросом.
     const PAGINATED_QUEUE = Array.from({ length: 60 }, (_, index) => ({
-      id: index + 1,
+      id: `visit:${800 + index}`,
       appointment_id: `a-${index + 1}`,
       visit_id: 800 + index,
       patient_id: index === 55 ? 102 : 200 + index,
       patient_fio: index === 55 ? 'Пациент Два' : `Пациент Заполнитель ${String(index + 1).padStart(2, '0')}`,
-      patient_phone: '',
-      status: 'waiting',
+      work_date: '2026-09-12',
+      status: index === 55 ? 'in_progress' : 'pending',
       report_instance_id: index === 55 ? 89 : null,
       services: [],
       service_codes: [],
       service_details: [],
     }));
     let secondPageRequests = 0;
-    await page.route('**/api/v1/lab/queue/today**', (route) => {
-      const requestUrl = new URL(route.request().url());
-      const limit = Number(requestUrl.searchParams.get('limit') ?? '50');
-      const offset = Number(requestUrl.searchParams.get('offset') ?? '0');
+    await page.route(WORKLIST_ROUTE, (route) => {
+      const { limit = 50, cursor } = route.request().postDataJSON();
+      const offset = cursor === NEXT_WORKLIST_CURSOR ? 50 : 0;
       if (offset > 0) secondPageRequests += 1;
-      return apiJson(route, {
-        entries: PAGINATED_QUEUE.slice(offset, offset + limit),
-        total: PAGINATED_QUEUE.length,
-        date: '2026-09-13',
-        timezone: 'Asia/Tashkent',
-      });
+      return apiJson(route, worklistPage(PAGINATED_QUEUE.slice(offset, offset + limit), PAGINATED_QUEUE.length,
+        offset + limit < PAGINATED_QUEUE.length ? NEXT_WORKLIST_CURSOR : null));
     });
 
     const firstPageLoaded = page.waitForResponse((response) => (
-      response.url().includes('/api/v1/lab/queue/today') && response.url().includes('offset=0')
+      response.url().endsWith(WORKLIST_PATH) && response.request().postDataJSON().cursor == null
     ));
     const instanceLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/report-instances/89'));
     await page.goto('/lab?instance=89');
@@ -2704,7 +2697,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // Вкладка очереди: дождаться refresh повторного входа (замещает список)
     // — только затем load-more, без гонки двух ответов.
     const queueRefreshed = page.waitForResponse((response) => (
-      response.url().includes('/api/v1/lab/queue/today') && response.url().includes('offset=0')
+      response.url().endsWith(WORKLIST_PATH) && response.request().postDataJSON().cursor == null
     ));
     await page.getByRole('tab').first().click();
     await queueRefreshed;
@@ -2714,7 +2707,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // Gate: запрос второй страницы; программный клик без scroll-событий —
     // infinite-scroll-обработчик не срабатывает, запрос ровно один.
     const secondPageRequested = page.waitForRequest((request) => (
-      request.url().includes('/api/v1/lab/queue/today') && request.url().includes('offset=50')
+      request.url().endsWith(WORKLIST_PATH) && request.postDataJSON().cursor === NEXT_WORKLIST_CURSOR
     ));
     await loadMoreButton.evaluate((el) => { (el as HTMLElement).click(); });
     await secondPageRequested;

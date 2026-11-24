@@ -99,16 +99,15 @@ const TEMPLATE_DETAIL = {
   versions: [TEMPLATE_VERSION],
 };
 
-// Очередь: пациент без бланка (report_instance_id=null) — стартовая точка
-// пути «создать». appointment a-3 (тот же идентификатор, что в
-// lab-dirty-guard.spec.ts для этого пациента).
+// Незавершённое исследование прошлого дня без отчёта.
 const QUEUE_ENTRY = {
-  id: 3,
-  appointment_id: 'a-3',
+  id: 'visit:703',
+  appointment_id: 3,
+  visit_id: 703,
   patient_id: 103,
   patient_fio: 'Пациент Без Бланка',
-  patient_phone: '',
-  status: 'waiting',
+  work_date: '2026-09-25',
+  status: 'pending',
   report_instance_id: null,
   services: [],
   service_codes: [],
@@ -253,6 +252,7 @@ const printLabResultsBodies: Array<Record<string, unknown>> = [];
 let pdfGetCount = 0;
 let markPrintedPostCount = 0;
 let revisePostCount = 0;
+let revisePayload: Record<string, unknown> | null = null;
 let historyPatientRequests: string[] = [];
 
 function instanceById(id: number) {
@@ -301,7 +301,7 @@ async function installApiMocks(page: Page) {
 
   // Очередь: после создания бланка точка входа пациента ссылается на него
   // (queue refresh после finalize/print получает консистентный read-model).
-  await page.route('**/api/v1/lab/queue/today**', (route) => json(route, {
+  await page.route('**/api/v1/lab/worklist/search', (route) => json(route, {
     entries: [
       {
         ...QUEUE_ENTRY,
@@ -309,6 +309,8 @@ async function installApiMocks(page: Page) {
       },
     ],
     total: 1,
+    counts: { actionable: 1, today: 0, overdue: 0, awaiting_specimen: 0, in_review: 0, ready: 0 },
+    next_cursor: null,
     date: '2026-09-26',
     timezone: 'Asia/Tashkent',
   }));
@@ -462,6 +464,7 @@ async function installApiMocks(page: Page) {
   // service.revise: status DRAFT, supersedes_instance_id, values copied).
   await page.route(`**/api/v1/lab/report-instances/${CREATED_INSTANCE_ID}/revise`, (route) => {
     revisePostCount += 1;
+    revisePayload = route.request().postDataJSON();
     const original = instanceById(CREATED_INSTANCE_ID);
     if (!original) {
       return route.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"not found"}' });
@@ -506,9 +509,70 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     pdfGetCount = 0;
     markPrintedPostCount = 0;
     revisePostCount = 0;
+    revisePayload = null;
     historyPatientRequests = [];
     await installSession(page);
     await installApiMocks(page);
+  });
+
+  test('finds an older order through worklist search without paging through the list', async ({ page }) => {
+    let requestedCursor = false;
+    await page.route('**/api/v1/lab/worklist/search', (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      const body = route.request().postDataJSON();
+      if (body.cursor) requestedCursor = true;
+      const matching = body.q === QUEUE_ENTRY.patient_fio;
+      return json(route, {
+        entries: matching ? [QUEUE_ENTRY] : [{ ...QUEUE_ENTRY, id: 'visit:801', visit_id: 801, patient_id: 301, patient_fio: 'SYNTHETIC-FIRST-PAGE' }],
+        total: matching ? 1 : 60,
+        counts: { actionable: matching ? 1 : 60, today: 0, overdue: 0, awaiting_specimen: 0, in_review: 0, ready: 0 },
+        next_cursor: matching ? null : 'next-worklist-page',
+        date: '2026-09-26',
+        timezone: 'Asia/Tashkent',
+      });
+    });
+    const initialPage = page.waitForResponse((response) => response.url().endsWith('/lab/worklist/search')
+      && response.request().method() === 'POST');
+    await page.goto('/lab');
+    await initialPage;
+    await expect(page.getByRole('button', { name: /SYNTHETIC-FIRST-PAGE/ })).toBeVisible();
+    const target = page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) });
+    await expect(target).toHaveCount(0);
+    const request = page.waitForRequest((entry) => entry.method() === 'POST' && entry.url().endsWith('/lab/worklist/search')
+      && entry.postDataJSON()?.q === QUEUE_ENTRY.patient_fio);
+    await page.getByRole('searchbox', { name: 'Пациент, заказ, исследование или штрихкод' }).fill(QUEUE_ENTRY.patient_fio);
+    expect((await request).method()).toBe('POST');
+    await expect(target).toBeVisible();
+    expect(requestedCursor).toBe(false);
+  });
+
+  test('keeps the selected order visible across the wide and narrow workspace layouts', async ({ page }) => {
+    await page.goto('/lab');
+    await page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) }).click();
+    const report = page.locator('#lab-panel-tabpanel-reports');
+    const queue = page.locator('#lab-panel-tabpanel-queue');
+    await expect(report.getByRole('heading', { name: QUEUE_ENTRY.patient_fio })).toBeVisible();
+    for (const width of [1920, 1280, 768, 375]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(report).toBeVisible();
+      if (width >= 1100) {
+        await expect(queue).toBeVisible();
+        const queueBox = await queue.boundingBox();
+        const reportBox = await report.boundingBox();
+        expect(queueBox).not.toBeNull();
+        expect(reportBox).not.toBeNull();
+        expect(queueBox!.x + queueBox!.width).toBeLessThanOrEqual(reportBox!.x + 1);
+      } else {
+        await expect(queue).toBeHidden();
+        await expect(report.getByRole('button', { name: 'К рабочему списку' })).toBeVisible();
+      }
+    }
+    const refreshed = page.waitForResponse((response) => response.url().endsWith('/lab/worklist/search')
+      && response.request().method() === 'POST');
+    await report.getByRole('button', { name: 'К рабочему списку' }).click();
+    await refreshed;
+    await expect(queue).toBeVisible();
+    await expect(queue.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) })).toHaveAttribute('aria-current', 'true');
   });
 
   test('queue -> create -> fill -> save -> preview -> finalize -> print(PDF) -> revise -> history, one instance lineage', async ({ page }) => {
@@ -542,7 +606,7 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     // (PR 3351 review round 9 — exactly-once для неидемпотентного POST).
     expect(createPayloads[0]).toMatchObject({
       patient_id: PATIENT_ID,
-      appointment_id: 'a-3',
+      appointment_id: 3,
       visit_id: VISIT_ID,
       template_id: 5,
     });
@@ -565,9 +629,8 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     await expect.poll(() => bulkSavePostCount).toBe(1);
     // Optimistic locking: bulk-save несёт expected_updated_at (WF-06).
     expect(lastBulkSaveQuery).toContain('expected_updated_at=');
-    // Полная форма payload (persistDraft): field_key + value_text +
-    // обнуленные value_numeric/comment — пиним точную форму контракта.
-    expect(lastBulkSavePayload).toEqual([{ field_key: 'wbc', value_text: '6.5', value_numeric: null, comment: null }]);
+    // Сервер получает исходный текст и владеет типизацией результата.
+    expect(lastBulkSavePayload).toEqual([{ field_key: 'wbc', value_text: '6.5', comment: null }]);
     // Статус DRAFT -> IN_PROGRESS; ре-гидрат ответом сохраняет значение.
     await expect(reportsPanel.getByText('Заполняется').first()).toBeVisible();
     await expect(fieldInput).toHaveValue('6.5');
@@ -648,10 +711,13 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     const reviseDialog = page.getByRole('dialog');
     await expect(reviseDialog).toBeVisible();
     await expect(reviseDialog.getByRole('heading', { name: 'Создание исправленной версии' })).toBeVisible();
+    await expect(reviseDialog.getByRole('button', { name: 'Создать версию' })).toBeDisabled();
+    await reviseDialog.getByRole('textbox', { name: 'Причина' }).fill('SYNTHETIC: исправление записи');
     await reviseDialog.getByRole('button', { name: 'Создать версию' }).click();
     await expect(reviseDialog).toHaveCount(0);
 
     await expect.poll(() => revisePostCount).toBe(1);
+    expect(revisePayload).toEqual({ reason: 'SYNTHETIC: исправление записи', expected_updated_at: '2026-09-26T08:15:00.000000+00:00' });
     // Ревизия открывается как АКТИВНЫЙ бланк: новый id, статус черновика,
     // значения скопированы, видна связь с оригиналом (supersedes).
     await expect(reportsPanel.getByText(`Отчёт #${REVISED_INSTANCE_ID}`).first()).toBeVisible();

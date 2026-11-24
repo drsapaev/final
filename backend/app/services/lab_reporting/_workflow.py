@@ -245,7 +245,7 @@ class WorkflowMixin(LabReportingServiceMixinBase):
             for value in instance.values:
                 result = value.result_payload or {}
                 has_measurement = value.value_numeric is not None or bool(
-                    value.value_text
+                    value.value_text and value.value_text.strip()
                 )
                 if (
                     has_measurement
@@ -288,7 +288,9 @@ class WorkflowMixin(LabReportingServiceMixinBase):
         return {
             item.id
             for item in specimens
-            if item.id in directly_assigned and item.status == "accepted"
+            if item.id in directly_assigned
+            and item.order_id == instance.order_id
+            and item.status == "accepted"
         }
 
     @staticmethod

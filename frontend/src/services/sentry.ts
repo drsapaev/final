@@ -43,7 +43,7 @@ const MEDICAL_PII_KEYS = [
   'diagnosis', 'diagnoses', 'icd10', 'icd10_codes', 'complaints', 'complaint',
   'examination', 'prescription', 'medications', 'allergies',
   'medical_history', 'symptoms', 'treatment', 'lab_results', 'blood_type',
-  'barcode', 'latest_reason', 'absence_reason',
+  'barcode', 'specimen_barcode', 'specimen_barcodes', 'latest_reason', 'absence_reason',
   // Visit
   'visit_reason', 'patient_name', 'patient_id', 'doctor_notes',
   // Auth tokens (defence-in-depth: Sentry SDK auto-scrubs these, but the

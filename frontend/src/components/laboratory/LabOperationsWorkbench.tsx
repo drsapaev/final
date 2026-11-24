@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   labOperationsApi,
   type LabCriticalTask,
@@ -169,6 +169,7 @@ export default function LabOperationsWorkbench({ reportId, onQueueChanged }: Lab
     : (['manual', 'csv', 'critical'] as const);
   const [manual, setManual] = useState<ManualRow[]>(() => [emptyRow(reportId)]);
   const [fileRows, setFileRows] = useState<LabImportEntry[]>([]);
+  const fileRead = useRef(0);
   const [outcomes, setOutcomes] = useState<LabImportOutcome[]>([]);
   const [prepared, setPrepared] = useState<LabImportEntry[]>([]);
   const [allowReplace, setAllowReplace] = useState(false);
@@ -188,14 +189,16 @@ export default function LabOperationsWorkbench({ reportId, onQueueChanged }: Lab
   }
 
   async function chooseFile(file: File | undefined) {
+    const read = ++fileRead.current;
     clearPreview();
     setFileRows([]);
     if (!file) return;
     try {
       if (file.size > 1024 * 1024) throw new Error('csv');
-      setFileRows(parseLabImportCsv(await file.text()));
+      const contents = await file.text();
+      if (read === fileRead.current) setFileRows(parseLabImportCsv(contents));
     } catch {
-      setError('formatError');
+      if (read === fileRead.current) setError('formatError');
     }
   }
 

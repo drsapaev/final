@@ -16,8 +16,13 @@ from app.models.visit import Visit
 from app.services.lab_reporting import LabReportingDomainError
 
 
-def _responsible_user_id(db: Session, instance: LabReportInstance) -> int | None:
-    return db.scalar(
+def _responsible_user_id(
+    db: Session,
+    instance: LabReportInstance,
+    *,
+    lock_ownership: bool = False,
+) -> int | None:
+    query = (
         select(User.id)
         .join(Doctor, Doctor.user_id == User.id)
         .join(Visit, Visit.doctor_id == Doctor.id)
@@ -29,6 +34,9 @@ def _responsible_user_id(db: Session, instance: LabReportInstance) -> int | None
             Doctor.active.is_(True),
         )
     )
+    if lock_ownership:
+        query = query.with_for_update(read=True, of=(Visit, Doctor, User))
+    return db.scalar(query)
 
 
 def _event(
@@ -228,7 +236,6 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
             continue
 
         task_id = task.id
-        report_id = task.report_instance_id
         actor_id = task.released_by_id
         is_correction = task.supersedes_communication_id is not None
         task.attempts += 1
@@ -238,6 +245,23 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
         )
         _event(db, task.id, "attempted", channel="in_app_inbox")
         db.commit()
+
+        task = _locked_task(db, task_id)
+        if (
+            task.state != "pending"
+            or task.attempts != attempt_number
+            or task.recipient_user_id != recipient_id
+        ):
+            db.rollback()
+            continue
+        instance = db.get(LabReportInstance, task.report_instance_id)
+        if _responsible_user_id(db, instance, lock_ownership=True) != recipient_id:
+            task.state = "needs_assignment"
+            task.recipient_user_id = None
+            task.next_attempt_at = None
+            _event(db, task.id, "needs_assignment")
+            db.commit()
+            continue
 
         recipient = db.get(User, recipient_id)
         title = (
@@ -259,7 +283,7 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
                 entity_type="lab_critical_communication",
                 entity_id=task_id,
                 deep_link="/doctor",
-                metadata={"communication_id": task_id, "report_instance_id": report_id},
+                metadata={"communication_id": task_id},
             )
         )
         db.rollback()

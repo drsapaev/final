@@ -43,6 +43,7 @@ PII_FIELD_PATTERNS = [
     "doc_series",
     "barcode",
     "specimen_barcode",
+    "specimen_barcodes",
     # Contact info
     "phone",
     "phone_number",
@@ -578,6 +579,7 @@ def _mask_key_value(key: str, value: Any) -> Any:
         "doc_series",
         "barcode",
         "specimen_barcode",
+        "specimen_barcodes",
         "diagnosis",
         "diagnoses",
         "icd10",
