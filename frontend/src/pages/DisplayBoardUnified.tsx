@@ -344,6 +344,7 @@ export default function DisplayBoardUnified({
   const invalidateBoardStateRequests = useCallback(() => { stateRequestRef.current++; }, []);
   const snapshotReadyRef = useRef(false);
   const currentCallRef = useRef<CurrentCall | null>(null);
+  const liveAudioCallRef = useRef<CurrentCall | null>(null);
   const pendingLiveAudioRef = useRef<CurrentCall | null>(null);
   const latestCallOrderRef = useRef('');
   const displayTestRef = useRef<DisplayTest | null>(null);
@@ -578,9 +579,11 @@ export default function DisplayBoardUnified({
   function showCall(call: CurrentCall | null, deadline?: number) {
     clearCallExpiry();
     const pending = pendingLiveAudioRef.current;
-    if (!call || (pending && pending.event_id !== call.event_id)) {
+    if (!call || (pending && !sameCall(call, pending))) {
       pendingLiveAudioRef.current = null;
     }
+    const live = liveAudioCallRef.current;
+    if (!call || (live && !sameCall(call, live))) liveAudioCallRef.current = null;
     currentCallRef.current = call;
     setCurrentCall(call);
     if (call && deadline !== undefined && deadline > Date.now()) {
@@ -664,6 +667,7 @@ export default function DisplayBoardUnified({
         }
         stopBoardAudio();
         showCall(data, deadline);
+        liveAudioCallRef.current = data;
         setCallStateAvailable(true);
         pendingLiveAudioRef.current = data;
         playPendingLiveCall();
@@ -762,10 +766,18 @@ export default function DisplayBoardUnified({
               // station. Keep the room from this exact live invitation.
               const cabinet = matchingEntry.cabinet === null
                 ? call.cabinet
-                : matchingEntry.cabinet === undefined ? queueCabinet : matchingEntry.cabinet;
+                : matchingEntry.cabinet ?? queueCabinet ?? call.cabinet;
               const updatedCall = { ...call, cabinet };
               currentCallRef.current = updatedCall;
               setCurrentCall(updatedCall);
+              // Correct a live invitation if its destination changes, but do
+              // not replay an invitation restored silently on reconnect.
+              if ((cabinet ?? '') !== (call.cabinet ?? '') && sameCall(liveAudioCallRef.current, call)) {
+                liveAudioCallRef.current = updatedCall;
+                stopBoardAudio();
+                pendingLiveAudioRef.current = updatedCall;
+                playPendingLiveCall();
+              }
             }
           }
           setQueueData((prev) => {

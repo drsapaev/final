@@ -303,6 +303,72 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
     }
   });
 
+  it.each([false, true])('corrects a live room change without repeating unchanged updates (speech ended: %s)', async (speechEnded) => {
+    const cancel = vi.fn();
+    const speak = vi.fn((utterance: { onstart?: () => void; onend?: () => void }) => {
+      utterance.onstart?.();
+      if (speechEnded) utterance.onend?.();
+    });
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'ru-RU' }], speak, cancel });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
+    const { push } = await renderBoard({}, {
+      sound_enabled: true, voice_announcements: true, voice_language: 'ru', volume_level: 50,
+    });
+    push({ type: 'patient_call', data: {
+      event_id: 'live-room-correction', queue_id: 1, queue_entry_id: 8,
+      queue_number: 8, cabinet: '506', expires_at: new Date(Date.now() + 10000).toISOString(),
+    } });
+    await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+    expect(speak).toHaveBeenNthCalledWith(1, expect.objectContaining({ text: expect.stringMatching(/8.*506/) }));
+    const updated = { type: 'queue_update', data: { queue_id: 1, cabinet: '507', queue_entries: [
+      { id: 8, queue_id: 1, number: 8, status: 'called', cabinet: '507' },
+    ] } };
+    push(updated);
+    await waitFor(() => expect(speak).toHaveBeenCalledTimes(2));
+    if (!speechEnded) expect(cancel).toHaveBeenCalled();
+    expect(screen.getAllByText('🚪 507')).not.toHaveLength(0);
+    expect(speak).toHaveBeenNthCalledWith(2, expect.objectContaining({ text: expect.stringMatching(/8.*507/) }));
+    push(updated);
+    expect(speak).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a known room and does not reannounce when an update omits the destination', async () => {
+    const speak = vi.fn((utterance: { onstart?: () => void }) => utterance.onstart?.());
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'ru-RU' }], speak, cancel: vi.fn() });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
+    const { push } = await renderBoard({}, {
+      sound_enabled: true, voice_announcements: true, voice_language: 'ru', volume_level: 50,
+    });
+    push({ type: 'patient_call', data: {
+      event_id: 'live-room-omitted', queue_id: 1, queue_entry_id: 8,
+      queue_number: 8, cabinet: '506', expires_at: new Date(Date.now() + 10000).toISOString(),
+    } });
+    await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+    push({ type: 'queue_update', data: { queue_id: 1, queue_entries: [
+      { id: 8, queue_id: 1, number: 8, status: 'called' },
+    ] } });
+    expect(screen.getByText('🚪 506')).toBeInTheDocument();
+    expect(speak).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a recovered call silent when its room changes', async () => {
+    const speak = vi.fn();
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'ru-RU' }], speak, cancel: vi.fn() });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
+    const { push } = await renderBoard({}, {
+      sound_enabled: true, voice_announcements: true, voice_language: 'ru', volume_level: 50,
+    });
+    push({ type: 'initial_state', data: { queue_entries: [], current_call: {
+      event_id: 'restored-call', queue_id: 1, queue_entry_id: 8,
+      queue_number: 8, cabinet: '506', expires_at: new Date(Date.now() + 10000).toISOString(),
+    } } });
+    push({ type: 'queue_update', data: { queue_id: 1, cabinet: '507', queue_entries: [
+      { id: 8, queue_id: 1, number: 8, status: 'called', cabinet: '507' },
+    ] } });
+    expect(screen.getAllByText('🚪 507')).not.toHaveLength(0);
+    expect(speak).not.toHaveBeenCalled();
+  });
+
   it('updates the current room and preserves an explicitly unknown resource room', async () => {
     const { push } = await renderBoard();
     push({ type: 'patient_call', data: { queue_id: 1, queue_entry_id: 11, queue_number: 5, cabinet: '101' } });
