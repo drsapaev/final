@@ -131,6 +131,12 @@ export interface EnhancedAppointmentsTableProps {
   showCheckboxes?: boolean;
   /** Explicit opt-in for backend-only ticket numbers in the registrar worklist. */
   preferCanonicalQueueNumber?: boolean;
+  /** Caller-controlled CSV contract, using table-filtered rows across pages. */
+  filteredExport?: {
+    label: string;
+    disabled?: boolean;
+    onExport: (rows: AppointmentRow[]) => void;
+  };
   view?: string;
   rawEntries?: AppointmentRow[];
   appointments?: AppointmentRow[];
