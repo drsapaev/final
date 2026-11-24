@@ -18426,6 +18426,74 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lab/report-instances/{instance_id}/submit-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Lab Report For Review */
+        post: operations["submit_lab_report_for_review_api_v1_lab_report_instances__instance_id__submit_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/report-instances/{instance_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Lab Report */
+        post: operations["review_lab_report_api_v1_lab_report_instances__instance_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/report-instances/{instance_id}/return-to-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Return Lab Report To Draft */
+        post: operations["return_lab_report_to_draft_api_v1_lab_report_instances__instance_id__return_to_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/report-instances/{instance_id}/qc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Lab Report Qc */
+        post: operations["record_lab_report_qc_api_v1_lab_report_instances__instance_id__qc_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lab/report-instances/{instance_id}/finalize": {
         parameters: {
             query?: never;
@@ -18547,6 +18615,267 @@ export type paths = {
          *     - inline + no-store; рендерер тот же, что у финального PDF.
          */
         get: operations["preview_lab_template_version_pdf_api_v1_lab_template_versions__version_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/orders/{order_id}/specimens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Order Specimens */
+        get: operations["lab_list_order_specimens"];
+        put?: never;
+        /** Create Specimen */
+        post: operations["lab_create_specimen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/visits/{visit_id}/specimens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Visit Specimen */
+        post: operations["lab_collect_specimen_for_visit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/specimens/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Scan Specimen */
+        post: operations["lab_scan_specimen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/specimens/{specimen_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Specimen Event */
+        post: operations["lab_apply_specimen_event"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/specimens/{specimen_id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Specimen */
+        post: operations["lab_assign_specimen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/specimens/{specimen_id}/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Issue Specimen Label */
+        post: operations["lab_issue_specimen_label"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/worklist/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List Lab Worklist
+         * @description Read a page of work and counters across the same search scope.
+         *
+         *     The search body keeps patient names and barcode values out of URLs.
+         */
+        post: operations["list_lab_worklist_api_v1_lab_worklist_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/visits/{visit_id}/tests/{visit_service_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Lab Ordered Test */
+        post: operations["cancel_lab_ordered_test_api_v1_lab_visits__visit_id__tests__visit_service_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/critical-communications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Communications */
+        get: operations["list_communications_api_v1_lab_critical_communications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/critical-communications/{task_id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Communication */
+        post: operations["assign_communication_api_v1_lab_critical_communications__task_id__assign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/critical-communications/{task_id}/escalate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Escalate Communication */
+        post: operations["escalate_communication_api_v1_lab_critical_communications__task_id__escalate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/critical-communications/{task_id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Acknowledge Communication */
+        post: operations["acknowledge_communication_api_v1_lab_critical_communications__task_id__acknowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Lab Values */
+        post: operations["import_lab_values_api_v1_lab_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/imports/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Lab Import */
+        post: operations["preview_lab_import_api_v1_lab_imports_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lab Metrics */
+        get: operations["lab_metrics_api_v1_lab_metrics_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -27382,6 +27711,35 @@ export type components = {
             /** Notes */
             notes?: string | null;
         };
+        /** CommunicationOut */
+        CommunicationOut: {
+            /** Id */
+            id: number;
+            /** Report Instance Id */
+            report_instance_id: number;
+            /** Supersedes Communication Id */
+            supersedes_communication_id: number | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "needs_assignment" | "pending" | "inbox_recorded" | "escalated" | "acknowledged" | "superseded";
+            /** Attempts */
+            attempts: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Inbox Recorded At */
+            inbox_recorded_at: string | null;
+            /** Acknowledged At */
+            acknowledged_at: string | null;
+            /** Escalated At */
+            escalated_at: string | null;
+            /** Available Actions */
+            available_actions?: ("assign" | "escalate" | "acknowledge")[];
+        };
         /**
          * ComplaintAnalysisRequest
          * @description Запрос на анализ жалоб
@@ -31953,6 +32311,20 @@ export type components = {
              */
             attempt_expires_at?: string | null;
         };
+        /** LabCanceledOrderedTest */
+        LabCanceledOrderedTest: {
+            /** Order Id */
+            order_id: number;
+            /** Visit Service Id */
+            visit_service_id: number;
+            /**
+             * Canceled At
+             * Format: date-time
+             */
+            canceled_at: string;
+            /** Canceled By User Id */
+            canceled_by_user_id: number;
+        };
         /** LabCatalogAnalyteOut */
         LabCatalogAnalyteOut: {
             /** Code */
@@ -31982,6 +32354,12 @@ export type components = {
             age_min_months?: number | null;
             /** Age Max Months */
             age_max_months?: number | null;
+            /** Material Code */
+            material_code?: string | null;
+            /** Method Code */
+            method_code?: string | null;
+            /** Unit Code */
+            unit_code?: string | null;
             /** Text */
             text?: string | null;
             /** Low */
@@ -32049,6 +32427,95 @@ export type components = {
             /** Threshold Display */
             threshold_display?: string | null;
         };
+        /** LabImportBatch */
+        LabImportBatch: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "manual" | "csv";
+            /** Rows */
+            rows: components["schemas"]["LabImportRow"][];
+        };
+        /** LabImportBatchOut */
+        LabImportBatchOut: {
+            /** Rows */
+            rows: components["schemas"]["LabImportRowOut"][];
+        };
+        /** LabImportRow */
+        LabImportRow: {
+            /**
+             * Message Id
+             * Format: uuid
+             */
+            message_id: string;
+            /** Report Instance Id */
+            report_instance_id: number;
+            /** Specimen Barcode */
+            specimen_barcode: string;
+            /** Expected Updated At */
+            expected_updated_at?: string | null;
+            /** Observed At */
+            observed_at?: string | null;
+            /**
+             * Replace Existing
+             * @default false
+             */
+            replace_existing: boolean;
+            /** Method Code */
+            method_code?: string | null;
+            /** Values */
+            values: components["schemas"]["LabImportValue"][];
+        };
+        /** LabImportRowOut */
+        LabImportRowOut: {
+            /**
+             * Message Id
+             * Format: uuid
+             */
+            message_id: string;
+            /** Report Instance Id */
+            report_instance_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "saved" | "duplicate" | "error";
+            /** Receipt Id */
+            receipt_id?: number | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /**
+             * Existing Values
+             * @default 0
+             */
+            existing_values: number;
+            /** Error Code */
+            error_code?: ("report_not_found" | "report_locked" | "stale_report" | "specimen_mismatch" | "method_mismatch" | "unknown_analyte" | "duplicate_analyte" | "unit_mismatch" | "invalid_value" | "message_conflict" | "values_exist") | null;
+        };
+        /** LabImportValue */
+        LabImportValue: {
+            /** Analyte Code */
+            analyte_code: string;
+            /** Value Text */
+            value_text?: string | null;
+            /** Value Numeric */
+            value_numeric?: number | string | null;
+            /** Comment */
+            comment?: string | null;
+            /** Result Kind */
+            result_kind?: ("numeric" | "qualified_numeric" | "coded_qualitative" | "text" | "absent") | null;
+            /** Comparator */
+            comparator?: ("lt" | "lte" | "gt" | "gte") | null;
+            /** Qualitative Code */
+            qualitative_code?: ("negative" | "positive" | "indeterminate") | null;
+            /** Absence Reason */
+            absence_reason?: string | null;
+            /** Unit Code */
+            unit_code?: string | null;
+            /** Method Code */
+            method_code?: string | null;
+        };
         /**
          * LabInterpretRequest
          * @description Запрос на интерпретацию анализов
@@ -32064,6 +32531,35 @@ export type components = {
             patient_gender?: string | null;
             provider?: components["schemas"]["AIProviderType"] | null;
         };
+        /** LabMetricsOut */
+        LabMetricsOut: {
+            /**
+             * From At
+             * Format: date-time
+             */
+            from_at: string;
+            /**
+             * Until At
+             * Format: date-time
+             */
+            until_at: string;
+            /** Actionable */
+            actionable: number;
+            /** Overdue */
+            overdue: number;
+            /** Rejected Samples */
+            rejected_samples: number;
+            /** Held Samples */
+            held_samples: number;
+            /** Turnaround Pairs */
+            turnaround_pairs: number;
+            /** Average Turnaround Minutes */
+            average_turnaround_minutes: number | null;
+            /** Released Corrections */
+            released_corrections: number;
+            /** Communications Open */
+            communications_open: number;
+        };
         /**
          * LabOrderCreate
          * @description Doctor-initiated lab order request.
@@ -32077,6 +32573,10 @@ export type components = {
             visit_id?: number | null;
             /** Notes */
             notes?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Priority */
+            priority?: ("routine" | "urgent") | null;
         };
         /**
          * LabOrderOut
@@ -32134,6 +32634,36 @@ export type components = {
             status: string;
             /** Notes */
             notes?: string | null;
+        };
+        /** LabOrderedTestCancellation */
+        LabOrderedTestCancellation: {
+            /** Order Id */
+            order_id?: number | null;
+            /** Reason */
+            reason: string;
+        };
+        /** LabQCEvidenceOut */
+        LabQCEvidenceOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "accepted" | "rejected" | "not_applicable";
+            /** Method */
+            method?: string | null;
+            /** Instrument Ref */
+            instrument_ref?: string | null;
+            /** Series Ref */
+            series_ref?: string | null;
+        };
+        /** LabReleaseSpecimenOut */
+        LabReleaseSpecimenOut: {
+            /** Id */
+            id: number;
+            /** Status */
+            status: string;
+            /** Revision */
+            revision: number;
         };
         /** LabReportBulkSaveResponse */
         LabReportBulkSaveResponse: {
@@ -32243,10 +32773,14 @@ export type components = {
             visit_id?: number | null;
             /** Template Version Id */
             template_version_id?: number | null;
+            /** Study Date */
+            study_date?: string | null;
             /** Service Codes */
             service_codes?: string[];
             /** Service Items */
             service_items?: components["schemas"]["LabServiceContextItemIn"][];
+            /** Visit Service Ids */
+            visit_service_ids?: number[];
             /** Signer Overrides */
             signer_overrides?: {
                 [key: string]: unknown;
@@ -32286,6 +32820,15 @@ export type components = {
             template_version_id: number;
             /** Status */
             status: string;
+            /**
+             * Managed Release
+             * @default false
+             */
+            managed_release: boolean;
+            /** Workflow Events */
+            workflow_events?: components["schemas"]["LabReportWorkflowEventOut"][];
+            /** Release Holds */
+            release_holds?: string[];
             /** Patient Snapshot */
             patient_snapshot: {
                 [key: string]: unknown;
@@ -32373,6 +32916,13 @@ export type components = {
             /** Status */
             status: string;
             /**
+             * Managed Release
+             * @default false
+             */
+            managed_release: boolean;
+            /** Supersedes Instance Id */
+            supersedes_instance_id?: number | null;
+            /**
              * Created At
              * Format: date-time
              */
@@ -32446,6 +32996,33 @@ export type components = {
             branding_snapshot?: {
                 [key: string]: unknown;
             } | null;
+            /** Study Date */
+            study_date?: string | null;
+        };
+        /** LabReportQCIn */
+        LabReportQCIn: {
+            /** Expected Updated At */
+            expected_updated_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "accepted" | "rejected" | "not_applicable";
+            /** Reason */
+            reason?: string | null;
+            /** Method */
+            method?: string | null;
+            /** Instrument Ref */
+            instrument_ref?: string | null;
+            /** Series Ref */
+            series_ref?: string | null;
+        };
+        /** LabReportReasonCommand */
+        LabReportReasonCommand: {
+            /** Expected Updated At */
+            expected_updated_at: string;
+            /** Reason */
+            reason: string;
         };
         /** LabReportRenderedFieldOut */
         LabReportRenderedFieldOut: {
@@ -32477,10 +33054,41 @@ export type components = {
             highlight_rule?: {
                 [key: string]: unknown;
             } | null;
+            /** Choice Options */
+            choice_options?: string[] | null;
+            /** Choice Option Codes */
+            choice_option_codes?: (("negative" | "positive" | "indeterminate") | null)[] | null;
             /** Value Text */
             value_text?: string | null;
             /** Value Numeric */
             value_numeric?: string | null;
+            /** Result Kind */
+            result_kind?: ("numeric" | "qualified_numeric" | "coded_qualitative" | "text" | "absent") | null;
+            /** Comparator */
+            comparator?: ("lt" | "lte" | "gt" | "gte") | null;
+            /** Qualitative Code */
+            qualitative_code?: ("negative" | "positive" | "indeterminate") | null;
+            /** Absence Reason */
+            absence_reason?: string | null;
+            /** Method Code */
+            method_code?: string | null;
+            /**
+             * Value Display
+             * @default
+             */
+            value_display: string;
+            /**
+             * Evaluation Status
+             * @default unknown
+             * @enum {string}
+             */
+            evaluation_status: "missing" | "not_evaluated" | "not_applicable" | "evaluated" | "unknown";
+            /** Interpretation */
+            interpretation?: ("normal" | "low" | "high" | "warning" | "abnormal" | "critical" | "negative" | "positive" | "indeterminate") | null;
+            /** Evaluation Snapshot */
+            evaluation_snapshot?: {
+                [key: string]: unknown;
+            } | null;
             /** Comment */
             comment?: string | null;
             /** Resolved Flag */
@@ -32703,6 +33311,60 @@ export type components = {
             value_numeric?: number | string | null;
             /** Comment */
             comment?: string | null;
+            /** Result Kind */
+            result_kind?: ("numeric" | "qualified_numeric" | "coded_qualitative" | "text" | "absent") | null;
+            /** Comparator */
+            comparator?: ("lt" | "lte" | "gt" | "gte") | null;
+            /** Qualitative Code */
+            qualitative_code?: ("negative" | "positive" | "indeterminate") | null;
+            /** Absence Reason */
+            absence_reason?: string | null;
+            /** Unit Code */
+            unit_code?: string | null;
+            /** Method Code */
+            method_code?: string | null;
+        };
+        /** LabReportVersionCommand */
+        LabReportVersionCommand: {
+            /** Expected Updated At */
+            expected_updated_at: string;
+        };
+        /** LabReportWorkflowEventOut */
+        LabReportWorkflowEventOut: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "entered" | "submitted" | "reviewed" | "returned" | "qc_recorded" | "finalized" | "revision_created";
+            /** Actor User Id */
+            actor_user_id: number;
+            /** Actor Name */
+            actor_name: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /**
+             * Report Version
+             * Format: date-time
+             */
+            report_version: string;
+            /** Reason */
+            reason?: string | null;
+            evidence?: components["schemas"]["LabReportWorkflowEvidenceOut"] | null;
+        };
+        /** LabReportWorkflowEvidenceOut */
+        LabReportWorkflowEvidenceOut: {
+            /** Specimens */
+            specimens?: components["schemas"]["LabReleaseSpecimenOut"][] | null;
+            /** Qc Event Id */
+            qc_event_id?: number | null;
+            /** Review Event Id */
+            review_event_id?: number | null;
+            qc?: components["schemas"]["LabQCEvidenceOut"] | null;
         };
         /**
          * LabResultItem
@@ -32806,6 +33468,174 @@ export type components = {
             /** Name */
             name?: string | null;
         };
+        /** LabSpecimenAssignmentCommand */
+        LabSpecimenAssignmentCommand: {
+            /** Visit Service Ids */
+            visit_service_ids?: number[];
+            /** Report Instance Ids */
+            report_instance_ids?: number[];
+            /** Expected Revision */
+            expected_revision: number;
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /**
+             * Operation
+             * @default add
+             * @enum {string}
+             */
+            operation: "add" | "remove";
+            /** Reason */
+            reason?: string | null;
+        };
+        /** LabSpecimenCommand */
+        LabSpecimenCommand: {
+            /** Expected Revision */
+            expected_revision: number;
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+        };
+        /** LabSpecimenCreate */
+        LabSpecimenCreate: {
+            /** Visit Service Ids */
+            visit_service_ids?: number[];
+            /** Report Instance Ids */
+            report_instance_ids?: number[];
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /** Material Code */
+            material_code: string;
+            /** Container Code */
+            container_code: string;
+            /** Parent Specimen Id */
+            parent_specimen_id?: number | null;
+            /** Replaces Specimen Id */
+            replaces_specimen_id?: number | null;
+        };
+        /** LabSpecimenErrorOut */
+        LabSpecimenErrorOut: {
+            /** Detail */
+            detail: string;
+        };
+        /** LabSpecimenEventOut */
+        LabSpecimenEventOut: {
+            /** Id */
+            id: number;
+            /** Revision */
+            revision: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "create" | "collect" | "receive" | "accept" | "hold" | "reject" | "print_label" | "assign" | "unassign" | "aliquot" | "recollect";
+            /**
+             * Resulting Status
+             * @enum {string}
+             */
+            resulting_status: "expected" | "collected" | "received" | "accepted" | "held" | "rejected";
+            /** Actor User Id */
+            actor_user_id: number;
+            /**
+             * Happened At
+             * Format: date-time
+             */
+            happened_at: string;
+            /** Reason */
+            reason: string | null;
+            /** Visit Service Ids */
+            visit_service_ids: number[];
+            /** Report Instance Ids */
+            report_instance_ids: number[];
+        };
+        /** LabSpecimenListOut */
+        LabSpecimenListOut: {
+            /** Items */
+            items: components["schemas"]["LabSpecimenOut"][];
+            /**
+             * Data Status
+             * @enum {string}
+             */
+            data_status: "known" | "unknown";
+        };
+        /** LabSpecimenOut */
+        LabSpecimenOut: {
+            /** Id */
+            id: number;
+            /** Order Id */
+            order_id: number;
+            /** Visit Id */
+            visit_id: number | null;
+            /** Barcode */
+            barcode: string;
+            /** Material Code */
+            material_code: string;
+            /** Container Code */
+            container_code: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "expected" | "collected" | "received" | "accepted" | "held" | "rejected";
+            /** Revision */
+            revision: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Collected At */
+            collected_at: string | null;
+            /** Received At */
+            received_at: string | null;
+            /** Accepted At */
+            accepted_at: string | null;
+            /** Latest Reason */
+            latest_reason: string | null;
+            /** Parent Specimen Id */
+            parent_specimen_id: number | null;
+            /** Replaces Specimen Id */
+            replaces_specimen_id: number | null;
+            /** Visit Service Ids */
+            visit_service_ids: number[];
+            /** Report Instance Ids */
+            report_instance_ids: number[];
+            /** Available Actions */
+            available_actions: ("collect" | "receive" | "accept" | "hold" | "reject" | "print_label" | "assign" | "aliquot" | "recollect")[];
+            /** Events */
+            events: components["schemas"]["LabSpecimenEventOut"][];
+        };
+        /** LabSpecimenScan */
+        LabSpecimenScan: {
+            /** Barcode */
+            barcode: string;
+            /** Order Id */
+            order_id?: number | null;
+        };
+        /** LabSpecimenTransitionCommand */
+        LabSpecimenTransitionCommand: {
+            /** Expected Revision */
+            expected_revision: number;
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "collect" | "receive" | "accept" | "hold" | "reject";
+            /** Reason */
+            reason?: string | null;
+        };
         /** LabTemplateResolutionIn */
         LabTemplateResolutionIn: {
             /** Patient Id */
@@ -32838,6 +33668,170 @@ export type components = {
             default_template?: components["schemas"]["LabReportTemplateSummaryOut"] | null;
             /** Allowed Templates */
             allowed_templates?: components["schemas"]["LabReportTemplateSummaryOut"][];
+        };
+        /** LabWorklistCounts */
+        LabWorklistCounts: {
+            /** Actionable */
+            actionable: number;
+            /** Today */
+            today: number;
+            /** Overdue */
+            overdue: number;
+            /** Awaiting Specimen */
+            awaiting_specimen: number;
+            /** In Review */
+            in_review: number;
+            /** Ready */
+            ready: number;
+        };
+        /** LabWorklistEntry */
+        LabWorklistEntry: {
+            /** Id */
+            id: string;
+            /** Patient Id */
+            patient_id: number;
+            /** Patient Fio */
+            patient_fio: string;
+            /** Patient Birth Year */
+            patient_birth_year: number | null;
+            /** Visit Id */
+            visit_id: number | null;
+            /** Appointment Id */
+            appointment_id: number | null;
+            /** Order Id */
+            order_id: number | null;
+            /** Queue Entry Id */
+            queue_entry_id: number | null;
+            /** Queue Number */
+            queue_number: number | null;
+            /** Queue Status */
+            queue_status: string | null;
+            /** Appointment Time */
+            appointment_time: string | null;
+            /**
+             * Work Date
+             * Format: date
+             */
+            work_date: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due At */
+            due_at: string | null;
+            /** Priority */
+            priority: ("routine" | "urgent") | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "awaiting_specimen" | "in_progress" | "in_review" | "held" | "partial" | "ready" | "canceled";
+            /** Hold Reason */
+            hold_reason: string | null;
+            /** Service Details */
+            service_details: components["schemas"]["LabWorklistService"][];
+            /** Services */
+            services: string[];
+            /** Service Codes */
+            service_codes: string[];
+            /** Report Instance Id */
+            report_instance_id: number | null;
+            /** Report Template Name */
+            report_template_name: string | null;
+            /** Lab Report Status */
+            lab_report_status: string | null;
+            progress: components["schemas"]["LabWorklistProgress"];
+            /** Specimen Ids */
+            specimen_ids: number[];
+            /** Specimen Barcodes */
+            specimen_barcodes: string[];
+        };
+        /** LabWorklistPage */
+        LabWorklistPage: {
+            /** Entries */
+            entries: components["schemas"]["LabWorklistEntry"][];
+            /** Total */
+            total: number;
+            counts: components["schemas"]["LabWorklistCounts"];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Timezone */
+            timezone: string;
+        };
+        /** LabWorklistProgress */
+        LabWorklistProgress: {
+            /** Total Reports */
+            total_reports: number;
+            /** Released Reports */
+            released_reports: number;
+            /** Ordered Tests */
+            ordered_tests?: number | null;
+            /** Released Tests */
+            released_tests?: number | null;
+            /** Canceled Tests */
+            canceled_tests?: number | null;
+        };
+        /** LabWorklistSearch */
+        LabWorklistSearch: {
+            /**
+             * Q
+             * @default
+             */
+            q: string;
+            /** Barcode */
+            barcode?: string | null;
+            /**
+             * View
+             * @default actionable
+             * @enum {string}
+             */
+            view: "actionable" | "today" | "overdue" | "awaiting_specimen" | "in_review" | "ready";
+            /**
+             * Sort
+             * @default oldest
+             * @enum {string}
+             */
+            sort: "oldest" | "newest" | "name";
+            /** From Date */
+            from_date?: string | null;
+            /** To Date */
+            to_date?: string | null;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /** Cursor */
+            cursor?: string | null;
+        };
+        /** LabWorklistService */
+        LabWorklistService: {
+            /** Id */
+            id: number;
+            /** Visit Service Id */
+            visit_service_id: number | null;
+            /** Code */
+            code: string | null;
+            /** Name */
+            name: string;
+            /** Quantity */
+            quantity: number;
+            /**
+             * Canceled
+             * @default false
+             */
+            canceled: boolean;
+            /**
+             * Can Cancel
+             * @default false
+             */
+            can_cancel: boolean;
         };
         /** LicenseActivationCreate */
         LicenseActivationCreate: {
@@ -80588,6 +81582,146 @@ export interface operations {
             };
         };
     };
+    submit_lab_report_for_review_api_v1_lab_report_instances__instance_id__submit_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabReportVersionCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabReportInstanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_lab_report_api_v1_lab_report_instances__instance_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabReportVersionCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabReportInstanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    return_lab_report_to_draft_api_v1_lab_report_instances__instance_id__return_to_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabReportReasonCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabReportInstanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_lab_report_qc_api_v1_lab_report_instances__instance_id__qc_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabReportQCIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabReportInstanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     finalize_lab_report_api_v1_lab_report_instances__instance_id__finalize_post: {
         parameters: {
             query?: never;
@@ -80597,7 +81731,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LabReportVersionCommand"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -80628,7 +81766,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LabReportReasonCommand"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -80767,6 +81909,709 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lab_list_order_specimens: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenListOut"];
+                };
+            };
+            /** @description Laboratory access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Record not found in this context */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lab_create_specimen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabSpecimenCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenOut"];
+                };
+            };
+            /** @description Laboratory access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Record not found in this context */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Conflict or unavailable action */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lab_collect_specimen_for_visit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabSpecimenCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenOut"];
+                };
+            };
+            /** @description Laboratory access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Record not found in this context */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Conflict or unavailable action */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lab_scan_specimen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabSpecimenScan"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenOut"];
+                };
+            };
+            /** @description Laboratory access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Record not found in this context */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lab_apply_specimen_event: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                specimen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabSpecimenTransitionCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenOut"];
+                };
+            };
+            /** @description Laboratory access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Record not found in this context */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Conflict or unavailable action */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lab_assign_specimen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                specimen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabSpecimenAssignmentCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenOut"];
+                };
+            };
+            /** @description Laboratory access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Record not found in this context */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Conflict or unavailable action */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lab_issue_specimen_label: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                specimen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabSpecimenCommand"];
+            };
+        };
+        responses: {
+            /** @description Issued Code 128 label */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Laboratory access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Record not found in this context */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Conflict or unavailable action */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSpecimenErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_lab_worklist_api_v1_lab_worklist_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabWorklistSearch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabWorklistPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_lab_ordered_test_api_v1_lab_visits__visit_id__tests__visit_service_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+                visit_service_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabOrderedTestCancellation"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabCanceledOrderedTest"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_communications_api_v1_lab_critical_communications_get: {
+        parameters: {
+            query?: {
+                visit_id?: number | null;
+                before_id?: number | null;
+                open_only?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_communication_api_v1_lab_critical_communications__task_id__assign_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    escalate_communication_api_v1_lab_critical_communications__task_id__escalate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    acknowledge_communication_api_v1_lab_critical_communications__task_id__acknowledge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_lab_values_api_v1_lab_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabImportBatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabImportBatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_lab_import_api_v1_lab_imports_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabImportBatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabImportBatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lab_metrics_api_v1_lab_metrics_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabMetricsOut"];
                 };
             };
             /** @description Validation Error */

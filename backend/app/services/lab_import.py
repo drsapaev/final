@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.lab_import import LabImportReceipt
 from app.repositories.lab_specimen_repository import SpecimenRepository
 from app.schemas.lab_import import LabImportBatch, LabImportRow, LabImportRowOut
+from app.services.audit_service import log_audit_event
 from app.services.lab_reporting import LabReportingDomainError, LabReportingService
 
 
@@ -257,6 +258,17 @@ def process_import_batch(
                 _process_row(db, batch.source, actor_id, row, preview=preview)
             )
         except RowRejected as exc:
+            db.rollback()
+            if not preview:
+                log_audit_event(
+                    db,
+                    event_type="LAB_IMPORT_ROW_REJECTED",
+                    actor_user_id=actor_id,
+                    resource_type="lab_import",
+                    action="import",
+                    outcome="error",
+                    reason_code={"source": batch.source, "error_code": exc.code},
+                )
             responses.append(
                 LabImportRowOut(
                     message_id=row.message_id,

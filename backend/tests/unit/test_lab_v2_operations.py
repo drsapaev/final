@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
+from app.models.audit import AuditLog
 from app.models.clinic import Doctor
 from app.models.lab import LabOrder, LabReportValue
 from app.models.lab_critical_communication import LabCriticalCommunicationEvent
@@ -161,6 +162,19 @@ def test_import_validation_receipt_and_partial_retry(db_session, test_patient):
     )
     assert rejected[0].error_code == "invalid_value"
     assert saved.value_numeric == Decimal("0.01")
+
+    last_rejection = db_session.scalar(
+        select(AuditLog)
+        .where(AuditLog.event_type == "LAB_IMPORT_ROW_REJECTED")
+        .order_by(AuditLog.id.desc())
+        .limit(1)
+    )
+    assert last_rejection.actor_user_id == actor.id
+    assert last_rejection.reason_code == {
+        "source": "manual",
+        "error_code": "invalid_value",
+    }
+    assert last_rejection.subject_patient_id is None and last_rejection.payload is None
 
 
 @pytest.mark.unit
