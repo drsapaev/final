@@ -244,9 +244,12 @@ def test_activatable_role_prevents_partial_revocation(finance_scope, owner):
         assert not _has(connection, scope, scope.gateway, "payment_visits", "TRUNCATE")
 
 
-@pytest.fixture
-def finance_trigger_scope(finance_scope, monkeypatch):
-    migration = _migration("0155_finance_trigger_acl.py")
+@pytest.fixture(params=[
+    "0155_finance_trigger_acl.py",
+    "0158_finance_internal_exec_acl.py",
+], ids=["0155", "0158"])
+def finance_trigger_scope(finance_scope, monkeypatch, request):
+    migration = _migration(request.param)
     scope = replace(finance_scope, migration=migration)
     monkeypatch.setattr(migration, "_GATEWAY_ROLES", (scope.gateway,))
     schema = scope.engine.dialect.identifier_preparer.quote_schema(scope.schema)
@@ -274,7 +277,7 @@ def finance_trigger_scope(finance_scope, monkeypatch):
             f"CREATE FUNCTION {unrelated}() RETURNS integer LANGUAGE sql AS 'SELECT 1'"
         )
         table = scope.qualified("unrelated_inventory")
-        function = scope.qualified("reserve_kaspi_payment_reference")
+        function = scope.qualified(migration._ROUTINES[0])
         connection.exec_driver_sql(
             f"CREATE TRIGGER synthetic_record BEFORE INSERT ON {table} "
             f"FOR EACH ROW EXECUTE FUNCTION {function}()"
