@@ -26,6 +26,7 @@ import {
   type PublicBookingRequestResubmitBody,
 } from '../api/publicBooking';
 import { useDocumentLanguage } from '../hooks/useDocumentLanguage';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { getVitePublicSiteAnalyticsEndpoint, PublicSiteAnalytics } from '../publicSiteAnalytics';
 import { getState } from '../stores/auth';
 
@@ -318,6 +319,7 @@ export default function PatientBookingPage() {
   const alternateLocale = locale === 'ru' ? 'uz-Latn' : 'ru';
   const copy = COPY[locale];
   useDocumentLanguage(locale);
+  useDocumentTitle(copy.title);
   const [resume, setResume] = useState<ReturnType<typeof takePendingPublicBookingResume>>(null);
   const [resumeLoaded, setResumeLoaded] = useState(false);
   const resumedResubmitContext = resume?.kind === 'selection' && resume.selection.resubmit
