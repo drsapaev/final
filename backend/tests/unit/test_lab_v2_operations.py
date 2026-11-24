@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.dialects import postgresql
 
 from app.models.audit import AuditLog
 from app.models.clinic import Doctor
@@ -15,6 +16,7 @@ from app.models.lab_import import LabImportReceipt
 from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment
 from app.models.user import User
 from app.schemas.lab_import import LabImportBatch
+from app.services.authentication_service import authentication_service
 from app.services.lab_critical_communication import (
     acknowledge,
     dispatch_pending,
@@ -337,6 +339,122 @@ def test_critical_communication_inbox_is_separate_from_acknowledgment(
         "created",
         "attempted",
         "delivery_failed",
+        "attempted",
+        "inbox_recorded",
+        "acknowledged",
+    ]
+
+
+@pytest.mark.unit
+def test_recorded_critical_task_follows_current_doctor(
+    db_session,
+    test_patient,
+    test_visit,
+    client,
+    auth_headers,
+    monkeypatch,
+):
+    doctors = [synthetic_user(db_session, "Doctor") for _ in range(2)]
+    profiles = [
+        Doctor(user_id=user.id, specialty="cardiology", active=True) for user in doctors
+    ]
+    db_session.add_all(profiles)
+    db_session.flush()
+    test_visit.doctor_id = profiles[0].id
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(
+        LabReportValue(
+            field_key="hgb",
+            value_numeric=Decimal("1"),
+            evaluation_snapshot={"interpretation": "critical"},
+        )
+    )
+    task = record_released_report(db_session, report)
+    assert task is not None
+    task_id = task.id
+    visit_id = test_visit.id
+    db_session.commit()
+
+    def doctor_headers(user):
+        token = authentication_service.create_access_token(
+            {
+                "sub": str(user.id),
+                "username": user.username,
+                "role": user.role,
+                "is_active": user.is_active,
+                "is_superuser": user.is_superuser,
+            }
+        )
+        return {"Authorization": f"Bearer {token}"}
+
+    route = "/api/v1/lab/critical-communications"
+    params = {"visit_id": visit_id}
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender
+    )
+    assert run(dispatch_pending(db_session)) == 1
+    assert task.state == "inbox_recorded"
+    before = client.get(route, params=params, headers=doctor_headers(doctors[0]))
+    assert before.status_code == 200
+    assert before.json()[0]["available_actions"] == ["acknowledge"]
+    admin = client.get(route, params=params, headers=auth_headers)
+    assert admin.status_code == 200
+    assert "assign" in admin.json()[0]["available_actions"]
+
+    test_visit.doctor_id = profiles[1].id
+    db_session.commit()
+    stale = client.post(
+        f"{route}/{task_id}/acknowledge", headers=doctor_headers(doctors[0])
+    )
+    assert stale.status_code == 404
+    assert (
+        client.get(route, params=params, headers=doctor_headers(doctors[0])).status_code
+        == 403
+    )
+
+    assert run(dispatch_pending(db_session)) == 1
+    assert task.recipient_user_id == doctors[1].id
+    assert task.state == "inbox_recorded"
+    assert [call.kwargs["recipient"].id for call in sender.await_args_list] == [
+        user.id for user in doctors
+    ]
+    after = client.get(route, params=params, headers=doctor_headers(doctors[1]))
+    assert after.status_code == 200
+    assert after.json()[0]["id"] == task_id
+    assert after.json()[0]["available_actions"] == ["acknowledge"]
+
+    locked_sql = []
+    scalar = db_session.scalar
+
+    def capture_scalar(statement, *args, **kwargs):
+        locked_sql.append(str(statement.compile(dialect=postgresql.dialect())))
+        return scalar(statement, *args, **kwargs)
+
+    with monkeypatch.context() as capture:
+        capture.setattr(db_session, "scalar", capture_scalar)
+        acknowledged_task = acknowledge(
+            db_session, task_id, actor_user_id=doctors[1].id
+        )
+        assert acknowledged_task.state == "acknowledged"
+    assert any("FOR SHARE OF visits, doctors, users" in sql for sql in locked_sql)
+
+    test_visit.doctor_id = profiles[0].id
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 0
+    assert len(sender.await_args_list) == 2
+    events = list(
+        db_session.scalars(
+            select(LabCriticalCommunicationEvent.event_type)
+            .where(LabCriticalCommunicationEvent.communication_id == task_id)
+            .order_by(LabCriticalCommunicationEvent.id)
+        )
+    )
+    assert events == [
+        "created",
+        "attempted",
+        "inbox_recorded",
+        "assigned",
         "attempted",
         "inbox_recorded",
         "acknowledged",

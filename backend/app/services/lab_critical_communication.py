@@ -16,24 +16,28 @@ from app.models.visit import Visit
 from app.services.lab_reporting import LabReportingDomainError
 
 
+def _active_visit_doctor_query(visit_id, patient_id):
+    return (
+        select(User.id)
+        .join(Doctor, Doctor.user_id == User.id)
+        .join(Visit, Visit.doctor_id == Doctor.id)
+        .where(
+            Visit.id == visit_id,
+            Visit.patient_id == patient_id,
+            User.is_active.is_(True),
+            func.lower(func.trim(User.role)) == "doctor",
+            Doctor.active.is_(True),
+        )
+    )
+
+
 def _responsible_user_id(
     db: Session,
     instance: LabReportInstance,
     *,
     lock_ownership: bool = False,
 ) -> int | None:
-    query = (
-        select(User.id)
-        .join(Doctor, Doctor.user_id == User.id)
-        .join(Visit, Visit.doctor_id == Doctor.id)
-        .where(
-            Visit.id == instance.visit_id,
-            Visit.patient_id == instance.patient_id,
-            User.is_active.is_(True),
-            func.lower(func.trim(User.role)) == "doctor",
-            Doctor.active.is_(True),
-        )
-    )
+    query = _active_visit_doctor_query(instance.visit_id, instance.patient_id)
     if lock_ownership:
         query = query.with_for_update(read=True, of=(Visit, Doctor, User))
     return db.scalar(query)
@@ -125,6 +129,25 @@ def _locked_task(db: Session, task_id: int) -> LabCriticalCommunication:
     return task
 
 
+def _set_task_recipient(
+    db: Session,
+    task: LabCriticalCommunication,
+    recipient_id: int | None,
+    *,
+    actor_user_id: int | None = None,
+) -> None:
+    task.recipient_user_id = recipient_id
+    task.inbox_recorded_at = None
+    task.state = "pending" if recipient_id is not None else "needs_assignment"
+    task.next_attempt_at = datetime.now(UTC) if recipient_id is not None else None
+    _event(
+        db,
+        task.id,
+        "assigned" if recipient_id is not None else "needs_assignment",
+        actor_user_id=actor_user_id,
+    )
+
+
 def assign_responsible_doctor(
     db: Session,
     task_id: int,
@@ -135,7 +158,7 @@ def assign_responsible_doctor(
     if task.state in {"acknowledged", "superseded"}:
         raise LabReportingDomainError(409, "Communication is closed")
     instance = db.get(LabReportInstance, task.report_instance_id)
-    recipient_id = _responsible_user_id(db, instance)
+    recipient_id = _responsible_user_id(db, instance, lock_ownership=True)
     if recipient_id is None:
         raise LabReportingDomainError(
             409, "No eligible doctor is assigned to this visit"
@@ -145,11 +168,7 @@ def assign_responsible_doctor(
         "inbox_recorded",
     }:
         return task
-    task.recipient_user_id = recipient_id
-    task.state = "pending"
-    task.inbox_recorded_at = None
-    task.next_attempt_at = datetime.now(UTC)
-    _event(db, task.id, "assigned", actor_user_id=actor_user_id)
+    _set_task_recipient(db, task, recipient_id, actor_user_id=actor_user_id)
     db.commit()
     return task
 
@@ -183,7 +202,7 @@ def acknowledge(
     instance = db.get(LabReportInstance, task.report_instance_id)
     if (
         task.recipient_user_id != actor_user_id
-        or _responsible_user_id(db, instance) != actor_user_id
+        or _responsible_user_id(db, instance, lock_ownership=True) != actor_user_id
     ):
         raise LabReportingDomainError(404, "Critical communication not found")
     if task.state == "superseded":
@@ -199,6 +218,43 @@ def acknowledge(
     return task
 
 
+def _reconcile_recorded_recipients(db: Session, *, limit: int) -> None:
+    # An inbox delivery stays in the journal, but it cannot stand in for
+    # acknowledgment by a doctor who becomes responsible later.
+    current_owner = (
+        _active_visit_doctor_query(
+            LabReportInstance.visit_id, LabReportInstance.patient_id
+        )
+        .correlate(LabReportInstance)
+        .scalar_subquery()
+    )
+    candidates = (
+        select(LabCriticalCommunication)
+        .join(
+            LabReportInstance,
+            LabReportInstance.id == LabCriticalCommunication.report_instance_id,
+        )
+        .where(
+            LabCriticalCommunication.state == "inbox_recorded",
+            LabCriticalCommunication.recipient_user_id.is_distinct_from(current_owner),
+        )
+        .order_by(LabCriticalCommunication.id)
+        .limit(1)
+        .with_for_update(of=LabCriticalCommunication, skip_locked=True)
+        .execution_options(populate_existing=True)
+    )
+    for _ in range(limit):
+        task = db.scalar(candidates)
+        if task is None:
+            db.rollback()
+            break
+        instance = db.get(LabReportInstance, task.report_instance_id)
+        recipient_id = _responsible_user_id(db, instance, lock_ownership=True)
+        if recipient_id != task.recipient_user_id:
+            _set_task_recipient(db, task, recipient_id)
+        db.commit()
+
+
 async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
     """Deliver due tasks to inbox via the canonical producer.
 
@@ -207,6 +263,7 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
     """
     from app.services.notifications import notification_sender_service
 
+    _reconcile_recorded_recipients(db, limit=limit)
     recorded = 0
     for _ in range(limit):
         now = datetime.now(UTC)
@@ -226,12 +283,9 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
             db.rollback()
             break
         instance = db.get(LabReportInstance, task.report_instance_id)
-        recipient_id = _responsible_user_id(db, instance)
+        recipient_id = _responsible_user_id(db, instance, lock_ownership=True)
         if recipient_id is None or recipient_id != task.recipient_user_id:
-            task.state = "needs_assignment"
-            task.recipient_user_id = None
-            task.next_attempt_at = None
-            _event(db, task.id, "needs_assignment")
+            _set_task_recipient(db, task, recipient_id)
             db.commit()
             continue
 
@@ -255,11 +309,9 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
             db.rollback()
             continue
         instance = db.get(LabReportInstance, task.report_instance_id)
-        if _responsible_user_id(db, instance, lock_ownership=True) != recipient_id:
-            task.state = "needs_assignment"
-            task.recipient_user_id = None
-            task.next_attempt_at = None
-            _event(db, task.id, "needs_assignment")
+        current_recipient = _responsible_user_id(db, instance, lock_ownership=True)
+        if current_recipient != recipient_id:
+            _set_task_recipient(db, task, current_recipient)
             db.commit()
             continue
 

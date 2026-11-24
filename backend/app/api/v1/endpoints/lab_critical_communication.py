@@ -59,8 +59,7 @@ def _out(task: LabCriticalCommunication, user: User) -> CommunicationOut:
     actions = []
     if task.state not in {"acknowledged", "superseded"}:
         if user.is_superuser or normalize_role_value(user.role) == "admin":
-            if task.state in {"needs_assignment", "escalated"}:
-                actions.append("assign")
+            actions.append("assign")
             if task.state != "escalated":
                 actions.append("escalate")
         elif user.id == task.recipient_user_id:
