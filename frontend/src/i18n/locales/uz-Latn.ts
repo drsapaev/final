@@ -540,7 +540,8 @@ const uzLatn = {
     print_unconfirmed: 'Chop etish holati tasdiqlanmadi: vazifa navbatda turishi mumkin, ammo ijobiy tasdiq olinmadi. Printerni/navbatni tekshiring — avtomatik takrorlamang.',
     print_pdf_opened_confirm: 'PDF yangi varaqda ochildi. Hujjat chinakam chop etilgandan keyin belgini tasdiqlang.',
     print_confirm_mark_printed: 'Chop etilgan deb belgilash',
-    telegram_delivery_manual: 'PDF Telegram orqali qo‘lda yuboriladi.',
+    telegram_delivery_manual:
+      'PDF Telegram orqali qo‘lda yuboriladi. Buyurtma tayyor bo‘lganda bemor sozlamalariga ko‘ra shaxsiy kabinet yoki SMS orqali alohida avtomatik xabarnoma olishi mumkin.',
     telegram_delivery_pending: 'PDF Telegram orqali yuborilmoqda…',
     print_marked: 'Hisobot chop etilgan deb belgilandi',
     print_pdf_blocked: 'PDF shakllantirildi, lekin yangi varaq bloklandi. Bu sayt uchun pop-up\'larga ruxsat bering va hisobot holatini yangilash uchun «Chop etish»ni qayta bosing.',

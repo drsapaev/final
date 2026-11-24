@@ -540,7 +540,8 @@ const en = {
     print_unconfirmed: 'Print status is unconfirmed: the job may already be queued, but no positive ACK was received. Check the printer/queue — do not retry automatically.',
     print_pdf_opened_confirm: 'PDF opened in a new tab. Confirm the mark after the document is physically printed.',
     print_confirm_mark_printed: 'Mark as printed',
-    telegram_delivery_manual: 'Send the PDF to Telegram manually.',
+    telegram_delivery_manual:
+      'Send the PDF to Telegram manually. When the order is ready, the patient may receive a separate automatic notice in their account or by SMS, depending on their settings.',
     telegram_delivery_pending: 'Sending PDF to Telegram…',
     print_marked: 'Report marked as printed',
     print_pdf_blocked: 'PDF сформирован, но новая вкладка заблокирована. Разрешите pop-up для этого сайта и нажмите «Печать» снова, чтобы обновить статус отчёта.',

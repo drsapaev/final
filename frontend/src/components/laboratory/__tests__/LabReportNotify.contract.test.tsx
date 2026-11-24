@@ -232,7 +232,8 @@ describe('Patient PDF send status uses the exact manual delivery response', () =
       </ThemeProvider>
     );
 
-    expect(screen.getByText('PDF в Telegram отправляется вручную.')).toBeVisible();
+    expect(screen.getByText(/PDF в Telegram отправляется вручную\./)).toBeVisible();
+    expect(screen.getByText(/отдельное автоматическое уведомление в личном кабинете или по SMS/)).toBeVisible();
     expect(screen.queryByText('Telegram подтвердил отправку PDF.')).not.toBeInTheDocument();
     expect(mockedApiPost).not.toHaveBeenCalled();
   });
@@ -260,7 +261,7 @@ describe('Patient PDF send status uses the exact manual delivery response', () =
 
     await act(async () => completeSend({ data: { success: true, report_instance_id: 91 } }));
     expect(notify).not.toHaveBeenCalled();
-    expect(screen.getByText('PDF в Telegram отправляется вручную.')).toBeVisible();
+    expect(screen.getByText(/PDF в Telegram отправляется вручную\./)).toBeVisible();
     expect(screen.queryByText('Telegram подтвердил отправку PDF.')).not.toBeInTheDocument();
   });
 
