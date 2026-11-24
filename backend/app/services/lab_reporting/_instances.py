@@ -226,6 +226,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
         expected_updated_at: str | None = None,
         *, actor_user_id: int | None = None, commit: bool = True,
         source_specimen_id: int | None = None,
+        import_origins: dict[str, dict[str, Any]] | None = None,
         draft_request_id: UUID | None = None,
     ) -> tuple[LabReportInstance, list[LabReportValue]]:
         logger.info(
@@ -284,7 +285,8 @@ class InstancesMixin(LabReportingServiceMixinBase):
             same_measurement = self._same_measurement(
                 lab_value, normalized, field_map[field_key],
             )
-            old_specimen_id = (lab_value.result_payload or {}).get("source_specimen_id")
+            previous = lab_value.result_payload or {}
+            old_specimen_id = previous.get("source_specimen_id")
             if result and result["kind"] != "absent":
                 # Saving a comment or resending the same result cannot silently
                 # move a measurement to a recollected specimen.
@@ -293,6 +295,15 @@ class InstancesMixin(LabReportingServiceMixinBase):
                     result_specimen_id = old_specimen_id
                 if result_specimen_id is not None:
                     result = {**result, "source_specimen_id": result_specimen_id}
+            if result:
+                if import_origins is not None:
+                    result["import_origin"] = import_origins[field_key]
+                elif (
+                    same_measurement
+                    and result.get("method_code") == previous.get("method_code")
+                    and "import_origin" in previous
+                ):
+                    result["import_origin"] = previous["import_origin"]
             # An explicit import anchored to a different accepted specimen is
             # a new measurement even when its result equals the old one.
             imported_measurement = (

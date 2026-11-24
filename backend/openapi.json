@@ -98978,6 +98978,18 @@
               }
             ],
             "title": "Method Code"
+          },
+          "instrument_flags": {
+            "items": {
+              "type": "string",
+              "maxLength": 32,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.%+!*?/-]+$"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Instrument Flags",
+            "description": "Opaque instrument warning codes in their original token form"
           }
         },
         "additionalProperties": false,
@@ -100657,6 +100669,18 @@
               }
             ],
             "title": "Evaluation Snapshot"
+          },
+          "instrument_flags": {
+            "items": {
+              "type": "string",
+              "maxLength": 32,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.%+!*?/-]+$"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Instrument Flags",
+            "description": "Unclassified warning codes from the import of this exact result"
           },
           "comment": {
             "anyOf": [

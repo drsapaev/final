@@ -80,6 +80,9 @@ class MaterializationMixin(LabReportingServiceMixinBase):
                         ),
                         "interpretation": evaluation.get("interpretation") if evaluation else None,
                         "evaluation_snapshot": deepcopy(evaluation),
+                        "instrument_flags": list(
+                            (result.get("import_origin") or {}).get("instrument_flags", [])
+                        ),
                         "comment": value.comment if value else None,
                         "resolved_flag": value.resolved_flag if value else None,
                         "resolved_flag_source": value.resolved_flag_source if value else None,

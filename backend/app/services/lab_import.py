@@ -35,6 +35,10 @@ def _digest(row: LabImportRow) -> str:
         mode="json", exclude={"expected_updated_at", "replace_existing"}
     )
     payload["specimen_barcode"] = row.specimen_barcode.upper()
+    for value in payload["values"]:
+        if not value["instrument_flags"]:
+            # Keep the existing receipt digest for requests without codes.
+            del value["instrument_flags"]
     payload["values"].sort(key=lambda value: value["field_key"])
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
@@ -93,7 +97,7 @@ def _map_values(
             and value.result_kind != "absent"
         ):
             raise RowRejected("invalid_value")
-        payload = value.model_dump(mode="json")
+        payload = value.model_dump(mode="json", exclude={"instrument_flags"})
         if payload.get("method_code") not in {None, row.method_code}:
             raise RowRejected("method_mismatch")
         payload["field_key"] = field.field_key
@@ -201,6 +205,15 @@ def _process_row(
         )
     if existing_values and not row.replace_existing:
         raise RowRejected("values_exist")
+    import_origins = {
+        mapped_value["field_key"]: {
+            "source": source,
+            "message_id": message_id,
+            "submitted_analyte_code": submitted.field_key,
+            "instrument_flags": submitted.instrument_flags,
+        }
+        for mapped_value, submitted in zip(mapped, row.values, strict=True)
+    }
     try:
         saved, updated = service.bulk_upsert_values(
             instance.id,
@@ -208,6 +221,7 @@ def _process_row(
             expected_updated_at=token,
             actor_user_id=actor_id,
             source_specimen_id=specimen.id,
+            import_origins=import_origins,
             commit=False,
         )
     except LabReportingDomainError as exc:

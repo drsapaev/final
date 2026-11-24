@@ -451,9 +451,13 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
             value.value_text = normalized["value_text"]
             value.value_numeric = normalized["value_numeric"]
             result = normalized["result_payload"]
-            source_specimen_id = (value.result_payload or {}).get("source_specimen_id")
-            if result and result["kind"] != "absent" and source_specimen_id is not None:
-                result = {**result, "source_specimen_id": source_specimen_id}
+            previous = value.result_payload or {}
+            if result:
+                source_specimen_id = previous.get("source_specimen_id")
+                if result["kind"] != "absent" and source_specimen_id is not None:
+                    result["source_specimen_id"] = source_specimen_id
+                if "import_origin" in previous:
+                    result["import_origin"] = previous["import_origin"]
             value.result_payload = result
 
     def _evaluate_saved_result(

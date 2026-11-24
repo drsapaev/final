@@ -14,7 +14,7 @@ from pydantic import (
 from pydantic.json_schema import SkipJsonSchema
 from pydantic_core import PydanticKnownError
 
-from app.schemas.lab_reporting import LabReportValueIn
+from app.schemas.lab_reporting import LabInstrumentFlags, LabReportValueIn
 
 Code = Annotated[
     str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.%/^-]+$")
@@ -31,6 +31,10 @@ class LabImportValue(LabReportValueIn):
     field_key: Code = Field(validation_alias="analyte_code")
     value_text: str | None = Field(default=None, max_length=128)
     comment: str | None = Field(default=None, max_length=500)
+    instrument_flags: LabInstrumentFlags = Field(
+        default_factory=list,
+        description="Opaque instrument warning codes in their original token form",
+    )
 
 
 class LabImportRow(BaseModel):

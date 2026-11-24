@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -179,6 +179,10 @@ LabResultComparator = Literal["lt", "lte", "gt", "gte"]
 LabQualitativeCode = Literal["negative", "positive", "indeterminate"]
 LabEvaluationStatus = Literal["missing", "not_evaluated", "not_applicable", "evaluated", "unknown"]
 LabInterpretation = Literal["normal", "low", "high", "warning", "abnormal", "critical", "negative", "positive", "indeterminate"]
+LabInstrumentFlagCode = Annotated[
+    str, Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9_.%+!*?/-]+$")
+]
+LabInstrumentFlags = Annotated[list[LabInstrumentFlagCode], Field(max_length=16)]
 
 
 class LabReportValueIn(BaseModel):
@@ -225,6 +229,10 @@ class LabReportRenderedFieldOut(BaseModel):
     evaluation_status: LabEvaluationStatus = "unknown"
     interpretation: LabInterpretation | None = None
     evaluation_snapshot: dict[str, Any] | None = None
+    instrument_flags: LabInstrumentFlags = Field(
+        default_factory=list,
+        description="Unclassified warning codes from the import of this exact result",
+    )
     comment: str | None = None
     resolved_flag: str | None = None
     resolved_flag_source: str | None = None

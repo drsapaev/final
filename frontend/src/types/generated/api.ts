@@ -32520,6 +32520,11 @@ export type components = {
             unit_code?: string | null;
             /** Method Code */
             method_code?: string | null;
+            /**
+             * Instrument Flags
+             * @description Opaque instrument warning codes in their original token form
+             */
+            instrument_flags?: string[];
         };
         /**
          * LabInterpretRequest
@@ -33098,6 +33103,11 @@ export type components = {
             evaluation_snapshot?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Instrument Flags
+             * @description Unclassified warning codes from the import of this exact result
+             */
+            instrument_flags?: string[];
             /** Comment */
             comment?: string | null;
             /** Resolved Flag */
