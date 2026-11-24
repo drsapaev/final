@@ -1,9 +1,10 @@
 import React from 'react';
 import '@testing-library/jest-dom';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import i18n from '@/i18n';
+import type { WorkspaceLabReport, WorkspaceLabs } from '@/api/emrWorkspace';
 
 /**
  * EMRLAB-FE-001..004 (audit 3886, round 15) — fail-first.
@@ -22,7 +23,20 @@ import i18n from '@/i18n';
  */
 
 const listInstancesMock = vi.hoisted(() => vi.fn());
+const getWorkspaceLabsMock = vi.hoisted(() => vi.fn());
+const reviewLabVersionMock = vi.hoisted(() => vi.fn());
 const downloadPdfMock = vi.hoisted(() => vi.fn());
+const listCriticalMock = vi.hoisted(() => vi.fn());
+const updateCriticalMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/api/labOperations', () => ({
+  labOperationsApi: { listCritical: listCriticalMock, updateCritical: updateCriticalMock },
+}));
+
+vi.mock('@/api/emrWorkspace', () => ({
+  getWorkspaceLabs: getWorkspaceLabsMock,
+  reviewLabVersion: reviewLabVersionMock,
+}));
 
 vi.mock('../../../../hooks/useLabReporting', () => ({
   useLabReporting: () => ({
@@ -59,8 +73,28 @@ function draft(id: number, name: string): Record<string, unknown> {
   return { id, template_name: name, status: 'IN_PROGRESS', updated_at: new Date().toISOString() };
 }
 
+const noWorkspaceLabs: WorkspaceLabs = { orders: [], unlinked_reports: [], executions: [], invoices: [] };
+
+function workspaceLabs(reports: WorkspaceLabReport[]): WorkspaceLabs {
+  return {
+    ...noWorkspaceLabs,
+    orders: [{ id: 77, status: 'completed', created_at: '2026-07-01T09:00:00Z', reports }],
+  };
+}
+
+function report(id: number, name: string, supersedes: number | null = null): WorkspaceLabReport {
+  return {
+    id, template_name: name, status: 'FINALIZED', finalized_at: '2026-07-01T11:00:00Z',
+    supersedes_instance_id: supersedes, is_current_final: true, reviews: [],
+  };
+}
+
 beforeEach(async () => {
   vi.clearAllMocks();
+  getWorkspaceLabsMock.mockReset().mockResolvedValue(noWorkspaceLabs);
+  downloadPdfMock.mockReset();
+  listCriticalMock.mockReset().mockResolvedValue([]);
+  updateCriticalMock.mockReset();
   await act(async () => { await i18n.changeLanguage('ru'); });
 });
 
@@ -169,8 +203,10 @@ describe('EMRLAB-FE-002: response ownership across context switches', () => {
     });
     expect(screen.queryByText('Отчёт C')).toBeNull();
   });
+});
 
-  it('opens only the current chart PDF when an earlier patient request resolves last', async () => {
+describe('PDF scope across patient changes', () => {
+  it('downloads only the current chart PDF when an earlier patient request resolves last', async () => {
     const stale = new Blob(['SYNTHETIC A'], { type: 'application/pdf' });
     const current = new Blob(['SYNTHETIC B'], { type: 'application/pdf' });
     let resolveEarlier!: (blob: Blob) => void;
@@ -180,7 +216,10 @@ describe('EMRLAB-FE-002: response ownership across context switches', () => {
     ));
     downloadPdfMock.mockImplementation((id) => (id === 11 ? earlier : Promise.resolve(current)));
     const createObjectURL = vi.fn().mockReturnValue('blob:synthetic-current');
-    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    let downloadLink: HTMLAnchorElement | undefined;
+    const clickLink = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloadLink = this;
+    });
     vi.stubGlobal('URL', class extends URL {
       static createObjectURL = createObjectURL;
       static revokeObjectURL = vi.fn();
@@ -197,14 +236,15 @@ describe('EMRLAB-FE-002: response ownership across context switches', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Скачать PDF: Бланк 1' }));
       view.rerender(chart(2, 6));
       fireEvent.click(await screen.findByRole('button', { name: 'Скачать PDF: Бланк 2' }));
-      await waitFor(() => expect(open).toHaveBeenCalledWith('blob:synthetic-current', '_blank'));
+      await waitFor(() => expect(downloadLink?.download).toBe('lab-22.pdf'));
+      expect(downloadLink?.href).toBe('blob:synthetic-current');
       await act(async () => resolveEarlier(stale));
 
       expect(downloadPdfMock.mock.calls).toEqual([[11], [22]]);
       expect(createObjectURL.mock.calls).toEqual([[current]]);
-      expect(open).toHaveBeenCalledTimes(1);
+      expect(clickLink).toHaveBeenCalledTimes(1);
     } finally {
-      open.mockRestore();
+      clickLink.mockRestore();
       vi.unstubAllGlobals();
     }
   });
@@ -242,6 +282,115 @@ describe('EMRLAB-FE-003: server-side status filtering before the limit', () => {
 });
 
 describe('EMRLAB-FE-004: read-only does not revoke read access', () => {
+  it('shows a transient failure and retries the exact report PDF in a signed encounter', async () => {
+    listInstancesMock.mockResolvedValue([finalized(777, 'SYNTHETIC laboratory report')]);
+    downloadPdfMock.mockRejectedValueOnce(new Error('SYNTHETIC transient 503'));
+    render(<ThemeProvider><LabResultsSection patientId={5} visitId={9} disabled /></ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+    const pdfButton = await screen.findByRole('button', { name: 'Скачать PDF: SYNTHETIC laboratory report' });
+    fireEvent.click(pdfButton);
+
+    await waitFor(() => expect(downloadPdfMock).toHaveBeenCalledExactlyOnceWith(777));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось скачать PDF. Повторите попытку.');
+
+    const createObjectURL = vi.fn(() => 'blob:synthetic-report');
+    vi.stubGlobal('URL', Object.assign(class extends URL {}, { createObjectURL, revokeObjectURL: vi.fn() }));
+    let downloadLink: HTMLAnchorElement | undefined;
+    const clickLink = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloadLink = this;
+    });
+    try {
+      const blob = new Blob(['%PDF-1.4'], { type: 'application/pdf' });
+      downloadPdfMock.mockResolvedValueOnce(blob);
+      fireEvent.click(pdfButton);
+      await waitFor(() => expect(clickLink).toHaveBeenCalledTimes(1));
+      expect(downloadPdfMock.mock.calls).toEqual([[777], [777]]);
+      expect(createObjectURL).toHaveBeenCalledWith(blob);
+      expect(downloadLink?.download).toBe('lab-777.pdf');
+      expect(downloadLink?.href).toBe('blob:synthetic-report');
+      expect(screen.queryByRole('alert')).toBeNull();
+    } finally {
+      clickLink.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it.each(['success', 'error'] as const)(
+    'guards duplicate report PDF clicks and drops late %s after a patient switch',
+    async (outcome) => {
+      listInstancesMock.mockResolvedValue([finalized(777, 'SYNTHETIC previous report')]);
+      let resolvePrevious!: (blob: Blob) => void;
+      let rejectPrevious!: (reason?: unknown) => void;
+      downloadPdfMock.mockImplementationOnce(() => new Promise((resolve, reject) => {
+        resolvePrevious = resolve;
+        rejectPrevious = reject;
+      }));
+      const view = render(<ThemeProvider><LabResultsSection patientId={5} visitId={9} disabled /></ThemeProvider>);
+      fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+      const oldPdf = await screen.findByRole('button', { name: 'Скачать PDF: SYNTHETIC previous report' });
+      act(() => {
+        fireEvent.click(oldPdf);
+        fireEvent.click(oldPdf);
+      });
+      expect(downloadPdfMock).toHaveBeenCalledExactlyOnceWith(777);
+      expect(oldPdf).toBeDisabled();
+
+      listInstancesMock.mockResolvedValue([finalized(778, 'SYNTHETIC next report')]);
+      view.rerender(<ThemeProvider><LabResultsSection patientId={6} visitId={10} disabled /></ThemeProvider>);
+      const newPdf = await screen.findByRole('button', { name: 'Скачать PDF: SYNTHETIC next report' });
+      const createObjectURL = vi.fn(() => 'blob:synthetic-previous-report');
+      vi.stubGlobal('URL', Object.assign(class extends URL {}, { createObjectURL, revokeObjectURL: vi.fn() }));
+      const clickLink = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      try {
+        await act(async () => {
+          if (outcome === 'success') resolvePrevious(new Blob(['%PDF-1.4'], { type: 'application/pdf' }));
+          else rejectPrevious(new Error('SYNTHETIC late 503'));
+        });
+        expect(createObjectURL).not.toHaveBeenCalled();
+        expect(clickLink).not.toHaveBeenCalled();
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(newPdf).toBeEnabled();
+      } finally {
+        clickLink.mockRestore();
+        vi.unstubAllGlobals();
+      }
+    },
+  );
+
+  it('uses canonical nested template names to identify each signed report and its PDF', async () => {
+    const rows = [
+      {
+        id: 44, patient_id: 5, visit_id: 9, status: 'FINALIZED',
+        finalized_at: '2026-07-02T11:00:00Z', template: { name: 'SYNTHETIC blood count', code: 'CBC' },
+      },
+      {
+        id: 45, patient_id: 5, visit_id: 9, status: 'PRINTED',
+        finalized_at: '2026-07-01T11:00:00Z', template: { name: 'SYNTHETIC glucose', code: 'GLU' },
+      },
+      {
+        id: 46, patient_id: 5, visit_id: 9, status: 'FINALIZED',
+        finalized_at: '2026-07-01T10:00:00Z', template: { name: '', code: 'SYNTHETIC_CODE' },
+      },
+      { id: 47, patient_id: 5, visit_id: 9, status: 'FINALIZED' },
+    ];
+    listInstancesMock.mockImplementation(async ({ status }) => rows.filter(row => row.status === status));
+    render(<ThemeProvider><LabResultsSection patientId={5} visitId={9} disabled /></ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+
+    expect(await screen.findByText('SYNTHETIC blood count')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Скачать PDF: SYNTHETIC blood count' })).toBeVisible();
+    expect(screen.getByText('SYNTHETIC glucose')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Скачать PDF: SYNTHETIC glucose' })).toBeVisible();
+    expect(screen.getByText('SYNTHETIC_CODE')).toBeVisible();
+    expect(screen.getByText('Бланк №47')).toBeVisible();
+    await act(async () => { await i18n.changeLanguage('uz-Latn'); });
+    expect(screen.getByText('47-blank')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'PDF faylini yuklab olish: SYNTHETIC blood count' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'PDF faylini yuklab olish: 47-blank' })).toBeVisible();
+    await act(async () => { await i18n.changeLanguage('uz-Cyrl'); });
+    expect(screen.getByRole('button', { name: 'PDF файлини юклаб олиш: 47-бланк' })).toBeVisible();
+  });
+
   it('a signed/read-only section still shows the PDF action and expands', async () => {
     listInstancesMock.mockResolvedValue([finalized(44, 'Гемоглобин', 2)]);
     render(
@@ -273,5 +422,143 @@ describe('EMRLAB-FE-004: read-only does not revoke read access', () => {
     // EMRCOLLAPSE-FE-001 (round 21): expand before querying body content.
     fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
     expect(screen.getByRole('button', { name: /Скачать PDF: Лейкоциты/ })).toBeVisible();
+  });
+});
+
+describe('Lab results refresh within the same encounter', () => {
+  it('retries the failed list and opens the newly finalized correction by exact version', async () => {
+    listInstancesMock.mockRejectedValue(new Error('Synthetic results outage'));
+    render(<ThemeProvider><LabResultsSection patientId={1} visitId={5} reviewerId={19} /></ThemeProvider>);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(i18n.t('emr_workspace.load_error'));
+    listInstancesMock.mockResolvedValue([]);
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('emr_workspace.retry') }));
+    fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+    expect(await screen.findByText(i18n.t('empty.no_lab_results'))).toBeVisible();
+
+    const original = report(11, 'SYNTHETIC original');
+    getWorkspaceLabsMock.mockResolvedValue(workspaceLabs([original]));
+    listInstancesMock.mockResolvedValue([finalized(11, original.template_name)]);
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('emr_workspace.lab_refresh') }));
+    expect(await screen.findByText(original.template_name)).toBeVisible();
+    expect(screen.getByRole('button', { name: i18n.t('emr_workspace.lab_review') })).toBeEnabled();
+
+    const correction = report(12, 'SYNTHETIC correction', original.id);
+    getWorkspaceLabsMock.mockResolvedValue(workspaceLabs([{ ...original, is_current_final: false }, correction]));
+    listInstancesMock.mockResolvedValue([
+      finalized(11, original.template_name), { ...finalized(12, correction.template_name), flagged_findings_count: 2 },
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('emr_workspace.lab_refresh') }));
+    expect(screen.queryByRole('button', { name: i18n.t('emr_workspace.lab_review') })).toBeNull();
+
+    expect(await screen.findByText(correction.template_name)).toBeVisible();
+    expect(screen.getByText(i18n.t('emr_workspace.lab_previous_version'))).toBeVisible();
+    expect(screen.getByRole('button', { name: `Скачать PDF: ${correction.template_name}` })).toBeVisible();
+    expect(screen.getByText(/2 отклонений/)).toBeVisible();
+    const latestReview = screen.getByRole('button', { name: i18n.t('emr_workspace.lab_review') });
+    fireEvent.click(latestReview);
+    await waitFor(() => expect(reviewLabVersionMock).toHaveBeenCalledExactlyOnceWith(5, 1, correction.id, ''));
+    expect(getWorkspaceLabsMock).toHaveBeenLastCalledWith(5, 1, expect.any(AbortSignal));
+  });
+
+  it('discards both late refresh responses after changing patients', async () => {
+    listInstancesMock.mockResolvedValue([]);
+    const view = render(<ThemeProvider><LabResultsSection patientId={1} visitId={5} /></ThemeProvider>);
+    const refresh = await screen.findByRole('button', { name: i18n.t('emr_workspace.lab_refresh') });
+    await waitFor(() => expect(refresh).toBeEnabled());
+
+    let resolveOldResults!: (value: Record<string, unknown>[]) => void;
+    let resolveOldWorkspace!: (value: WorkspaceLabs) => void;
+    listInstancesMock.mockImplementationOnce(() => new Promise(resolve => { resolveOldResults = resolve; }));
+    getWorkspaceLabsMock.mockImplementationOnce(() => new Promise(resolve => { resolveOldWorkspace = resolve; }));
+    fireEvent.click(refresh);
+    await waitFor(() => expect(resolveOldResults).toBeTypeOf('function'));
+
+    const current = report(22, 'SYNTHETIC current patient');
+    getWorkspaceLabsMock.mockResolvedValue(workspaceLabs([current]));
+    listInstancesMock.mockResolvedValue([
+      { ...finalized(22, current.template_name), visit_id: 6, patient_id: 2 },
+      { ...finalized(23, 'SYNTHETIC unexpected scope'), visit_id: 5, patient_id: 1 },
+    ]);
+    view.rerender(<ThemeProvider><LabResultsSection patientId={2} visitId={6} /></ThemeProvider>);
+    expect(await screen.findByText(current.template_name)).toBeInTheDocument();
+
+    const previous = report(11, 'SYNTHETIC previous patient');
+    await act(async () => {
+      resolveOldResults([finalized(11, previous.template_name)]);
+      resolveOldWorkspace(workspaceLabs([previous]));
+    });
+    expect(screen.getByText(current.template_name)).toBeInTheDocument();
+    expect(screen.queryByText(previous.template_name)).toBeNull();
+    expect(screen.queryByText('SYNTHETIC unexpected scope')).toBeNull();
+  });
+});
+
+describe('managed critical communications in the physician workspace', () => {
+  function task(id: number, reportInstanceId: number) {
+    return { id, report_instance_id: reportInstanceId, state: 'pending', available_actions: ['acknowledge'] };
+  }
+
+  it('keeps correction lineage, exact-version review and critical acknowledgement independent', async () => {
+    const original = { ...report(11, 'SYNTHETIC original'), is_current_final: false };
+    const correction = report(12, 'SYNTHETIC correction', original.id);
+    getWorkspaceLabsMock.mockResolvedValue(workspaceLabs([original, correction]));
+    listInstancesMock.mockResolvedValue([
+      { ...finalized(11, original.template_name), patient_id: 1, visit_id: 5, managed_release: true },
+      { ...finalized(12, correction.template_name), patient_id: 1, visit_id: 5, managed_release: true, supersedes_instance_id: 11 },
+      { ...finalized(13, 'SYNTHETIC unbound identity'), managed_release: true },
+      { ...finalized(14, 'SYNTHETIC other patient'), patient_id: 2, visit_id: 5, managed_release: true },
+    ]);
+    const currentTask = task(51, 12);
+    listCriticalMock.mockResolvedValue([currentTask, task(52, 13), task(53, 14), task(54, 99)]);
+    updateCriticalMock.mockResolvedValue({ ...currentTask, state: 'acknowledged', available_actions: [] });
+
+    render(<ThemeProvider><LabResultsSection patientId={1} visitId={5} reviewerId={19} /></ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+    expect(await screen.findByText('Заменён исправлением')).toBeVisible();
+    expect(screen.getByText('Исправление к отчёту #11')).toBeVisible();
+    expect(screen.getByRole('heading', { name: new RegExp(i18n.t('emr_workspace.lab_order', { id: 77 })) })).toBeVisible();
+    expect(screen.queryByText('SYNTHETIC other patient')).not.toBeInTheDocument();
+
+    const critical = within(await screen.findByRole('region', { name: 'Критические сообщения' }));
+    expect(listCriticalMock).toHaveBeenCalledExactlyOnceWith(5, expect.any(AbortSignal));
+    expect(critical.getByText(/Отчёт #12/)).toBeVisible();
+    expect(critical.queryByText(/Отчёт #(13|14|99)/)).not.toBeInTheDocument();
+    fireEvent.click(critical.getByRole('button', { name: 'Подтвердить получение' }));
+    await waitFor(() => expect(critical.queryByRole('button', { name: 'Подтвердить получение' })).not.toBeInTheDocument());
+    expect(updateCriticalMock).toHaveBeenCalledExactlyOnceWith(51, 'acknowledge');
+    expect(reviewLabVersionMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('emr_workspace.lab_review') }));
+    await waitFor(() => expect(reviewLabVersionMock).toHaveBeenCalledExactlyOnceWith(5, 1, 12, ''));
+    expect(updateCriticalMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('discards a late critical response when the active patient and visit change', async () => {
+    let resolvePrevious!: (rows: ReturnType<typeof task>[]) => void;
+    listCriticalMock.mockImplementation((visitId: number) => visitId === 5
+      ? new Promise(resolve => { resolvePrevious = resolve; })
+      : Promise.resolve([task(62, 22)]));
+    listInstancesMock.mockImplementation(({ patient_id, visit_ids, status }) => Promise.resolve(
+      status === 'FINALIZED' ? [{
+        ...finalized(patient_id === 1 ? 11 : 22, `SYNTHETIC report ${patient_id}`),
+        patient_id, visit_id: visit_ids[0], managed_release: true,
+      }] : [],
+    ));
+    const chart = (patientId: number, visitId: number) => (
+      <ThemeProvider><LabResultsSection patientId={patientId} visitId={visitId} /></ThemeProvider>
+    );
+
+    const view = render(chart(1, 5));
+    fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+    await waitFor(() => expect(listCriticalMock).toHaveBeenCalledExactlyOnceWith(5, expect.any(AbortSignal)));
+    const earlierSignal: AbortSignal = listCriticalMock.mock.calls[0][1];
+
+    view.rerender(chart(2, 6));
+    expect(await screen.findByText(/Отчёт #22/)).toBeVisible();
+    expect(earlierSignal.aborted).toBe(true);
+    await act(async () => resolvePrevious([task(61, 11)]));
+    expect(screen.queryByText(/Отчёт #11/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Отчёт #22/)).toBeVisible();
   });
 });
