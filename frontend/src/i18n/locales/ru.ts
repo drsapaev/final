@@ -8565,6 +8565,7 @@ const ru = {
     tg_results_title: 'Результаты',
     tg_results_pdf: 'PDF в Telegram, до {count} файлов',
     tg_results_notification: 'Уведомление в Telegram',
+    tg_results_mini_app: 'В защищённом Mini App пациента',
     tg_quick_actions: 'Быстрые действия',
     tg_configure_bot: 'Настроить бота',
     tg_registering_commands: 'Регистрация команд...',

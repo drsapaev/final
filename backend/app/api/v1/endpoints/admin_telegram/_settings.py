@@ -523,9 +523,11 @@ def get_telegram_integration_status(
                 )
 
         webhook_set = bool(webhook_info and webhook_info.get("url"))
-        patient_mini_app_ready = bool(
-            bot_token and str(getattr(settings, "FRONTEND_URL", "") or "").strip()
+        from app.api.v1.endpoints.telegram_webhook._helpers import (
+            _telegram_patient_frontend_url,
         )
+
+        patient_mini_app_ready = bool(bot_token and _telegram_patient_frontend_url())
         webhook_url = (
             webhook_info.get("url")
             if webhook_info
@@ -558,7 +560,7 @@ def get_telegram_integration_status(
                 "patient_payments_mini_app_entry",
                 "patient_status",
                 "patient_language_notification_settings",
-                "lab_results_pdf",
+                "patient_results_mini_app_entry",
                 "staff_link_start_token_handler",
                 "telegram_ai_approval_notifications",
                 "telegram_ai_approval_outcome_capture",
@@ -611,7 +613,7 @@ def get_telegram_integration_status(
                     },
                     {
                         "key": "patient_booking_entrypoint",
-                        "label": "Запись к врачу через защищенный Mini App",
+                        "label": "Параметры записи в защищённом Mini App",
                         "enabled": patient_mini_app_ready,
                         "contract": PATIENT_BOOKING_ENTRY_CONTRACT,
                     },
@@ -649,8 +651,13 @@ def get_telegram_integration_status(
                     },
                     {
                         "key": "lab_results_pdf",
-                        "label": "PDF-результаты лаборатории",
-                        "enabled": bool(bot_token),
+                        "label": "PDF-результаты в чате",
+                        "enabled": False,
+                    },
+                    {
+                        "key": "patient_results_mini_app_entry",
+                        "label": "Результаты в защищённом Mini App",
+                        "enabled": patient_mini_app_ready,
                     },
                     {
                         "key": "patient_forms_entrypoint",
@@ -665,7 +672,7 @@ def get_telegram_integration_status(
                     },
                     {
                         "key": "doctor_schedule_entrypoint",
-                        "label": "Выбор врача и времени в защищенной записи",
+                        "label": "Параметры записи к врачу",
                         "enabled": patient_mini_app_ready,
                         "contract": PATIENT_BOOKING_ENTRY_CONTRACT,
                     },
@@ -697,8 +704,8 @@ def get_telegram_integration_status(
                         "enabled": bool(staff_bot_token_status.get("ready")),
                     },
                 ],
-                "results_delivery": "telegram_pdf",
-                "max_pdf_reports_per_request": 3,
+                "results_delivery": "protected_mini_app",
+                "max_pdf_reports_per_request": 0,
             },
             "staff_bot": _build_staff_bot_status(webhook_set, staff_bot_token_status),
             "transition_path": (

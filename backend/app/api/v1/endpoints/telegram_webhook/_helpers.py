@@ -14,12 +14,12 @@ import html  # noqa: F401
 import ipaddress  # noqa: F401
 import json  # noqa: F401
 import logging  # noqa: F401
+import re
 import secrets  # noqa: F401
-import socket  # noqa: F401
 from datetime import UTC, date, datetime, timedelta  # noqa: F401
 from decimal import Decimal  # noqa: F401
-from typing import Any, NoReturn  # noqa: F401
-from urllib.parse import urlsplit, urlunsplit  # noqa: F401
+from typing import Any, Literal, NoReturn  # noqa: F401
+from urllib.parse import urlsplit  # noqa: F401
 
 from fastapi import (  # noqa: F401
     APIRouter,
@@ -125,6 +125,7 @@ from app.models.webhook import (  # noqa: F401
     WebhookCallStatus,
     WebhookEvent,
 )
+from app.repositories.public_site_read_repository import PublicSiteReadRepository
 from app.schemas import appointment as appointment_schemas  # noqa: F401
 from app.schemas.patient_onboarding import (  # noqa: F401
     OnboardingAnalyticsSummaryResponse,
@@ -142,12 +143,14 @@ from app.schemas.patient_onboarding import (  # noqa: F401
 )
 from app.services.lab_report_pdf_service import lab_report_pdf_service  # noqa: F401
 from app.services.lab_reporting_service import LabReportingService  # noqa: F401
+from app.services.patient_onboarding._base import ONBOARDING_ACTIVE_STATUSES
 from app.services.patient_onboarding_service import (
     PatientOnboardingService,  # noqa: F401
 )
 from app.services.payment_reconciliation_api_service import (  # noqa: F401
     PaymentReconciliationApiService,
 )
+from app.services.public_site_read_service import PublicSiteReadService
 from app.services.telegram_bot import (  # noqa: F401
     get_telegram_bot_service,
     telegram_text_corruption_reason,
@@ -307,16 +310,9 @@ TELEGRAM_NEEDS_LINK_MESSAGE = (
 )
 TELEGRAM_MAIN_MENU = {
     "keyboard": [
-        [{"text": "📱 Поделиться номером", "request_contact": True}],
-        [{"text": "🏥 Записаться на приём"}],
-        [{"text": "🎫 Моя очередь"}, {"text": "📅 Мои визиты"}],
-        [{"text": "💳 Оплаты и долг"}, {"text": "📄 Результаты"}],
-        [{"text": "📲 Онлайн-сервисы"}],
-        [{"text": "📋 Анкеты пациента"}, {"text": "🧾 Документы и чеки"}],
-        [{"text": "🧑‍⚕️ Врачи и расписание"}, {"text": "📲 Кабинет пациента"}],
-        [{"text": "👥 Режим сотрудника"}],
-        [{"text": "👤 Мой статус"}, {"text": "⚙️ Настройки"}],
-        [{"text": "☎️ Связаться с клиникой"}, {"text": "❓ Помощь"}],
+        [{"text": "🏥 Записаться"}, {"text": "📲 Мой кабинет"}],
+        [{"text": "📄 Результаты"}, {"text": "☎️ Клиника"}],
+        [{"text": "⚙️ Настройки"}],
     ],
     "resize_keyboard": True,
     "one_time_keyboard": False,
@@ -348,20 +344,21 @@ TELEGRAM_MAIN_MENUS = {
     TELEGRAM_LANGUAGE_RU: TELEGRAM_MAIN_MENU,
     TELEGRAM_LANGUAGE_UZ: {
         "keyboard": [
-            [{"text": "📱 Telefon raqamni ulashish", "request_contact": True}],
-            [{"text": "🏥 Qabulga yozilish"}],
-            [{"text": "🎫 Mening navbatim"}, {"text": "📅 Mening tashriflarim"}],
-            [{"text": "💳 To'lovlar va qarz"}, {"text": "📄 Natijalar"}],
-            [{"text": "📲 Onlayn xizmatlar"}],
-            [{"text": "📋 Bemor anketalari"}, {"text": "🧾 Hujjatlar va cheklar"}],
-            [{"text": "🧑‍⚕️ Shifokorlar jadvali"}, {"text": "📲 Bemor kabineti"}],
-            [{"text": "👥 Xodim rejimi"}],
-            [{"text": "👤 Mening holatim"}, {"text": "⚙️ Sozlamalar"}],
-            [{"text": "☎️ Klinikaga bog'lanish"}, {"text": "❓ Yordam"}],
+            [{"text": "🏥 Qabulga yozilish"}, {"text": "📲 Mening kabinetim"}],
+            [{"text": "📄 Natijalar"}, {"text": "☎️ Klinika"}],
+            [{"text": "⚙️ Sozlamalar"}],
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False,
     },
+}
+TELEGRAM_ONBOARDING_MENU_LABELS = {
+    TELEGRAM_LANGUAGE_RU: ("📱 Поделиться номером", "📋 Статус заявки", "☎️ Клиника"),
+    TELEGRAM_LANGUAGE_UZ: (
+        "📱 Telefon raqamni ulashish",
+        "📋 Ariza holati",
+        "☎️ Klinika",
+    ),
 }
 TELEGRAM_PATIENT_SERVICES_MENUS = {
     TELEGRAM_LANGUAGE_RU: {
@@ -440,6 +437,96 @@ TELEGRAM_SETTINGS_STATUS_LABELS = {
     },
 }
 TELEGRAM_LOCALIZED_TEXTS = {
+    "patient_menu_intro": {
+        TELEGRAM_LANGUAGE_RU: "Выберите действие в меню.",
+        TELEGRAM_LANGUAGE_UZ: "Menyudan kerakli amalni tanlang.",
+    },
+    "patient_link_unavailable": {
+        TELEGRAM_LANGUAGE_RU: "Кабинет недоступен. Обратитесь в регистратуру.",
+        TELEGRAM_LANGUAGE_UZ: "Kabinetni ochib bo'lmadi. Registraturaga murojaat qiling.",
+    },
+    "patient_link_prompt": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Откройте QR-код с чека или поделитесь номером, "
+            "чтобы получить ссылку на защищённую заявку."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Chekdagi QR kodni oching yoki himoyalangan ariza havolasini "
+            "olish uchun telefon raqamingizni ulashing."
+        ),
+    },
+    "patient_app_unavailable": {
+        TELEGRAM_LANGUAGE_RU: "Приложение недоступно. Обратитесь в регистратуру.",
+        TELEGRAM_LANGUAGE_UZ: "Ilovani ochib bo'lmadi. Registraturaga murojaat qiling.",
+    },
+    "patient_open_cabinet": {
+        TELEGRAM_LANGUAGE_RU: "Откройте защищённый кабинет.",
+        TELEGRAM_LANGUAGE_UZ: "Himoyalangan kabinetni oching.",
+    },
+    "patient_open_results": {
+        TELEGRAM_LANGUAGE_RU: "Посмотреть результаты можно в защищённом кабинете.",
+        TELEGRAM_LANGUAGE_UZ: "Natijalarni himoyalangan kabinetda ko'rishingiz mumkin.",
+    },
+    "patient_open_visits": {
+        TELEGRAM_LANGUAGE_RU: "Посмотреть записи можно в защищённом кабинете.",
+        TELEGRAM_LANGUAGE_UZ: "Tashriflaringizni himoyalangan kabinetda ko'rishingiz mumkin.",
+    },
+    "patient_open_queue": {
+        TELEGRAM_LANGUAGE_RU: "Информация об очереди доступна в защищённом кабинете.",
+        TELEGRAM_LANGUAGE_UZ: "Navbat haqidagi ma'lumot himoyalangan kabinetda mavjud.",
+    },
+    "patient_open_payments": {
+        TELEGRAM_LANGUAGE_RU: "Информация об оплате доступна в защищённом кабинете.",
+        TELEGRAM_LANGUAGE_UZ: "To'lovlar haqidagi ma'lumot himoyalangan kabinetda mavjud.",
+    },
+    "patient_open_booking": {
+        TELEGRAM_LANGUAGE_RU: (
+            "В защищённом кабинете можно посмотреть варианты записи. "
+            "Чтобы записаться, обратитесь в регистратуру."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Qabul variantlarini himoyalangan kabinetda ko'rishingiz mumkin. "
+            "Qabulga yozilish uchun registraturaga murojaat qiling."
+        ),
+    },
+    "patient_open_onboarding": {
+        TELEGRAM_LANGUAGE_RU: "Откройте защищённую форму заявки для регистратуры.",
+        TELEGRAM_LANGUAGE_UZ: "Registratura uchun himoyalangan ariza shaklini oching.",
+    },
+    "patient_open_request_status": {
+        TELEGRAM_LANGUAGE_RU: "Статус заявки доступен в защищённом приложении.",
+        TELEGRAM_LANGUAGE_UZ: "Ariza holatini himoyalangan ilovada ko'rishingiz mumkin.",
+    },
+    "request_status_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть статус заявки",
+        TELEGRAM_LANGUAGE_UZ: "Ariza holatini ochish",
+    },
+    "results_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть результаты",
+        TELEGRAM_LANGUAGE_UZ: "Natijalarni ochish",
+    },
+    "clinic_title": {
+        TELEGRAM_LANGUAGE_RU: "Клиника",
+        TELEGRAM_LANGUAGE_UZ: "Klinika",
+    },
+    "clinic_phone_label": {
+        TELEGRAM_LANGUAGE_RU: "Телефон",
+        TELEGRAM_LANGUAGE_UZ: "Telefon",
+    },
+    "clinic_address_label": {
+        TELEGRAM_LANGUAGE_RU: "Адрес",
+        TELEGRAM_LANGUAGE_UZ: "Manzil",
+    },
+    "clinic_hours_label": {
+        TELEGRAM_LANGUAGE_RU: "Часы работы",
+        TELEGRAM_LANGUAGE_UZ: "Ish vaqti",
+    },
+    "clinic_contacts_unavailable": {
+        TELEGRAM_LANGUAGE_RU: "Уточните контакты и часы работы в регистратуре клиники.",
+        TELEGRAM_LANGUAGE_UZ: (
+            "Aloqa ma'lumotlari va ish vaqtini klinika registraturasidan aniqlang."
+        ),
+    },
     "language_prompt": {
         TELEGRAM_LANGUAGE_RU: "Выберите язык обслуживания.\n\nTilni tanlang.",
         TELEGRAM_LANGUAGE_UZ: "Tilni tanlang.\n\nВыберите язык обслуживания.",
@@ -1337,58 +1424,68 @@ def _append_patient_mini_app_entry_token(entry_url: str, token: str) -> str:
     return f"{entry_url}{separator}entryToken={token}"
 
 
-def _detect_local_lan_ip() -> str | None:
-    try:
-        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        probe.settimeout(0)
-        try:
-            probe.connect(("8.8.8.8", 80))
-            local_ip = probe.getsockname()[0]
-        finally:
-            probe.close()
-    except OSError:
-        try:
-            local_ip = socket.gethostbyname(socket.gethostname())
-        except OSError:
-            return None
-
-    try:
-        parsed_ip = ipaddress.ip_address(local_ip)
-    except ValueError:
-        return None
-    if parsed_ip.is_loopback or parsed_ip.is_unspecified:
-        return None
-    return local_ip
-
-
-def _is_local_frontend_host(hostname: str | None) -> bool:
-    host = str(hostname or "").strip().lower()
-    if host in {"localhost", "127.0.0.1", "::1"}:
+def _is_local_frontend_host(hostname: str) -> bool:
+    if hostname.removesuffix(".") == "localhost":
         return True
     try:
-        return ipaddress.ip_address(host).is_private
+        address = ipaddress.ip_address(hostname)
     except ValueError:
         return False
+    return address.is_private and not address.is_unspecified
+
+
+def _is_valid_frontend_host(hostname: str) -> bool:
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        try:
+            ascii_hostname = hostname.removesuffix(".").encode("idna").decode("ascii")
+        except UnicodeError:
+            return False
+        return len(ascii_hostname) <= 253 and all(
+            re.fullmatch(r"[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?", label)
+            for label in ascii_hostname.split(".")
+        )
+    return not (address.is_unspecified or address.is_multicast)
 
 
 def _telegram_patient_frontend_url() -> str | None:
     configured_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
-    if not configured_url:
+    if not configured_url or any(
+        char.isspace() or ord(char) < 32 or ord(char) == 127 or char in "\\?#"
+        for char in configured_url
+    ):
         return None
 
-    parsed = urlsplit(configured_url)
-    if parsed.scheme != "http" or not _is_local_frontend_host(parsed.hostname):
+    try:
+        parsed = urlsplit(configured_url)
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        return None
+    if (
+        not hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.netloc.endswith(":")
+        or "%" in parsed.netloc
+        or (
+            "[" in parsed.netloc
+            and not re.fullmatch(r"\[[^\[\]]+\](?::[0-9]+)?", parsed.netloc)
+        )
+        or port == 0
+        or not _is_valid_frontend_host(hostname)
+    ):
+        return None
+    if parsed.scheme == "https":
         return configured_url
-
-    local_ip = _detect_local_lan_ip()
-    if not local_ip:
+    if (
+        parsed.scheme == "http"
+        and settings.is_development
+        and _is_local_frontend_host(hostname)
+    ):
         return configured_url
-
-    port = parsed.port or 5173
-    netloc = f"{local_ip}:{port}"
-    return urlunsplit(
-        (parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment)
-    )
+    return None
 
 
 def _patient_entry_url(section: str | None = None) -> str | None:
@@ -1427,18 +1524,45 @@ def _patient_booking_entry_url() -> str | None:
     return _patient_entry_url("booking")
 
 
+def _telegram_patient_access(
+    db: Session, chat_id: int
+) -> tuple[TelegramUser | None, Literal["linked", "onboarding", "unavailable"]]:
+    telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
+    if telegram_user is None:
+        return None, "onboarding"
+    if not telegram_user.active or telegram_user.blocked:
+        return telegram_user, "unavailable"
+    if telegram_user.patient_id is None:
+        return telegram_user, "onboarding"
+    patient_exists = (
+        db.query(Patient.id).filter(Patient.id == telegram_user.patient_id).scalar()
+        is not None
+    )
+    return telegram_user, "linked" if patient_exists else "unavailable"
+
+
+def _telegram_has_pending_onboarding(
+    db: Session, telegram_user: TelegramUser | None
+) -> bool:
+    if (
+        telegram_user is None
+        or not telegram_user.active
+        or telegram_user.blocked
+        or telegram_user.patient_id is not None
+    ):
+        return False
+    request = PatientOnboardingService(db).latest_for_telegram_user(telegram_user)
+    return request is not None and request.status in ONBOARDING_ACTIVE_STATUSES
+
+
 def _telegram_service_entry_markup(
     db: Session,
     chat_id: int,
     section: str,
     button_text_key: str,
 ) -> dict[str, Any] | None:
-    from app.api.v1.endpoints.telegram_webhook._staff_commands import (
-        _patient_for_telegram_chat,
-    )
-
-    telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
-    if not telegram_user or not telegram_user.patient_id:
+    telegram_user, access = _telegram_patient_access(db, chat_id)
+    if access != "linked":
         return None
 
     entry_url = _patient_entry_url(section)
@@ -1452,7 +1576,9 @@ def _telegram_service_entry_markup(
         )
         entry_url = _append_patient_mini_app_entry_token(entry_url, entry_token)
 
-    language = _telegram_chat_language(db, chat_id)
+    language = _normalize_patient_language(
+        getattr(telegram_user, "language_code", None)
+    )
     return {
         "inline_keyboard": [
             [
@@ -1466,8 +1592,11 @@ def _telegram_service_entry_markup(
 
 
 def _telegram_onboarding_entry_markup(
-    db: Session, chat_id: int
+    db: Session, chat_id: int, button_text_key: str = "onboarding_entry_button"
 ) -> dict[str, Any] | None:
+    telegram_user, access = _telegram_patient_access(db, chat_id)
+    if access != "onboarding":
+        return None
     entry_url = _patient_entry_url("booking")
     if not entry_url:
         return None
@@ -1479,12 +1608,14 @@ def _telegram_onboarding_entry_markup(
         )
         entry_url = _append_patient_mini_app_entry_token(entry_url, entry_token)
 
-    language = _telegram_chat_language(db, chat_id)
+    language = _normalize_patient_language(
+        getattr(telegram_user, "language_code", None)
+    )
     return {
         "inline_keyboard": [
             [
                 _telegram_entry_button(
-                    _localized_text("onboarding_entry_button", language),
+                    _localized_text(button_text_key, language),
                     entry_url,
                 )
             ]
@@ -1609,13 +1740,17 @@ def _localized_notification_consent_menu(language_code: Any) -> dict[str, Any]:
     )
 
 
-def _localized_settings_menu(language_code: Any) -> dict[str, Any]:
+def _localized_settings_menu(
+    language_code: Any, *, navigation_menu: dict[str, Any] | None = None
+) -> dict[str, Any]:
     language = _normalize_patient_language(language_code)
     settings_menu = TELEGRAM_SETTINGS_MENUS.get(
         language,
         TELEGRAM_SETTINGS_MENUS[TELEGRAM_LANGUAGE_RU],
     )
-    main_keyboard = _localized_main_menu(language).get("keyboard", [])
+    if navigation_menu is None:
+        navigation_menu = _localized_main_menu(language)
+    main_keyboard = navigation_menu.get("keyboard", [])
     settings_keyboard = settings_menu.get("keyboard", [])
     return {
         **settings_menu,
@@ -1633,7 +1768,43 @@ def _telegram_chat_text(db: Session, chat_id: int, key: str) -> str:
 
 
 def _telegram_chat_menu(db: Session, chat_id: int) -> dict[str, Any]:
-    return _localized_main_menu(_telegram_chat_language(db, chat_id))
+    telegram_user, access = _telegram_patient_access(db, chat_id)
+    language = _normalize_patient_language(
+        getattr(telegram_user, "language_code", None)
+    )
+    if access == "linked":
+        return _localized_main_menu(language)
+
+    contact_label, status_label, clinic_label = TELEGRAM_ONBOARDING_MENU_LABELS[
+        language
+    ]
+    keyboard: list[list[dict[str, Any]]] = []
+    if access == "onboarding":
+        keyboard.append([{"text": contact_label, "request_contact": True}])
+        if _telegram_has_pending_onboarding(db, telegram_user):
+            keyboard.append([{"text": status_label}])
+    keyboard.append([{"text": clinic_label}])
+    return {"keyboard": keyboard, "resize_keyboard": True, "one_time_keyboard": False}
+
+
+def _telegram_clinic_message(db: Session, chat_id: int) -> str:
+    language = _telegram_chat_language(db, chat_id)
+    clinic = PublicSiteReadService(PublicSiteReadRepository(db)).get_clinic()
+    details = []
+    if clinic.phone:
+        label = _localized_text("clinic_phone_label", language)
+        details.append(f"{label}: {html.escape(clinic.phone)}")
+    if clinic.address:
+        label = _localized_text("clinic_address_label", language)
+        details.append(f"{label}: {html.escape(clinic.address)}")
+    if clinic.working_hours_start is not None and clinic.working_hours_end is not None:
+        start = clinic.working_hours_start.strftime("%H:%M")
+        end = clinic.working_hours_end.strftime("%H:%M")
+        label = _localized_text("clinic_hours_label", language)
+        details.append(f"{label}: {start}–{end}")
+    if not details:
+        details.append(_localized_text("clinic_contacts_unavailable", language))
+    return f"{_localized_text('clinic_title', language)}\n\n" + "\n".join(details)
 
 
 def _telegram_settings_message(db: Session, chat_id: int) -> str:
@@ -1685,7 +1856,7 @@ TELEGRAM_PATIENT_BUTTON_ICON_PREFIXES = (
 
 def _normalize_patient_button_text(text: Any) -> str:
     value = " ".join(str(text or "").strip().lower().split())
-    value = value.replace("\ufe0f", "").strip()
+    value = value.replace("\ufe0f", "").translate(str.maketrans("ʻʼ‘’", "''''")).strip()
     for prefix in TELEGRAM_PATIENT_BUTTON_ICON_PREFIXES:
         if value.startswith(prefix):
             value = value[len(prefix) :].strip()

@@ -128,6 +128,25 @@ def _latest_patient_bot_template_key(db: Session, chat_id: int) -> str | None:
     return str(row[0]) if row and row[0] else None
 
 
+def _has_patient_language_selection(db: Session, chat_id: int) -> bool:
+    row = (
+        db.query(TelegramMessage.id)
+        .filter(
+            TelegramMessage.chat_id == chat_id,
+            TelegramMessage.message_type == "patient_bot_reply",
+            TelegramMessage.template_key.in_(
+                (
+                    "telegram_patient_language_selected",
+                    "telegram_patient_language_selected_needs_contact",
+                    "telegram_patient_settings_language_selected",
+                )
+            ),
+        )
+        .first()
+    )
+    return row is not None
+
+
 def _is_patient_settings_context_template(template_key: str | None) -> bool:
     return template_key in {
         "telegram_patient_settings",

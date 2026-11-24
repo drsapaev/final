@@ -8431,6 +8431,7 @@ const uzLatn = {
     tg_results_title: 'Natijalar',
     tg_results_pdf: 'Telegramda PDF, {count} tagacha fayllar',
     tg_results_notification: 'Telegramda bildirishnoma',
+    tg_results_mini_app: 'Bemorning himoyalangan Mini Appʼida',
     tg_quick_actions: 'Tezkor amallar',
     tg_configure_bot: 'Botni sozlash',
     tg_registering_commands: 'Buyruqlar roʻyxatdan oʻtkazilmoqda...',
