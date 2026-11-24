@@ -173,6 +173,48 @@ describe('REG-FE-082 — no foreign clinic brand substitution', () => {
   });
 });
 
+describe('QUEUEPRINT-FE-004 — the displayed amount belongs to the ticket', () => {
+  beforeEach(() => {
+    fetchTicketPrintSettingsMock.mockResolvedValue({ ...TICKET_PRINT_SETTINGS_DEFAULTS, show_price: true });
+  });
+
+  it('omits the price when the ticket has no matching service', async () => {
+    const html = await buildPanelTicketsBatchPrintableHtml([
+      {
+        amount: 80000,
+        print_tickets: [{ queue_name: 'Кардиология', queue_number: 4 }],
+        services: [{ name: 'Консультация кардиолога', price: 50000 }],
+      },
+    ]);
+
+    expect(html).not.toContain('Цена:');
+  });
+
+  it('shows a genuine free service matched to a ticket', async () => {
+    const html = await buildPanelTicketsBatchPrintableHtml([
+      {
+        print_tickets: [{ queue_name: 'Консультация', queue_number: 4 }],
+        services: [{ name: 'Консультация', price: 0 }],
+      },
+    ]);
+
+    expect(html).toContain('Цена:');
+    expect(html).toContain('0 UZS');
+  });
+
+  it('renders a recorded decimal amount', async () => {
+    const html = await buildPanelTicketPrintableHtml({ queue_number: 4, service_price: '50000.00' });
+
+    expect(html).toMatch(/50\s*000\s*UZS/);
+  });
+
+  it.each([{}, ' ', false, Number.POSITIVE_INFINITY])('omits unrecognized amounts (%j)', async (servicePrice) => {
+    const html = await buildPanelTicketPrintableHtml({ queue_number: 4, service_price: servicePrice });
+
+    expect(html).not.toContain('Цена:');
+  });
+});
+
 describe('CSH-FE-043 — the unconditional-true sync wrapper is gone', () => {
   it('module no longer exports printPanelTicketInBrowser', () => {
     expect((panelPrintModule as Record<string, unknown>).printPanelTicketInBrowser).toBeUndefined();
