@@ -17,6 +17,9 @@ const states = {
 const groups = ['problem', 'medication', 'allergy'] as const;
 type FactKind = ClinicalFact['kind'];
 type Editor = { id: string; kind: FactKind; current?: ClinicalEntry };
+type Conflict =
+  | { expectedVersion: number; status: 'detected' | 'loading' | 'error' }
+  | { expectedVersion: number; status: 'ready'; latest: ClinicalEntry };
 
 function ClinicalInput({ label, ...props }: ComponentProps<typeof Input> & { label: string }) {
   return <label className="emr-workspace-field">{label}<Input {...props} aria-label={label} /></label>;
@@ -76,39 +79,74 @@ export function ClinicalSummary({
   const [editor, setEditor] = useState<Editor>();
   const [busy, setBusy] = useState(false);
   const writeInFlight = useRef(false);
-  const [failure, setFailure] = useState<'conflict' | 'save_error'>();
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [conflict, setConflict] = useState<Conflict>();
+  const conflictRequest = useRef(0);
   const [history, setHistory] = useState<{ id: string; rows?: ClinicalEntry[]; error?: boolean }>();
   const historyRequest = useRef(0);
   const { visit, patient, clinical_entries: entries } = workspace;
   const priorCheck = entries.find(entry => entry.clinical_details.kind === 'allergy_check');
   const fact = editor?.current?.clinical_details;
 
+  function clearEditor() {
+    conflictRequest.current += 1;
+    setConflict(undefined);
+    setSaveFailed(false);
+    setEditor(undefined);
+  }
+
   function edit(kind: FactKind, current?: ClinicalEntry) {
     if (readOnly || writeInFlight.current) return;
-    setFailure(undefined);
+    clearEditor();
     setEditor({ id: current?.entry_id ?? crypto.randomUUID(), kind, current });
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editor || readOnly || writeInFlight.current) return;
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const keepLocal = submitter instanceof HTMLButtonElement && submitter.name === 'keep-local';
+    if (conflict && (!keepLocal || conflict.status !== 'ready')) return;
+    const expectedVersion = conflict?.status === 'ready' ? conflict.latest.version : (editor.current?.version ?? 0);
     const form = new FormData(event.currentTarget);
-    setFailure(undefined);
+    setSaveFailed(false);
     setBusy(true);
     writeInFlight.current = true;
     try {
       await saveClinicalEntry(
-        visit.id, patient.id, editor.id, editor.current?.version ?? 0,
+        visit.id, patient.id, editor.id, expectedVersion,
         readFact(editor.kind, form), form.get('source') as ClinicalSource, form.has('confirmed'),
       );
-      setEditor(undefined);
+      clearEditor();
       reload();
     } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response?.status;
-      setFailure(status === 409 ? 'conflict' : 'save_error');
+      const response = (error as { response?: { status?: number; data?: { detail?: { code?: string } } } })?.response;
+      if (editor.current && response?.status === 409 && response.data?.detail?.code === 'CLINICAL_ENTRY_CONFLICT') {
+        setConflict({ expectedVersion, status: 'detected' });
+      } else {
+        setSaveFailed(true);
+      }
     } finally {
       writeInFlight.current = false;
       setBusy(false);
+    }
+  }
+
+  async function loadConflictingRevision() {
+    if (!editor || !conflict || conflict.status === 'loading' || writeInFlight.current) return;
+    const { expectedVersion } = conflict;
+    const sequence = ++conflictRequest.current;
+    setSaveFailed(false);
+    setConflict({ expectedVersion, status: 'loading' });
+    try {
+      const rows = await getClinicalHistory(visit.id, patient.id, editor.id);
+      const latest = rows.filter(row => row.entry_id === editor.id
+        && row.clinical_details.kind === editor.kind && row.version > expectedVersion)
+        .sort((first, second) => second.version - first.version)[0];
+      if (conflictRequest.current !== sequence) return;
+      setConflict(latest ? { expectedVersion, status: 'ready', latest } : { expectedVersion, status: 'error' });
+    } catch {
+      if (conflictRequest.current === sequence) setConflict({ expectedVersion, status: 'error' });
     }
   }
 
@@ -241,13 +279,27 @@ export function ClinicalSummary({
               {t('emr_workspace.confirm_now')}
             </label>
             <div className="emr-workspace-controls">
-              <Button type="submit" size="small">{t('common.save')}</Button>
-              <Button type="button" size="small" variant="ghost" onClick={() => setEditor(undefined)}>{t('misc.cancel')}</Button>
+              <Button type="submit" size="small" disabled={Boolean(conflict)}>{t('common.save')}</Button>
+              <Button type="button" size="small" variant="ghost" onClick={clearEditor}>{t('misc.cancel')}</Button>
             </div>
           </fieldset>
           {busy && <p role="status">{t('emr_workspace.saving')}</p>}
-          {failure && <p role="alert">{t(`emr_workspace.${failure}`)}</p>}
-          {failure === 'conflict' && <Button type="button" variant="outline" size="small" onClick={reload}>{t('emr_workspace.retry')}</Button>}
+          {saveFailed && <p role="alert">{t('emr_workspace.save_error')}</p>}
+          {conflict && <div className="emr-workspace-group">
+            <p role="alert">{t('emr_workspace.clinical_conflict_review')}</p>
+            {conflict.status === 'loading' && <p role="status">{t('emr_workspace.loading')}</p>}
+            {conflict.status === 'error' && <p role="alert">{t('emr_workspace.load_error')}</p>}
+            {conflict.status === 'ready' ? <>
+              <div className="emr-workspace-entry">
+                <small>{t('emr_workspace.clinical_conflict_current', { version: conflict.latest.version })}</small>
+                <EntryText entry={conflict.latest} />
+              </div>
+              <Button type="submit" name="keep-local" size="small" disabled={readOnly || busy}>
+                {t('emr_workspace.clinical_conflict_keep_local')}
+              </Button>
+            </> : <Button type="button" size="small" variant="outline" disabled={busy || conflict.status === 'loading'}
+              onClick={() => void loadConflictingRevision()}>{t('emr_workspace.open_version')}</Button>}
+          </div>}
         </form>
       )}
     </section>
