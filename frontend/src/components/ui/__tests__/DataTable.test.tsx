@@ -260,28 +260,26 @@ describe('DataTable — row virtualization (DT-13..16, PR-UI-09e-1)', () => {
   const makeRows = (count: number): VRow[] =>
     Array.from({ length: count }, (_, i) => ({ id: i, name: `Row ${i}` }));
 
-  // jsdom performs no layout: every element reports offsetHeight 0 and
-  // @tanstack/react-virtual would compute an empty window. The virtualizer
-  // measures the viewport (a <div>) and the rows (<tr>) via offsetHeight, so
-  // tag-specific prototype mocks give a deterministic 320px viewport and a
-  // configurable row height — scoped to this describe block and restored.
+  // jsdom performs no layout. TanStack Virtual reads clientHeight for the
+  // scroll viewport and offsetHeight for rows. Mock both measurements within
+  // this suite to exercise a 320px viewport and configurable row height.
   const VIEWPORT = 320;
   let mockRowHeight = 32;
   const trDescriptor = Object.getOwnPropertyDescriptor(HTMLTableRowElement.prototype, 'offsetHeight');
-  const divDescriptor = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'offsetHeight');
+  const divDescriptor = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'clientHeight');
   beforeEach(() => {
     mockRowHeight = 32;
     Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', {
       configurable: true,
       get: () => mockRowHeight,
     });
-    Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', {
+    Object.defineProperty(HTMLDivElement.prototype, 'clientHeight', {
       configurable: true,
       value: VIEWPORT,
     });
   });
   afterEach(() => {
-    // jsdom inherits offsetHeight from HTMLElement.prototype, so the captured
+    // The geometry getters are inherited in jsdom, so the captured
     // descriptors are undefined (Codex P2-8, PR 2872): restoring would be a
     // no-op and the mocks would leak into later test files in the shared
     // single-fork environment. When no own property existed, DELETE the mock
@@ -292,9 +290,9 @@ describe('DataTable — row virtualization (DT-13..16, PR-UI-09e-1)', () => {
       delete (HTMLTableRowElement.prototype as { offsetHeight?: number }).offsetHeight;
     }
     if (divDescriptor) {
-      Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', divDescriptor);
+      Object.defineProperty(HTMLDivElement.prototype, 'clientHeight', divDescriptor);
     } else {
-      delete (HTMLDivElement.prototype as { offsetHeight?: number }).offsetHeight;
+      delete (HTMLDivElement.prototype as { clientHeight?: number }).clientHeight;
     }
   });
 
@@ -1037,12 +1035,12 @@ describe('DataTable — PR-UI-12 features (DT-17..27)', () => {
     // scrollToIndex cannot drive the window here, so the window is moved by a
     // manual scrollTop assignment like DT-14).
     const trDescriptor = Object.getOwnPropertyDescriptor(HTMLTableRowElement.prototype, 'offsetHeight');
-    const divDescriptor = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'offsetHeight');
+    const divDescriptor = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'clientHeight');
     Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', {
       configurable: true,
       get: () => 20
     });
-    Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', {
+    Object.defineProperty(HTMLDivElement.prototype, 'clientHeight', {
       configurable: true,
       value: 200
     });
@@ -1098,9 +1096,9 @@ describe('DataTable — PR-UI-12 features (DT-17..27)', () => {
         Reflect.deleteProperty(HTMLTableRowElement.prototype, 'offsetHeight');
       }
       if (divDescriptor) {
-        Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', divDescriptor);
+        Object.defineProperty(HTMLDivElement.prototype, 'clientHeight', divDescriptor);
       } else {
-        Reflect.deleteProperty(HTMLDivElement.prototype, 'offsetHeight');
+        Reflect.deleteProperty(HTMLDivElement.prototype, 'clientHeight');
       }
     }
   });
@@ -1308,12 +1306,12 @@ describe('DataTable — PR-UI-12-4 sticky-header bounded viewport (DT-45..47)', 
     // activation. Mirrors the DT-13 jsdom geometry mocks so the virtualizer
     // actually opens a window.
     const trDescriptor = Object.getOwnPropertyDescriptor(HTMLTableRowElement.prototype, 'offsetHeight');
-    const divDescriptor = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'offsetHeight');
+    const divDescriptor = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'clientHeight');
     Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', {
       configurable: true,
       get: () => 32,
     });
-    Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', {
+    Object.defineProperty(HTMLDivElement.prototype, 'clientHeight', {
       configurable: true,
       value: 320,
     });
@@ -1328,6 +1326,7 @@ describe('DataTable — PR-UI-12-4 sticky-header bounded viewport (DT-45..47)', 
       expect(wrapper.style.maxHeight).toBe('320px');
       // Windowed rendering active (virtualization took precedence)…
       const bodyRows = container.querySelectorAll('tbody tr');
+      expect(bodyRows.length).toBeGreaterThan(0);
       expect(bodyRows.length).toBeLessThan(100);
       // …and the header stays sticky inside the shared viewport.
       const headerTh = screen.getByText('Name').closest('th') as HTMLElement;
@@ -1339,9 +1338,9 @@ describe('DataTable — PR-UI-12-4 sticky-header bounded viewport (DT-45..47)', 
         delete (HTMLTableRowElement.prototype as { offsetHeight?: number }).offsetHeight;
       }
       if (divDescriptor) {
-        Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', divDescriptor);
+        Object.defineProperty(HTMLDivElement.prototype, 'clientHeight', divDescriptor);
       } else {
-        delete (HTMLDivElement.prototype as { offsetHeight?: number }).offsetHeight;
+        delete (HTMLDivElement.prototype as { clientHeight?: number }).clientHeight;
       }
     }
   });
