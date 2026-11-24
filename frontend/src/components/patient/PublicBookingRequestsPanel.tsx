@@ -192,17 +192,23 @@ export default function PublicBookingRequestsPanel() {
         <div className="pp-home-list" aria-busy={loading}>
           {items.map((item) => {
             const canWithdraw = item.status === 'pending' || item.status === 'needs_new_time';
+            const localizedService = language === 'uz-Latn' ? item.service_name_uz?.trim() : item.service_name_ru?.trim();
+            const serviceName = localizedService || item.service_name_ru?.trim();
+            const doctorName = item.doctor_display_name?.trim();
+            const serviceDescriptionId = `booking-service-${item.id}`;
+            const doctorDescriptionId = `booking-doctor-${item.id}`;
+            const requestDescription = `${serviceDescriptionId} ${doctorDescriptionId}`;
             return (
               <div key={item.id} className="pp-home-list-item" data-testid="patient-booking-request">
                 <div className="min-w-0">
                   <div className="pp-list-item-primary">
                     {t('publicBookingRequests.requestedTime')}: {formatRequestedSlot(item, locale)}
                   </div>
-                  <div className="pp-list-item-secondary">
-                    {t('publicBookingRequests.serviceCode')}: {item.service_slug}
+                  <div id={serviceDescriptionId} className="pp-list-item-secondary">
+                    {t(serviceName ? 'publicBookingRequests.serviceName' : 'publicBookingRequests.serviceCode')}: {serviceName || item.service_slug}
                   </div>
-                  <div className="pp-list-item-secondary">
-                    {t('publicBookingRequests.doctorCode')}: {item.doctor_slug}
+                  <div id={doctorDescriptionId} className="pp-list-item-secondary">
+                    {t(doctorName ? 'publicBookingRequests.doctorName' : 'publicBookingRequests.doctorCode')}: {doctorName || item.doctor_slug}
                   </div>
                   <div className="pp-list-item-secondary">
                     {t(STATUS_HELP_KEYS[item.status])}
@@ -210,6 +216,7 @@ export default function PublicBookingRequestsPanel() {
                   {item.status === 'needs_new_time' && (
                     <Link
                       className="mt-2 inline-block text-sm text-blue-700 underline dark:text-blue-300"
+                      aria-describedby={requestDescription}
                       to={language === 'uz-Latn' ? '/booking' : '/ru/booking'}
                       state={{
                         publicBookingResubmit: {
@@ -229,6 +236,7 @@ export default function PublicBookingRequestsPanel() {
                       size="small"
                       className="mt-3"
                       disabled={Boolean(busyRequestId)}
+                      aria-describedby={requestDescription}
                       onClick={() => { void withdraw(item); }}
                     >
                       {busyRequestId === item.id

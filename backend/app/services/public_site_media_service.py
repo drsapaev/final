@@ -518,7 +518,14 @@ class PublicSiteMediaService:
 
         try:
             self._write_backup(media)
-            old_values = {"is_published": True, "published_at": media.published_at}
+            old_values = {
+                "is_published": True,
+                "published_at": (
+                    media.published_at.isoformat()
+                    if media.published_at is not None
+                    else None
+                ),
+            }
             media.is_published = False
             media.published_at = None
             media.updated_at = datetime.now(UTC)
