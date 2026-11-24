@@ -17,10 +17,8 @@ vi.mock('../../../i18n/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-vi.mock('../../ui/macos', () => ({
-  Alert: ({ title, message }: { title: string; message: string }) => (
-    <div role="alert">{title}: {message}</div>
-  ),
+vi.mock('../../ui/macos', async () => ({
+  Alert: (await vi.importActual<typeof import('../../ui/macos/Alert')>('../../ui/macos/Alert')).default,
   Badge: ({ children }: { children: ReactNode }) => <span>{children}</span>,
   Button: ({
     children,
@@ -63,6 +61,14 @@ describe('PublicBookingSettingsManager', () => {
     const enable = await screen.findByRole('checkbox', { name: 'admin2.pbs_enable' });
     expect(enable).toBeDisabled();
     expect(screen.getByRole('button', { name: 'admin2.pbs_save' })).toBeDisabled();
+  });
+
+  it('shows the load error detail and allows retrying', async () => {
+    getSettings.mockRejectedValueOnce(new Error('Synthetic settings load failure'));
+    render(<PublicBookingSettingsManager />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('admin2.pbs_error_load');
+    expect(screen.getByRole('button', { name: 'admin2.pbs_retry' })).toBeEnabled();
   });
 
   it('saves a complete versioned configuration before enabling the settings', async () => {

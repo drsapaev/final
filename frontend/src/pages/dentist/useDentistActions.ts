@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react';
 
 import notify from '../../services/notify';
+import { reportVisitCompletionCall } from '../../utils/visitCompletionChoice';
 import logger from '../../utils/logger';
 import { apiClient } from '../../api/client';
 import { queueService } from '../../services/queue';
@@ -27,7 +28,7 @@ import {
  *  - C-3 critical ICD-10 gate: CRITICAL_ICD10_CODES (K04/K10) +
  *    getCriticalDiagnosisWarning (prefix matching)
  *  - handleCompleteVisit (tiered confirm C-1 + C-3 danger intent,
- *    queueService.completeVisit + callNextWaiting auto-invite)
+ *    queueService.completeVisit + explicit optional callNextWaiting)
  *  - dialog-opening patient handlers: handleDiagnosis / handleVisitProtocol /
  *    handlePhotoArchive / handleProtocolTemplates / handleReports /
  *    handleDentalChart / handleTreatmentPlanner
@@ -342,7 +343,7 @@ export function useDentistActions({
   //   1. resolveDoctorQueueEntryId(selectedPatient) — canonical entry id
   //   2. queueService.completeVisit(entryId, payload) — POST /doctor/queue/{id}/complete
   //   3. Сброс состояния и возврат на вкладку очереди
-  //   4. callNextWaiting('dentistry') — автовызов следующего пациента
+  //   4. callNextWaiting('dentistry') — только по выбору в подтверждении
   //
   // Контракт SSOT (DoctorPanels.contract.test.jsx) требует:
   //   - НЕ использовать row.id / selectedPatient.id напрямую
@@ -386,7 +387,7 @@ export function useDentistActions({
     const icd10ForCheck = extractCanonicalIcd10(latestDraft as Record<string, unknown>);
     const criticalWarning = getCriticalDiagnosisWarning(icd10ForCheck);
 
-    let confirmOptions;
+    let confirmOptions: Record<string, unknown>;
     if (criticalWarning) {
       confirmOptions = {
         title: tI18n('dental.dental_panel_critical_title', { label: criticalWarning.label, code: criticalWarning.code }),
@@ -407,6 +408,12 @@ export function useDentistActions({
       };
     }
 
+    let callNext = false;
+    confirmOptions.confirmationOption = {
+      label: tI18n('misc.visit_completion_call_next_option'),
+      onConfirm: (checked: boolean) => { callNext = checked; },
+    };
+
     const ok = await confirm(confirmOptions);
     if (!ok) {
       // DENTVISIT-FE-002 (audit 3892): an explicit user abort is not a
@@ -419,11 +426,12 @@ export function useDentistActions({
     // completion to the snapshotted queue-entry/patient identity and abort
     // (no POST, no UI reset) when the panel has moved to another patient;
     // otherwise a stale handler could complete A and wipe B's state.
-    const currentSelection = selectedPatientRef.current;
-    if (
-      String(resolveDoctorQueueEntryId(currentSelection)) !== String(completionIdentity.queueEntryId) ||
-      String(resolvePatientId(currentSelection)) !== String(completionIdentity.patientId)
-    ) {
+    const stillCurrent = () => {
+      const current = selectedPatientRef.current;
+      return String(resolveDoctorQueueEntryId(current)) === String(completionIdentity.queueEntryId) &&
+        String(resolvePatientId(current)) === String(completionIdentity.patientId);
+    };
+    if (!stillCurrent()) {
       logger.warn('[Dentistry] Selection changed during completion confirmation — aborting stale completion');
       return undefined;
     }
@@ -479,6 +487,10 @@ export function useDentistActions({
         // screen can surface its persistent completion-failed state.
         return false;
       }
+      if (!stillCurrent()) {
+        // Completion belongs to the former selection. Never reset or call over the current one.
+        return true;
+      }
       logger.info('[Dentistry] Queue visit completed');
       notify.success(tI18n('dental.visit_completed'));
 
@@ -488,15 +500,12 @@ export function useDentistActions({
       setProtocolTemplateDraft(null);
       handleTabChange('queue');
 
-      // Автовызов следующего пациента по стоматологии
-      try {
-        const next = await queueService.callNextWaiting(SPECIALTY_KEYS.DENTISTRY);
-        if (next?.success && next?.entry?.number) {
-          notify.success(tI18n('dental.dental_panel_next_patient_called', { number: next.entry.number }));
-        }
-      } catch {
-        logger.warn('[Dentistry] Failed to call next queue entry');
-        // Не блокируем UI: визит уже завершён, просто информируем
+      if (callNext) {
+        await reportVisitCompletionCall(
+          () => queueService.callNextWaiting(SPECIALTY_KEYS.DENTISTRY),
+          tI18n,
+          'dental.dental_panel_next_patient_called',
+        );
       }
       // DENTVISIT-FE-002 (audit 3892): the queue completion itself succeeded —
       // report completion even if the best-effort next-patient call failed.
