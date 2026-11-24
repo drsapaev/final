@@ -12,7 +12,7 @@
  * readers (and, for whitespace-bearing profile keys, an INVALID IDREF).
  * These tests pin the resolved wiring (plan §RQ-19, S-16).
  */
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../api/registrarTabs', () => ({ getRegistrarTabs: vi.fn() }));
@@ -22,8 +22,10 @@ vi.mock('../../../../i18n/useTranslation', () => ({
 }));
 
 vi.mock('../../../../components/tables/EnhancedAppointmentsTable', () => ({
-  default: ({ preferCanonicalQueueNumber }: { preferCanonicalQueueNumber?: boolean }) =>
-    <div data-testid="appointments-stub" data-canonical-ticket={String(Boolean(preferCanonicalQueueNumber))} />,
+  default: ({ preferCanonicalQueueNumber, onRowClick }: { preferCanonicalQueueNumber?: boolean; onRowClick?: (row: unknown) => void }) =>
+    <div className="mac-table-scroll-wrapper" data-testid="appointments-stub" data-canonical-ticket={String(Boolean(preferCanonicalQueueNumber))}>
+      <button onClick={() => onRowClick?.({ id: 9 })}>SYNTHETIC row</button>
+    </div>,
 }));
 
 vi.mock('../../../../components/ui', () => ({
@@ -429,4 +431,16 @@ describe('RQ-21.b — signed worklist counters', () => {
     // signed counter (now unit-correct) while the badge shows loading.
     expect(screen.getAllByText(/rp_counter_records/).length).toBe(1);
   });
+});
+
+it('opens Preview on row activation and resets horizontal position on a department switch', () => {
+  const onActionClick = vi.fn();
+  const props = { ...baseProps, onActionClick, isMobile: true, filteredAppointments: [{ id: 9 }] };
+  const { rerender } = render(<WorklistView {...props} />);
+  const scroller = screen.getByTestId('appointments-stub');
+  scroller.scrollLeft = 450;
+  fireEvent.click(screen.getByRole('button', { name: 'SYNTHETIC row' }));
+  expect(onActionClick).toHaveBeenCalledWith('view', { id: 9 });
+  rerender(<WorklistView {...props} activeTab="lab" />);
+  expect(scroller.scrollLeft).toBe(0);
 });

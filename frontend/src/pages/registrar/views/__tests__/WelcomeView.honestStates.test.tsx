@@ -10,7 +10,7 @@
  *               «no matches», never the empty-queue state + create CTA.
  * - REG-FE-029  a failed primary load renders a visible error + retry state
  *               instead of a blank history region.
- * - REG-FE-030  quick filters mutate only the status key; «Все записи» clears
+ * - REG-FE-030  the calendar mutates only the date key; clearing filters clears
  *               the narrowing (status/q) but keeps date/dept/doctor scope.
  * - REG-FE-031  selection checkboxes are disabled until a bulk consumer
  *               exists (same dead-UI removal as the worklist).
@@ -37,26 +37,23 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/components/ui/macos', () => ({
   Button: (props: Record<string, unknown>) => <button {...props} />,
   Badge: (props: Record<string, unknown>) => <span {...props} />,
+  Tooltip: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
   Card: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   CardHeader: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   CardContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  Input: (props: Record<string, unknown>) => <input {...props} />,
-}));
-
-vi.mock('@/components/ui', () => ({
-  AnimatedTransition: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
-}));
-
-vi.mock('@/components/statistics/ModernStatistics', () => ({
-  default: () => <div data-testid="modern-statistics" />,
+  Input: ({ icon: _icon, ...props }: Record<string, unknown>) => <input {...props} />,
+  Select: ({ options, ...props }: { options: { value: string; label: string }[] }) => (
+    <select {...props}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+  ),
 }));
 
 vi.mock('@/components/tables/EnhancedAppointmentsTable', () => ({
-  default: ({ showCheckboxes, data }: { showCheckboxes?: boolean; data?: unknown[] }) => (
-    <div
-      data-testid="appointments-stub"
-      data-show-checkboxes={String(Boolean(showCheckboxes))}
-      data-rows={String(data?.length ?? 0)} />
+  default: ({ showCheckboxes, data, onRowClick, filteredExport }: import('@/components/tables/appointmentsTableContracts').EnhancedAppointmentsTableProps) => (
+    <div data-testid="appointments-stub" data-show-checkboxes={String(Boolean(showCheckboxes))}>
+      {data?.map((row, index) => <button key={index} onClick={() => onRowClick?.(row)}>Open {index}</button>)}
+      {filteredExport && <button disabled={filteredExport.disabled}
+        onClick={() => filteredExport.onExport(data?.slice(0, 1) ?? [])}>{filteredExport.label}</button>}
+    </div>
   ),
 }));
 
@@ -73,6 +70,8 @@ vi.mock('@/utils/logger', () => ({
 }));
 
 import notify from '@/services/notify';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import ru from '@/i18n/locales/ru';
 import WelcomeView, { formatClinicDayLong, formatClinicTodayLong } from '../WelcomeView';
 
 afterEach(() => {
@@ -91,28 +90,32 @@ afterAll(() => {
 });
 
 const makeProps = (overrides: Record<string, unknown> = {}) => ({
-  t: (key: string) => key,
+  t: (key: string, options?: Record<string, unknown>) => {
+    const value = key.startsWith('rp_welcome_')
+      ? ru.registrarPanel[key as keyof typeof ru.registrarPanel]
+      : key;
+    return String(value).replace(/{(\w+)}/g, (_match, param: string) => String(options?.[param] ?? ''));
+  },
   language: 'ru',
   theme: 'light',
   textColor: '#000000',
   appointments: [] as Record<string, unknown>[],
-  departmentStats: {},
   dataSource: 'api',
   appointmentsLoading: false,
   filteredAppointments: [] as Record<string, unknown>[],
   services: {},
-  activeTab: null,
-  historyDate: '2026-10-30',
+  today: '2026-11-02',
+  selectedDate: '2026-11-02',
+  loadedDate: '2026-11-02',
+  stale: false,
+  hasUrlFilters: true,
   showCalendar: false,
-  tempDateInput: '',
   loadAppointments: vi.fn(),
   setShowWizard: vi.fn(),
   setWizardEditMode: vi.fn(),
   setWizardInitialData: vi.fn(),
   setShowPaymentManager: vi.fn(),
-  setHistoryDate: vi.fn(),
   setShowCalendar: vi.fn(),
-  setTempDateInput: vi.fn(),
   setSearchParams: vi.fn(),
   navigate: vi.fn(),
   setPaymentDialog: vi.fn(),
@@ -154,7 +157,7 @@ describe('REG-FE-027 — morning checklist owner groups and honest counts', () =
     expect(screen.getByText('Петрова Анна')).toBeInTheDocument();
     expect(screen.getByText('ЭКГ')).toBeInTheDocument();
     expect(screen.getByText('Врач №12')).toBeInTheDocument();
-    expect(screen.getByText('Без привязки к врачу')).toBeInTheDocument();
+    expect(screen.getByText('Без привязки к очереди')).toBeInTheDocument();
     // THE defect: canonical rows carry no legacy doctor_id — everything used
     // to collapse into one bogus «Врач #undefined» card.
     expect(screen.queryByText(/Врач #/)).toBeNull();
@@ -175,16 +178,16 @@ describe('REG-FE-027 — morning checklist owner groups and honest counts', () =
   });
 
   it('the checklist is a TODAY instrument: a historical sample does not render it', () => {
-    render(<WelcomeView {...makeProps({ appointments: summaryRows, loadedDateIsToday: false })} />);
+    render(<WelcomeView {...makeProps({ appointments: summaryRows, selectedDate: '2026-10-30', loadedDate: '2026-10-30' })} />);
 
-    expect(screen.queryByText('Утренний статус приёма')).toBeNull();
+    expect(screen.queryByText('Сегодня: записи по очередям и врачам')).toBeNull();
     expect(screen.queryByText('Иванов Иван')).toBeNull();
   });
 
   it('no rows → no checklist block (and no crash)', () => {
     render(<WelcomeView {...makeProps({ appointments: [] })} />);
 
-    expect(screen.queryByText('Утренний статус приёма')).toBeNull();
+    expect(screen.queryByText('Сегодня: записи по очередям и врачам')).toBeNull();
   });
 });
 
@@ -205,9 +208,9 @@ describe('REG-FE-028 — filtered-to-zero scope is «no matches», not an empty 
 
     expect(screen.getByText('rp_worklist_no_matches')).toBeInTheDocument();
     expect(screen.getByText('rp_empty_filter_desc')).toBeInTheDocument();
-    // THE defect: this used to render «Очередь пуста» + «Создать первую
+    // THE defect: this used to render «На выбранную дату нет записей» + «Создать первую
     // запись» — inviting a duplicate registration.
-    expect(screen.queryByText('Очередь пуста')).toBeNull();
+    expect(screen.queryByText('На выбранную дату нет записей')).toBeNull();
     expect(screen.queryByText('Создать первую запись')).toBeNull();
   });
 
@@ -218,7 +221,7 @@ describe('REG-FE-028 — filtered-to-zero scope is «no matches», not an empty 
       />,
     );
 
-    expect(screen.getByText('Очередь пуста')).toBeInTheDocument();
+    expect(screen.getByText('На выбранную дату нет записей')).toBeInTheDocument();
     expect(screen.getByText('Создать первую запись')).toBeInTheDocument();
     expect(screen.queryByText('rp_worklist_no_matches')).toBeNull();
   });
@@ -228,7 +231,7 @@ describe('REG-FE-028 — filtered-to-zero scope is «no matches», not an empty 
       <WelcomeView {...makeProps({ appointments: [], filteredAppointments: [], dataSource: 'api' })} />,
     );
 
-    expect(screen.getByText('Очередь пуста')).toBeInTheDocument();
+    expect(screen.getByText('На выбранную дату нет записей')).toBeInTheDocument();
     expect(screen.queryByText('rp_worklist_no_matches')).toBeNull();
   });
 });
@@ -246,7 +249,7 @@ describe('REG-FE-029 — primary queue load failure renders an error + retry sta
 
     // THE defect: this exact state rendered NOTHING (blank history region).
     expect(screen.getByText('ds_error_message')).toBeInTheDocument();
-    expect(screen.queryByText('Очередь пуста')).toBeNull();
+    expect(screen.queryByText('На выбранную дату нет записей')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'ds_retry' }));
     expect(loadAppointments).toHaveBeenCalledWith({ source: 'welcome_retry' });
@@ -258,66 +261,46 @@ describe('REG-FE-029 — primary queue load failure renders an error + retry sta
         {...makeProps({
           appointments: [{ id: 1 }],
           filteredAppointments: [{ id: 1, patient_fio: 'SYNTHETIC PATIENT' }],
-          dataSource: 'error',
+          dataSource: 'api',
+          stale: true,
         })}
       />,
     );
 
     expect(screen.getByTestId('appointments-stub')).toBeInTheDocument();
+    expect(screen.getByTestId('dsi')).toBeInTheDocument();
     expect(screen.queryByText('ds_error_message')).toBeNull();
   });
 });
 
 // ─── REG-FE-030 — quick filters preserve unrelated URL scope ────────────────
 
-describe('REG-FE-030 — quick filters mutate only the status key', () => {
-  it('status quick filter keeps date/dept/doctor/search scope (functional URL update)', () => {
+describe('REG-FE-030 — calendar and narrowing preserve unrelated URL scope', () => {
+  it('changes only the date; returning to today removes the archive parameter', () => {
     const setSearchParams = vi.fn();
-    render(<WelcomeView {...makeProps({ setSearchParams })} />);
+    const view = render(<WelcomeView {...makeProps({ setSearchParams, showCalendar: true })} />);
 
-    fireEvent.click(screen.getByRole('menuitem', { name: /Активная очередь/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Вчера' }));
+    const query = 'date=2026-11-01&dept=lab&status=queued&q=text&doctor_id=5';
+    const next = setSearchParams.mock.calls[0][0](new URLSearchParams(query));
+    expect(next.toString()).toBe(query);
 
-    expect(setSearchParams).toHaveBeenCalledTimes(1);
-    const updater = setSearchParams.mock.calls[0][0] as (prev: URLSearchParams) => URLSearchParams;
-    // THE defect: the pre-fix call passed `{ status: 'queued' }` — a plain
-    // object that REPLACED the whole query.
-    expect(typeof updater).toBe('function');
-    const next = updater(new URLSearchParams('date=2026-10-28&dept=lab&q=синтетика&doctor_id=5'));
-    expect(next.get('status')).toBe('queued');
-    expect(next.get('date')).toBe('2026-10-28');
-    expect(next.get('dept')).toBe('lab');
-    expect(next.get('q')).toBe('синтетика');
-    expect(next.get('doctor_id')).toBe('5');
+    view.rerender(<WelcomeView {...makeProps({ setSearchParams, showCalendar: true,
+      selectedDate: '2026-11-01', loadedDate: '2026-11-01' })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Сегодня' }));
+    expect(setSearchParams.mock.calls[1][0](new URLSearchParams(query)).toString())
+      .toBe('dept=lab&status=queued&q=text&doctor_id=5');
   });
 
-  it('the payment quick filter behaves the same way', () => {
+  it('clears search and status without losing date, department or doctor', () => {
     const setSearchParams = vi.fn();
     render(<WelcomeView {...makeProps({ setSearchParams })} />);
 
-    fireEvent.click(screen.getByRole('menuitem', { name: /Ожидают оплаты/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Сбросить поиск и статус/ }));
 
     const updater = setSearchParams.mock.calls[0][0] as (prev: URLSearchParams) => URLSearchParams;
-    const next = updater(new URLSearchParams('date=2026-10-28&q=text'));
-    expect(next.get('status')).toBe('paid_pending');
-    expect(next.get('date')).toBe('2026-10-28');
-    expect(next.get('q')).toBe('text');
-  });
-
-  it('«Все записи» clears the narrowing (status + search) but keeps the scope', () => {
-    const setSearchParams = vi.fn();
-    render(<WelcomeView {...makeProps({ setSearchParams })} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /Все записи/ }));
-
-    const updater = setSearchParams.mock.calls[0][0] as (prev: URLSearchParams) => URLSearchParams;
-    expect(typeof updater).toBe('function');
-    const next = updater(new URLSearchParams('date=2026-10-28&dept=lab&status=queued&q=text&doctor_id=5'));
-    expect(next.get('status')).toBeNull();
-    expect(next.get('q')).toBeNull();
-    // Scope keys survive — "all records" must not silently move the day.
-    expect(next.get('date')).toBe('2026-10-28');
-    expect(next.get('dept')).toBe('lab');
-    expect(next.get('doctor_id')).toBe('5');
+    expect(updater(new URLSearchParams('date=2026-10-28&dept=lab&status=queued&q=text&doctor_id=5')).toString())
+      .toBe('date=2026-10-28&dept=lab&doctor_id=5');
   });
 });
 
@@ -328,7 +311,7 @@ describe('REG-FE-008 — manual refresh toasts success only after a verified out
     const loadAppointments = vi.fn().mockResolvedValue('failed');
     render(<WelcomeView {...makeProps({ loadAppointments })} />);
 
-    fireEvent.click(screen.getByRole('menuitem', { name: /Обновить данные/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Обновить данные/ }));
 
     await waitFor(() => expect(loadAppointments).toHaveBeenCalledTimes(1));
     // Flush the outcome .then chain before judging the toast.
@@ -341,7 +324,7 @@ describe('REG-FE-008 — manual refresh toasts success only after a verified out
     const loadAppointments = vi.fn().mockResolvedValue('loaded');
     render(<WelcomeView {...makeProps({ loadAppointments })} />);
 
-    fireEvent.click(screen.getByRole('menuitem', { name: /Обновить данные/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Обновить данные/ }));
 
     await waitFor(() => expect(notify.success).toHaveBeenCalledTimes(1));
     expect(notify.success).toHaveBeenCalledWith('misc.data_updated');
@@ -351,7 +334,7 @@ describe('REG-FE-008 — manual refresh toasts success only after a verified out
     const loadAppointments = vi.fn().mockResolvedValue('empty');
     render(<WelcomeView {...makeProps({ loadAppointments })} />);
 
-    fireEvent.click(screen.getByRole('menuitem', { name: /Обновить данные/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Обновить данные/ }));
 
     await waitFor(() => expect(notify.success).toHaveBeenCalledTimes(1));
   });
@@ -360,7 +343,7 @@ describe('REG-FE-008 — manual refresh toasts success only after a verified out
     const loadAppointments = vi.fn().mockResolvedValue('skipped');
     render(<WelcomeView {...makeProps({ loadAppointments })} />);
 
-    fireEvent.click(screen.getByRole('menuitem', { name: /Обновить данные/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Обновить данные/ }));
 
     await waitFor(() => expect(loadAppointments).toHaveBeenCalledTimes(1));
     await Promise.resolve();
@@ -403,11 +386,112 @@ describe('REG-FE-032 — clinic-timezone date labels', () => {
     // new Date('2026-10-30').toLocaleDateString(...) rendered «29 октября».
     render(
       <WelcomeView
-        {...makeProps({ showCalendar: true, historyDate: '2026-10-30' })}
+        {...makeProps({ showCalendar: false, selectedDate: '2026-10-30', loadedDate: '2026-10-30' })}
       />,
     );
 
     expect(screen.getByText(/30 октября 2026/)).toBeInTheDocument();
     expect(screen.queryByText(/29 октября/)).toBeNull();
   });
+});
+
+describe('Welcome workflow', () => {
+  it('exposes the three start-of-shift actions first and uses the existing routes', () => {
+    const props = makeProps();
+    render(<WelcomeView {...props} />);
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.slice(0, 3).map(button => button.textContent))
+      .toEqual(['new_appointment', 'Найти пациента', 'Открыть очередь']);
+    buttons.slice(0, 3).forEach(button => fireEvent.click(button));
+    expect(props.setShowWizard).toHaveBeenCalledWith(true);
+    expect(props.navigate.mock.calls).toEqual([['/clinical/search'], ['/registrar/queue']]);
+  });
+
+  it('associates the calendar label and applies an explicitly submitted date', () => {
+    const setSearchParams = vi.fn();
+    render(<WelcomeView {...makeProps({ showCalendar: true, setSearchParams })} />);
+    const input = screen.getByLabelText('Дата записей');
+    expect(input).toHaveValue('2026-11-02');
+    fireEvent.change(input, { target: { value: '2026-10-30' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Показать за дату' }));
+    expect(setSearchParams.mock.calls[0][0](new URLSearchParams('dept=lab')).toString())
+      .toBe('dept=lab&date=2026-10-30');
+  });
+
+  it('does not put an old sample, its counts or CSV under a newly selected date', () => {
+    const props = makeProps({
+      selectedDate: '2026-10-30',
+      appointments: [{ id: 1, status: 'waiting' }],
+      filteredAppointments: [{ id: 1, status: 'waiting' }],
+    });
+    const view = render(<WelcomeView {...props} appointmentsLoading />);
+    expect(screen.queryByTestId('appointments-stub')).toBeNull();
+    expect(screen.queryByText('Ждут вызова')).toBeNull();
+    expect(screen.queryByText('На выбранную дату нет записей')).toBeNull();
+    view.rerender(<WelcomeView {...props} stale />);
+    expect(screen.getByRole('alert')).toHaveTextContent('ds_error_message');
+    expect(screen.queryByTestId('appointments-stub')).toBeNull();
+  });
+
+  it('uses backend status counts without inventing trends or course-change claims', () => {
+    render(<WelcomeView {...makeProps({
+      appointments: [
+        { id: 1, canonical_status: 'waiting', status: 'paid', payment_status: 'pending' },
+        { id: 2, status: 'queued' },
+        { id: 3, status: 'completed' },
+        { id: 4, status: 'called' },
+      ],
+    })} />);
+    expect(screen.getByText('Ждут вызова').nextElementSibling).toHaveTextContent(/^2$/);
+    expect(screen.getByText('Ожидают оплаты').nextElementSibling).toHaveTextContent(/^1$/);
+    expect(screen.getByText('status_done').nextElementSibling).toHaveTextContent(/^1$/);
+    expect(screen.queryByText(/%/)).toBeNull();
+  });
+
+  it('exports the table’s filtered rows with the selected date and opens the same preview as row actions', () => {
+    const aggregate = { id: 1, patient_fio: 'SYNTHETIC A', queue_numbers: [{ number: 1 }, { number: 2 }] };
+    const props = makeProps({
+      selectedDate: '2026-10-30', loadedDate: '2026-10-30',
+      appointments: [{ id: 101 }, { id: 102 }, { id: 103 }],
+      filteredAppointments: [aggregate, { id: 2, patient_fio: 'SYNTHETIC B' }],
+      generateCSV: vi.fn().mockReturnValue('synthetic csv'),
+    });
+    render(<WelcomeView {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Скачать CSV по фильтрам' }));
+    expect(props.generateCSV).toHaveBeenCalledExactlyOnceWith([aggregate], { includeQueueNumber: true });
+    expect(props.downloadCSV).toHaveBeenCalledExactlyOnceWith('synthetic csv', 'appointments_2026-10-30.csv');
+    fireEvent.click(screen.getByRole('button', { name: 'Open 0' }));
+    expect(props.openRecordPreview).toHaveBeenCalledExactlyOnceWith(aggregate);
+  });
+
+  it('does not invite a new appointment in an empty archive or export kept stale records', () => {
+    const props = makeProps({ selectedDate: '2026-10-30', loadedDate: '2026-10-30' });
+    const view = render(<WelcomeView {...props} />);
+    expect(screen.getByText('На выбранную дату нет записей')).toBeInTheDocument();
+    expect(screen.queryByText('Создать первую запись')).toBeNull();
+    view.rerender(<WelcomeView {...props} stale filteredAppointments={[{ id: 1 }]} />);
+    expect(screen.getByRole('button', { name: 'Скачать CSV по фильтрам' })).toBeDisabled();
+  });
+});
+
+it('the real table exports matching rows across pagination and refuses an empty result', async () => {
+  const { default: ActualTable } = await vi.importActual<typeof import('@/components/tables/EnhancedAppointmentsTable')>(
+    '@/components/tables/EnhancedAppointmentsTable',
+  );
+  const onExport = vi.fn();
+  const matches = Array.from({ length: 25 }, (_, id) => ({ id: id + 1, patient_fio: 'SYNTHETIC MATCH ' + id }));
+  render(<ThemeProvider><ActualTable data={[...matches, { id: 100, patient_fio: 'SYNTHETIC OTHER' }]}
+    showCheckboxes={false} filteredExport={{ label: 'filtered csv', onExport }} /></ThemeProvider>);
+
+  const search = screen.getByRole('textbox');
+  const exportButton = screen.getByRole('button', { name: 'filtered csv' });
+  fireEvent.change(search, { target: { value: 'SYNTHETIC MATCH' } });
+  fireEvent.click(exportButton);
+  expect(onExport).toHaveBeenCalledTimes(1);
+  expect(onExport.mock.calls[0][0]).toHaveLength(25);
+  expect(onExport.mock.calls[0][0]).toEqual(expect.arrayContaining(matches));
+  fireEvent.change(search, { target: { value: 'no matching text' } });
+  expect(exportButton).toBeDisabled();
+  fireEvent.click(exportButton);
+  expect(onExport).toHaveBeenCalledTimes(1);
 });

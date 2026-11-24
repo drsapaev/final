@@ -28,7 +28,7 @@ import {
 
 const holder = vi.hoisted(() => ({
   navigate: null as ((to: string) => void) | null,
-  confirmResolve: null as ((ok: boolean) => void) | null,
+  confirmResolve: null as ((ok: boolean, optIn?: boolean) => void) | null,
   emrDirty: false,
   saveForVisit: vi.fn(async (_visitId?: unknown, _options?: Record<string, unknown>) => ({ status: 'in_progress', row_version: 3 })),
   discardForVisit: vi.fn(),
@@ -188,7 +188,13 @@ vi.mock('../../components/common/ScheduleNextModal', () => ({
 }));
 vi.mock('../../components/common/SessionWarningModal', () => ({ default: () => <div /> }));
 vi.mock('../../components/common/ConfirmDialog', () => ({
-  useConfirm: () => [() => new Promise<boolean>((resolve) => { holder.confirmResolve = resolve; }), null],
+  useConfirm: () => [(options: { confirmationOption?: { onConfirm: (checked: boolean) => void } }) =>
+    new Promise<boolean>((resolve) => {
+      holder.confirmResolve = (ok, optIn = false) => {
+        if (ok) options.confirmationOption?.onConfirm(optIn);
+        resolve(ok);
+      };
+    }), null],
 }));
 vi.mock('../../hooks/useSessionTimeoutWarning', () => ({
   useSessionTimeoutWarning: () => undefined,
@@ -342,7 +348,7 @@ describe('derma deferred completion acknowledgement (DERMACOMPLETE-FE-002 follow
     }, { timeout: 2500 });
     fireEvent.click(completeButton);
     // The confirm dialog resolves immediately for the completion path.
-    holder.confirmResolve?.(true);
+    holder.confirmResolve?.(true, true);
     // DERMACOMPLETE-FE-001: the synthetic editor registers `emr-visit-98`
     // dirty in the shared registry — the completion defers to the canonical
     // Save/Discard dialog; Save flushes the draft and issues the POST.
@@ -369,9 +375,9 @@ describe('derma deferred completion acknowledgement (DERMACOMPLETE-FE-002 follow
     expect(screen.getByTestId('emr-editor').getAttribute('data-visit')).toBe('55');
   });
 
-  it('positive control: a fresh acknowledgement toasts, resets and auto-calls the next patient', async () => {
+  it.each([false, true])('fresh acknowledgement completes; calls next only on opt-in %s', async (optIn) => {
     mockedCompleteVisit.mockResolvedValue({ success: true } as never);
-    mockedCallNext.mockResolvedValue({ success: true } as never);
+    mockedCallNext.mockResolvedValue({ success: true, entry: { number: 7 } } as never);
 
     renderWithDirtyGuard(<DermatologistPanelUnified />, {
       routerProps: { initialEntries: ['/doctor/dermatology'] },
@@ -385,7 +391,7 @@ describe('derma deferred completion acknowledgement (DERMACOMPLETE-FE-002 follow
       return button as HTMLButtonElement;
     }, { timeout: 2500 });
     fireEvent.click(completeButton);
-    holder.confirmResolve?.(true);
+    holder.confirmResolve?.(true, optIn);
     // DERMACOMPLETE-FE-001: the always-dirty editor defers the completion to
     // the shared guard dialog; Save flushes the draft, then the fresh
     // acknowledgement path runs end-to-end.
@@ -395,7 +401,7 @@ describe('derma deferred completion acknowledgement (DERMACOMPLETE-FE-002 follow
     await waitFor(() => {
       expect(notifyService.success).toHaveBeenCalledWith('Прием завершен успешно');
     }, { timeout: 2500 });
-    expect(mockedCallNext).toHaveBeenCalled();
+    expect(mockedCallNext).toHaveBeenCalledTimes(optIn ? 1 : 0);
     await waitFor(() => {
       expect(screen.queryByTestId('emr-editor')).toBeNull();
     }, { timeout: 2500 });

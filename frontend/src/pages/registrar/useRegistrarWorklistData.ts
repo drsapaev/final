@@ -216,6 +216,11 @@ export const useRegistrarWorklistData = ({
 
   const { appointments, dataSource, appointmentsLoading, paginationInfo, stale, loadedDate } = state;
   const appointmentsCount = appointments.length;
+  const urlDate = searchParams.get('date');
+  const calendarDate = showCalendar && historyDate ? historyDate : urlDate;
+  // A "today" request resolves the clinic clock at request time (including across midnight).
+  const selectedDate = calendarDate || getLocalDateString();
+  const previousCalendarDate = useRef(calendarDate);
 
   // In-flight / cooldown / freshness guards (ports of panel refs).
   const initialLoadRef = useRef(false);
@@ -281,9 +286,7 @@ export const useRegistrarWorklistData = ({
       }
 
       // Используем новый эндпоинт для получения очередей на указанную дату
-      // Если календарь открыт, используем historyDate, иначе сегодня
-      const urlDate = searchParams.get('date');
-      const dateParam = showCalendar && historyDate ? historyDate : urlDate || getLocalDateString();
+      const dateParam = calendarDate || getLocalDateString();
 
       const response = await api.get('/registrar/queues/today', { params: { target_date: dateParam } }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
@@ -407,7 +410,7 @@ export const useRegistrarWorklistData = ({
           autoRefreshCooldownLoggedRef.current = false;
           logger.warn('⏳ Регистраторская очередь ограничена по частоте, включаем cooldown на 60с', {
             source: callSource,
-            dateParam: showCalendar && historyDate ? historyDate : getLocalDateString()
+            dateParam: calendarDate || getLocalDateString()
           });
           // REG-FE-007 (audit ledger 3803): 429 — явный сбой загрузки, а не
           // молчаливое «ничего»: primary → error + retry, refresh → строки
@@ -466,7 +469,7 @@ export const useRegistrarWorklistData = ({
     // the original RegistrarPanel closure semantics exactly (adding it would
     // change effect re-run behavior on language switch, e.g. an extra
     // calendar-date reload while the calendar is open on a non-today date).
-  }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, searchParams, activeTab, appointmentsCount]);
+  }, [enrichAppointmentsWithPatientData, calendarDate, activeTab, appointmentsCount]);
 
   // Слушаем обновления отделений от админ-панели
   useEffect(() => {
@@ -531,14 +534,13 @@ export const useRegistrarWorklistData = ({
     }
   }, [searchQuery, statusFilter]);
 
-  // Перезагружаем данные при изменении даты в календаре
+  // Back/forward, archive selection and returning to today all refresh.
+  // Visibility and unrelated query/filter changes keep the same sample.
   useEffect(() => {
-    if (showCalendar && historyDate && initialLoadRef.current) {
-      logger.info('📅 Дата календаря изменилась на:', historyDate);
-      logger.info('📅 Вызываем loadAppointments с параметрами:', { showCalendar, historyDate });
-      loadAppointments({ silent: false, source: 'calendar_date_change' });
-    }
-  }, [historyDate, showCalendar, loadAppointments]);
+    if (previousCalendarDate.current === calendarDate) return;
+    previousCalendarDate.current = calendarDate;
+    void loadAppointments({ silent: false, source: 'calendar_date_change' });
+  }, [calendarDate, loadAppointments]);
 
   // Автообновление очереди с возможностью паузы (в тихом режиме)
   const autoRefresh = true; // Новые состояния для интеграции с админ панелью
@@ -616,6 +618,7 @@ export const useRegistrarWorklistData = ({
     paginationInfo,
     stale,
     loadedDate,
+    selectedDate,
     loadAppointments,
     loadMoreAppointments,
   };
