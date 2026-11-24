@@ -27,13 +27,14 @@ const dialogSource = fs.readFileSync(path.join(__dirname, '../EMRConflictDialog.
 const hookSource = fs.readFileSync(path.join(__dirname, '../../../hooks/useEMR.ts'), 'utf8');
 
 describe('EMRContainerV2 lifecycle guards (audit 3886 round 17)', () => {
-    it('EMRAMEND-FE-002: editingDisabled locks amended records and in-flight saves', () => {
+    it('locks finalized records and signing while a background save leaves editing enabled', () => {
         const m = source.match(/const editingDisabled = ([^;]+);/);
         expect(m).not.toBeNull();
         expect(m![1]).toContain('isReadOnly');
         expect(m![1]).toContain('isSigned');
         expect(m![1]).toContain('isAmended');
-        expect(m![1]).toContain('isSaving');
+        expect(m![1]).toContain('isSigning');
+        expect(m![1]).not.toContain('isSaving');
     });
 
     it('EMRAMEND-FE-001: the amend flow has its own reachability flag, not editingDisabled', () => {

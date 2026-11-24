@@ -35,6 +35,7 @@ MAX_PINNED_PER_SECTION = 3
 STALE_MONTHS = 12
 FREQUENCY_THRESHOLD_HIGH = 5
 FREQUENCY_THRESHOLD_LOW = 2
+TEMPLATE_REVISION_CONFLICT = "Шаблон изменён. Откройте актуальную версию."
 
 
 class DoctorSectionTemplatesService:
@@ -242,6 +243,9 @@ class DoctorSectionTemplatesService:
                 is_stale=is_stale(t.last_used_at),
                 last_used_at=t.last_used_at,
                 created_at=t.created_at,
+                reviewed_at=t.reviewed_at,
+                template_revision=t.template_revision,
+                shortcut=t.shortcut,
             )
             for t in templates
         ]
@@ -361,12 +365,32 @@ class DoctorSectionTemplatesService:
             self.db.rollback()
             return False, str(e)
 
+    def review_template(
+        self, doctor_id: int, section_type: str, template_id: str, expected_revision: int, reviewed: bool,
+    ) -> DoctorSectionTemplate | None:
+        template = self.db.execute(
+            select(DoctorSectionTemplate).where(
+                DoctorSectionTemplate.id == template_id,
+                DoctorSectionTemplate.doctor_id == doctor_id,
+                DoctorSectionTemplate.section_type == section_type,
+            ).with_for_update()
+        ).scalar_one_or_none()
+        if template is None or template.template_revision != expected_revision:
+            return None
+        template.reviewed_at = (template.reviewed_at or datetime.now(UTC)) if reviewed else None
+        self.db.commit()
+        self.db.refresh(template)
+        return template
+
     def update_template(
         self,
         doctor_id: int,
         template_id: str,
         new_text: str,
         mode: str = "replace",  # "replace" | "save_as_new"
+        *,
+        shortcut: str | None = None,
+        expected_revision: int | None = None,
     ) -> tuple[DoctorSectionTemplate | None, str]:
         """
         Обновить или создать новый шаблон.
@@ -392,19 +416,29 @@ class DoctorSectionTemplatesService:
                     DoctorSectionTemplate.id == template_id,
                     DoctorSectionTemplate.doctor_id == doctor_id,
                 )
-            )
+            ).with_for_update()
             result = self.db.execute(stmt)
             original = result.scalar_one_or_none()
 
             if not original:
                 return None, "Шаблон не найден"
+            if (
+                expected_revision is not None
+                and original.template_revision != expected_revision
+            ):
+                return None, TEMPLATE_REVISION_CONFLICT
 
             new_hash = DoctorSectionTemplate.compute_hash(new_text)
 
             if mode == "replace":
                 # Update existing template
+                if original.template_text != new_text.strip():
+                    original.template_revision += 1
+                    original.reviewed_at = None
                 original.template_text = new_text.strip()
                 original.template_hash = new_hash
+                if shortcut is not None:
+                    original.shortcut = shortcut or None
                 original.last_used_at = datetime.now(UTC)
                 self.db.commit()
                 self.db.refresh(original)
@@ -438,6 +472,7 @@ class DoctorSectionTemplatesService:
                     icd10_code=original.icd10_code,
                     template_text=new_text.strip(),
                     template_hash=new_hash,
+                    shortcut=shortcut or None,
                     usage_count=1,
                     is_pinned=False,
                     last_used_at=datetime.now(UTC),

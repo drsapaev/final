@@ -612,9 +612,10 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     });
     await page.goto('/lab');
 
-    await queuePatientButton(page, 'Пациент Один').dispatchEvent('click');
+    const queue = page.getByRole('tabpanel', { name: /^Очередь/ });
+    await queue.getByRole('button', { name: /Пациент Один/ }).click();
     await expect.poll(() => instance88GetCount).toBe(1);
-    await queuePatientButton(page, 'Пациент Два').dispatchEvent('click');
+    await queue.getByRole('button', { name: /Пациент Два/ }).click();
 
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     const staleResponse = page.waitForResponse((response) => response.url().includes('/report-instances/88'));
@@ -631,11 +632,20 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     history101ResponseGate = new Promise<void>((resolve) => {
       releaseHistory101Response = resolve;
     });
+    instance88ResponseGate = new Promise<void>((resolve) => {
+      releaseInstance88Response = resolve;
+    });
     await page.goto('/lab');
 
-    await queuePatientButton(page, 'Пациент Один').dispatchEvent('click');
+    const queue = page.getByRole('tabpanel', { name: /^Очередь/ });
+    await queue.getByRole('button', { name: /Пациент Один/ }).click();
+    // Let the appointment start history loading before the report can try to load it.
+    await expect.poll(() => instance88GetCount).toBe(1);
     await expect.poll(() => reportHistoryPatientRequests.includes('101')).toBe(true);
-    await queuePatientButton(page, 'Пациент Два').dispatchEvent('click');
+    releaseInstance88Response?.();
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await page.getByRole('tab', { name: /^Очередь/ }).click();
+    await queue.getByRole('button', { name: /Пациент Два/ }).click();
 
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     const reportsPanel = page.locator('#lab-panel-tabpanel-reports');
@@ -1653,11 +1663,16 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     });
     await page.goto('/lab');
 
-    await queuePatientButton(page, 'Пациент Один').dispatchEvent('click');
+    const queue = page.getByRole('tabpanel', { name: /^Очередь/ });
+    await queue.getByRole('button', { name: /Пациент Один/ }).click();
     await expect.poll(() => templateResolutionPatientRequests.includes('101')).toBe(true);
-    await queuePatientButton(page, 'Пациент Два').dispatchEvent('click');
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await page.getByRole('tab', { name: /^Очередь/ }).click();
+    await queue.getByRole('button', { name: /Пациент Два/ }).click();
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     await expect.poll(() => templateResolutionPatientRequests.includes('102')).toBe(true);
+    const addReport = page.getByRole('button', { name: 'Добавить бланк' });
+    await expect(addReport).toBeVisible();
     const staleResolutionResponse = page.waitForResponse((response) => {
       if (!response.url().endsWith('/api/v1/lab/template-resolutions/resolve')) return false;
       return String(response.request().postDataJSON()?.patient_id ?? '') === '101';
@@ -1666,7 +1681,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await staleResolutionResponse;
     await waitForReactToSettle(page);
 
-    await page.getByRole('button', { name: 'Добавить бланк' }).click();
+    await addReport.click();
     await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
     expect(lastReportInstanceCreatePayload).toMatchObject({
       patient_id: 102,

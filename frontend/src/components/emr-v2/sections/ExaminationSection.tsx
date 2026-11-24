@@ -150,13 +150,13 @@ export function ExaminationSection({
   }, [aiEnabled, onRequestAI]);
 
   // Handle template apply
-  const handleApplyTemplate = useCallback((text: string) => {
+  const handleApplyTemplate = useCallback((text: string, source?: Record<string, unknown>) => {
     if (!text) return;
     const current = value || '';
     const newValue = current.trim() ?
     `${current.trim()}\n\n${text}` :
     text;
-    onChange?.(newValue);
+    onChange?.(newValue, source);
   }, [value, onChange]);
 
   return (

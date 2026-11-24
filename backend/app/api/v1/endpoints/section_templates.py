@@ -13,7 +13,7 @@ Endpoints:
 
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
@@ -24,7 +24,10 @@ from app.models.section_templates import (
     SectionType,
 )
 from app.models.user import User
-from app.services.section_templates_service import DoctorSectionTemplatesService
+from app.services.section_templates_service import (
+    TEMPLATE_REVISION_CONFLICT,
+    DoctorSectionTemplatesService,
+)
 
 router = APIRouter(
     prefix="/section-templates",
@@ -38,6 +41,28 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class TemplateReviewRequest(BaseModel):
+    expected_revision: int = Field(gt=0)
+    reviewed: bool = True
+
+
+@router.post("/{section_type}/{template_id}/review", response_model=DoctorSectionTemplateResponse)
+def review_section_template(
+    section_type: SectionType,
+    template_id: str,
+    payload: TemplateReviewRequest,
+    current_user: User = Depends(deps.get_current_active_user),
+    db: Session = Depends(deps.get_db),
+):
+    service = DoctorSectionTemplatesService(db)
+    template = service.review_template(
+        current_user.id, section_type.value, template_id, payload.expected_revision, payload.reviewed,
+    )
+    if template is None:
+        raise HTTPException(status_code=409, detail="Template unavailable or version changed")
+    return DoctorSectionTemplateResponse.model_validate(template)
+
+
 @router.get(
     "/{section_type}",
     response_model=DoctorSectionTemplatesListResponse,
@@ -47,7 +72,7 @@ async def get_section_templates(
     section_type: str,
     icd10_code: str | None = Query(None, description="ICD-10 code for filtering"),
     limit: int = Query(10, ge=1, le=50),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_user),
     db: Session = Depends(deps.get_db),
 ):
     """
@@ -88,7 +113,7 @@ async def get_section_templates(
 async def pin_template(
     section_type: str,
     template_id: str,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_user),
     db: Session = Depends(deps.get_db),
 ):
     """
@@ -117,7 +142,7 @@ async def pin_template(
 async def unpin_template(
     section_type: str,
     template_id: str,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_user),
     db: Session = Depends(deps.get_db),
 ):
     """Открепить шаблон."""
@@ -137,12 +162,13 @@ async def unpin_template(
     "/{section_type}/{template_id}",
     response_model=DoctorSectionTemplateResponse,
     summary="Update template",
+    responses={409: {"description": "The selected template revision has changed"}},
 )
 async def update_template(
     section_type: str,
     template_id: str,
     body: DoctorSectionTemplateUpdate,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_user),
     db: Session = Depends(deps.get_db),
 ):
     """
@@ -158,21 +184,17 @@ async def update_template(
         template_id=template_id,
         new_text=body.new_text,
         mode=body.mode,
+        shortcut=body.shortcut,
+        expected_revision=body.expected_revision,
     )
 
     if not template:
-        raise HTTPException(status_code=400, detail=message)
+        raise HTTPException(
+            status_code=409 if message == TEMPLATE_REVISION_CONFLICT else 400,
+            detail=message,
+        )
 
-    return DoctorSectionTemplateResponse(
-        id=template.id,
-        section_type=template.section_type,
-        icd10_code=template.icd10_code,
-        template_text=template.template_text,
-        usage_count=template.usage_count,
-        is_pinned=template.is_pinned,
-        last_used_at=template.last_used_at,
-        created_at=template.created_at,
-    )
+    return DoctorSectionTemplateResponse.model_validate(template)
 
 
 @router.delete(
@@ -183,7 +205,7 @@ async def update_template(
 async def delete_template(
     section_type: str,
     template_id: str,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_user),
     db: Session = Depends(deps.get_db),
 ):
     """Удалить шаблон."""

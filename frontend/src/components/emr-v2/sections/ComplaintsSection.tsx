@@ -33,7 +33,7 @@ import { useTranslation } from '@/i18n/useTranslation';
  */
 interface ComplaintsSectionProps {
   value?: string;
-  onChange?: ((value: string) => void) | undefined;
+  onChange?: ((value: string, source?: Record<string, unknown>) => void) | undefined;
   disabled?: boolean;
   required?: boolean;
   defaultOpen?: boolean;
@@ -99,13 +99,13 @@ export function ComplaintsSection({
     }, [doctorId, specialty]);
 
     // Handle template apply
-    const handleApplyTemplate = useCallback((text: string) => {
+    const handleApplyTemplate = useCallback((text: string, source?: Record<string, unknown>) => {
         if (!text) return;
         const current = value || '';
         const newValue = current.trim()
             ? `${current.trim()}, ${text}`
             : text;
-        onChange?.(newValue);
+        onChange?.(newValue, source);
     }, [value, onChange]);
 
     return (

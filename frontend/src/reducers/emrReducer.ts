@@ -125,18 +125,26 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
         // SET_FIELD - Update single field
         // =========================================================================
         case EMR_ACTIONS.SET_FIELD: {
-            const { field, value } = action.payload;
+            const { field, value, source } = action.payload;
 
             if (state.data[field] === value) {
                 return state;
             }
 
+            const data = { ...state.data, [field]: value };
+            if (source?.source === 'section_template' || source?.source === 'template') {
+                const sources = Array.isArray(state.data.content_sources) ? state.data.content_sources : [];
+                data.content_sources = [...sources, {
+                    field,
+                    source: source.source,
+                    template_id: source.templateId,
+                    template_revision: source.templateRevision ?? 1,
+                    inserted_at: new Date().toISOString(),
+                }];
+            }
             return {
                 ...state,
-                data: {
-                    ...state.data,
-                    [field]: value,
-                },
+                data,
                 isDirty: true,
                 // EMRSAVE-FE-001: a local edit invalidates any in-flight
                 // save ACK — the ACK for the older snapshot must not clear
@@ -193,6 +201,9 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
             return applyEmrTransition({
                 ...state,
                 emr,
+                data: !editsAfterSaveStart && emr.data?.follow_up
+                    ? { ...state.data, follow_up: emr.data.follow_up }
+                    : state.data,
                 version: emr.version ?? state.version,
                 rowVersion: emr.row_version ?? state.rowVersion,
                 isDirty: editsAfterSaveStart ? true : false,
@@ -349,9 +360,9 @@ export const emrActions = {
         payload: { emr },
     }),
 
-    setField: (field: string, value: unknown): EmrAction => ({
+    setField: (field: string, value: unknown, source?: Record<string, unknown>): EmrAction => ({
         type: EMR_ACTIONS.SET_FIELD,
-        payload: { field, value },
+        payload: { field, value, source },
     }),
 
     setNestedField: (path: string, value: unknown): EmrAction => ({

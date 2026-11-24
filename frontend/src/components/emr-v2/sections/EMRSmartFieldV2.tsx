@@ -10,12 +10,12 @@
  * IDE-like behavior:
  * - Shows AI button when field has content
  * - Click AI button → show suggestion popover
- * - Keyboard: Tab to accept first suggestion
+ * - Keyboard: Alt+Enter to accept a displayed suggestion
  * 
  * ⚠️ EXPERIMENTAL: Advanced Ghost Mode (Opt-in)
  * - Enables inline ghost text for rapid entry
  * - "AI draft – not yet committed" visual marker
- * - Explicit commit required (Tab/Enter)
+ * - Explicit commit required
  */
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
@@ -268,22 +268,7 @@ export function EMRSmartFieldV2({
         }
     }, [hasSuggestions, isFocused, showPopover, experimentalGhostMode, suggestions, visibleSuggestions, value]);
 
-    // Keyboard: Tab to accept first suggestion
-    useEffect(() => {
-        if (!showPopover || visibleSuggestions.length === 0) return;
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Tab' && !e.shiftKey && document.activeElement === fieldRef.current) {
-                e.preventDefault();
-                const first = visibleSuggestions[0] as EMRSmartFieldV2Suggestion;
-                handleApply(first);
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [showPopover, visibleSuggestions, handleApply]);
-
+    const { t } = useTranslation();
     const InputComponent = multiline ? 'textarea' : 'input';
 
     return (
@@ -306,6 +291,13 @@ export function EMRSmartFieldV2({
                     rows={multiline ? rows : undefined}
                     aria-label={label || undefined}
                     aria-required={required ? true : undefined}
+                    aria-keyshortcuts={showPopover && visibleSuggestions.length ? 'Alt+Enter' : undefined}
+                    onKeyDown={event => {
+                        if (!disabled && showPopover && visibleSuggestions[0] && event.altKey && event.key === 'Enter') {
+                            event.preventDefault();
+                            handleApply(visibleSuggestions[0] as EMRSmartFieldV2Suggestion);
+                        }
+                    }}
                 />
 
                 {/* Ghost Text Overlay */}
@@ -343,6 +335,9 @@ export function EMRSmartFieldV2({
                     position="bottom"
                     anchorRef={containerRef}
                 />
+            )}
+            {showPopover && visibleSuggestions.length > 0 && (
+                <div className="emr-smart-field-v2__hint">{t('emr_workspace.suggestion_shortcut')}</div>
             )}
 
             {/* Hint when focused with suggestions */}

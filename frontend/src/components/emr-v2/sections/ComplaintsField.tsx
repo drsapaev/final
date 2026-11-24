@@ -227,8 +227,8 @@ const ComplaintsField = ({
             return;
         }
 
-        // Enter or Tab to accept selected suggestion
-        if ((e.key === 'Enter' && e.altKey) || (e.key === 'Tab' && aiSuggestions.length > 0)) {
+        // Alt+Enter accepts the selected suggestion
+        if (e.key === 'Enter' && e.altKey && aiSuggestions.length > 0) {
             e.preventDefault();
             handleAcceptSuggestion(aiSuggestions[selectedIndex]);
             return;

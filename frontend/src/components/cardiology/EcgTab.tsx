@@ -13,7 +13,7 @@
 import { Plus } from 'lucide-react';
 import { Button } from '../ui/macos';
 import ECGViewer from './ECGViewer';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import EchoForm from './EchoForm';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -29,12 +29,22 @@ export function EcgTab({
   onAddEcg,
   onDataUpdate,
   getSpacing,
+  focusStudy,
+  onReturn,
 }: {
   selectedPatient: Record<string, unknown> | null;
   onAddEcg: () => void;
   onDataUpdate: () => void;
   getSpacing: (key: string) => string;
+  focusStudy?: 'ecg' | 'echo';
+  onReturn?: () => void;
 }) {
+  const { t } = useTranslation();
+  const ecgRef = useRef<HTMLElement>(null);
+  const echoRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (focusStudy) (focusStudy === 'echo' ? echoRef : ecgRef).current?.focus();
+  }, [focusStudy]);
   if (!selectedPatient) {
     return null;
   }
@@ -58,22 +68,27 @@ export function EcgTab({
       gap: getSpacing('xl'),
     }}>
       <div className="flex justify-end">
+        {onReturn && <Button type="button" variant="outline" onClick={onReturn}>{t('emr_workspace.return_emr')}</Button>}
         <Button onClick={onAddEcg}>
           <Plus size={16} className="cardio-icon-mr" /> Добавить ЭКГ
         </Button>
       </div>
+      <section ref={ecgRef} tabIndex={-1} aria-label={t('misc.cs_tab_ecg')}>
       <ECGViewer
         key={`ecg-viewer-${ownerKey}`}
         visitId={visitIdentity}
         patientId={patientIdentity}
         onDataUpdate={onDataUpdate}
       />
+      </section>
+      <section ref={echoRef} tabIndex={-1} aria-label={t('misc.cs_tab_echo')}>
       <EchoForm
         key={`echo-form-${ownerKey}`}
         visitId={visitIdentity}
         patientId={patientIdentity}
         onDataUpdate={onDataUpdate}
       />
+      </section>
     </div>
   );
 }

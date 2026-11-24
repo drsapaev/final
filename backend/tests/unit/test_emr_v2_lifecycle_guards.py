@@ -26,13 +26,18 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
+from sqlalchemy import event
+from sqlalchemy.dialects import postgresql
 
 from app.core.security import get_password_hash
+from app.models.audit import AuditLog
 from app.models.clinic import Doctor
+from app.models.emr_v2 import EMRAuditLog
 from app.models.patient import Patient
 from app.models.user import User
+from app.models.user_profile import UserAuditLog
 from app.models.visit import Visit
-from app.services.emr_v2_service import ConcurrencyError, EMRSignedError
+from app.services.emr_v2_service import ConcurrencyError, EMRSignedError, emr_v2_service
 
 pytestmark = pytest.mark.unit
 
@@ -192,7 +197,7 @@ def test_amended_emr_rejects_resign(client, db_session):
     )
 
 
-def test_second_amendment_is_the_sanctioned_path(client, db_session):
+def test_second_amendment_is_the_sanctioned_path(client, db_session, caplog):
     """EMRAMEND-FE-002: a repeat reasoned amendment on an amended record is
     allowed and stays versioned/audited (documented repeat-amend pathway)."""
     visit, user = _mk_visit(db_session, "amd_twice")
@@ -211,14 +216,155 @@ def test_second_amendment_is_the_sanctioned_path(client, db_session):
     assert r.status_code == 200
     rv = r.json()["row_version"]
 
-    r2 = _amend(
-        client, headers, visit.id,
-        {"complaints": "v1 corrected again", "specialty": "therapy"},
-        "Second correction after lab review", rv,
-    )
+    reason = "SYNTHETIC-AUDIT-PRIVATE-AMENDMENT"
+    with caplog.at_level("INFO", logger="app.services.emr_v2_service"):
+        r2 = _amend(
+            client, headers, visit.id,
+            {"complaints": "v1 corrected again", "specialty": "therapy"},
+            reason, rv,
+        )
     assert r2.status_code == 200, r2.text
     assert r2.json()["status"] == "amended"
     assert r2.json()["version"] > r.json()["version"]
+    amended = r2.json()
+    assert reason not in caplog.text
+    audit = (
+        db_session.query(EMRAuditLog)
+        .filter_by(emr_id=amended["id"], action="amend")
+        .order_by(EMRAuditLog.id.desc())
+        .first()
+    )
+    assert audit.extra_data == {
+        "version": amended["version"],
+        "reason_present": True,
+        "fields_changed": ["complaints"],
+        "other_fields_changed": 0,
+    }
+    revision = client.get(
+        f"/api/v1/v2/emr/{visit.id}/version/{amended['version']}", headers=headers
+    )
+    assert revision.status_code == 200, revision.text
+    assert reason in revision.json()["change_summary"]
+
+
+def test_revision_reads_audit_snapshots_and_comparison_without_clinical_values(client, db_session):
+    visit, user = _mk_visit(db_session, "audit_revision")
+    headers = _login(client, user.username)
+    first = _save(client, headers, visit.id, {"notes": "SYNTHETIC-ORIGINAL"}, 0, "audit")
+    assert first.status_code == 200, first.text
+    record = first.json()
+    second = _save(
+        client, headers, visit.id, {"notes": "SYNTHETIC-NEWER"}, record["row_version"], "audit"
+    )
+    assert second.status_code == 200, second.text
+
+    response = client.get(
+        f"/api/v1/v2/emr/{visit.id}/version/{record['version']}", headers=headers
+    )
+    assert response.status_code == 200, response.text
+    revision = response.json()
+    assert revision["data"]["notes"] == "SYNTHETIC-ORIGINAL"
+
+    old_version = record["version"]
+    new_version = second.json()["version"]
+    history = client.get(f"/api/v1/v2/emr/{visit.id}/history?limit=1", headers=headers)
+    assert history.status_code == 200, history.text
+    assert [item["version"] for item in history.json()["revisions"]] == [new_version]
+
+    diff_url = f"/api/v1/v2/emr/{visit.id}/diff?v1={old_version}"
+    diff = client.get(f"{diff_url}&v2={new_version}", headers=headers)
+    assert diff.status_code == 200, diff.text
+    assert "SYNTHETIC-ORIGINAL" in diff.text
+    assert "SYNTHETIC-NEWER" in diff.text
+    missing_diff = client.get(f"{diff_url}&v2={new_version + 1}", headers=headers)
+    assert missing_diff.status_code == 400, missing_diff.text
+
+    audit = (
+        db_session.query(AuditLog)
+        .filter_by(
+            event_type="DOCTOR_OPEN_EMR", action="view", resource_type="emr",
+            resource_id=str(record["id"]), actor_user_id=user.id,
+        )
+        .order_by(AuditLog.id)
+        .all()
+    )
+    assert [entry.payload for entry in audit] == [
+        {"revision_id": revision["id"], "version": old_version},
+        {
+            "current_version": new_version, "revision_count": 1,
+            "newest_version": new_version, "oldest_version": new_version,
+        },
+        {"version_from": old_version, "version_to": new_version, "change_count": 1},
+    ]
+    assert all(entry.subject_patient_id == visit.patient_id for entry in audit)
+    assert all(entry.reason_code == {"context": "visit", "id": visit.id} for entry in audit)
+
+
+def test_patient_emr_list_audits_only_records_visible_to_the_doctor(client, db_session):
+    visit, user = _mk_visit(db_session, "audit_patient_list")
+    other_visit, other_user = _mk_visit(db_session, "audit_patient_other_owner")
+    other_visit.patient_id = visit.patient_id
+    db_session.commit()
+    headers = _login(client, user.username)
+    other_headers = _login(client, other_user.username)
+    list_url = f"/api/v1/v2/emr/patient/{visit.patient_id}"
+    other = _save(client, other_headers, other_visit.id, {"notes": "SYNTHETIC-PRIVATE"}, 0, "other")
+    assert other.status_code == 200, other.text
+    empty = client.get(list_url, headers=headers)
+    assert empty.status_code == 200
+    assert empty.json() == []
+
+    saved = _save(client, headers, visit.id, {"diagnosis": "SYNTHETIC-DIAGNOSIS"}, 0, "list")
+    assert saved.status_code == 200, saved.text
+    visible = client.get(list_url, headers=headers)
+    assert visible.status_code == 200, visible.text
+    assert [entry["id"] for entry in visible.json()] == [saved.json()["id"]]
+    assert visible.json()[0]["diagnosis_main"] == "SYNTHETIC-DIAGNOSIS"
+    audit = db_session.query(AuditLog).filter_by(
+        event_type="DOCTOR_OPEN_EMR", action="view", resource_type="emr", actor_user_id=user.id,
+    ).one()
+    assert audit.subject_patient_id == visit.patient_id
+    assert audit.resource_id is None
+    assert audit.payload == {"record_count": 1}
+
+
+def test_save_audit_retains_versions_and_field_names_without_clinical_data(client, db_session):
+    visit, user = _mk_visit(db_session, "audit_save")
+    headers = _login(client, user.username)
+    first = _save(
+        client, headers, visit.id,
+        {"notes": "SYNTHETIC-PREVIOUS-CONTENT", "follow_up": {"changes": "SYNTHETIC-PREVIOUS-FOLLOW-UP"}},
+        0, "audit-save",
+    )
+    assert first.status_code == 200, first.text
+    record = first.json()
+    second = _save(
+        client, headers, visit.id,
+        {"notes": "SYNTHETIC-NEXT-CONTENT", "follow_up": {"changes": "SYNTHETIC-NEXT-FOLLOW-UP"},
+         "SYNTHETIC-EXTENSION-KEY": "SYNTHETIC-EXTENSION-CONTENT"},
+        record["row_version"], "audit-save",
+    )
+    assert second.status_code == 200, second.text
+    audits = db_session.query(UserAuditLog).filter_by(
+        resource_type="emr", resource_id=record["id"],
+    ).order_by(UserAuditLog.id).all()
+    created, edited = audits
+    assert created.action == "CREATE"
+    assert created.old_values is None
+    assert created.new_values["version"] == record["version"]
+    assert edited.action == "UPDATE"
+    assert edited.old_values == {
+        "version": record["version"], "row_version": record["row_version"], "status": "draft",
+    }
+    assert edited.new_values == {
+        "version": second.json()["version"], "row_version": second.json()["row_version"],
+        "status": "draft", "fields_changed": ["follow_up", "notes"], "other_fields_changed": 1,
+    }
+    assert "SYNTHETIC-" not in str(created.new_values)
+    emr_audit = db_session.query(EMRAuditLog).filter_by(emr_id=record["id"], action="update").one()
+    assert emr_audit.extra_data == {
+        "version": second.json()["version"], "fields_changed": ["follow_up", "notes"], "other_fields_changed": 1,
+    }
 
 
 # ────────────────── EMRRESTORE-FE-001: restore policy ──────────────────
@@ -326,12 +472,20 @@ def test_unsigned_restore_with_reason_and_version_succeeds(client, db_session):
     assert r.status_code == 200
     rv = r.json()["row_version"]
 
-    r = _restore(
-        client, headers, visit.id, 1, rv,
-        "Restoring the pre-edit clinical text",
-    )
+    reason = "SYNTHETIC-AUDIT-PRIVATE-RESTORE"
+    r = _restore(client, headers, visit.id, 1, rv, reason)
     assert r.status_code == 200, r.text
-    assert r.json()["data"]["complaints"] == "v1"
+    restored = r.json()
+    assert restored["data"]["complaints"] == "v1"
+    audit = db_session.query(EMRAuditLog).filter_by(emr_id=restored["id"], action="restore").one()
+    assert audit.extra_data == {
+        "from_version": 1, "to_version": restored["version"], "reason_present": True,
+    }
+    revision = client.get(
+        f"/api/v1/v2/emr/{visit.id}/version/{restored['version']}", headers=headers
+    )
+    assert revision.status_code == 200, revision.text
+    assert reason in revision.json()["change_summary"]
 
 
 # ────────────────── EMRRESTORE-FE-002: optimistic locking ──────────────────
@@ -416,6 +570,113 @@ def test_same_session_identical_retry_is_idempotent_noop(client, db_session):
     assert second["version"] == first["version"], (
         "identical duplicate retry must not create a new revision"
     )
+
+
+def test_same_session_stale_version_cannot_sign_or_promote_matching_draft(client, db_session):
+    visit, user = _mk_visit(db_session, "stale_sign")
+    headers = _login(client, user.username)
+    session = "same-session-sign-order"
+    initial = _save(client, headers, visit.id, {"notes": "SYNTHETIC-INITIAL"}, 0, session)
+    assert initial.status_code == 200, initial.text
+    stale_version = initial.json()["row_version"]
+    data = {"notes": "SYNTHETIC-UPDATED"}
+    current = _save(client, headers, visit.id, data, stale_version, session)
+    assert current.status_code == 200, current.text
+
+    sign = _sign(client, headers, visit.id, data, stale_version, session)
+    assert sign.status_code == 409, sign.text
+    assert sign.json()["detail"]["error"] == "CONFLICT"
+    finalize = _save(client, headers, visit.id, data, stale_version, session, draft=False)
+    assert finalize.status_code == 409, finalize.text
+    saved = client.get(f"/api/v1/v2/emr/{visit.id}", headers=headers).json()
+    assert saved["row_version"] == current.json()["row_version"]
+    assert saved["status"] == "draft"
+    assert saved["signed_at"] is None
+
+
+def test_emr_lifecycle_writes_lock_visit_before_record(db_session):
+    visit, user = _mk_visit(db_session, "write_lock")
+    locking_reads = []
+    dialect = postgresql.dialect()
+
+    @event.listens_for(db_session, "do_orm_execute")
+    def capture_lock(execution):
+        if execution.is_select:
+            statement = str(execution.statement.compile(dialect=dialect))
+            if "FOR UPDATE" in statement:
+                locking_reads.append(statement.split("FROM ", 1)[1].split()[0])
+
+    data = {"notes": "SYNTHETIC-NOTE"}
+    emr = emr_v2_service.save(db_session, visit.id, data, user.id)
+    emr = emr_v2_service.save(db_session, visit.id, data, user.id, emr.row_version)
+    emr = emr_v2_service.restore(
+        db_session, visit.id, target_version=1, user_id=user.id,
+        row_version=emr.row_version, reason="SYNTHETIC revision restore",
+    )
+    emr = emr_v2_service.sign(db_session, visit.id, data, user.id, emr.row_version)
+    emr_v2_service.amend(
+        db_session, visit.id, data, "SYNTHETIC amendment", user.id, emr.row_version
+    )
+    emr_v2_service.get_by_visit(db_session, visit.id)
+
+    assert locking_reads == ["visits", "emr_records"] * 5
+
+
+@pytest.mark.parametrize("operation", ("save", "mobile_save", "sign", "amend", "restore"))
+def test_emr_write_checks_current_visit_owner(client, db_session, operation):
+    visit, user = _mk_visit(db_session, f"reassigned_{operation}")
+    visit_id = visit.id
+    headers = _login(client, user.username)
+    initial = {"notes": "SYNTHETIC-ORIGINAL"}
+    saved = _save(client, headers, visit_id, initial, 0, "reassignment")
+    assert saved.status_code == 200, saved.text
+    if operation == "amend":
+        saved = _sign(client, headers, visit_id, initial, saved.json()["row_version"], "reassignment")
+        assert saved.status_code == 200, saved.text
+    row_version = saved.json()["row_version"]
+
+    db_session.refresh(visit)
+    db_session.execute(Visit.__table__.update().where(Visit.id == visit_id).values(doctor_id=None))
+    assert visit.doctor_id is not None
+
+    url = f"/api/v1/v2/emr/{visit_id}"
+    payload = {"data": {"notes": "SYNTHETIC-EDIT"}, "row_version": row_version}
+    if operation == "mobile_save":
+        url = f"/api/v1/emr/{visit_id}"
+    elif operation != "save":
+        url += f"/{operation}"
+    if operation in {"amend", "restore"}:
+        payload["reason"] = "SYNTHETIC reason for correction"
+    if operation == "restore":
+        payload = {"target_version": 1, "row_version": row_version, "reason": payload["reason"]}
+
+    response = client.post(url, headers=headers, json=payload)
+    assert response.status_code == 403, response.text
+    current = emr_v2_service.get_by_visit(db_session, visit_id)
+    assert current.row_version == row_version
+    assert current.data["notes"] == initial["notes"]
+
+
+def test_inactive_emr_account_cannot_use_canonical_or_mobile_route(client, db_session):
+    visit, user = _mk_visit(db_session, "inactive_account")
+    visit_id = visit.id
+    headers = _login(client, user.username)
+    payload = {"data": {"notes": "SYNTHETIC-ORIGINAL"}, "row_version": 0}
+    saved = client.post(f"/api/v1/v2/emr/{visit_id}", headers=headers, json=payload)
+    assert saved.status_code == 200, saved.text
+    payload["row_version"] = saved.json()["row_version"]
+    payload["data"]["notes"] = "SYNTHETIC-EDIT"
+
+    user.is_active = False
+    db_session.commit()
+    for prefix in ("/api/v1/v2/emr", "/api/v1/emr"):
+        url = f"{prefix}/{visit_id}"
+        assert client.get(url, headers=headers).status_code == 403
+        assert client.post(url, headers=headers, json=payload).status_code == 403
+
+    current = emr_v2_service.get_by_visit(db_session, visit_id)
+    assert current.row_version == saved.json()["row_version"]
+    assert current.data["notes"] == "SYNTHETIC-ORIGINAL"
 
 
 def test_cross_session_stale_write_still_conflicts(client, db_session):

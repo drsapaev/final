@@ -43,6 +43,18 @@
     white-space: nowrap;
 }
 
+.emr-vitals__row--measurements {
+    align-items: flex-end;
+}
+
+.emr-vitals__row--measurements .emr-vitals__field {
+    min-width: min(8rem, 100%);
+}
+
+.emr-vitals__row--measurements label {
+    white-space: normal;
+}
+
 .emr-vitals__field input {
     width: 100%;
     padding: 4px 8px;

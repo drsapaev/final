@@ -12,8 +12,10 @@ import { useTranslation } from '../../i18n/useTranslation';
  * - Sticky header
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useId, useRef } from 'react';
 import { useEMR } from '../../hooks/useEMR';
+import { useEMRWorkspace } from '../../hooks/useEMRWorkspace';
+import type { FollowUp } from '../../api/emrWorkspace';
 import { useEMRAutosave } from '../../hooks/useEMRAutosave';
 import { useEMRLeaveGuard } from '../../hooks/useEMRLeaveGuard';
 import { isRejectedEMRWrite } from './emrWriteResult';
@@ -33,7 +35,7 @@ import { useAppData } from '../../contexts/AppDataContext';
 // ADR-0015: use useMcpClient hook instead of importing api/mcpClient directly.
 import { useMcpClient } from '../../hooks/useMcpClient';
 import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecialty';
-import { readSavedEMRForCompletion, emrTextValue, emrTreatmentText } from './emrCompletion';
+import { readSavedEMRForCompletion, emrTextValue } from './emrCompletion';
 import { assertMedicalAiSafety, hasMedicalAiSafety } from '../../utils/aiSafety';
 // Analytics is handled via handleTelemetry callback
 
@@ -61,13 +63,19 @@ import type { DermatologyCosmeticProcedureRecord } from './sections/specialty/De
 // Previously doctors had no way to see LabReportInstance data; cardiologist
 // had a separate manual-entry CardioBloodTest table, derma/dental had nothing.
 import LabResultsSection from './sections/LabResultsSection';
+import VitalsWidget from './sections/VitalsWidget';
+import { FollowUpEditor, WorkspaceSidePanel } from './workspace/VisitHistory';
+import { PrescriptionAction } from './workspace/PrescriptionAction';
+import { DocumentPreview } from './workspace/DocumentPreview';
+import { FieldDictation } from './workspace/FieldDictation';
 
 import './EMRContainerV2.css';
+import './workspace/EMRWorkspace.css';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 // QW-03 (UX audit): replace native alert() in Ghost Mode with notify.warning.
 import notify from '../../services/notify';
-import { Button } from '../ui/macos';
+import { Button, Modal, Textarea } from '../ui/macos';
 import logger from '../../utils/logger';
 
 // QW-04 (UX audit): replace emoji toolbar buttons with lucide-react icons
@@ -116,6 +124,7 @@ interface EMRContainerV2Props {
     ICD10Component?: React.ComponentType<Record<string, unknown>> | null;
     onPersisted?: () => void | Promise<void>;
     onDirtyChange?: (dirty: boolean) => void;
+    onOpenCardiacStudy?: (study: 'ecg' | 'echo') => void;
 }
 
 interface EMRDataShape {
@@ -130,7 +139,7 @@ interface EMRDataShape {
     icd10_code?: string;
     specialty?: string;
     vitals?: Record<string, unknown>;
-    medications?: { text?: string; list?: unknown[] };
+    medications?: { text?: string; list?: unknown[]; [key: string]: unknown } | unknown[];
     specialty_data?: Record<string, unknown>;
     patient_age?: string | number;
     patient_gender?: string;
@@ -174,7 +183,7 @@ export async function persistEMRAndRefresh(
 export async function persistAndSignEMR(actions: {
     confirm: () => Promise<boolean>;
     save: (options: Record<string, unknown>) => Promise<unknown>;
-    sign: (options: { rowVersion: number }) => Promise<unknown>;
+    sign: (options: { rowVersion: number; data?: Record<string, unknown> }) => Promise<unknown>;
     onPersisted?: () => void | Promise<void>;
 }): Promise<PersistAndSignResult> {
     let confirmed: boolean;
@@ -204,7 +213,8 @@ export async function persistAndSignEMR(actions: {
     };
 
     try {
-        const signed = await actions.sign({ rowVersion });
+        const savedData = (saved as { data?: Record<string, unknown> }).data;
+        const signed = await actions.sign(savedData ? { rowVersion, data: savedData } : { rowVersion });
         await refreshStatus();
         return isRejectedEMRWrite(signed) ? 'sign_failed' : 'sign_attempted';
     } catch {
@@ -238,7 +248,7 @@ export async function signSavedEMR(actions: {
 }
 
 interface EMRHookResult {
-    emr: { id?: string | number; status?: string } | null;
+    emr: { id?: string | number; visit_id?: number; patient_id?: number; status?: string; data?: Record<string, unknown>; signed_at?: string; signed_by?: number } | null;
     data: EMRDataShape | null;
     status: string;
     isDirty: boolean;
@@ -259,9 +269,9 @@ interface EMRHookResult {
     canRedo: boolean;
     loadEMR: (forceRefresh?: boolean) => Promise<unknown>;
     saveEMR: (opts?: Record<string, unknown>) => Promise<unknown>;
-    signEMR: (opts?: { rowVersion?: number }) => Promise<unknown>;
-    amendEMR: (reason: string, opts?: Record<string, unknown>) => Promise<unknown>;
-    setField: (field: string, value: unknown) => void;
+    signEMR: (opts?: { rowVersion?: number; data?: Record<string, unknown> }) => Promise<unknown>;
+    amendEMR: (reason: string, opts?: { data?: Record<string, unknown> }) => Promise<unknown>;
+    setField: (field: string, value: unknown, source?: Record<string, unknown>) => void;
     setNestedField: (path: string, value: unknown) => void;
     undo: () => void;
     redo: () => void;
@@ -271,6 +281,7 @@ interface EMRHookResult {
 export function EMRContainerV2({
     visitId,
     patientId = null,
+    patientName,
     specialty,
     isReadOnly = false,
     completionBusy = false,
@@ -279,6 +290,7 @@ export function EMRContainerV2({
     ICD10Component = null,
     onPersisted,
     onDirtyChange,
+    onOpenCardiacStudy,
 }: EMRContainerV2Props) {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
@@ -287,6 +299,8 @@ export function EMRContainerV2({
     // ADR-0015: MCP API accessed via hook, not direct import.
     const mcpAPI = useMcpClient();
     const canonicalSpecialty = normalizeSpecialty(specialty);
+    const workspaceState = useEMRWorkspace(visitId, patientId);
+    const workspace = workspaceState.status === 'ready' ? workspaceState.data : undefined;
     const {
         emr,
         data,
@@ -315,17 +329,24 @@ export function EMRContainerV2({
         redo,
         reloadFromServer,
     } = useEMR(visitId, { specialty: canonicalSpecialty }) as EMRHookResult;
+    const storedMedications = data?.medications;
+    const legacyMedicationList = Array.isArray(storedMedications);
+    const medicationSection = legacyMedicationList ? { list: storedMedications } : storedMedications;
+    const medications = Array.isArray(medicationSection?.list) ? medicationSection.list : [];
+    const followUp = data?.follow_up && typeof data.follow_up === 'object' ? data.follow_up as FollowUp : {};
     const [isPreparingCompletion, setIsPreparingCompletion] = useState(false);
-    const completionScopeRef = useRef({ visitId, active: true });
-    // EMRSIGN-FE-001 + EMRAMEND-FE-002 (audit 3886 round 17): `isSaving` now
-    // locks field editing for the whole save→sign transaction so the doctor
-    // cannot type text B while the save of text A is in flight — the signed
-    // revision must equal the latest explicitly approved clinical snapshot.
-    // `isAmended` joins `isSigned` because an amended record is a finalized
-    // state whose ordinary fields must never be editable through the plain
-    // save/sign UI (the reasoned amendment flow is the only sanctioned
-    // correction pathway — see `amendAllowed` below).
-    const editingDisabled = isReadOnly || isSigned || isAmended || isPreparingCompletion || completionBusy || isSaving;
+    const [isSigning, setIsSigning] = useState(false);
+    const signingScopeRef = useRef<object | null>(null);
+    const completionScopeRef = useRef({ visitId, patientId, active: true });
+    const editingDisabled = isReadOnly || isSigned || isAmended || isPreparingCompletion || completionBusy || isSigning || accessDenied;
+    // Issuing a separate prescription does not edit the signed document.
+    const prescriptionBlocked = isSigned || isAmended
+        ? isReadOnly || isPreparingCompletion || completionBusy || isSigning || accessDenied
+            || isLoading || serverFinalized || !workspace || !emr?.id || !version || version <= 0
+            || workspace.visit.id !== emr.visit_id || workspace.patient.id !== emr.patient_id
+            || String(workspace.visit.id) !== String(visitId) || String(workspace.patient.id) !== String(patientId)
+            || (workspace.visit.status !== 'open' && workspace.visit.status !== 'in_progress')
+        : editingDisabled;
     // EMRAMEND-FE-001 (audit 3886 round 17): the amendment workflow must be
     // REACHABLE on the very records it exists for (signed, and — after round
     // 16 — amended ones eligible for a repeat reasoned correction). The old
@@ -339,8 +360,10 @@ export function EMRContainerV2({
     // container must render the amendment branch for exactly that window
     // (the stale-local draft is preserved; the reasoned amendment is the
     // sanctioned pathway onto the server's signed record).
-    const amendAllowed = (isSigned || isAmended || serverFinalized) && !isReadOnly && !isPreparingCompletion && !completionBusy;
+    const amendAllowed = (isSigned || isAmended || serverFinalized) && !isReadOnly && !isPreparingCompletion && !completionBusy && !accessDenied;
     const savedEMRStatus = String(emr?.status ?? '').trim().toLowerCase();
+    const saveActionId = useId();
+    const requiresSave = isDirty || !emr?.id || savedEMRStatus === 'draft';
     const canSignReadOnly = isReadOnly
         && Boolean(emr?.id)
         && savedEMRStatus !== ''
@@ -356,12 +379,12 @@ export function EMRContainerV2({
         && rowVersion > 0;
 
     useEffect(() => {
-        const scope = { visitId, active: true };
+        const scope = { visitId, patientId, active: true };
         completionScopeRef.current = scope;
         return () => {
             scope.active = false;
         };
-    }, [visitId]);
+    }, [visitId, patientId]);
 
     // Get current user (doctor) for history/AI suggestions
     const { currentUser } = useAppData() as { currentUser?: { id?: string | number | null } };
@@ -376,7 +399,7 @@ export function EMRContainerV2({
         saveEMR,
         debounceMs: DEBOUNCE.autosave,
         maxWaitMs: 30000,
-        enabled: !editingDisabled && !accessDenied,
+        enabled: Boolean(emr) && !editingDisabled && !accessDenied,
     });
 
     // RETRO-3971-04 residual (post-merge re-review of 4009): the unmount
@@ -421,6 +444,11 @@ export function EMRContainerV2({
     const [showDiff, setShowDiff] = useState(false);
     const [amendReason, setAmendReason] = useState('');
     const [showAmendForm, setShowAmendForm] = useState(false);
+    const [amendField, setAmendField] = useState<'complaints' | 'examination' | 'recommendations' | 'notes'>('notes');
+    const [amendPatch, setAmendPatch] = useState<Record<string, string>>({});
+    const [amendError, setAmendError] = useState(false);
+    const amending = useRef(false);
+    const [showPreview, setShowPreview] = useState(false);
     const [experimentalGhostMode, setExperimentalGhostMode] = useState(false);
 
     // AI Suggestions state — keyed by EMR field name (examination/diagnosis/treatment).
@@ -749,9 +777,9 @@ export function EMRContainerV2({
     };
 
     // Field change handlers
-    const handleFieldChange = useCallback((field: string) => (value: unknown) => {
-        setField(field, value);
-    }, [setField]);
+    const handleFieldChange = useCallback((field: string) => (value: unknown, source?: Record<string, unknown>) => {
+        if (!editingDisabled && signingScopeRef.current !== completionScopeRef.current) setField(field, value, source);
+    }, [editingDisabled, setField]);
 
     const handleNestedFieldChange = useCallback((path: string) => (value: unknown) => {
         setNestedField(path, value);
@@ -795,7 +823,11 @@ export function EMRContainerV2({
 
     // Actions
     const handleSign = useCallback(async () => {
-        if ((isReadOnly && !canSignReadOnly) || isPreparingCompletion || completionBusy) return;
+        const scope = completionScopeRef.current;
+        if ((isReadOnly && !canSignReadOnly) || isPreparingCompletion || completionBusy
+            || isSaving || signingScopeRef.current === scope || accessDenied || conflict) return;
+        signingScopeRef.current = scope;
+        setIsSigning(true);
         const confirmSigning = () => confirm({
             title: t('misc.emr_sign_title'),
             message: t('misc.emr_sign_message'),
@@ -808,14 +840,23 @@ export function EMRContainerV2({
         // token (row_version), NOT the clinical revision (version). signSavedEMR
         // validates the token; persistAndSignEMR derives row_version from the save
         // response itself and refreshes the parent status after persisting.
-        const result = isReadOnly
-            ? await signSavedEMR({ confirm: confirmSigning, rowVersion, sign: signEMR })
-            : await persistAndSignEMR({
-                confirm: confirmSigning,
-                save: saveEMR,
-                sign: signEMR,
-                onPersisted: refreshParentStatus,
-            });
+        let result: PersistAndSignResult;
+        const sign: typeof signEMR = (options) => scope.active ? signEMR(options) : Promise.resolve(null);
+        try {
+            result = isReadOnly
+                ? await signSavedEMR({ confirm: confirmSigning, rowVersion, sign })
+                : await persistAndSignEMR({
+                    confirm: confirmSigning,
+                    save: (options) => scope.active ? saveEMR(options) : Promise.resolve(null),
+                    sign,
+                    onPersisted: () => scope.active ? refreshParentStatus() : undefined,
+                });
+        } finally {
+            if (signingScopeRef.current === scope) {
+                signingScopeRef.current = null;
+                setIsSigning(false);
+            }
+        }
         if (result === 'save_failed') {
             logger.error('[EMR] Save-and-sign stopped because the save did not return a valid non-draft version');
         } else if (result === 'sign_failed') {
@@ -829,6 +870,9 @@ export function EMRContainerV2({
         isReadOnly,
         isPreparingCompletion,
         completionBusy,
+        isSaving,
+        accessDenied,
+        conflict,
         canSignReadOnly,
         rowVersion,
         refreshParentStatus,
@@ -840,6 +884,7 @@ export function EMRContainerV2({
             || isReadOnly
             || isPreparingCompletion
             || completionBusy
+            || signingScopeRef.current === completionScopeRef.current
             || isLoading
             || isSaving
             || accessDenied
@@ -896,7 +941,7 @@ export function EMRContainerV2({
         canRedo: canRedo && !editingDisabled,
         canSave: isDirty && !isSaving && !editingDisabled,
         canSign: !isDirty && !isSaving && !isSigned && (!isReadOnly || canSignReadOnly) && !completionBusy,
-        enabled: (!isReadOnly || canSignReadOnly) && !isPreparingCompletion && !completionBusy,
+        enabled: (!isReadOnly || canSignReadOnly) && !isPreparingCompletion && !completionBusy && !conflict,
     });
 
     if (!visitId) {
@@ -928,7 +973,7 @@ export function EMRContainerV2({
     // a skeleton stack mirroring the section layout instead of empty clinical
     // fields. Subsequent saves/refreshes keep the real sections mounted
     // (autosave must not flash skeletons over a doctor's in-progress input).
-    if (isLoading && !data) {
+    if ((!emr && !error) || (emr?.visit_id != null && String(emr.visit_id) !== String(visitId))) {
         return (
             <div className="emr-v2-container">
                 <div className="emr-v2-main">
@@ -937,17 +982,29 @@ export function EMRContainerV2({
             </div>
         );
     }
+    if (emr?.patient_id != null && patientId != null && String(emr.patient_id) !== String(patientId)) {
+        return <div className="emr-v2-container" role="alert">{t('emr_workspace.patient_context_changed')}</div>;
+    }
 
     const handleAmend = async () => {
-        // EMRAMEND-FE-001 (audit 3886 round 17): the guard must NOT use
-        // `editingDisabled` — that flag contains `isSigned`/`isAmended` by
-        // definition of the amendment workflow, so the old check made this
-        // handler unreachable dead code. Only true blockers apply.
-        if (isReadOnly || isPreparingCompletion || completionBusy) return;
-        if (amendReason.trim().length >= 10) {
-            await amendEMR(amendReason);
+        if (!amendAllowed || isSaving || amending.current || amendReason.trim().length < 10 || !data) return;
+        const scope = completionScopeRef.current;
+        amending.current = true;
+        setAmendError(false);
+        try {
+            const result = await amendEMR(amendReason, { data: { ...data, ...amendPatch } });
+            if (!scope.active) return;
+            if (isRejectedEMRWrite(result)) {
+                setAmendError(true);
+                return;
+            }
             setShowAmendForm(false);
             setAmendReason('');
+            await refreshParentStatus();
+        } catch {
+            if (scope.active) setAmendError(true);
+        } finally {
+            amending.current = false;
         }
     };
 
@@ -960,6 +1017,7 @@ export function EMRContainerV2({
     // bypasses the cache (loadEMR(true)) so the doctor sees the truly
     // authoritative server version, not a stale cached copy.
     const handleToolbarRefresh = async () => {
+        const scope = completionScopeRef.current;
         if (isDirty && !isSigned && !isAmended && !isReadOnly) {
             const confirmed = await confirm({
                 title: t('misc.emr_refresh_title'),
@@ -971,7 +1029,11 @@ export function EMRContainerV2({
             });
             if (!confirmed) return;
         }
-        await loadEMR(true);
+        if (!scope.active) return;
+        const refreshed = await loadEMR(true).catch(() => null);
+        if (scope.active && !isRejectedEMRWrite(refreshed) && !(refreshed as { stale?: boolean }).stale) {
+            workspaceState.reload();
+        }
     };
 
     // Conflict handlers
@@ -1006,9 +1068,15 @@ export function EMRContainerV2({
                 {/* Header */}
                 <header className="emr-v2-header">
                     <div className="emr-v2-header__left">
-                        {/* UX Audit Doctor M-20: «ЭМК v2» → «Электронная медицинская карта». */}
-                        <h2>{t('misc.emr_title')}</h2>
-                        {patientId && <span className="emr-v2-patient-id">{t('misc.emr_patient', { id: patientId })}</span>}
+                        <h2>{workspace?.patient.full_name || patientName || t('misc.emr_title')}</h2>
+                        <span className="emr-workspace-identity">
+                            {(workspace?.patient.id ?? patientId) && t('misc.emr_patient', { id: workspace?.patient.id ?? patientId })}
+                            {workspace?.patient.birth_date && <span>{t('emr_workspace.birth_date')} <time dateTime={workspace.patient.birth_date}>{workspace.patient.birth_date}</time></span>}
+                            <span>{t('emr_workspace.visit_number', { id: visitId })} {workspace?.visit.date}</span>
+                        </span>
+                        {workspace?.allergy_state === 'specific' && (
+                            <strong className="emr-workspace-allergy">{t('emr_workspace.allergy_warning')}</strong>
+                        )}
                     </div>
 
                     <div className="emr-v2-header__right">
@@ -1068,46 +1136,34 @@ export function EMRContainerV2({
                     <Button variant="ghost" size="small" onClick={redo} disabled={!canRedo || editingDisabled} title={t('misc.emr_redo_title')} aria-label={t('misc.emr_redo_title')}>
                         <Redo2 size={14} aria-hidden="true" /> {t('misc.emr_redo')}
                     </Button>
-                    <Button variant="ghost" size="small" onClick={() => { void handleToolbarRefresh(); }} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
+                    <Button variant="ghost" size="small" onClick={() => { void handleToolbarRefresh(); }} disabled={isSaving} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
                         <RefreshCw size={14} aria-hidden="true" /> {t('misc.emr_refresh')}
                     </Button>
+                    <Button type="button" variant="outline" size="small" disabled={!data || accessDenied}
+                      onClick={() => setShowPreview(true)}>{t('emr_workspace.preview')}</Button>
                 </div>
 
-                {/* Sections */}
+                <div className="emr-workspace-layout">
                 <div className="emr-v2-sections">
-                    {/* UX Audit Doctor M-48: progress indicator for EMR sections. */}
-                    {(() => {
-                        const sections = [
-                            { name: t('misc.emr_sec_complaints'), filled: emrTextValue(data?.complaints).trim() !== '' },
-                            { name: t('misc.emr_sec_anamnesis'), filled: emrTextValue(data?.anamnesis_morbi).trim() !== '' },
-                            { name: t('misc.emr_sec_examination'), filled: emrTextValue(data?.examination).trim() !== '' },
-                            { name: t('misc.emr_sec_diagnosis'), filled: emrTextValue(data?.diagnosis).trim() !== '' },
-                            // EMRTREAT-FE-001 (audit 3886): the treatment row counts
-                            // the CANONICAL treatment text (treatment →
-                            // medications.text → plan.treatment, mirroring the
-                            // backend's get_emr_text_field chain) — the visible
-                            // TreatmentSection editor is bound to
-                            // medications.text, so a genuine treatment plan typed
-                            // there must mark «Лечение» as filled.
-                            { name: t('misc.emr_sec_treatment'), filled: emrTreatmentText(data) !== '' },
-                            { name: t('misc.emr_sec_recommendations'), filled: emrTextValue(data?.recommendations).trim() !== '' },
-                            { name: t('misc.emr_sec_notes'), filled: emrTextValue(data?.notes).trim() !== '' },
-                        ];
-                        const filledCount = sections.filter(s => s.filled).length;
-                        return (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
-                                <span>{t('misc.emr_filled', { filled: filledCount, total: sections.length })}</span>
-                                <div style={{ flex: 1, maxWidth: '200px', height: '6px', borderRadius: '3px', background: 'var(--mac-bg-tertiary)' }}>
-                                    <div style={{ width: `${(filledCount / sections.length) * 100}%`, height: '100%', borderRadius: '3px', background: 'var(--mac-success)', transition: 'width 0.3s ease' }} />
-                                </div>
-                                {sections.filter(s => !s.filled).length > 0 && (
-                                    <span style={{ fontSize: '12px' }}>
-                                        {t('misc.emr_remaining', { sections: sections.filter(s => !s.filled).map(s => s.name).join(', ') })}
-                                    </span>
-                                )}
-                            </div>
-                        );
-                    })()}
+                    <section className="emr-workspace-visit-section" aria-label={t('emr_workspace.today_vitals')}>
+                        <h3>{t('emr_workspace.today_vitals')}</h3>
+                        <VitalsWidget vitals={data?.vitals || {}} onChange={handleFieldChange('vitals')}
+                            disabled={editingDisabled} collapseAdditional />
+                    </section>
+                    <FollowUpEditor value={followUp} disabled={editingDisabled}
+                        onChange={handleFieldChange('follow_up')} />
+                    {onComplete && !isReadOnly && (
+                      <section className="emr-workspace-visit-section" aria-label={t('emr_workspace.readiness')}>
+                        <h3>{t('emr_workspace.readiness')}</h3>
+                        <p>{t(requiresSave ? 'emr_workspace.save_before_finish' : 'emr_workspace.ready_for_finish')}</p>
+                        {requiresSave && !editingDisabled && !isSaving && !conflict && !accessDenied && (
+                          <a href={`#${saveActionId}`} onClick={event => {
+                            event.preventDefault();
+                            document.getElementById(saveActionId)?.focus();
+                          }}>{t('misc.emr_save_aria')}</a>
+                        )}
+                      </section>
+                    )}
                     {/* Phase 4+ cognitive load reduction: sections are collapsible.
                         Default-open: Complaints + Examination + Diagnosis (the 3
                         sections a doctor fills on every visit).
@@ -1119,13 +1175,19 @@ export function EMRContainerV2({
                         onChange={handleFieldChange('complaints')}
                         disabled={editingDisabled}
                         doctorId={doctorId}
+                        specialty={canonicalSpecialty}
                     />
+                    <FieldDictation key={`dictation:${workspaceState.scope}`} disabled={editingDisabled || accessDenied}
+                        onInsert={text => handleFieldChange('complaints')(
+                            [emrTextValue(data?.complaints).trimEnd(), text].filter(Boolean).join('\n'),
+                        )} />
 
                     <AnamnesisMorbiSection
                         value={data?.anamnesis_morbi}
                         onChange={handleFieldChange('anamnesis_morbi')}
                         disabled={editingDisabled}
                         doctorId={doctorId}
+                        specialty={canonicalSpecialty}
                         icd10Code={data?.icd10_code || ''}
                     />
 
@@ -1134,8 +1196,6 @@ export function EMRContainerV2({
                         onChange={handleFieldChange('anamnesis_vitae')}
                         disabled={editingDisabled}
                         doctorId={doctorId}
-                        vitals={data?.vitals || {}}
-                        onVitalsChange={handleFieldChange('vitals')}
                         defaultOpen={false}
                     />
 
@@ -1170,16 +1230,15 @@ export function EMRContainerV2({
                     />
 
                     <TreatmentSection
-                        value={data?.medications?.text || ''}
-                        onChange={(text) => handleFieldChange('medications')({
-                            ...(data?.medications || {}),
+                        value={medicationSection?.text || ''}
+                        onChange={(text, source) => handleFieldChange('medications')({
+                            ...medicationSection,
                             text
-                        })}
-                        medications={data?.medications?.list || []}
-                        onMedicationsChange={(list) => handleFieldChange('medications')({
-                            ...(data?.medications || {}),
-                            list
-                        })}
+                        }, source)}
+                        medications={medications}
+                        onMedicationsChange={(list) => handleFieldChange('medications')(
+                            legacyMedicationList ? list : { ...medicationSection, list },
+                        )}
                         disabled={editingDisabled}
                         specialty={data?.specialty || 'general'}
                         icd10Code={data?.icd10_code || ''}
@@ -1193,6 +1252,13 @@ export function EMRContainerV2({
                         defaultOpen={false}
                         visitKey={visitId}
                     />
+                    {workspace && (
+                        <PrescriptionAction key={`prescription:${workspaceState.scope}`} visitId={workspace.visit.id}
+                            patientId={workspace.patient.id} rowVersion={rowVersion}
+                            hasMedications={medications.length > 0}
+                            isCurrentSaved={!isDirty && !isSaving && rowVersion > 0 && savedEMRStatus !== 'draft'}
+                            readOnly={prescriptionBlocked || Boolean(conflict)} />
+                    )}
 
                     {/* Recommendations is reused in TreatmentSection above, or separate?
                         EMR V2 usually separates Treatment (Process) and Recommendations (Output).
@@ -1233,6 +1299,7 @@ export function EMRContainerV2({
                             ecgData={(data?.specialty_data?.ecg as Record<string, unknown>) || {}}
                             echoData={(data?.specialty_data?.echo as Record<string, unknown>) || {}}
                             labResults={(data?.specialty_data?.cardio_labs as Record<string, unknown>) || {}}
+                            onOpenStudy={onOpenCardiacStudy}
                             onChange={(field, value) => handleFieldChange('specialty_data')({
                                 ...(data?.specialty_data || {}),
                                 [field]: value
@@ -1287,10 +1354,18 @@ export function EMRContainerV2({
                         Collapsible (defaultOpen=false when no results, true when
                         results exist). Read-only — doctors view, don't edit. */}
                     <LabResultsSection
+                        key={`labs:${workspaceState.scope}`}
                         patientId={patientId}
                         visitId={visitId}
                         disabled={editingDisabled}
+                        reviewerId={accessDenied ? null : doctorId}
                     />
+                </div>
+                <WorkspaceSidePanel key={workspaceState.scope} workspace={workspace}
+                    status={workspaceState.status} reload={workspaceState.reload}
+                    currentVitals={data?.vitals} currentEcho={data?.specialty_data?.echo as Record<string, unknown> | undefined}
+                    readOnly={editingDisabled || accessDenied} followUp={followUp}
+                    onFollowUpChange={handleFieldChange('follow_up')} />
                 </div>
 
                 {/* Actions */}
@@ -1320,9 +1395,10 @@ export function EMRContainerV2({
                     ) : !isSigned && !isAmended && !serverFinalized ? (
                         <>
                             <button
+                                id={saveActionId}
                                 className="emr-v2-btn emr-v2-btn--primary"
                                 onClick={() => saveManually({ isDraft: false })}
-                                disabled={isSaving || !isDirty || accessDenied || editingDisabled}
+                                disabled={isSaving || (!isDirty && savedEMRStatus !== 'draft') || accessDenied || editingDisabled}
                                 aria-label={isSaving ? t('misc.emr_saving_aria') : t('misc.emr_save_aria')}
                             >
                                 {isSaving ? (
@@ -1348,42 +1424,16 @@ export function EMRContainerV2({
                                 <CheckCircle2 size={14} aria-hidden="true" /> {t('misc.emr_signed')} {isAmended && t('misc.emr_with_amendments')}
                             </div>
 
-                            {!showAmendForm ? (
-                                <button
-                                    className="emr-v2-btn emr-v2-btn--warning"
-                                    onClick={() => setShowAmendForm(true)}
-                                    disabled={!amendAllowed || isSaving}
-                                    aria-label={t('misc.emr_amend_aria')}
-                                >
-                                    <FilePenLine size={14} aria-hidden="true" /> {t('misc.emr_amend')}
-                                </button>
-                            ) : (
-                                <div className="emr-v2-amend-form">
-                                    <textarea
-                                        aria-label={t('misc.emr_amend_reason_aria')}
-                                        value={amendReason}
-                                        onChange={(e) => setAmendReason(e.target.value)}
-                                        placeholder={t('misc.emr_amend_reason_ph')}
-                                        disabled={!amendAllowed}
-                                    />
-                                    <div className="emr-v2-amend-actions">
-                                        <button
-                                            className="emr-v2-btn emr-v2-btn--primary"
-                                            onClick={handleAmend}
-                                            disabled={amendReason.trim().length < 10 || !amendAllowed || isSaving}
-                                        >
-                                            {t('misc.emr_save')}
-                                        </button>
-                                        <button
-                                            className="emr-v2-btn"
-                                            onClick={() => setShowAmendForm(false)}
-                                            disabled={!amendAllowed}
-                                        >
-                                            {t('misc.cancel')}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            <button className="emr-v2-btn emr-v2-btn--warning" type="button"
+                                onClick={() => {
+                                    setAmendField('notes');
+                                    setAmendPatch({});
+                                    setAmendReason('');
+                                    setAmendError(false);
+                                    setShowAmendForm(true);
+                                }} disabled={!amendAllowed || isSaving} aria-label={t('misc.emr_amend_aria')}>
+                                <FilePenLine size={14} aria-hidden="true" /> {t('misc.emr_amend')}
+                            </button>
                         </>
                     )}
                     {!isReadOnly && onComplete && (
@@ -1410,6 +1460,43 @@ export function EMRContainerV2({
                     )}
                 </div>
             </div>
+
+            {showPreview && data && (
+                <DocumentPreview visitId={visitId} patientId={patientId} patientName={patientName}
+                    workspace={workspace} version={version} signedAt={emr?.signed_at} signedBy={emr?.signed_by}
+                    status={emr?.status} dirty={isDirty} data={isSigned || isAmended ? emr?.data ?? data : data}
+                    onClose={() => setShowPreview(false)} />
+            )}
+            {showAmendForm && (
+                <Modal isOpen title={t('misc.emr_amend')} size="large"
+                    onClose={() => { if (!isSaving) setShowAmendForm(false); }} actions={<>
+                      <Button type="button" variant="ghost" disabled={isSaving}
+                          onClick={() => setShowAmendForm(false)}>{t('misc.cancel')}</Button>
+                      <Button type="button" disabled={amendReason.trim().length < 10 || isSaving || !amendAllowed}
+                          onClick={() => void handleAmend()}>{t('common.save')}</Button>
+                    </>}>
+                        <label>{t('emr_workspace.amend_field')}
+                            <select value={amendField} disabled={isSaving} onChange={event => {
+                                const field = event.target.value as typeof amendField;
+                                setAmendField(field);
+                            }}>
+                                {['notes', 'complaints', 'examination', 'recommendations'].map(field => (
+                                    <option key={field} value={field}>{t(`emr_workspace.${field}`)}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="emr-workspace-field">{t(`emr_workspace.${amendField}`)}
+                            <Textarea value={amendPatch[amendField] ?? emrTextValue(data?.[amendField])} rows={5} disabled={isSaving}
+                                aria-label={t(`emr_workspace.${amendField}`)}
+                                onChange={event => setAmendPatch({ ...amendPatch, [amendField]: event.target.value })} />
+                        </label>
+                        <label className="emr-workspace-field">{t('misc.emr_amend_reason_aria')}
+                            <Textarea aria-label={t('misc.emr_amend_reason_aria')} value={amendReason} maxLength={1000}
+                                rows={3} disabled={isSaving} onChange={event => setAmendReason(event.target.value)} />
+                        </label>
+                        {amendError && <p role="alert">{t('emr_workspace.save_error')}</p>}
+                </Modal>
+            )}
 
             {/* History sidebar */}
             {renderHistoryPanel()}
@@ -1441,7 +1528,7 @@ export function EMRContainerV2({
             )}
 
             {/* Conflict dialog */}
-            {!isReadOnly && Boolean(conflict) && (
+            {!isReadOnly && Boolean(conflict) && !showAmendForm && !(showDiff && selectedVersion) && (
                 <EMRConflictDialog
                     conflict={conflict as Record<string, unknown> | null}
                     isSigned={isSigned}

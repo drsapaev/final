@@ -52,13 +52,14 @@ describe('EMRContainerV2 — skeleton wiring contract (PR-UI-12-3)', () => {
   const read = (rel: string): string =>
     fs.readFileSync(path.join(process.cwd(), rel), 'utf-8');
 
-  it('renders the skeleton stack on FIRST load only (isLoading && !data)', () => {
+  it('renders the skeleton before a document is known and keeps it during writes', () => {
     const src = read('src/components/emr-v2/EMRContainerV2.tsx');
     // The loading signal is consumed from the EMR hook.
     expect(src).toContain('isLoading,');
     // The skeleton branch is guarded to initial load (no data yet) so
     // autosave/saving never flashes skeletons over in-progress input.
-    expect(src).toContain('if (isLoading && !data)');
+    expect(src).toContain('(!emr && !error)');
+    expect(src).toContain('String(emr.visit_id) !== String(visitId)');
     expect(src).toContain('<EMRSectionSkeleton');
   });
 

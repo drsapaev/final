@@ -45,7 +45,9 @@ import { ThemeProvider } from '../../../contexts/ThemeContext';
 
 beforeEach(() => {
   panelState.update.mockReset();
-  panelState.templates = [{ id: 5, template_text: 'Старый текст шаблона', is_pinned: false }];
+  panelState.templates = [{
+    id: 5, template_text: 'Старый текст шаблона', is_pinned: false, shortcut: 'qa', template_revision: 3,
+  }];
 });
 
 function renderPanel() {
@@ -84,7 +86,7 @@ describe('EMRTEMPL-FE-001: a failed template update never discards the edit dial
     expect(textarea).toBeInTheDocument();
     // …and the failure is surfaced instead of silently closing.
     expect(screen.getByRole('alert')).toHaveTextContent('HTTP 500: сервер недоступен');
-    expect(panelState.update).toHaveBeenCalledWith('5', 'Исправленная терапия', 'replace');
+    expect(panelState.update).toHaveBeenCalledWith('5', 'Исправленная терапия', 'replace', 'qa', 3);
   });
 
   it('failed Save As New keeps the dialog open too', async () => {

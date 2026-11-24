@@ -64,6 +64,7 @@ from app.api.v1.endpoints import (
     emr_templates,
     emr_v2,
     emr_versioning_enhanced,
+    emr_workspace,
     fcm_notifications,
     feature_flags,
     file_system,
@@ -601,6 +602,7 @@ api_router.include_router(
 
 # EMR v2 - Production EMR with versioning and audit
 api_router.include_router(emr_v2.router, prefix="/v2", tags=["emr-v2"])
+api_router.include_router(emr_workspace.router, prefix="/v2", tags=["emr-v2"])
 
 # Mobile-contract alias (Android client): GET/POST /api/v1/emr/{visit_id} via
 # a NARROW alias router. Kept AFTER every static /emr/* router so those
