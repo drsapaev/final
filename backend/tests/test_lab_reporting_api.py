@@ -1136,20 +1136,27 @@ def test_emr_lab_uses_current_frozen_assessment_and_release_date(
 
 @pytest.mark.integration
 @pytest.mark.parametrize(
-    ("changed_context", "same_release_time"),
+    ("changed_context", "timing"),
     [
-        ({}, False),
-        ({"analyte_code": "other-analyte"}, False),
-        ({"unit_code": "other-unit"}, False),
-        ({"material_code": "other-material"}, False),
-        ({"method_code": "other-method"}, False),
-        ({"method_code": None}, False),
-        ({"status": "missing"}, False),
-        ({}, True),
+        ({}, "study_date"),
+        ({}, "specimen_collection"),
+        ({"analyte_code": "other-analyte"}, "study_date"),
+        ({"unit_code": "other-unit"}, "study_date"),
+        ({"material_code": "other-material"}, "study_date"),
+        ({"method_code": "other-method"}, "study_date"),
+        ({"method_code": None}, "study_date"),
+        ({"status": "missing"}, "study_date"),
+        ({"age_at_date": None}, "study_date"),
+        ({"age_at_date": "invalid-date"}, "study_date"),
+        ({"reference_date_source": "unsupported"}, "study_date"),
+        ({"reference_date_source": "specimen_collection"}, "study_date"),
+        ({}, "same_release_time"),
+        ({}, "same_observation_date"),
+        ({}, "older_study_corrected"),
     ],
 )
 def test_emr_lab_trends_only_aggregate_matching_numeric_observations(
-    client, db_session, changed_context, same_release_time
+    client, db_session, changed_context, timing
 ) -> None:
     user, doctor = _create_doctor_user(db_session, label="trend_exact")
     patient = _create_patient(db_session)
@@ -1176,21 +1183,30 @@ def test_emr_lab_trends_only_aggregate_matching_numeric_observations(
         ("positive", None, "coded_qualitative", "evaluated", "positive"),
         ("8", Decimal("8"), "numeric", "evaluated", "high"),
     ]
+    release_context = {
+        "order_id": order.id,
+        "visit_id": visit.id,
+        "patient_id": patient.id,
+        "template_id": template.id,
+        "template_version_id": version.id,
+        "status": "FINALIZED",
+    }
     for index, (raw, numeric, kind, state, interpretation) in enumerate(observations):
-        released_at = now - timedelta(
-            days=1 if same_release_time else len(observations) - index
+        observation_time = now - timedelta(days=len(observations) - index)
+        released_at = (
+            now - timedelta(days=1)
+            if timing == "same_release_time"
+            else observation_time
         )
-        report = LabReportInstance(
-            order_id=order.id,
-            visit_id=visit.id,
-            patient_id=patient.id,
-            template_id=template.id,
-            template_version_id=version.id,
-            status="FINALIZED",
-            finalized_at=released_at,
+        reference_date = (
+            (now - timedelta(days=len(observations))).date()
+            if timing == "same_observation_date"
+            else observation_time.date()
         )
-        db_session.add(report)
+        original = LabReportInstance(**release_context, finalized_at=released_at)
+        db_session.add(original)
         db_session.flush()
+        report = original
         snapshot = {
             "status": state,
             "interpretation": interpretation,
@@ -1200,23 +1216,36 @@ def test_emr_lab_trends_only_aggregate_matching_numeric_observations(
             "unit_code": "synthetic-unit",
             "material_code": "synthetic-material",
             "method_code": "synthetic-method",
+            "age_at_date": reference_date.isoformat(),
+            "reference_date_source": "specimen_collection"
+            if timing == "specimen_collection"
+            else "study_date",
         }
         if index == len(observations) - 1:
             snapshot.update(changed_context)
         result_payload = {"kind": kind}
         if kind == "qualified_numeric":
             result_payload["comparator"] = "lt"
+        report_value = {
+            "field_key": test_code,
+            "value_numeric": numeric,
+            "value_text": raw if numeric is None else None,
+            "resolved_reference_text": "SYNTHETIC frozen reference",
+            "evaluation_snapshot": snapshot,
+            "result_payload": result_payload,
+        }
+        if timing == "older_study_corrected" and index == 0:
+            db_session.add(LabReportValue(instance_id=original.id, **report_value))
+            report = LabReportInstance(
+                **release_context,
+                finalized_at=now - timedelta(hours=1),
+                supersedes_instance_id=original.id,
+            )
+            db_session.add(report)
+            db_session.flush()
         db_session.add_all(
             [
-                LabReportValue(
-                    instance_id=report.id,
-                    field_key=test_code,
-                    value_numeric=numeric,
-                    value_text=raw if numeric is None else None,
-                    resolved_reference_text="SYNTHETIC frozen reference",
-                    evaluation_snapshot=snapshot,
-                    result_payload=result_payload,
-                ),
+                LabReportValue(instance_id=report.id, **report_value),
                 LabResult(
                     order_id=order.id,
                     test_code=test_code,
@@ -1225,7 +1254,7 @@ def test_emr_lab_trends_only_aggregate_matching_numeric_observations(
                     unit="previous unit",
                     ref_range="previous range",
                     source_instance_id=report.id,
-                    source_root_instance_id=report.id,
+                    source_root_instance_id=original.id,
                     created_at=released_at,
                 ),
             ]
@@ -1241,25 +1270,31 @@ def test_emr_lab_trends_only_aggregate_matching_numeric_observations(
     trend = response.json()
     assert trend["patient_id"] == patient.id and trend["test_type"] == test_code
     assert trend["period_days"] == 7 and trend["total_measurements"] == 4
-    assert [point["value"] for point in trend["trend_data"]] == [
-        "0",
-        "<1",
-        "positive",
-        "8",
-    ]
-    assert [point["is_abnormal"] for point in trend["trend_data"]] == [
+    expected_values = ["0", "<1", "positive", "8"]
+    expected_assessments = [
         False,
         None,
         None,
         None if changed_context.get("status") == "missing" else True,
     ]
+    if timing == "older_study_corrected":
+        assert (
+            trend["trend_data"][-1]["date"]
+            == (now - timedelta(hours=1)).date().isoformat()
+        )
+        expected_values = ["<1", "positive", "8", "0"]
+        expected_assessments = [None, None, True, False]
+    assert [point["value"] for point in trend["trend_data"]] == expected_values
+    assert [
+        point["is_abnormal"] for point in trend["trend_data"]
+    ] == expected_assessments
     assert {point["unit"] for point in trend["trend_data"]} == {"mg/L"}
     assert {point["normal_range"] for point in trend["trend_data"]} == {
         "SYNTHETIC frozen reference"
     }
     assert trend["trend_stats"] == (
         {}
-        if changed_context or same_release_time
+        if changed_context or timing not in ("study_date", "specimen_collection")
         else {
             "min_value": 0,
             "max_value": 8,

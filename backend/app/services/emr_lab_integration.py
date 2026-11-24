@@ -3,7 +3,7 @@
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -165,10 +165,11 @@ class EMRLabIntegrationService:
 
     @staticmethod
     def _comparable_numeric_trend(results: list[dict[str, Any]]) -> dict[str, Any]:
-        # A single summary needs matching measurement context and a known
-        # ordering between the numerical observations.
+        # Release order is visible to the reader. The same order must hold
+        # for observations, including when a correction was released later.
         comparison = None
         previous_release = None
+        previous_observation_date: date | None = None
         values: list[Decimal] = []
         assessments: list[bool] = []
         for result in results:
@@ -194,6 +195,11 @@ class EMRLabIntegrationService:
                 or not numeric.is_finite()
             ):
                 return {}
+            reference_date = snapshot.get("age_at_date")
+            if not isinstance(reference_date, str) or snapshot.get(
+                "reference_date_source"
+            ) not in ("study_date", "specimen_collection"):
+                return {}
             context = tuple(
                 snapshot.get(key)
                 for key in (
@@ -202,6 +208,7 @@ class EMRLabIntegrationService:
                     "unit",
                     "material_code",
                     "method_code",
+                    "reference_date_source",
                 )
             )
             if not all(isinstance(code, str) and code.strip() for code in context):
@@ -209,12 +216,22 @@ class EMRLabIntegrationService:
             if comparison is not None and context != comparison:
                 return {}
             try:
-                if Decimal(result["value"]) != numeric:
-                    return {}
-            except (InvalidOperation, TypeError):
+                observation_date = date.fromisoformat(reference_date)
+                displayed_numeric = Decimal(result["value"])
+            except (InvalidOperation, TypeError, ValueError):
+                return {}
+            if (
+                displayed_numeric != numeric
+                or observation_date.isoformat() != reference_date
+                or (
+                    previous_observation_date is not None
+                    and observation_date <= previous_observation_date
+                )
+            ):
                 return {}
             comparison = context
             previous_release = released_at
+            previous_observation_date = observation_date
             values.append(numeric)
             if result["is_abnormal"] is not None:
                 assessments.append(result["is_abnormal"])
