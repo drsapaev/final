@@ -966,10 +966,21 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     const bounds = await editor.boundingBox();
     if (!bounds) throw new Error('EMR editor has no layout bounds');
     await expect(page).toHaveScreenshot('pr124-emr-screen.png', {
-      clip: { x: Math.ceil(bounds.x), y: Math.max(0, Math.ceil(bounds.y)), width: Math.floor(bounds.width), height: 540 },
+      clip: {
+        x: Math.ceil(bounds.x),
+        y: Math.max(0, Math.ceil(bounds.y)),
+        width: Math.floor(bounds.width),
+        height: 540,
+      },
       maxDiffPixelRatio: 0.01,
       animations: 'disabled',
     });
+
+    const refresh = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/v1/v2/emr/501/workspace' && response.ok(),
+    );
+    await editor.getByRole('button', { name: 'Обновить EMR', exact: true }).click();
+    await refresh;
   });
 });
 

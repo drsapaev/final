@@ -333,7 +333,7 @@ export function EMRContainerV2({
     const [isPreparingCompletion, setIsPreparingCompletion] = useState(false);
     const [isSigning, setIsSigning] = useState(false);
     const signingScopeRef = useRef<object | null>(null);
-    const completionScopeRef = useRef({ visitId, active: true });
+    const completionScopeRef = useRef({ visitId, patientId, active: true });
     const editingDisabled = isReadOnly || isSigned || isAmended || isPreparingCompletion || completionBusy || isSigning;
     // EMRAMEND-FE-001 (audit 3886 round 17): the amendment workflow must be
     // REACHABLE on the very records it exists for (signed, and — after round
@@ -367,12 +367,12 @@ export function EMRContainerV2({
         && rowVersion > 0;
 
     useEffect(() => {
-        const scope = { visitId, active: true };
+        const scope = { visitId, patientId, active: true };
         completionScopeRef.current = scope;
         return () => {
             scope.active = false;
         };
-    }, [visitId]);
+    }, [visitId, patientId]);
 
     // Get current user (doctor) for history/AI suggestions
     const { currentUser } = useAppData() as { currentUser?: { id?: string | number | null } };
@@ -1005,6 +1005,7 @@ export function EMRContainerV2({
     // bypasses the cache (loadEMR(true)) so the doctor sees the truly
     // authoritative server version, not a stale cached copy.
     const handleToolbarRefresh = async () => {
+        const scope = completionScopeRef.current;
         if (isDirty && !isSigned && !isAmended && !isReadOnly) {
             const confirmed = await confirm({
                 title: t('misc.emr_refresh_title'),
@@ -1016,7 +1017,9 @@ export function EMRContainerV2({
             });
             if (!confirmed) return;
         }
-        await loadEMR(true);
+        if (!scope.active) return;
+        const refreshed = await loadEMR(true).catch(() => null);
+        if (scope.active && !isRejectedEMRWrite(refreshed)) workspaceState.reload();
     };
 
     // Conflict handlers
