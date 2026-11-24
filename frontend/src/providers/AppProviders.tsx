@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom';
 import { TranslationProvider } from '../i18n/useTranslation';
 import { AppDataProvider } from '../contexts/AppDataContext';
 import { ChatProvider } from '../contexts/ChatContext';
@@ -7,6 +8,12 @@ import ErrorBoundary from '../components/common/ErrorBoundary';
 import { NotificationPrompt } from '../components/chat/NotificationPrompt';
 import { NotificationCenterProvider } from '../contexts/NotificationCenterContext';
 import { NotificationWebSocketProvider } from '../contexts/NotificationWebSocketContext';
+import { resolvePublicSiteRoute } from '../routing/publicSiteRouteEntries';
+
+function RouteNotificationPrompt() {
+  const { pathname } = useLocation();
+  return resolvePublicSiteRoute(pathname) ? null : <NotificationPrompt />;
+}
 
 /**
  * Главный провайдер для всех контекстов.
@@ -23,7 +30,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
                 <NotificationWebSocketProvider>
                   <FormProvider>
                     {children}
-                    <NotificationPrompt />
+                    <RouteNotificationPrompt />
                   </FormProvider>
                 </NotificationWebSocketProvider>
               </NotificationCenterProvider>
