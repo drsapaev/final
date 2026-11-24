@@ -229,6 +229,7 @@ const kk = {
     lab_order: '№{id} тапсырыс',
     lab_report: '№{id} бланк',
     lab_download_pdf_aria: 'PDF файлын жүктеп алу: {name}',
+    lab_download_pdf_failed: 'PDF файлын жүктеп алу мүмкін болмады. Қайта көріңіз.',
     lab_ordered: 'Тапсырыс берілді',
     lab_in_progress: 'Орындалуда',
     lab_done: 'Орындалды',

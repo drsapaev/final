@@ -25,6 +25,7 @@ import type { WorkspaceLabReport, WorkspaceLabs } from '@/api/emrWorkspace';
 const listInstancesMock = vi.hoisted(() => vi.fn());
 const getWorkspaceLabsMock = vi.hoisted(() => vi.fn());
 const reviewLabVersionMock = vi.hoisted(() => vi.fn());
+const downloadPdfMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/api/emrWorkspace', () => ({
   getWorkspaceLabs: getWorkspaceLabsMock,
@@ -35,7 +36,7 @@ vi.mock('../../../../hooks/useLabReporting', () => ({
   useLabReporting: () => ({
     listInstances: listInstancesMock,
     createOrder: vi.fn(),
-    downloadPdf: vi.fn(),
+    downloadPdf: downloadPdfMock,
     listTemplates: vi.fn().mockResolvedValue([]),
     getInstance: vi.fn(),
     createInstance: vi.fn(),
@@ -85,6 +86,7 @@ function report(id: number, name: string, supersedes: number | null = null): Wor
 beforeEach(async () => {
   vi.clearAllMocks();
   getWorkspaceLabsMock.mockReset().mockResolvedValue(noWorkspaceLabs);
+  downloadPdfMock.mockReset();
   await act(async () => { await i18n.changeLanguage('ru'); });
 });
 
@@ -227,6 +229,81 @@ describe('EMRLAB-FE-003: server-side status filtering before the limit', () => {
 });
 
 describe('EMRLAB-FE-004: read-only does not revoke read access', () => {
+  it('shows a transient failure and retries the exact report PDF in a signed encounter', async () => {
+    listInstancesMock.mockResolvedValue([finalized(777, 'SYNTHETIC laboratory report')]);
+    downloadPdfMock.mockRejectedValueOnce(new Error('SYNTHETIC transient 503'));
+    render(<ThemeProvider><LabResultsSection patientId={5} visitId={9} disabled /></ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+    const pdfButton = await screen.findByRole('button', { name: 'Скачать PDF: SYNTHETIC laboratory report' });
+    fireEvent.click(pdfButton);
+
+    await waitFor(() => expect(downloadPdfMock).toHaveBeenCalledExactlyOnceWith(777));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось скачать PDF. Повторите попытку.');
+
+    const createObjectURL = vi.fn(() => 'blob:synthetic-report');
+    vi.stubGlobal('URL', Object.assign(class extends URL {}, { createObjectURL, revokeObjectURL: vi.fn() }));
+    let downloadLink: HTMLAnchorElement | undefined;
+    const clickLink = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloadLink = this;
+    });
+    try {
+      const blob = new Blob(['%PDF-1.4'], { type: 'application/pdf' });
+      downloadPdfMock.mockResolvedValueOnce(blob);
+      fireEvent.click(pdfButton);
+      await waitFor(() => expect(clickLink).toHaveBeenCalledTimes(1));
+      expect(downloadPdfMock.mock.calls).toEqual([[777], [777]]);
+      expect(createObjectURL).toHaveBeenCalledWith(blob);
+      expect(downloadLink?.download).toBe('lab-777.pdf');
+      expect(downloadLink?.href).toBe('blob:synthetic-report');
+      expect(screen.queryByRole('alert')).toBeNull();
+    } finally {
+      clickLink.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it.each(['success', 'error'] as const)(
+    'guards duplicate report PDF clicks and drops late %s after a patient switch',
+    async (outcome) => {
+      listInstancesMock.mockResolvedValue([finalized(777, 'SYNTHETIC previous report')]);
+      let resolvePrevious!: (blob: Blob) => void;
+      let rejectPrevious!: (reason?: unknown) => void;
+      downloadPdfMock.mockImplementationOnce(() => new Promise((resolve, reject) => {
+        resolvePrevious = resolve;
+        rejectPrevious = reject;
+      }));
+      const view = render(<ThemeProvider><LabResultsSection patientId={5} visitId={9} disabled /></ThemeProvider>);
+      fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+      const oldPdf = await screen.findByRole('button', { name: 'Скачать PDF: SYNTHETIC previous report' });
+      act(() => {
+        fireEvent.click(oldPdf);
+        fireEvent.click(oldPdf);
+      });
+      expect(downloadPdfMock).toHaveBeenCalledExactlyOnceWith(777);
+      expect(oldPdf).toBeDisabled();
+
+      listInstancesMock.mockResolvedValue([finalized(778, 'SYNTHETIC next report')]);
+      view.rerender(<ThemeProvider><LabResultsSection patientId={6} visitId={10} disabled /></ThemeProvider>);
+      const newPdf = await screen.findByRole('button', { name: 'Скачать PDF: SYNTHETIC next report' });
+      const createObjectURL = vi.fn(() => 'blob:synthetic-previous-report');
+      vi.stubGlobal('URL', Object.assign(class extends URL {}, { createObjectURL, revokeObjectURL: vi.fn() }));
+      const clickLink = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      try {
+        await act(async () => {
+          if (outcome === 'success') resolvePrevious(new Blob(['%PDF-1.4'], { type: 'application/pdf' }));
+          else rejectPrevious(new Error('SYNTHETIC late 503'));
+        });
+        expect(createObjectURL).not.toHaveBeenCalled();
+        expect(clickLink).not.toHaveBeenCalled();
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(newPdf).toBeEnabled();
+      } finally {
+        clickLink.mockRestore();
+        vi.unstubAllGlobals();
+      }
+    },
+  );
+
   it('uses canonical nested template names to identify each signed report and its PDF', async () => {
     const rows = [
       {

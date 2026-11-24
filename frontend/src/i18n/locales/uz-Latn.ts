@@ -229,6 +229,7 @@ const uzLatn = {
     lab_order: "{id}-buyurtma",
     lab_report: "{id}-blank",
     lab_download_pdf_aria: "PDF faylini yuklab olish: {name}",
+    lab_download_pdf_failed: "PDF faylini yuklab bo‘lmadi. Qayta urinib ko‘ring.",
     lab_ordered: "Buyurtma berilgan",
     lab_in_progress: "Bajarilmoqda",
     lab_done: "Bajarilgan",

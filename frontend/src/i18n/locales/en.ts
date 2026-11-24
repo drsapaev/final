@@ -229,6 +229,7 @@ const en = {
     lab_order: 'Order #{id}',
     lab_report: 'Report #{id}',
     lab_download_pdf_aria: 'Download PDF: {name}',
+    lab_download_pdf_failed: 'Could not download the PDF. Try again.',
     lab_ordered: 'Ordered',
     lab_in_progress: 'In progress',
     lab_done: 'Done',

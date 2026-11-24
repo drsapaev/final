@@ -62,6 +62,8 @@ interface LabResultList {
   rows: LabReportInstance[] | null;
 }
 
+type PdfDownloadPhase = 'loading' | 'error';
+
 interface LabTemplate {
   id: string | number;
   name?: string;
@@ -101,6 +103,8 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [ordering, setOrdering] = useState(false);
   const orderIntentRef = useRef<number | null>(null);
+  const [pdfDownloads, setPdfDownloads] = useState<{ scope: string; phases: Record<string, PdfDownloadPhase | undefined> }>();
+  const pdfInFlight = useRef(new Set<string>());
   const labScope = `${visitId ?? ''}:${patientId ?? ''}`;
   const [labState, setLabState] = useState<{ scope: string; refresh: number; data?: WorkspaceLabs; error: boolean }>();
   const [labReload, setLabReload] = useState(0);
@@ -220,15 +224,34 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
 
   const handleDownload = async (instanceId: string | number) => {
     const epoch = contextEpoch.current;
+    const reportId = String(instanceId);
+    const requestKey = `${epoch}:${reportId}`;
+    if (pdfInFlight.current.has(requestKey)) return;
+    pdfInFlight.current.add(requestKey);
+    const contextChanged = () => contextEpoch.current !== epoch
+      || contextRef.current.visitId !== visitId || contextRef.current.patientId !== patientId;
+    const setPhase = (phase?: PdfDownloadPhase) => setPdfDownloads(previous => ({
+      scope: labScope,
+      phases: { ...(previous?.scope === labScope ? previous.phases : {}), [reportId]: phase },
+    }));
+    setPhase('loading');
     try {
       const blob = await labReportingApi.downloadPdf(instanceId);
-      if (contextEpoch.current !== epoch) return;
+      if (contextChanged()) return;
       const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = `lab-${reportId}.pdf`;
+      link.click();
+      setPhase();
     } catch (err: unknown) {
+      if (contextChanged()) return;
+      setPhase('error');
       const errShape = err as { message?: string };
       logger.error('[LabResultsSection] PDF download failed', { error: errShape?.message });
+    } finally {
+      pdfInFlight.current.delete(requestKey);
     }
   };
 
@@ -242,6 +265,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
     setTemplates([]);
     setTemplatesLoading(false);
     setOrdering(false);
+    setPdfDownloads(undefined);
   }, [patientId, visitId]);
 
   // P1 fix: Order lab tests — opens a modal listing published templates.
@@ -346,6 +370,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
           )}</h4>}
           {group.map((instance) => {
             const details = reportDetails.get(Number(instance.id));
+            const pdfPhase = pdfDownloads?.scope === labScope ? pdfDownloads.phases[String(instance.id)] : undefined;
             const reportTitle = instance.template?.name || instance.template?.code || details?.template_name
               || instance.template_name || instance.template_code || t('emr_workspace.lab_report', { id: instance.id });
             return <div key={instance.id} className="emr-workspace-group">
@@ -386,8 +411,11 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
                   разрешает Doctor'у finalized/printed). disabled гейтит
                   только мутации (create order), а не чтение. */}
               <Button
+                type="button"
                 variant="outline"
                 size="small"
+                disabled={pdfPhase === 'loading'}
+                aria-busy={pdfPhase === 'loading'}
                 onClick={() => handleDownload(instance.id)}
                 aria-label={t('emr_workspace.lab_download_pdf_aria', { name: reportTitle })}>
                 <Download size={14} style={{ marginRight: 4 }} aria-hidden="true" />
@@ -395,6 +423,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
               </Button>
             </div>
           </div>
+          {pdfPhase === 'error' && <p role="alert">{t('emr_workspace.lab_download_pdf_failed')}</p>}
           {details && visitId && patientId && <LabVersionReview key={`${labScope}:${details.id}`} report={details}
             visitId={visitId} patientId={patientId} reviewerId={canReview ? reviewerId : undefined} retry={refreshLabs} />}
           </div>;

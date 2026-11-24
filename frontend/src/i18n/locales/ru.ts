@@ -266,6 +266,7 @@ const ru = {
     lab_order: "Заказ №{id}",
     lab_report: "Бланк №{id}",
     lab_download_pdf_aria: "Скачать PDF: {name}",
+    lab_download_pdf_failed: "Не удалось скачать PDF. Повторите попытку.",
     lab_ordered: "Заказано",
     lab_in_progress: "Выполняется",
     lab_done: "Выполнено",

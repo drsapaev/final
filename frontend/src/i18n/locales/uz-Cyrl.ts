@@ -229,6 +229,7 @@ const uzCyrl = {
     lab_order: "{id}-буюртма",
     lab_report: "{id}-бланк",
     lab_download_pdf_aria: "PDF файлини юклаб олиш: {name}",
+    lab_download_pdf_failed: "PDF файлини юклаб бўлмади. Қайта уриниб кўринг.",
     lab_ordered: "Буюртма берилган",
     lab_in_progress: "Бажарилмоқда",
     lab_done: "Бажарилган",
