@@ -296,6 +296,114 @@ def test_worklist_preserves_release_across_correction_and_scans_exact_specimen(
     }
 
 
+def test_previous_day_partial_order_stays_actionable_after_tashkent_midnight(
+    db_session, admin_user
+):
+    lab, _ = _catalog(db_session)
+    patient, visit, released_line = _new_visit(db_session, "PARTIAL", lab)
+    _, today_visit, _ = _new_visit(db_session, "TODAY", lab, day=TODAY)
+    midnight = NOW - timedelta(minutes=15)
+    before_midnight = midnight - timedelta(seconds=1)
+    opened_at = midnight - timedelta(hours=2)
+    visit.created_at = opened_at
+    released_line.created_at = opened_at
+    active_line = VisitService(
+        visit_id=visit.id, service_id=lab.id, name=lab.name, created_at=opened_at
+    )
+    canceled_line = VisitService(
+        visit_id=visit.id, service_id=lab.id, name=lab.name, created_at=opened_at
+    )
+    order = LabOrder(
+        patient_id=patient.id,
+        visit_id=visit.id,
+        created_at=opened_at,
+        due_at=midnight,
+        priority="urgent",
+    )
+    template = LabReportTemplate(
+        code="SYNTHETIC-PARTIAL", name="SYNTHETIC-PARTIAL", family="SYNTHETIC"
+    )
+    db_session.add_all([active_line, canceled_line, order, template])
+    db_session.flush()
+    version = LabReportTemplateVersion(
+        template_id=template.id,
+        version_no=1,
+        layout_preset="default",
+        status="PUBLISHED",
+        published_at=opened_at,
+    )
+    db_session.add(version)
+    db_session.flush()
+    released = LabReportInstance(
+        order_id=order.id,
+        visit_id=visit.id,
+        patient_id=patient.id,
+        template_id=template.id,
+        template_version_id=version.id,
+        status="FINALIZED",
+        created_at=opened_at,
+        finalized_at=midnight - timedelta(minutes=1),
+    )
+    db_session.add(released)
+    db_session.flush()
+    db_session.add_all(
+        [
+            LabOrderTest(
+                order_id=order.id,
+                visit_service_id=released_line.id,
+                report_instance_id=released.id,
+            ),
+            LabOrderTest(order_id=order.id, visit_service_id=active_line.id),
+            LabOrderTest(
+                order_id=order.id,
+                visit_service_id=canceled_line.id,
+                canceled_at=midnight - timedelta(minutes=2),
+                canceled_by_user_id=admin_user.id,
+                cancel_reason="SYNTHETIC cancellation",
+            ),
+        ]
+    )
+    db_session.flush()
+
+    order_identity = f"order:{order.id}"
+    before = search_lab_worklist(
+        db_session, LabWorklistSearch(view="today"), CLINIC_TZ, now=before_midnight
+    )
+    assert before.date == YESTERDAY and before.counts.overdue == 0
+    assert [(entry.id, entry.status) for entry in before.entries] == [
+        (order_identity, "partial")
+    ]
+
+    actionable = _search(db_session)
+    assert actionable.date == TODAY
+    assert actionable.total == actionable.counts.actionable == 2
+    assert actionable.counts.ready == 0 and actionable.counts.overdue == 1
+    partial = next(entry for entry in actionable.entries if entry.id == order_identity)
+    assert partial.work_date == YESTERDAY and partial.status == "partial"
+    assert partial.priority == "urgent" and partial.report_instance_id == released.id
+    assert partial.progress.model_dump() == {
+        "total_reports": 1,
+        "released_reports": 1,
+        "ordered_tests": 3,
+        "released_tests": 1,
+        "canceled_tests": 1,
+    }
+    assert {
+        item.visit_service_id: (item.canceled, item.can_cancel)
+        for item in partial.service_details
+    } == {
+        released_line.id: (False, False),
+        active_line.id: (False, True),
+        canceled_line.id: (True, False),
+    }
+    assert [entry.id for entry in _search(db_session, view="overdue").entries] == [
+        order_identity
+    ]
+    assert [entry.id for entry in _search(db_session, view="today").entries] == [
+        f"visit:{today_visit.id}"
+    ]
+
+
 def test_first_specimen_moves_exact_requisition_to_its_order(
     client, db_session, auth_headers
 ):
