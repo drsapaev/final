@@ -30429,6 +30429,11 @@ export type components = {
              */
             row_version: number;
             /**
+             * Expected Patient Id
+             * @description Patient ID currently selected in the editor
+             */
+            expected_patient_id?: number | null;
+            /**
              * Client Session Id
              * @description Client session UUID for conflict resolution
              */
@@ -32288,6 +32293,7 @@ export type components = {
             patient_id: number;
             /** Expected Row Version */
             expected_row_version: number;
+            reviewed_text?: components["schemas"]["ReviewedPrescriptionText"] | null;
         };
         /**
          * JSONLoginRequest
@@ -41334,6 +41340,15 @@ export type components = {
              */
             reason?: string | null;
         };
+        /** ReviewedPrescriptionText */
+        ReviewedPrescriptionText: {
+            /** Expected Token */
+            expected_token: string;
+            /** Instructions */
+            instructions: string | null;
+            /** Doctor Notes */
+            doctor_notes: string | null;
+        };
         /**
          * RoleCreate
          * @description Schema for creating a new role
@@ -45881,6 +45896,12 @@ export type components = {
             emr_version: number | null;
             /** Is Draft */
             is_draft: boolean;
+            /** Instructions */
+            instructions?: string | null;
+            /** Doctor Notes */
+            doctor_notes?: string | null;
+            /** Review Token */
+            review_token?: string | null;
         };
         /** WorkspaceVisit */
         WorkspaceVisit: {

@@ -30,7 +30,7 @@ from app.schemas.emr_workspace import (
 )
 from app.services.emr_contract import get_emr_text_field
 from app.services.emr_lab_result_evidence import frozen_assessment, released_numeric_observation
-from app.services.emr_v2_service import emr_v2_service
+from app.services.emr_v2_service import EMRPatientContextMismatch, emr_v2_service
 
 
 class WorkspaceError(Exception):
@@ -256,7 +256,10 @@ class EMRWorkspaceService:
             and source.visit_date > visit.visit_date
         ):
             raise WorkspaceError(404, "HISTORY_DOCUMENT_NOT_FOUND")
-        record = emr_v2_service.get_by_visit(self.db, source.id)
+        try:
+            record = emr_v2_service.get_by_visit(self.db, source.id)
+        except EMRPatientContextMismatch:
+            raise WorkspaceError(404, "HISTORY_DOCUMENT_NOT_FOUND") from None
         if record is None or record.patient_id != visit.patient_id:
             raise WorkspaceError(404, "HISTORY_DOCUMENT_NOT_FOUND")
         revision = emr_v2_service.get_revision(self.db, record.id, version)

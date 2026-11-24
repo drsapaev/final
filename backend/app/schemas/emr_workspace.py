@@ -182,9 +182,16 @@ class FollowUpWrite(BaseModel):
     )
 
 
+class ReviewedPrescriptionText(BaseModel):
+    expected_token: str = Field(min_length=1, max_length=128)
+    instructions: str | None = Field(max_length=2000)
+    doctor_notes: str | None = Field(max_length=1000)
+
+
 class IssuePrescription(BaseModel):
     patient_id: int = Field(gt=0)
     expected_row_version: int = Field(gt=0)
+    reviewed_text: ReviewedPrescriptionText | None = None
 
 
 class WorkspacePrescription(BaseModel):
@@ -192,6 +199,9 @@ class WorkspacePrescription(BaseModel):
     visit_id: int
     emr_version: int | None
     is_draft: bool
+    instructions: str | None = None
+    doctor_notes: str | None = None
+    review_token: str | None = None
 
 
 class LabReviewRequest(BaseModel):

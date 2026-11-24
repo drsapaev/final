@@ -267,6 +267,7 @@ interface EMRHookResult {
     isSigned: boolean;
     isAmended: boolean;
     accessDenied: boolean;
+    patientContextChanged: boolean;
     // RETRO-4007-01: the record was finalized on the server while the
     // local editor held the stale in_progress draft.
     serverFinalized: boolean;
@@ -321,6 +322,7 @@ export function EMRContainerV2({
         isSigned,
         isAmended,
         accessDenied,
+        patientContextChanged,
         serverFinalized,
         version,
         rowVersion,
@@ -335,7 +337,9 @@ export function EMRContainerV2({
         undo,
         redo,
         reloadFromServer,
-    } = useEMR(visitId, { specialty: canonicalSpecialty }) as EMRHookResult;
+    } = useEMR(visitId, { specialty: canonicalSpecialty, patientId }) as EMRHookResult;
+    const identityBlocked = patientContextChanged || (emr?.patient_id != null && patientId != null
+        && String(emr.patient_id) !== String(patientId));
     const storedMedications = data?.medications;
     const legacyMedicationList = Array.isArray(storedMedications);
     const medicationSection = legacyMedicationList ? { list: storedMedications } : storedMedications;
@@ -345,7 +349,7 @@ export function EMRContainerV2({
     const [isSigning, setIsSigning] = useState(false);
     const signingScopeRef = useRef<object | null>(null);
     const completionScopeRef = useRef({ visitId, patientId, active: true });
-    const editingDisabled = isReadOnly || isSigned || isAmended || isPreparingCompletion || completionBusy || isSigning || accessDenied;
+    const editingDisabled = isReadOnly || isSigned || isAmended || isPreparingCompletion || completionBusy || isSigning || accessDenied || identityBlocked;
     // Issuing a separate prescription does not edit the signed document.
     const prescriptionBlocked = isSigned || isAmended
         ? isReadOnly || isPreparingCompletion || completionBusy || isSigning || accessDenied
@@ -386,12 +390,12 @@ export function EMRContainerV2({
         && rowVersion > 0;
 
     useEffect(() => {
-        const scope = { visitId, patientId, active: true };
+        const scope = { visitId, patientId, active: !identityBlocked };
         completionScopeRef.current = scope;
         return () => {
             scope.active = false;
         };
-    }, [visitId, patientId]);
+    }, [visitId, patientId, identityBlocked]);
 
     // Get current user (doctor) for history/AI suggestions
     const { currentUser } = useAppData() as { currentUser?: { id?: string | number | null } };
@@ -429,7 +433,7 @@ export function EMRContainerV2({
         // PR-4009 unmount autosave ДО асинхронного reload — отброшенный
         // врачом черновик не может уйти на сервер из деструктора.
         onDiscard: suppressOnDiscard,
-        enabled: !isReadOnly && !accessDenied,
+        enabled: !isReadOnly && !accessDenied && !identityBlocked,
     });
 
     // Navigation guard
@@ -458,6 +462,19 @@ export function EMRContainerV2({
     const amending = useRef(false);
     const [showPreview, setShowPreview] = useState(false);
     const [experimentalGhostMode, setExperimentalGhostMode] = useState(false);
+
+    useEffect(() => {
+        if (!identityBlocked) return;
+        setShowHistory(false);
+        setSelectedVersion(null);
+        setShowDiff(false);
+        setShowAmendForm(false);
+        setAmendPatch({});
+        setAmendReason('');
+        setAmendError(false);
+        setShowPreview(false);
+        cacheService.invalidateByVisit(visitId);
+    }, [identityBlocked, visitId]);
 
     // AI Suggestions state — keyed by EMR field name (examination/diagnosis/treatment).
     const [aiSuggestions, setAiSuggestions] = useState<Record<string, unknown[]>>({});
@@ -507,10 +524,10 @@ export function EMRContainerV2({
 
     // Cache EMR snapshot for the current visit
     useEffect(() => {
-        if (visitId && data) {
+        if (visitId && data && !identityBlocked) {
             cacheService.cacheEMR(visitId, data);
         }
-    }, [visitId, data]);
+    }, [visitId, data, identityBlocked]);
 
     // 🔒 1. Strict Rules for Ghost Mode
     // Auto-disable if signed, amended, or conflict occurs
@@ -949,7 +966,7 @@ export function EMRContainerV2({
         canRedo: canRedo && !editingDisabled,
         canSave: isDirty && !isSaving && !editingDisabled,
         canSign: !isDirty && !isSaving && !isSigned && (!isReadOnly || canSignReadOnly) && !completionBusy,
-        enabled: (!isReadOnly || canSignReadOnly) && !isPreparingCompletion && !completionBusy && !conflict,
+        enabled: (!isReadOnly || canSignReadOnly) && !isPreparingCompletion && !completionBusy && !conflict && !identityBlocked,
     });
 
     if (!visitId) {
@@ -976,6 +993,17 @@ export function EMRContainerV2({
         );
     }
 
+    if (identityBlocked) {
+        return (
+            <div className="emr-v2-container">
+                <p role="alert">{t('emr_workspace.patient_context_changed')}</p>
+                <Button type="button" variant="ghost" onClick={() => void reloadFromServer().catch(() => undefined)}>
+                    {t('emr_workspace.retry')}
+                </Button>
+            </div>
+        );
+    }
+
     // PR-UI-12-3 (plan §PR-UI-12 item 1: "EMR sections — skeleton loading"):
     // while the EMR snapshot loads for the FIRST time (no data yet), render
     // a skeleton stack mirroring the section layout instead of empty clinical
@@ -990,10 +1018,6 @@ export function EMRContainerV2({
             </div>
         );
     }
-    if (emr?.patient_id != null && patientId != null && String(emr.patient_id) !== String(patientId)) {
-        return <div className="emr-v2-container" role="alert">{t('emr_workspace.patient_context_changed')}</div>;
-    }
-
     const handleAmend = async () => {
         if (!amendAllowed || isSaving || amending.current || amendReason.trim().length < 10 || !data) return;
         const scope = completionScopeRef.current;

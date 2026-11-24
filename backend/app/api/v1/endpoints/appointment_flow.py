@@ -14,7 +14,11 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.core.audit import extract_model_changes
 from app.core.config import settings
-from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, DOCTOR_ROLE_SPELLINGS, is_doctor_role_spelling
+from app.core.roles import (
+    DOCTOR_FAMILY_GATE_ROLES,
+    DOCTOR_ROLE_SPELLINGS,
+    is_doctor_role_spelling,
+)
 from app.crud import emr as crud_emr
 from app.crud.appointment import appointment as crud_appointment
 from app.models.clinic import Doctor
@@ -270,6 +274,7 @@ def create_or_update_emr(
         allow_visit_fallback=False,
         current_user=current_user,
     )
+    expected_patient_id = appointment.patient_id
 
     # Проверяем статус записи
     # Разрешаем сохранение EMR если статус: in_visit, in_progress, completed, или called (вызван врачом)
@@ -326,6 +331,7 @@ def create_or_update_emr(
             row_version=row_version,
             client_session_id=f"legacy-appointment-flow:{current_user.id}",
             is_draft=emr_data.is_draft,
+            expected_patient_id=expected_patient_id,
         )
         if canonical_emr is None:
             logger.info(
@@ -378,6 +384,7 @@ def save_emr(
         allow_visit_fallback=False,
         current_user=current_user,
     )
+    expected_patient_id = appointment.patient_id
     canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
     if not canonical_emr:
         raise HTTPException(status_code=404, detail="EMR не найдена")
@@ -395,6 +402,7 @@ def save_emr(
         row_version=canonical_emr.row_version,
         client_session_id=f"legacy-appointment-flow:{current_user.id}",
         is_draft=False,
+        expected_patient_id=expected_patient_id,
     )
     logger.info(
         "[FIX:EMR_AUDIT] Logging UPDATE user audit for saved EMR %d on appointment %d",

@@ -409,8 +409,11 @@ def test_workspace_rx_reuses_exact_appointment_only_prescription(
     ) for appointment_time in ("10:00:00", "11:00")]
     db_session.add_all([matching, different_time])
     db_session.flush()
-    legacy, unrelated = [Prescription(appointment_id=appointment.id, is_draft=False)
-                         for appointment in (matching, different_time)]
+    legacy = Prescription(appointment_id=matching.id, is_draft=False)
+    unrelated = Prescription(
+        appointment_id=different_time.id, is_draft=False,
+        instructions="SYNTHETIC instructions for another visit",
+    )
     db_session.add_all([legacy, unrelated])
     db_session.commit()
     saved = save_prescribable_workspace(client, cardio_auth_headers, test_visit.id)
@@ -420,6 +423,7 @@ def test_workspace_rx_reuses_exact_appointment_only_prescription(
     assert lookup.status_code == 200, lookup.text
     assert lookup.json() == {
         "id": legacy.id, "visit_id": test_visit.id, "emr_version": None, "is_draft": False,
+        "instructions": None, "doctor_notes": None, "review_token": None,
     }
     assert legacy.visit_id is None
 
@@ -432,6 +436,107 @@ def test_workspace_rx_reuses_exact_appointment_only_prescription(
     assert unrelated.visit_id is None
     assert client.post(route, headers=cardio_auth_headers, json=body).json() == issued.json()
     assert db_session.query(Prescription).filter_by(visit_id=test_visit.id).count() == 1
+
+
+@pytest.mark.parametrize("appointment_only", [False, True], ids=["canonical", "appointment-only"])
+def test_workspace_rx_requires_review_before_issuing_existing_supplemental_text(
+    client, db_session, cardio_auth_headers, test_visit, appointment_only,
+):
+    saved = save_prescribable_workspace(client, cardio_auth_headers, test_visit.id)
+    original = {"instructions": "  SYNTHETIC инструкция\n", "doctor_notes": "SYNTHETIC notes"}
+    existing = Prescription(**original, medications=[], is_draft=True)
+    if appointment_only:
+        appointment = Appointment(
+            patient_id=test_visit.patient_id, doctor_id=test_visit.doctor_id,
+            appointment_date=test_visit.visit_date, appointment_time=test_visit.visit_time,
+            status=AppointmentStatus.IN_VISIT,
+        )
+        db_session.add(appointment)
+        db_session.flush()
+        existing.appointment_id = appointment.id
+    else:
+        existing.visit_id = test_visit.id
+    db_session.add(existing)
+    db_session.commit()
+    route = f"{emr_path(test_visit.id)}/workspace/prescription"
+    body = {"patient_id": test_visit.patient_id, "expected_row_version": saved["row_version"]}
+
+    lookup = client.get(route, headers=cardio_auth_headers, params={"patient_id": test_visit.patient_id})
+    assert lookup.status_code == 200, lookup.text
+    observed = lookup.json()
+    assert observed["id"] == existing.id
+    assert observed["review_token"]
+    assert {key: observed[key] for key in original} == original
+
+    without_review = client.post(route, headers=cardio_auth_headers, json=body)
+    assert without_review.status_code == 409, without_review.text
+    assert without_review.json()["detail"]["code"] == "PRESCRIPTION_TEXT_REVIEW_REQUIRED"
+    db_session.refresh(existing)
+    assert (existing.instructions, existing.doctor_notes) == tuple(original.values())
+    assert (existing.medications, existing.is_draft, existing.emr_record_id, existing.emr_revision_id) == (
+        [], True, None, None,
+    )
+    assert existing.visit_id == (None if appointment_only else test_visit.id)
+
+    reviewed = {**original, "expected_token": observed["review_token"]}
+    issued = client.post(route, headers=cardio_auth_headers, json={**body, "reviewed_text": reviewed})
+    assert issued.status_code == 200, issued.text
+    assert issued.json()["id"] == existing.id
+    assert issued.json()["emr_version"] == saved["version"]
+    assert {key: issued.json()[key] for key in original} == original
+    db_session.refresh(existing)
+    assert existing.visit_id == test_visit.id
+    assert existing.is_draft is False
+    assert existing.medications[0]["name"] == "SYNTHETIC item"
+    attributed_revision = existing.emr_revision_id
+    assert attributed_revision is not None
+
+    changed_review = {**reviewed, "expected_token": issued.json()["review_token"], "doctor_notes": None}
+    changed = client.post(route, headers=cardio_auth_headers, json={**body, "reviewed_text": changed_review})
+    assert changed.status_code == 200, changed.text
+    db_session.refresh(existing)
+    assert existing.instructions == original["instructions"]
+    assert existing.doctor_notes is None
+    assert existing.emr_revision_id == attributed_revision
+    assert changed.json()["review_token"] != issued.json()["review_token"]
+
+
+@pytest.mark.parametrize("latest_instructions", ["SYNTHETIC changed instructions", None])
+def test_workspace_rx_rejects_stale_review_after_concurrent_text_change(
+    client, db_session, cardio_auth_headers, test_visit, latest_instructions,
+):
+    saved = save_prescribable_workspace(client, cardio_auth_headers, test_visit.id)
+    existing = Prescription(visit_id=test_visit.id, is_draft=True, instructions="SYNTHETIC old")
+    db_session.add(existing)
+    db_session.commit()
+    route = f"{emr_path(test_visit.id)}/workspace/prescription"
+    params = {"patient_id": test_visit.patient_id}
+    lookup = client.get(route, headers=cardio_auth_headers, params=params)
+    assert lookup.status_code == 200, lookup.text
+    previous = lookup.json()
+    db_session.execute(Prescription.__table__.update().where(Prescription.id == existing.id).values(
+        instructions=latest_instructions,
+    ))
+    db_session.commit()
+
+    response = client.post(route, headers=cardio_auth_headers, json={
+        **params, "expected_row_version": saved["row_version"],
+        "reviewed_text": {
+            "expected_token": previous["review_token"], "instructions": previous["instructions"],
+            "doctor_notes": previous["doctor_notes"],
+        },
+    })
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "PRESCRIPTION_TEXT_REVIEW_REQUIRED"
+    db_session.refresh(existing)
+    assert existing.instructions == latest_instructions
+    assert (existing.doctor_notes, existing.medications, existing.is_draft, existing.emr_revision_id) == (
+        None, None, True, None,
+    )
+    latest = client.get(route, headers=cardio_auth_headers, params=params)
+    assert latest.status_code == 200, latest.text
+    assert latest.json()["instructions"] == latest_instructions
+    assert latest.json()["review_token"] != previous["review_token"]
 
 
 def test_workspace_rx_refuses_ambiguous_legacy_visit_mapping(
@@ -462,6 +567,30 @@ def test_workspace_rx_refuses_ambiguous_legacy_visit_mapping(
     assert attempt.json()["detail"]["code"] == "PRESCRIPTION_LEGACY_AMBIGUOUS"
     assert legacy.visit_id is None
     assert db_session.query(Prescription).filter_by(visit_id=test_visit.id).count() == 0
+
+
+def test_workspace_rx_refuses_to_review_or_issue_ambiguous_canonical_prescriptions(
+    client, db_session, cardio_auth_headers, test_visit,
+):
+    saved = save_prescribable_workspace(client, cardio_auth_headers, test_visit.id)
+    existing = [Prescription(visit_id=test_visit.id, instructions=content)
+                for content in ("SYNTHETIC first", "SYNTHETIC second")]
+    db_session.add_all(existing)
+    db_session.commit()
+    route = f"{emr_path(test_visit.id)}/workspace/prescription"
+    params = {"patient_id": test_visit.patient_id}
+
+    lookup = client.get(route, headers=cardio_auth_headers, params=params)
+    issuance = client.post(route, headers=cardio_auth_headers, json={
+        **params, "expected_row_version": saved["row_version"],
+    })
+    for result in (lookup, issuance):
+        assert result.status_code == 409, result.text
+        assert result.json()["detail"]["code"] == "PRESCRIPTION_LEGACY_AMBIGUOUS"
+    for item, content in zip(existing, ("SYNTHETIC first", "SYNTHETIC second"), strict=True):
+        db_session.refresh(item)
+        assert item.instructions == content
+        assert item.is_draft and item.medications is None and item.emr_revision_id is None
 
 
 @pytest.mark.parametrize("change,expected_status,expected_code", [

@@ -18,6 +18,7 @@ from app.core.pii_masker import (
     is_sensitive_verification_path,
     mask_pii,
 )
+from app.services.emr_v2_service import EMRPatientContextMismatch
 from app.services.queue_service import (
     QueueConflictError,
     QueueError,
@@ -122,6 +123,15 @@ def register_exception_handlers(app: FastAPI) -> None:
     """
     Регистрирует все обработчики исключений в FastAPI приложении
     """
+
+    @app.exception_handler(EMRPatientContextMismatch)
+    async def emr_patient_context_mismatch(
+        _request: Request, _exc: EMRPatientContextMismatch
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": {"code": "PATIENT_CONTEXT_CHANGED"}},
+        )
 
     @app.exception_handler(QueueValidationError)
     async def queue_validation_error_handler(
