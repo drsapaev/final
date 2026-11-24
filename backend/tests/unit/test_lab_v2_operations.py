@@ -52,6 +52,26 @@ def synthetic_report(db, patient_id, *, visit_id=None):
     )
 
 
+def accepted_specimen(db_session, report, barcode):
+    specimen = LabSpecimen(
+        order_id=report.order_id,
+        barcode=barcode,
+        material_code="blood",
+        container_code="tube",
+        status="accepted",
+        revision=1,
+        create_request_id=str(uuid4()),
+        created_at=datetime.now(UTC),
+    )
+    db_session.add(specimen)
+    db_session.flush()
+    db_session.add(
+        LabSpecimenAssignment(specimen_id=specimen.id, report_instance_id=report.id)
+    )
+    db_session.commit()
+    return specimen
+
+
 @pytest.mark.unit
 def test_standalone_does_not_attach_to_old_order(db_session, test_patient, test_visit):
     old_order = LabOrder(
@@ -86,22 +106,7 @@ def test_standalone_does_not_attach_to_old_order(db_session, test_patient, test_
 def test_import_validation_receipt_and_partial_retry(db_session, test_patient):
     actor = synthetic_user(db_session, "Lab")
     service, report = synthetic_report(db_session, test_patient.id)
-    specimen = LabSpecimen(
-        order_id=report.order_id,
-        barcode="SYNTHETIC-IMPORT",
-        material_code="blood",
-        container_code="tube",
-        status="accepted",
-        revision=1,
-        create_request_id=str(uuid4()),
-        created_at=datetime.now(UTC),
-    )
-    db_session.add(specimen)
-    db_session.flush()
-    db_session.add(
-        LabSpecimenAssignment(specimen_id=specimen.id, report_instance_id=report.id)
-    )
-    db_session.commit()
+    specimen = accepted_specimen(db_session, report, "SYNTHETIC-IMPORT")
 
     field = service._field_map(report.template_version)["hgb"]
     data = {
@@ -175,6 +180,100 @@ def test_import_validation_receipt_and_partial_retry(db_session, test_patient):
         "error_code": "invalid_value",
     }
     assert last_rejection.subject_patient_id is None and last_rejection.payload is None
+
+
+@pytest.mark.unit
+def test_csv_uses_the_published_catalog_mapping(db_session, test_patient):
+    actor = synthetic_user(db_session, "Lab")
+    service, old_report = synthetic_report(db_session, test_patient.id)
+    draft = service.create_template_version(
+        old_report.template_id, old_report.template_version_id
+    )
+    field = service._field_map(draft)["hgb"]
+    field.analyte_code = "hgb"
+    field.unit_code = "g_per_l"
+    db_session.commit()
+    published = service.publish_template_version(draft.id)
+    report = service.create_instance(
+        {
+            "patient_id": test_patient.id,
+            "template_id": old_report.template_id,
+            "template_version_id": published.id,
+        }
+    )
+    specimen = accepted_specimen(db_session, report, "SYNTHETIC-CSV")
+    base = {
+        "report_instance_id": report.id,
+        "specimen_barcode": specimen.barcode,
+    }
+    cases = [
+        (
+            {
+                **base,
+                "values": [
+                    {
+                        "analyte_code": "unmapped",
+                        "unit_code": "g_per_l",
+                        "value_text": "0",
+                    }
+                ],
+            },
+            "unknown_analyte",
+        ),
+        (
+            {
+                **base,
+                "values": [
+                    {
+                        "analyte_code": "hgb",
+                        "unit_code": "mmol_per_l",
+                        "value_text": "0",
+                    }
+                ],
+            },
+            "unit_mismatch",
+        ),
+        (
+            {
+                **base,
+                "method_code": "unconfirmed",
+                "values": [
+                    {"analyte_code": "hgb", "unit_code": "g_per_l", "value_text": "0"}
+                ],
+            },
+            "method_mismatch",
+        ),
+        (
+            {
+                **base,
+                "values": [
+                    {"analyte_code": "hgb", "unit_code": "g_per_l", "value_text": "0"}
+                ],
+            },
+            None,
+        ),
+    ]
+    rows = [{**case, "message_id": str(uuid4())} for case, _ in cases]
+    preview = process_import_batch(
+        db_session,
+        LabImportBatch(source="csv", rows=rows),
+        actor_id=actor.id,
+        preview=True,
+    )
+    assert [item.error_code for item in preview] == [code for _, code in cases]
+    assert preview[-1].status == "ready"
+    rows[-1]["expected_updated_at"] = preview[-1].updated_at
+    saved = process_import_batch(
+        db_session,
+        LabImportBatch(source="csv", rows=[rows[-1]]),
+        actor_id=actor.id,
+    )[0]
+    assert saved.status == "saved"
+    value = db_session.scalar(
+        select(LabReportValue).where(LabReportValue.instance_id == report.id)
+    )
+    assert value.value_numeric == Decimal("0")
+    assert value.result_payload["source_specimen_id"] == specimen.id
 
 
 @pytest.mark.unit
