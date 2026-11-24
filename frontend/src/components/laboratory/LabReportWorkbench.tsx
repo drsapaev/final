@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from '../ui/macos';
 // ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
 import { useLabReporting } from '../../hooks/useLabReporting';
@@ -1496,16 +1496,28 @@ export default function LabReportWorkbench({
     </fieldset>
   );
 
+  function revealCoveredControl(event: FocusEvent<HTMLDivElement>) {
+    const control = event.target;
+    const { x, y, width, height } = control.getBoundingClientRect();
+    const stickyRegion = document.elementFromPoint?.(x + width / 2, y + height / 2)
+      ?.closest('.lab-order-identity, .lab-report-actions-dock');
+    if (stickyRegion && !stickyRegion.contains(control)) {
+      control.scrollIntoView({ block: 'center', inline: 'nearest' });
+    }
+  }
+
   return (
     <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
-      <Card variant="filled" padding="none">
+      <Card variant="filled" padding="none" style={{ overflow: 'clip' }}>
         <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
           <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <FileText size={20} aria-hidden="true" />
             {t('workbench.title')}
           </CardTitle>
         </CardHeader>
-        <CardContent style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)', display: 'grid', gap: 'var(--mac-spacing-4)' }}>
+        <CardContent
+          onFocusCapture={revealCoveredControl}
+          style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)', display: 'grid', gap: 'var(--mac-spacing-4)' }}>
           {!selectedAppointment && !activeInstance ? (
             <Alert severity="info">
               {recentReports.length > 0
@@ -1691,43 +1703,6 @@ export default function LabReportWorkbench({
                       )}
                     </Alert>
                   )}
-                {/* P-04 fix: панель действий вынесена в LabReportActionsBar */}
-                <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <LabReportActionsBar
-                    saving={saving || instanceTransitionPending}
-                    busyAction={busyAction ?? undefined}
-                    canSaveDraft={canSaveDraft && saveFailure !== 'conflict'}
-                    // WF-10 fix: Finalize disabled пока есть missing required fields.
-                    canFinalize={canFinalizeWithValidation && !isDirty && !saveFailure
-                      && !(activeInstance.release_holds as string[] | undefined)?.length}
-                    canRevise={canRevise}
-                    canPrint={canPrint}
-                    canPreview={canPreview}
-                    // P1 fix: Notify patient — only for finalized/printed reports.
-                    canNotify={String(activeInstance?.status ?? '') === 'FINALIZED' || String(activeInstance?.status ?? '') === 'PRINTED'}
-                    onSaveDraft={handleSaveDraft}
-                    onFinalize={handleFinalize}
-                    onRevise={() => openWorkflowPrompt('revise')}
-                    onPrint={handlePrint}
-                    onNotify={handleNotifyPatient}
-                    onPreview={handlePreviewPdf}
-                  />
-                  {/* WF-10 fix: inline-индикатор missing required fields.
-                      Показываем сколько обязательных полей ещё не заполнено,
-                      чтобы лаборант понимал, почему Finalize disabled. */}
-                  {/* PR-66 / Low-27: replaced plain text spans with Badge components */}
-                  {(canFinalize || hasLabReportAction(activeInstance, 'submit_review')) && hasMissingRequired && (
-                    <Badge variant="warning" style={{ marginLeft: 'var(--mac-spacing-2)' }}>
-                      {t('workbench.required_remaining', { count: missingRequiredFields.length })}
-                    </Badge>
-                  )}
-                  {/* P-01 fix: AI-анализ бланка. Перенесён из LabResultsManager
-                      с сохранением P-02 fix (блокировка при отсутствии возраста/пола).
-                      Использует patient_snapshot из activeInstance — отдельный
-                      запрос GET /patients/{id} не нужен. */}
-                  {/* PR-61 / Medium-22: AI button styled as secondary (was visually mixed with operational buttons) */}
-                  {/* STRAT#25: AI analysis moved to ReportSidebar — rendered after the editor card. */}
-                </div>
               </div>
 
               <ReportWorkflowPanel
@@ -1896,6 +1871,36 @@ export default function LabReportWorkbench({
                 canEditActiveInstance={canEditVisibleInstance}
                 reportHistory={reportHistory}
               />
+              <div className="lab-report-actions-dock">
+                <LabReportActionsBar
+                  saving={saving || instanceTransitionPending}
+                  busyAction={busyAction ?? undefined}
+                  canSaveDraft={canSaveDraft && saveFailure !== 'conflict'}
+                  // WF-10 fix: Finalize disabled пока есть missing required fields.
+                  canFinalize={canFinalizeWithValidation && !isDirty && !saveFailure
+                    && !(activeInstance.release_holds as string[] | undefined)?.length}
+                  canRevise={canRevise}
+                  canPrint={canPrint}
+                  canPreview={canPreview}
+                  // P1 fix: Notify patient — only for finalized/printed reports.
+                  canNotify={String(activeInstance?.status ?? '') === 'FINALIZED' || String(activeInstance?.status ?? '') === 'PRINTED'}
+                  onSaveDraft={handleSaveDraft}
+                  onFinalize={handleFinalize}
+                  onRevise={() => openWorkflowPrompt('revise')}
+                  onPrint={handlePrint}
+                  onNotify={handleNotifyPatient}
+                  onPreview={handlePreviewPdf}
+                />
+                {/* WF-10 fix: inline-индикатор missing required fields.
+                    Показываем сколько обязательных полей ещё не заполнено,
+                    чтобы лаборант понимал, почему Finalize disabled. */}
+                {/* PR-66 / Low-27: replaced plain text spans with Badge components */}
+                {(canFinalize || hasLabReportAction(activeInstance, 'submit_review')) && hasMissingRequired && (
+                  <Badge variant="warning" style={{ marginLeft: 'var(--mac-spacing-2)' }}>
+                    {t('workbench.required_remaining', { count: missingRequiredFields.length })}
+                  </Badge>
+                )}
+              </div>
             </div>
           )}
         </CardContent>

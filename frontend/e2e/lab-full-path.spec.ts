@@ -575,6 +575,100 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     await expect(queue.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) })).toHaveAttribute('aria-current', 'true');
   });
 
+  test('keeps identity and one save action available in a tall report with a critical finding', async ({ page }) => {
+    const record = makeInstanceRecord(CREATED_INSTANCE_ID, 'IN_PROGRESS');
+    const originalField = record.sections[0].fields[0];
+    const fields = Array.from({ length: 32 }, (_, index) => ({
+      ...originalField,
+      id: index + 1,
+      field_key: `synthetic_${index + 1}`,
+      label: `SYNTHETIC-RESULT-${index + 1}`,
+      value_type: 'numeric',
+      value_text: index === 0 ? '24.0' : '4.2',
+      sort_order: index + 1,
+    }));
+    record.sections = [{ ...record.sections[0], fields }];
+    state.instances.push(record);
+    await page.route(`**/api/v1/lab/report-instances/${CREATED_INSTANCE_ID}`, (route) => json(route, {
+      ...record,
+      critical_findings: [{
+        section_key: record.sections[0].key,
+        field_key: fields[0].field_key,
+        label: fields[0].label,
+        value_display: fields[0].value_text,
+        unit: 'SYNTHETIC-UNIT',
+        threshold_display: '> 12.0',
+        resolved_flag: 'critical',
+      }],
+    }));
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto('/lab');
+    const appFrame = page.locator('#main-content');
+    await expect(appFrame).toHaveCSS('overflow', 'auto');
+    await page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) }).click();
+    const report = page.getByRole('tabpanel', { name: /Отчёты/ });
+    const identity = report.getByRole('heading', { name: QUEUE_ENTRY.patient_fio });
+    const critical = report.getByRole('alert').filter({ hasText: 'Критические показатели' });
+    const save = report.getByRole('button', { name: 'Сохранить черновик', exact: true });
+    const value = report.getByRole('textbox', { name: 'Результат: SYNTHETIC-RESULT-16' });
+    const nextValue = report.getByRole('textbox', { name: 'Результат: SYNTHETIC-RESULT-17' });
+    const isUnobscured = (element: Element) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      return element.contains(document.elementFromPoint(x + width / 2, y + height / 2));
+    };
+
+    await expect(critical).toBeVisible();
+    await page.setViewportSize({ width: 375, height: 600 });
+    await expect(appFrame).toHaveCSS('overflow', 'auto');
+
+    for (const viewport of [
+      { width: 375, height: 812 },
+      { width: 768, height: 1024 },
+      { width: 1280, height: 800 },
+      { width: 1920, height: 1080 },
+    ]) {
+      await test.step(`critical report at ${viewport.width}px`, async () => {
+        await page.setViewportSize(viewport);
+        await expect(appFrame).toHaveCSS('overflow', 'clip');
+        await critical.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+        await expect(critical).toBeInViewport({ ratio: 0.95 });
+        await expect(critical).toContainText('SYNTHETIC-RESULT-1');
+        await expect(critical).toContainText('24.0');
+        expect(await critical.getByText('SYNTHETIC-RESULT-1', { exact: true }).evaluate(isUnobscured)).toBe(true);
+
+        await value.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+        await expect(identity).toBeInViewport({ ratio: 1 });
+        await expect(save).toHaveCount(1);
+        await expect(save).toBeInViewport({ ratio: 1 });
+        expect(await save.evaluate(isUnobscured)).toBe(true);
+
+        await value.focus();
+        await page.keyboard.press('Enter');
+        await expect(nextValue).toBeFocused();
+        expect(await nextValue.evaluate(isUnobscured)).toBe(true);
+
+        await nextValue.evaluate((element) => {
+          const dock = element.closest('.lab-workspace-report')?.querySelector('.lab-report-actions-dock');
+          const scroller = element.closest('.app-shell-grid');
+          if (!dock || !scroller) throw new Error('Missing report dock or scroll container');
+          scroller.scrollTop += element.getBoundingClientRect().top - dock.getBoundingClientRect().top - 8;
+        });
+        await value.focus();
+        await page.keyboard.press('Enter');
+        await expect(nextValue).toBeFocused();
+        expect(await nextValue.evaluate(isUnobscured)).toBe(true);
+        expect(finalizePostCount).toBe(0);
+      });
+    }
+
+    await nextValue.fill('4.3');
+    await save.focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(() => bulkSavePostCount).toBeGreaterThan(0);
+    expect(finalizePostCount).toBe(0);
+  });
+
   test('queue -> create -> fill -> save -> preview -> finalize -> print(PDF) -> revise -> history, one instance lineage', async ({ page }) => {
     // Все 3 tabpanel смонтированы постоянно (hidden-секции PR5), а панель
     // очереди рендерит свою копию истории (lqw-history-*) — скрытую при
