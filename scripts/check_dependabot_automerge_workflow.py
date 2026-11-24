@@ -270,6 +270,9 @@ def test_decide(steps: dict[str, str]) -> None:
         ("synchronize+eligible -> none", {"VERDICT": "automerge", "FILES_OK": "true", "EVENT": "synchronize"}, "none"),
         ("synchronize+broken -> disable_and_triage", {"VERDICT": "automerge", "FILES_OK": "false", "EVENT": "synchronize"}, "disable_and_triage"),
         ("opened+broken -> disable_and_triage", {"VERDICT": "automerge", "FILES_OK": "false", "EVENT": "opened"}, "disable_and_triage"),
+        ("shared queue supersedes native auto-merge on opened", {"VERDICT": "automerge", "FILES_OK": "true", "EVENT": "opened", "QUEUE_ENABLED": "true"}, "disable_and_triage"),
+        ("shared queue disarms previously enabled auto-merge on synchronize", {"VERDICT": "automerge", "FILES_OK": "true", "EVENT": "synchronize", "QUEUE_ENABLED": "true"}, "disable_and_triage"),
+        ("shared queue never enables non-allowlisted candidates", {"VERDICT": "triage", "FILES_OK": "", "EVENT": "opened", "QUEUE_ENABLED": "true"}, "disable_and_triage"),
         ("outside allowlist -> triage", {"VERDICT": "triage", "FILES_OK": "", "EVENT": "opened"}, "triage"),
     ]
     for label, envs, expected in cases:
