@@ -42,11 +42,13 @@ def bot(request, monkeypatch):
     return service
 
 
-def _update(text, *, chat_id=CHAT_ID, sender_id=CHAT_ID, chat_type="private"):
+def _update(
+    text, *, chat_id=CHAT_ID, sender_id=CHAT_ID, chat_type="private", is_bot=False
+):
     return {
         "message": {
             "chat": {"id": chat_id, "type": chat_type},
-            "from": {"id": sender_id, "language_code": "ru"},
+            "from": {"id": sender_id, "language_code": "ru", "is_bot": is_bot},
             "text": text,
         }
     }
@@ -417,18 +419,64 @@ async def test_dual_link_uses_patient_menu_for_plain_start(
     assert not _inline_buttons(markup)
 
 
-async def test_unknown_and_textless_messages_do_not_reach_legacy_dispatch(
-    db_session, bot
-):
-    update = _update("SYNTHETIC ignored", chat_type="group")
+@pytest.mark.parametrize(
+    "update",
+    [
+        _update("SYNTHETIC ignored", chat_type="group"),
+        _update("SYNTHETIC ignored", sender_id=CHAT_ID + 1),
+        _update("SYNTHETIC ignored", is_bot=True),
+        {"message": None},
+        {"message": {"chat": ["invalid"], "text": "SYNTHETIC ignored"}},
+        _update("SYNTHETIC ignored", chat_id="invalid"),
+        _update(None),
+        _update("  "),
+        _update({"text": "SYNTHETIC ignored"}),
+    ],
+    ids=[
+        "group",
+        "mismatched-sender",
+        "bot",
+        "bad-message",
+        "bad-chat",
+        "bad-chat-id",
+        "no-text",
+        "blank",
+        "bad-text",
+    ],
+)
+async def test_invalid_messages_do_not_reach_legacy_dispatch(db_session, bot, update):
     assert await telegram_webhook._handle_clinic_bot_update(update, db_session, bot)
     bot._send_message.assert_not_awaited()
-
-    update = _update("")
-    assert await telegram_webhook._handle_clinic_bot_update(update, db_session, bot)
-    bot._send_message.assert_not_awaited()
+    bot.process_webhook_update.assert_not_awaited()
     assert db_session.query(TelegramUser).filter_by(chat_id=CHAT_ID).first() is None
 
+
+async def test_callback_still_passes_clinic_patient_dispatch(db_session, bot):
     assert not await telegram_webhook._handle_clinic_bot_update(
         {"callback_query": {"id": "synthetic-callback"}}, db_session, bot
     )
+
+
+async def test_unknown_slash_command_returns_help_without_echo(db_session, bot):
+    help_message, help_markup = await _reply(db_session, bot, "/help")
+    message, markup = await _reply(db_session, bot, "/synthetic_unknown SYNTHETIC-NOTE")
+    assert (message, markup) == (help_message, help_markup)
+    assert "synthetic" not in message.casefold()
+
+
+@pytest.mark.parametrize(
+    ("language", "results_label", "protected_label"),
+    [("ru", "результаты", "защищ"), ("uz-Latn", "natijalar", "himoya")],
+)
+async def test_help_points_to_protected_results_without_promising_pdfs(
+    db_session, bot, language, results_label, protected_label
+):
+    _profile(db_session, linked=True, language=language)
+
+    message, _ = await _reply(db_session, bot, "/help")
+
+    assert any(
+        results_label in line and protected_label in line
+        for line in message.casefold().splitlines()
+    )
+    assert "pdf" not in message.casefold()

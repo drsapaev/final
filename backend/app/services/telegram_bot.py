@@ -166,6 +166,17 @@ async def dispatch_patient_bot_update(
         _private_patient_chat_id,
     )
 
+    message = update.get("message")
+    if "message" in update:
+        if not isinstance(message, dict):
+            return True
+        chat = message.get("chat")
+        if not isinstance(chat, dict) or type(chat.get("id")) is not int:
+            return True
+        sender = message.get("from")
+        if isinstance(sender, dict) and sender.get("is_bot") is True:
+            return True
+
     if await staff_start_handler(update, db, bot_service):
         return True
     # A linked staff member's ordinary menu can also handle /start.
@@ -174,32 +185,33 @@ async def dispatch_patient_bot_update(
     if staff_menu_handler and await staff_menu_handler(update, db, bot_service):
         return True
 
-    if "message" not in update:
+    if message is None:
         return False
 
-    message = update["message"]
-    if not isinstance(message, dict):
-        return True
     chat_id = _private_patient_chat_id(message)
     if chat_id is None:
         return True
     if await contact_handler(message, db, bot_service):
         return True
 
-    text = str(message.get("text") or "").strip()
-    if not text:
+    raw_text = message.get("text")
+    if not isinstance(raw_text, str) or not raw_text.strip():
         return True
+    text = raw_text.strip()
 
     command = text.split(maxsplit=1)[0].split("@", 1)[0].lower()
     if command == "/start":
         await start_handler(chat_id, message)
         return True
 
-    handler = (
-        command_handlers.get(command)
-        or text_handlers.get(_normalize_patient_button_text(text))
-        or command_handlers.get("/help")
+    handler = command_handlers.get(command) or text_handlers.get(
+        _normalize_patient_button_text(text)
     )
+    if handler is None:
+        if not text.startswith("/"):
+            # The transport's private-text fallback refreshes the profile.
+            return False
+        handler = command_handlers.get("/help")
     if handler is not None:
         await handler(chat_id)
     return True
@@ -326,13 +338,19 @@ class TelegramBotService:
             if text.startswith("/"):
                 await self._handle_command(text, chat_id, telegram_user, db)
             else:
+                from app.api.v1.endpoints.telegram_webhook._helpers import (
+                    _localized_text,
+                )
+
                 await self.send_plain_message(
                     chat_id,
-                    "Откройте меню командой /start, чтобы выбрать нужный раздел.",
+                    _localized_text("private_start_hint", telegram_user.language_code),
                 )
 
         except Exception as e:
-            logger.error("Telegram legacy message failed error_type=%s", type(e).__name__)
+            logger.error(
+                "Telegram legacy message failed error_type=%s", type(e).__name__
+            )
 
     async def _handle_callback_query(self, callback_query: dict[str, Any], db: Session):
         """Обработка callback запросов (кнопки)"""
@@ -602,13 +620,17 @@ class TelegramBotService:
                 "username": username,
                 "first_name": first_name,
                 "last_name": last_name,
-                "language_code": language_code or "ru",
                 "last_activity": datetime.now(UTC),
             }
             if telegram_user is None:
                 return crud_telegram.create_telegram_user(
                     db,
-                    {**profile, "chat_id": chat_id, "notifications_enabled": False},
+                    {
+                        **profile,
+                        "chat_id": chat_id,
+                        "language_code": language_code or "ru",
+                        "notifications_enabled": False,
+                    },
                 )
             if not telegram_user.active or telegram_user.blocked:
                 return None
@@ -616,7 +638,10 @@ class TelegramBotService:
             # Telegram sender ID or a clinic User ID.
             return crud_telegram.update_telegram_user(db, telegram_user.id, profile)
         except Exception as e:
-            logger.error("Telegram private profile refresh failed error_type=%s", type(e).__name__)
+            logger.error(
+                "Telegram private profile refresh failed error_type=%s",
+                type(e).__name__,
+            )
             return None
 
     async def _send_welcome_message(self, chat_id: int, telegram_user):

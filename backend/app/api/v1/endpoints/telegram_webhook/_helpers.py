@@ -620,19 +620,20 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_RU: "Уведомления отключены. Их можно включить позже через клинику.",
         TELEGRAM_LANGUAGE_UZ: "Xabarnomalar o'chirildi. Ularni keyin klinika orqali yoqish mumkin.",
     },
+    "private_start_hint": {
+        TELEGRAM_LANGUAGE_RU: "Откройте меню командой /start, чтобы выбрать нужный раздел.",
+        TELEGRAM_LANGUAGE_UZ: "Kerakli bo'limni tanlash uchun /start buyrug'i bilan menyuni oching.",
+    },
     "help": {
         TELEGRAM_LANGUAGE_RU: (
             "Kosmed Clinic bot\n\n"
             "Для пациента:\n"
-            "🏥 Записаться на приём - отправить заявку через защищенный Mini App.\n"
-            "🎫 Моя очередь - номер, кабинет, статус и позиция ожидания.\n"
-            "📅 Мои визиты - последние и сегодняшние визиты без медицинских деталей.\n"
-            "💳 Оплаты и долг - начислено, оплачено, долг и незавершенные платежи.\n"
-            "📄 Результаты - до 3 готовых PDF-отчетов, только после привязки.\n"
+            "🏥 Записаться - варианты записи в Mini App.\n"
+            "🎫 Очередь, визиты, оплаты и готовые результаты - в защищённом кабинете.\n"
             "📲 Онлайн-сервисы - карта подключенных и будущих защищенных функций.\n"
             "📋 Анкеты пациента - защищенное заполнение через Mini App.\n"
-            "🧾 Документы и чеки - безопасный вход к будущему кабинету документов.\n"
-            "🧑‍⚕️ Врачи и расписание - защищенный просмотр расписания.\n"
+            "🧾 Документы - переход к результатам в кабинете.\n"
+            "🧑‍⚕️ Врачи и расписание - переход к вариантам записи.\n"
             "📲 Кабинет пациента - защищенный вход без медданных в чате.\n"
             "👤 Мой статус - привязка Telegram к карте пациента.\n"
             "⚙️ Настройки - язык и уведомления.\n"
@@ -649,15 +650,12 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_UZ: (
             "Kosmed Clinic bot\n\n"
             "Bemor uchun:\n"
-            "🏥 Qabulga yozilish - himoyalangan Mini App orqali so'rov yuborish.\n"
-            "🎫 Mening navbatim - raqam, kabinet, holat va kutishdagi o'rin.\n"
-            "📅 Mening tashriflarim - so'nggi va bugungi tashriflar, tibbiy tafsilotlarsiz.\n"
-            "💳 To'lovlar va qarz - hisoblangan, to'langan, qarz va yakunlanmagan to'lovlar.\n"
-            "📄 Natijalar - faqat bog'langan bemor uchun 3 tagacha tayyor PDF hisobot.\n"
+            "🏥 Qabulga yozilish - Mini App orqali mavjud imkoniyatlar.\n"
+            "🎫 Navbat, tashriflar, to'lovlar va tayyor natijalar himoyalangan kabinetda.\n"
             "📲 Onlayn xizmatlar - ulangan va kelajakdagi himoyalangan funksiyalar xaritasi.\n"
             "📋 Bemor anketalari - Mini App orqali himoyalangan to'ldirish.\n"
-            "🧾 Hujjatlar va cheklar - kelajakdagi himoyalangan hujjatlar kabineti kirishi.\n"
-            "🧑‍⚕️ Shifokorlar jadvali - himoyalangan jadval ko'rish.\n"
+            "🧾 Hujjatlar - kabinetdagi natijalarga o'tish.\n"
+            "🧑‍⚕️ Shifokorlar jadvali - yozilish imkoniyatlariga o'tish.\n"
             "📲 Bemor kabineti - chatda tibbiy ma'lumotsiz himoyalangan kirish.\n"
             "👤 Mening holatim - Telegram bemor kartasiga bog'langanini ko'rish.\n"
             "⚙️ Sozlamalar - til va xabarnomalar.\n"
