@@ -227,6 +227,82 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
     }));
   });
 
+  it.each([true, false])('announces the updated room before audio settings are ready (event ID: %s)', async (hasEventId) => {
+    const speak = vi.fn((utterance: { onstart?: () => void }) => utterance.onstart?.());
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'ru-RU' }], speak, cancel: vi.fn() });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
+    let finishSettings!: (response: unknown) => void;
+    apiMock.api.get.mockImplementation(() => new Promise((resolve) => { finishSettings = resolve; }));
+    let onMessage!: (message: unknown) => void;
+    wsMock.openDisplayBoardWS.mockImplementation((_id, handler, onConnect) => {
+      onMessage = handler;
+      onConnect();
+      return vi.fn();
+    });
+    render(<DisplayBoardUnified department="Reg" dateStr="2026-05-23" />);
+    await waitFor(() => expect(apiMock.api.get).toHaveBeenCalled());
+    act(() => {
+      onMessage({ type: 'initial_state', data: { queue_entries: [] } });
+      onMessage({ type: 'patient_call', data: {
+        ...(hasEventId ? { event_id: 'room-change-before-audio' } : {}), queue_id: 1, queue_entry_id: 8,
+        queue_number: 8, cabinet: '506',
+      } });
+      onMessage({ type: 'queue_update', data: { queue_id: 1, cabinet: '507', queue_entries: [
+        { id: 8, queue_id: 1, number: 8, status: 'called', cabinet: '507' },
+      ] } });
+    });
+    expect(screen.getAllByText('🚪 507')).not.toHaveLength(0);
+    expect(speak).not.toHaveBeenCalled();
+    await act(async () => finishSettings({ data: {
+      sound_enabled: true, voice_announcements: true, voice_language: 'ru', volume_level: 50,
+    } }));
+    await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+    expect(speak).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringMatching(/8.*507/) }));
+  });
+
+  it('announces the updated room when it changes while the voice locale is loading', async () => {
+    const locale = 'uz-Latn';
+    const connector = i18n.services.backendConnector as unknown as {
+      state: Record<string, number>;
+      backend: { read: (language: string, namespace: string, callback: (error: Error | null, data: object | null) => void) => void };
+    };
+    const stateKey = `${locale}|translation`;
+    const previousState = connector.state[stateKey];
+    const previousBundle = i18n.getResourceBundle(locale, 'translation');
+    i18n.removeResourceBundle(locale, 'translation');
+    connector.state[stateKey] = -1;
+    let finishLocale!: (error: Error | null, data: object | null) => void;
+    const read = vi.spyOn(connector.backend, 'read').mockImplementation((_language, _namespace, callback) => {
+      finishLocale = callback;
+    });
+    const speak = vi.fn((utterance: { onstart?: () => void }) => utterance.onstart?.());
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'uz-UZ' }], speak, cancel: vi.fn() });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
+    try {
+      const { push } = await renderBoard({}, {
+        sound_enabled: true, voice_announcements: true, voice_language: 'uz', volume_level: 50,
+      });
+      await waitFor(() => expect(read).toHaveBeenCalled());
+      push({ type: 'patient_call', data: {
+        event_id: 'room-change-before-locale', queue_id: 1, queue_entry_id: 9,
+        queue_number: 9, cabinet: '601',
+      } });
+      push({ type: 'queue_update', data: { queue_id: 1, cabinet: '602', queue_entries: [
+        { id: 9, queue_id: 1, number: 9, status: 'called', cabinet: '602' },
+      ] } });
+      expect(speak).not.toHaveBeenCalled();
+      await act(async () => finishLocale(null, { misc: { dbu_voice_patient_call: '{number}-raqamli talon, {cabinet}-xonaga oʻting' } }));
+      await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+      expect(speak).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringMatching(/9-raqamli talon.*602/) }));
+    } finally {
+      read.mockRestore();
+      i18n.removeResourceBundle(locale, 'translation');
+      if (previousBundle) i18n.addResourceBundle(locale, 'translation', previousBundle);
+      if (previousState === undefined) delete connector.state[stateKey];
+      else connector.state[stateKey] = previousState;
+    }
+  });
+
   it('updates the current room and preserves an explicitly unknown resource room', async () => {
     const { push } = await renderBoard();
     push({ type: 'patient_call', data: { queue_id: 1, queue_entry_id: 11, queue_number: 5, cabinet: '101' } });

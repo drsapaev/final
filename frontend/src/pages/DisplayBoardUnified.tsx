@@ -220,6 +220,13 @@ function sameId(a: unknown, b: unknown) {
   return a != null && b != null && String(a) === String(b);
 }
 
+function sameCall(a: CurrentCall | null, b: CurrentCall) {
+  if (!a) return false;
+  if (a === b) return true;
+  if (a.event_id || b.event_id) return sameId(a.event_id, b.event_id);
+  return sameId(a.queue_id, b.queue_id) && sameId(a.queue_entry_id, b.queue_entry_id);
+}
+
 /**
  * Объединенное табло очереди с полным функционалом
  * Объединяет функции из DisplayBoard.jsx и QueueBoard.jsx
@@ -592,13 +599,15 @@ export default function DisplayBoardUnified({
   function playPendingLiveCall() {
     const pending = pendingLiveAudioRef.current;
     if (!pending || !snapshotReadyRef.current || !audioProfileRef.current) return;
-    if (currentCallRef.current !== pending &&
-        (!pending.event_id || currentCallRef.current?.event_id !== pending.event_id)) {
+    if (!sameCall(currentCallRef.current, pending)) {
       pendingLiveAudioRef.current = null;
       return;
     }
     pendingLiveAudioRef.current = null;
-    void playBoardAudio((voiceLanguage) => callText(pending, voiceLanguage));
+    void playBoardAudio((voiceLanguage) => {
+      const current = currentCallRef.current;
+      return callText(current && sameCall(current, pending) ? current : pending, voiceLanguage);
+    });
   }
 
   const handleWebSocketMessage = (messageRaw: unknown, replyToTest?: DisplayTestReply) => {
