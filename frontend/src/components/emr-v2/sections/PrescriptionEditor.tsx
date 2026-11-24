@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Plus, Trash2, Pill } from 'lucide-react';
+import { Pencil, Plus, Trash2, Pill } from 'lucide-react';
 import './PrescriptionEditor.css';
 import { Input } from '../../ui/macos';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -25,6 +25,7 @@ export interface PrescriptionItem {
   frequency?: string;
   freq?: string;
   duration?: string;
+  quantity?: string | number;
   note?: string;
   [key: string]: unknown;
 }
@@ -92,6 +93,7 @@ interface DrugSuggestion {
   defaultFreq: string;
 }
 
+const emptyItem = { name: '', dose: '', frequency: '', duration: '', quantity: '', note: '' };
 
 const PrescriptionEditor = ({
   prescriptions = [],
@@ -102,13 +104,8 @@ const PrescriptionEditor = ({
 }: PrescriptionEditorProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   const [isAdding, setIsAdding] = useState(false);
-  const [newItem, setNewItem] = useState({
-    name: '',
-    dose: '',
-    frequency: '',
-    duration: '',
-    note: ''
-  });
+  const [newItem, setNewItem] = useState(emptyItem);
+  const [editedItem, setEditedItem] = useState<PrescriptionItem>();
   const [suggestions, setSuggestions] = useState<DrugSuggestion[]>([]);
 
   // EMRPRES-FE-001 (audit 3886, round 19): the draft form belongs to the
@@ -122,7 +119,8 @@ const PrescriptionEditor = ({
   useEffect(() => {
     if (lastVisitKeyRef.current === visitKey) return;
     lastVisitKeyRef.current = visitKey;
-    setNewItem({ name: '', dose: '', frequency: '', duration: '', note: '' });
+    setNewItem(emptyItem);
+    setEditedItem(undefined);
     setIsAdding(false);
     setSuggestions([]);
   }, [visitKey]);
@@ -148,8 +146,6 @@ const PrescriptionEditor = ({
     setNewItem((prev) => ({
       ...prev,
       name: drug.name,
-      dose: drug.defaultDose,
-      frequency: drug.defaultFreq
     }));
     setSuggestions([]);
   };
@@ -158,12 +154,15 @@ const PrescriptionEditor = ({
     if (!newItem.name) return;
 
     // EMRPRES-FE-003: collision-resistant client id (see nextClientId).
-    const updated = [...prescriptions, { ...newItem, id: nextClientId() }];
+    const updated = editedItem
+      ? prescriptions.map(item => item === editedItem ? { ...item, ...newItem } : item)
+      : [...prescriptions, { ...newItem, id: nextClientId() }];
     onChange?.(updated);
     onFieldTouch?.('prescriptions');
 
     // Reset
-    setNewItem({ name: '', dose: '', frequency: '', duration: '', note: '' });
+    setNewItem(emptyItem);
+    setEditedItem(undefined);
     setIsAdding(false);
   };
 
@@ -177,6 +176,16 @@ const PrescriptionEditor = ({
     const updated = prescriptions.filter((p) => p !== item);
     onChange?.(updated);
     onFieldTouch?.('prescriptions');
+  };
+
+  const handleEdit = (item: PrescriptionItem) => {
+    setEditedItem(item);
+    setNewItem({
+      name: displayName(item), dose: displayDose(item), frequency: displayFrequency(item),
+      duration: item.duration ?? '', quantity: String(item.quantity ?? ''), note: item.note ?? '',
+    });
+    setSuggestions([]);
+    setIsAdding(true);
   };
 
   return (
@@ -193,10 +202,15 @@ const PrescriptionEditor = ({
                                     {displayDose(p) && `${displayDose(p)} `}
                                     {displayFrequency(p) && `• ${displayFrequency(p)} `}
                                     {p.duration && `• ${p.duration}`}
+                                    {p.quantity && ` • ${t('emr_workspace.prescription_quantity')}: ${p.quantity}`}
                                 </span>
                             </div>
                             {isEditable &&
           <div className="prescription-item__actions">
+                                    <button type="button" className="prescription-action-btn"
+                                      onClick={() => handleEdit(p)} aria-label={t('emr_workspace.edit')}>
+                                      <Pencil size={14} aria-hidden="true" />
+                                    </button>
                                     <button
               className="prescription-action-btn prescription-action-btn--delete"
               onClick={() => handleDeleteItem(p)}
@@ -218,7 +232,7 @@ const PrescriptionEditor = ({
                     {!isAdding ?
         <button
           className="prescription-toggle-btn"
-          onClick={() => setIsAdding(true)}>
+          onClick={() => { setEditedItem(undefined); setNewItem(emptyItem); setIsAdding(true); }}>
           
                             <Plus size={14} />
                             Добавить назначение
@@ -293,8 +307,16 @@ const PrescriptionEditor = ({
                                 </div>
                             </div>
 
+                            <Input
+                                type="number"
+                                min={1}
+                                step={1}
+                                label={t('emr_workspace.prescription_quantity')}
+                                value={newItem.quantity}
+                                onChange={event => handleInputChange('quantity', event.target.value)}
+                            />
                             <button className="prescription-add-btn" onClick={handleAdd}>
-                                Добавить
+                                {t(editedItem ? 'common.save' : 'emr_workspace.add')}
                             </button>
                             <button className="prescription-cancel-btn" onClick={() => setIsAdding(false)}>
                                 Отмена

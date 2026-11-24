@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.emr import EMR, Prescription
+from app.models.visit import Visit
 from app.schemas.emr import EMRCreate, EMRUpdate, PrescriptionCreate, PrescriptionUpdate
 
 
@@ -33,6 +34,44 @@ class CRUDEMR(CRUDBase[EMR, EMRCreate, EMRUpdate]):
 
 class CRUDPrescription(CRUDBase[Prescription, PrescriptionCreate, PrescriptionUpdate]):
     """CRUD операции для рецептов"""
+
+    def store_for_visit(
+        self,
+        db: Session,
+        *,
+        visit_id: int,
+        emr_record_id: int,
+        emr_revision_id: int | None,
+        values: dict,
+        appointment_id: int | None = None,
+    ) -> Prescription:
+        # The visit lock covers the first insert as well as updates from both APIs.
+        db.query(Visit.id).filter(Visit.id == visit_id).with_for_update().one()
+        item = self.get_by_visit(db, visit_id=visit_id)
+        if item is None and appointment_id is not None:
+            previous = self.get_by_appointment(db, appointment_id=appointment_id)
+            if previous and previous.visit_id in (None, visit_id):
+                item = previous
+        fields = {
+            **values,
+            "visit_id": visit_id,
+            "emr_record_id": emr_record_id,
+            "emr_revision_id": emr_revision_id,
+            "appointment_id": appointment_id if appointment_id is not None else (item.appointment_id if item else None),
+        }
+        if item is None:
+            item = Prescription(**fields)
+        elif all(getattr(item, key) == value for key, value in fields.items()):
+            return item
+        else:
+            for key, value in fields.items():
+                setattr(item, key, value)
+        item.updated_at = datetime.now(UTC)
+        if not item.is_draft:
+            item.saved_at = item.updated_at
+        db.add(item)
+        db.flush()
+        return item
 
     def get_by_appointment(
         self, db: Session, *, appointment_id: int

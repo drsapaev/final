@@ -35,7 +35,7 @@ export function AnamnesisVitaeSection({
     onChange,
     disabled = false,
     defaultOpen = true,
-    vitals = {},
+    vitals,
     onVitalsChange
 }: AnamnesisVitaeSectionProps) {
     const [showMyExperience, setShowMyExperience] = useState(false);
@@ -76,7 +76,7 @@ export function AnamnesisVitaeSection({
             }
         >
             {/* Vitals Widget */}
-            <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+            {vitals && <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
                 <h4 style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-2)' }}>
                     Витальные показатели
                 </h4>
@@ -85,7 +85,7 @@ export function AnamnesisVitaeSection({
                     onChange={onVitalsChange}
                     disabled={disabled}
                 />
-            </div>
+            </div>}
 
             <EMRTextField
                 value={value}

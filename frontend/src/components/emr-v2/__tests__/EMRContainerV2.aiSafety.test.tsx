@@ -45,6 +45,11 @@ vi.mock('../../../hooks/useEMR', () => ({ useEMR: () => ({
 }) }));
 vi.mock('../../../hooks/useEMRAutosave', () => ({ useEMRAutosave: () => ({ suppressOnDiscard: vi.fn(), config: {} }) }));
 vi.mock('../../../hooks/useEMRLeaveGuard', () => ({ useEMRLeaveGuard: () => {} }));
+vi.mock('../../../hooks/useEMRWorkspace', () => ({
+  useEMRWorkspace: () => ({ status: 'loading', scope: '900:42', reload: vi.fn() }),
+}));
+vi.mock('../sections/VitalsWidget', () => ({ default: () => null }));
+vi.mock('../sections/LabResultsSection', () => ({ default: () => null }));
 vi.mock('../../../hooks/useNavigationGuard', () => ({ useBeforeUnload: () => {} }));
 vi.mock('../../../hooks/useEMRKeyboard', () => ({ useEMRKeyboard: () => {} }));
 vi.mock('../../../hooks/useVisitLifecycle', () => ({ useVisitLifecycle: () => ({ getAbortSignal: mocks.getSignal }) }));

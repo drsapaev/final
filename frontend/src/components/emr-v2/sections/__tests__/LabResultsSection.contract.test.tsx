@@ -72,9 +72,9 @@ describe('LabResultsSection icon contract — Track 3-2 forward-guard', () => {
     expect(fnBody).toMatch(/await\s+\(?confirm/);
     // STRAT#12: строка мигрирована на t('confirm.order_title')
     expect(fnBody).toContain("t('confirm.order_title')");
-    expect(fnBody).toContain('if (!ok) return;');
+    expect(fnBody).toContain('if (!ok || contextChanged()) return;');
     // createOrder должен вызываться ПОСЛЕ confirm
-    const confirmIdx = fnBody.indexOf('await confirm(');
+    const confirmIdx = fnBody.indexOf('await (confirm');
     const createIdx = fnBody.indexOf('labReportingApi.createOrder(');
     expect(createIdx).toBeGreaterThan(confirmIdx);
   });

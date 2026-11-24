@@ -1,0 +1,193 @@
+.emr-v2-main {
+    min-width: 0;
+    max-width: 1200px;
+}
+
+.emr-v2-header {
+    gap: var(--mac-spacing-3);
+    flex-wrap: wrap;
+}
+
+.emr-v2-header__left {
+    flex: 1 1 240px;
+    min-width: 0;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--mac-spacing-1);
+    overflow-wrap: anywhere;
+}
+
+.emr-v2-header__right,
+.emr-v2-toolbar,
+.emr-v2-actions {
+    flex-wrap: wrap;
+}
+
+.emr-v2-main > .emr-v2-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: var(--mac-bg-primary);
+}
+
+.emr-workspace-identity,
+.emr-workspace-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mac-spacing-2);
+    align-items: center;
+}
+
+.emr-workspace-identity {
+    color: var(--mac-text-secondary);
+    font-size: var(--mac-font-size-sm);
+}
+
+.emr-workspace-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.emr-workspace-layout > * {
+    min-width: 0;
+}
+
+.emr-workspace-sidebar {
+    padding: var(--mac-spacing-4);
+    background: var(--mac-bg-secondary);
+    border-top: 1px solid var(--mac-separator);
+    overflow-wrap: anywhere;
+}
+
+.emr-workspace-visit-section {
+    margin: 0 0 var(--mac-spacing-4);
+    padding: var(--mac-spacing-3);
+    border-bottom: 1px solid var(--mac-separator);
+}
+
+.emr-workspace-sidebar h3,
+.emr-workspace-sidebar h4,
+.emr-workspace-visit-section h3 {
+    margin: 0 0 var(--mac-spacing-2);
+}
+
+.emr-workspace-sidebar p {
+    margin: var(--mac-spacing-2) 0;
+}
+
+.emr-workspace-group {
+    margin-top: var(--mac-spacing-3);
+    padding-top: var(--mac-spacing-3);
+    border-top: 1px solid var(--mac-separator);
+}
+
+.emr-workspace-entry {
+    display: grid;
+    gap: var(--mac-spacing-1);
+    padding: var(--mac-spacing-2) 0;
+    border-bottom: 1px solid var(--mac-separator);
+}
+
+.emr-workspace-entry > button {
+    justify-self: start;
+}
+
+.emr-workspace-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.emr-workspace-line {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-2);
+    justify-content: space-between;
+}
+
+.emr-workspace-allergy {
+    color: var(--mac-text-primary);
+    background: var(--mac-bg-tertiary);
+    border-inline-start: 3px solid var(--mac-warning);
+    padding: var(--mac-spacing-1) var(--mac-spacing-2);
+}
+
+.emr-workspace-form fieldset,
+.emr-workspace-follow-up {
+    display: grid;
+    gap: var(--mac-spacing-2);
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+.emr-workspace-form {
+    margin-top: var(--mac-spacing-3);
+    padding-top: var(--mac-spacing-3);
+    border-top: 1px solid var(--mac-separator);
+}
+
+.emr-workspace-layout select {
+    display: block;
+    width: 100%;
+    min-height: 36px;
+    color: var(--mac-text-primary);
+    background: var(--mac-bg-primary);
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-sm);
+    padding: var(--mac-spacing-1) var(--mac-spacing-2);
+}
+
+.emr-workspace-follow-up {
+    margin-top: var(--mac-spacing-3);
+}
+
+.emr-workspace-check {
+    display: flex;
+    gap: var(--mac-spacing-2);
+    align-items: flex-start;
+}
+
+.emr-workspace-document-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.emr-workspace-sidebar summary {
+    cursor: pointer;
+}
+
+.emr-workspace-sidebar :focus-visible,
+.emr-workspace-visit-section :focus-visible {
+    outline: 2px solid var(--mac-accent-blue);
+    outline-offset: 2px;
+}
+
+@media (min-width: 1050px) {
+    .emr-workspace-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(275px, 32%);
+    }
+
+    .emr-workspace-sidebar {
+        border-top: 0;
+        border-inline-start: 1px solid var(--mac-separator);
+    }
+}
+
+@media (max-width: 640px) {
+    .emr-v2-container,
+    .emr-v2-sections,
+    .emr-v2-header,
+    .emr-v2-toolbar,
+    .emr-v2-actions {
+        padding-inline: var(--mac-spacing-2);
+    }
+
+    .emr-v2-container--with-sidebar .emr-v2-main {
+        max-width: 100%;
+    }
+
+    .emr-workspace-visit-section .emr-vitals__row {
+        flex-wrap: wrap;
+    }
+}

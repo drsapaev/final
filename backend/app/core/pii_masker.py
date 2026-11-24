@@ -61,6 +61,12 @@ PII_FIELD_PATTERNS = [
     "medication",
     "allergies",
     "allergy",
+    "clinical_entries",
+    "clinical_details",
+    "legacy_conditions",
+    "follow_up",
+    "transferred_fields",
+    "next_action",
     # Visit
     "visit_reason",
     "patient_name",

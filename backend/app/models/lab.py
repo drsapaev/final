@@ -439,6 +439,21 @@ class LabReportInstance(Base):
     )
 
 
+class LabResultReview(Base):
+    """Clinical review of an immutable report instance, including its corrections."""
+
+    __tablename__ = "lab_result_reviews"
+
+    instance_id: Mapped[int] = mapped_column(
+        ForeignKey("lab_report_instances.id", ondelete="RESTRICT"), primary_key=True
+    )
+    reviewer_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True
+    )
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    next_action: Mapped[str | None] = mapped_column(String(500))
+
+
 class LabReportValue(Base):
     __tablename__ = "lab_report_values"
     __table_args__ = (

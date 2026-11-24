@@ -149,6 +149,7 @@ export function VisitTab({
           key={selectedPatient?.visit_id ?? 'no-visit'}
           visitId={selectedPatient?.visit_id ?? ''}
           patientId={selectedPatient?.patient?.id || selectedPatient?.patient_id}
+          patientName={selectedPatient.patient_name || selectedPatient.patient?.full_name}
           specialty="cardiology"
           isReadOnly={isCompleted}
           completionBusy={loading}

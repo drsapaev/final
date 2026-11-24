@@ -193,6 +193,9 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
             return applyEmrTransition({
                 ...state,
                 emr,
+                data: !editsAfterSaveStart && emr.data?.follow_up
+                    ? { ...state.data, follow_up: emr.data.follow_up }
+                    : state.data,
                 version: emr.version ?? state.version,
                 rowVersion: emr.row_version ?? state.rowVersion,
                 isDirty: editsAfterSaveStart ? true : false,

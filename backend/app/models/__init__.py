@@ -99,6 +99,7 @@ from .emr_v2 import (
     EMRRevision,
 )
 from .emr_version import EMRVersion
+from .patient_clinical import PatientClinicalRevision
 from .family_relation import FamilyRelation, RelationType
 from .feature_flags import FeatureFlag, FeatureFlagHistory
 from .file_system import (
@@ -124,6 +125,7 @@ from .lab import (
     LabOrder,
     LabReportFieldDef,
     LabReportInstance,
+    LabResultReview,
     LabReportSection,
     LabReportTemplate,
     LabReportTemplateVersion,

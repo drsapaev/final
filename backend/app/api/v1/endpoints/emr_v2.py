@@ -47,6 +47,7 @@ from app.services.emr_v2_service import (
     EMRSignedError,
     emr_v2_service,
 )
+from app.services.emr_workspace_service import WorkspaceError, prepare_workspace_document
 from app.services.section_templates_service import DoctorSectionTemplatesService
 
 logger = logging.getLogger(__name__)
@@ -167,6 +168,16 @@ def filter_patient_emrs_for_access(
         .all()
     }
     return [emr for emr in emrs if emr.visit_id in allowed_visit_ids]
+
+
+def verify_workspace_write(db: Session, visit_id: int, data: dict, user: User, previous=None) -> dict:
+    try:
+        return prepare_workspace_document(
+            db, visit_id, data, previous, user.id,
+            authorize_source=lambda source_id: ensure_emr_visit_access(db, source_id, user),
+        )
+    except WorkspaceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail={"code": exc.code}) from exc
 
 
 # =============================================================================
@@ -419,7 +430,7 @@ async def save_emr(
         emr = emr_v2_service.save(
             db,
             visit_id=visit_id,
-            data=payload.data,
+            data=verify_workspace_write(db, visit_id, payload.data, current_user, existing_emr),
             user_id=current_user.id,
             row_version=payload.row_version,
             client_session_id=payload.client_session_id,
@@ -487,7 +498,9 @@ async def sign_emr(
         emr = emr_v2_service.sign(
             db,
             visit_id=visit_id,
-            data=payload.data,
+            data=verify_workspace_write(
+                db, visit_id, payload.data, current_user, emr_v2_service.get_by_visit(db, visit_id)
+            ),
             user_id=current_user.id,
             row_version=payload.row_version,
             client_session_id=payload.client_session_id,
@@ -570,7 +583,9 @@ async def amend_emr(
         emr = emr_v2_service.amend(
             db,
             visit_id=visit_id,
-            data=payload.data,
+            data=verify_workspace_write(
+                db, visit_id, payload.data, current_user, emr_v2_service.get_by_visit(db, visit_id)
+            ),
             reason=payload.reason,
             user_id=current_user.id,
             row_version=payload.row_version,

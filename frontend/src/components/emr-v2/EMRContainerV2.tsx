@@ -14,6 +14,8 @@ import { useTranslation } from '../../i18n/useTranslation';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useEMR } from '../../hooks/useEMR';
+import { useEMRWorkspace } from '../../hooks/useEMRWorkspace';
+import type { FollowUp } from '../../api/emrWorkspace';
 import { useEMRAutosave } from '../../hooks/useEMRAutosave';
 import { useEMRLeaveGuard } from '../../hooks/useEMRLeaveGuard';
 import { isRejectedEMRWrite } from './emrWriteResult';
@@ -61,8 +63,12 @@ import type { DermatologyCosmeticProcedureRecord } from './sections/specialty/De
 // Previously doctors had no way to see LabReportInstance data; cardiologist
 // had a separate manual-entry CardioBloodTest table, derma/dental had nothing.
 import LabResultsSection from './sections/LabResultsSection';
+import VitalsWidget from './sections/VitalsWidget';
+import { FollowUpEditor, WorkspaceSidePanel } from './workspace/VisitHistory';
+import { PrescriptionAction } from './workspace/PrescriptionAction';
 
 import './EMRContainerV2.css';
+import './workspace/EMRWorkspace.css';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 // QW-03 (UX audit): replace native alert() in Ghost Mode with notify.warning.
@@ -272,6 +278,7 @@ interface EMRHookResult {
 export function EMRContainerV2({
     visitId,
     patientId = null,
+    patientName,
     specialty,
     isReadOnly = false,
     completionBusy = false,
@@ -288,6 +295,8 @@ export function EMRContainerV2({
     // ADR-0015: MCP API accessed via hook, not direct import.
     const mcpAPI = useMcpClient();
     const canonicalSpecialty = normalizeSpecialty(specialty);
+    const workspaceState = useEMRWorkspace(visitId, patientId);
+    const workspace = workspaceState.status === 'ready' ? workspaceState.data : undefined;
     const {
         emr,
         data,
@@ -316,6 +325,7 @@ export function EMRContainerV2({
         redo,
         reloadFromServer,
     } = useEMR(visitId, { specialty: canonicalSpecialty }) as EMRHookResult;
+    const followUp = data?.follow_up && typeof data.follow_up === 'object' ? data.follow_up as FollowUp : {};
     const [isPreparingCompletion, setIsPreparingCompletion] = useState(false);
     const [isSigning, setIsSigning] = useState(false);
     const signingScopeRef = useRef<object | null>(null);
@@ -1018,9 +1028,15 @@ export function EMRContainerV2({
                 {/* Header */}
                 <header className="emr-v2-header">
                     <div className="emr-v2-header__left">
-                        {/* UX Audit Doctor M-20: «ЭМК v2» → «Электронная медицинская карта». */}
-                        <h2>{t('misc.emr_title')}</h2>
-                        {patientId && <span className="emr-v2-patient-id">{t('misc.emr_patient', { id: patientId })}</span>}
+                        <h2>{workspace?.patient.full_name || patientName || t('misc.emr_title')}</h2>
+                        <span className="emr-workspace-identity">
+                            {(workspace?.patient.id ?? patientId) && t('misc.emr_patient', { id: workspace?.patient.id ?? patientId })}
+                            {workspace?.patient.birth_date && <span>{t('emr_workspace.birth_date')} <time dateTime={workspace.patient.birth_date}>{workspace.patient.birth_date}</time></span>}
+                            <span>{t('emr_workspace.visit_number', { id: visitId })} {workspace?.visit.date}</span>
+                        </span>
+                        {workspace?.allergy_state === 'specific' && (
+                            <strong className="emr-workspace-allergy">{t('emr_workspace.allergy_warning')}</strong>
+                        )}
                     </div>
 
                     <div className="emr-v2-header__right">
@@ -1085,8 +1101,14 @@ export function EMRContainerV2({
                     </Button>
                 </div>
 
-                {/* Sections */}
+                <div className="emr-workspace-layout">
                 <div className="emr-v2-sections">
+                    <section className="emr-workspace-visit-section" aria-label={t('emr_workspace.today_vitals')}>
+                        <h3>{t('emr_workspace.today_vitals')}</h3>
+                        <VitalsWidget vitals={data?.vitals || {}} onChange={handleFieldChange('vitals')} disabled={editingDisabled} />
+                    </section>
+                    <FollowUpEditor value={followUp} disabled={editingDisabled}
+                        onChange={handleFieldChange('follow_up')} />
                     {/* UX Audit Doctor M-48: progress indicator for EMR sections. */}
                     {(() => {
                         const sections = [
@@ -1148,8 +1170,6 @@ export function EMRContainerV2({
                         onChange={handleFieldChange('anamnesis_vitae')}
                         disabled={editingDisabled}
                         doctorId={doctorId}
-                        vitals={data?.vitals || {}}
-                        onVitalsChange={handleFieldChange('vitals')}
                         defaultOpen={false}
                     />
 
@@ -1207,6 +1227,13 @@ export function EMRContainerV2({
                         defaultOpen={false}
                         visitKey={visitId}
                     />
+                    {workspace && (
+                        <PrescriptionAction key={workspaceState.scope} visitId={workspace.visit.id}
+                            patientId={workspace.patient.id} rowVersion={rowVersion}
+                            hasMedications={Boolean(data?.medications?.list?.length)}
+                            isCurrentSaved={!isDirty && !isSaving && rowVersion > 0 && savedEMRStatus !== 'draft'}
+                            readOnly={editingDisabled || accessDenied || Boolean(conflict)} />
+                    )}
 
                     {/* Recommendations is reused in TreatmentSection above, or separate?
                         EMR V2 usually separates Treatment (Process) and Recommendations (Output).
@@ -1301,10 +1328,17 @@ export function EMRContainerV2({
                         Collapsible (defaultOpen=false when no results, true when
                         results exist). Read-only — doctors view, don't edit. */}
                     <LabResultsSection
+                        key={workspaceState.scope}
                         patientId={patientId}
                         visitId={visitId}
                         disabled={editingDisabled}
+                        reviewerId={accessDenied ? null : doctorId}
                     />
+                </div>
+                <WorkspaceSidePanel key={workspaceState.scope} workspace={workspace}
+                    status={workspaceState.status} reload={workspaceState.reload}
+                    readOnly={editingDisabled || accessDenied} followUp={followUp}
+                    onFollowUpChange={handleFieldChange('follow_up')} />
                 </div>
 
                 {/* Actions */}
@@ -1336,7 +1370,7 @@ export function EMRContainerV2({
                             <button
                                 className="emr-v2-btn emr-v2-btn--primary"
                                 onClick={() => saveManually({ isDraft: false })}
-                                disabled={isSaving || !isDirty || accessDenied || editingDisabled}
+                                disabled={isSaving || (!isDirty && savedEMRStatus !== 'draft') || accessDenied || editingDisabled}
                                 aria-label={isSaving ? t('misc.emr_saving_aria') : t('misc.emr_save_aria')}
                             >
                                 {isSaving ? (

@@ -37,6 +37,8 @@ import notify from '@/services/notify';
 import { useTranslation } from '@/i18n/useTranslation';
 import { getErrorMessage } from '../../../utils/type-guards';
 import { Download, FileText, Plus, TestTube2 } from 'lucide-react';
+import { getWorkspaceLabs, type WorkspaceLabs } from '@/api/emrWorkspace';
+import { LabVersionReview, LabWorkspaceState } from '../workspace/LabWorkspaceState';
 
 // UX-AUDIT-FIX10: STATUS_LABELS и STATUS_VARIANTS удалены —
 // используются formatLabStatus() и getLabStatusVariant() из labUiLabels.js.
@@ -63,6 +65,7 @@ interface LabResultsSectionProps {
   patientId?: string | number | null;
   visitId?: string | number | null;
   disabled?: boolean;
+  reviewerId?: string | number | null;
 }
 
 function formatDate(dateStr: unknown): string {
@@ -78,7 +81,7 @@ function formatDate(dateStr: unknown): string {
   }
 }
 
-export function LabResultsSection({ patientId, visitId, disabled = false }: LabResultsSectionProps) {
+export function LabResultsSection({ patientId, visitId, disabled = false, reviewerId }: LabResultsSectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
   // ADR-0015: lab reporting API accessed via hook.
   const labReportingApi = useLabReporting();
@@ -89,6 +92,29 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
   const [templates, setTemplates] = useState<LabTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [ordering, setOrdering] = useState(false);
+  const orderIntentRef = useRef<number | null>(null);
+  const labScope = `${visitId ?? ''}:${patientId ?? ''}`;
+  const [labState, setLabState] = useState<{ scope: string; data?: WorkspaceLabs; error: boolean }>();
+  const [labReload, setLabReload] = useState(0);
+  const refreshWorkspaceLabs = useCallback(() => setLabReload(value => value + 1), []);
+  const activeLabState = labState?.scope === labScope ? labState : undefined;
+  const labs = activeLabState?.data;
+
+  useEffect(() => {
+    if (!visitId) return;
+    const controller = new AbortController();
+    void getWorkspaceLabs(visitId, patientId ?? null, controller.signal).then(
+      data => {
+        if (!controller.signal.aborted) setLabState({ scope: labScope, data, error: false });
+      },
+      () => {
+        if (!controller.signal.aborted) setLabState(previous => ({
+          scope: labScope, data: previous?.scope === labScope ? previous.data : undefined, error: true,
+        }));
+      },
+    );
+    return () => controller.abort();
+  }, [visitId, patientId, labScope, labReload]);
 
   // UX-AUDIT-FIX9: useConfirm для подтверждения создания заказа на анализы.
   // Ранее один клик в модалке «Заказать анализы» мгновенно создавал заказ
@@ -223,6 +249,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
     setShowOrderModal(false);
     setTemplates([]);
     setTemplatesLoading(false);
+    setOrdering(false);
   }, [patientId, visitId]);
 
   // P1 fix: Order lab tests — opens a modal listing published templates.
@@ -256,52 +283,43 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
   };
 
   const handleOrder = async (templateId: string | number, templateName: string) => {
-    // The intent is bound to the context it was started in.
     const startContext = contextRef.current;
-    // UX-AUDIT-FIX9: подтверждение перед созданием заказа.
-    // STRAT#12: строки мигрированы на t() / tInterpolate() из labTranslations.
-    const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
-      title: t('confirm.order_title'),
-      message: t('confirm.order_message', { name: templateName }),
-      description: t('confirm.order_description'),
-      confirmLabel: t('confirm.order_confirm'),
-      cancelLabel: t('confirm.cancel'),
-      intent: 'primary',
-    });
-    if (!ok) return;
-    // EMRORDER-FE-001: recheck before the irreversible createOrder — the
-    // mounted EMR must still belong to the patient/visit the intent was
-    // started in; a late confirm of visit A must not create A's order (and
-    // show a success toast) inside visit B's active EMR.
-    if (contextRef.current.patientId !== startContext.patientId
-      || contextRef.current.visitId !== startContext.visitId) {
-      logger.info('[LabResultsSection] Dropped stale order intent', {
-        templateId: String(templateId),
-        // No PHI in logs: template ids only, never patient/visit ids.
-      });
-      return;
-    }
+    const epoch = requestEpochRef.current;
+    if (orderIntentRef.current === epoch || disabled || !patientId || !visitId) return;
+    orderIntentRef.current = epoch;
     setOrdering(true);
+    const contextChanged = () =>
+      contextRef.current.patientId !== startContext.patientId
+      || contextRef.current.visitId !== startContext.visitId
+      || requestEpochRef.current !== epoch;
+
     try {
+      const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
+        title: t('confirm.order_title'),
+        message: t('confirm.order_message', { name: templateName }),
+        description: t('confirm.order_description'),
+        confirmLabel: t('confirm.order_confirm'),
+        cancelLabel: t('confirm.cancel'),
+        intent: 'primary',
+      });
+      if (!ok || contextChanged()) return;
       await labReportingApi.createOrder({
         template_id: templateId,
         patient_id: patientId,
         visit_id: visitId,
       });
-      // Second recheck: if the context switched while the POST was in
-      // flight, the order exists server-side, but its success must not be
-      // celebrated inside the new visit's EMR.
-      if (contextRef.current.patientId !== startContext.patientId
-        || contextRef.current.visitId !== startContext.visitId) {
-        return;
-      }
-      notify.success(`Заказ «${templateName}» создан. Лаборатория увидит его в очереди.`);
+      if (contextChanged()) return;
+      notify.success(t('emr_workspace.lab_order_created'));
       setShowOrderModal(false);
+      refreshWorkspaceLabs();
     } catch (err: unknown) {
-      const msg = getErrorMessage(err) || 'Не удалось создать заказ.';
-      notify.error(typeof msg === 'string' ? msg : 'Не удалось создать заказ.');
+      if (!contextChanged()) {
+        const message = getErrorMessage(err) || t('emr_workspace.save_error');
+        notify.error(typeof message === 'string' ? message : t('emr_workspace.save_error'));
+      }
     } finally {
-      setOrdering(false);
+      if (orderIntentRef.current === epoch) orderIntentRef.current = null;
+      if (!contextChanged()) setOrdering(false);
     }
   };
 
@@ -322,13 +340,31 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
       );
     }
 
+    const reportOrder = new Map(labs?.orders.flatMap(order => order.reports.map(report => [report.id, order] as const)) ?? []);
+    const reportDetails = new Map([
+      ...(labs?.orders.flatMap(order => order.reports) ?? []), ...(labs?.unlinked_reports ?? []),
+    ].map(report => [report.id, report]));
+    const groups = new Map<number | undefined, LabReportInstance[]>();
+    for (const instance of instances) {
+      const orderId = reportOrder.get(Number(instance.id))?.id;
+      const group = groups.get(orderId);
+      if (group) group.push(instance);
+      else groups.set(orderId, [instance]);
+    }
     return (
-      <div style={{ display: 'grid', gap: '8px', padding: '8px 0' }}>
-        {instances.map((instance) => (
+      <div className="emr-workspace-result-list">
+        {[...groups].map(([orderId, group]) => <section key={orderId ?? 'unlinked'}>
+          {orderId != null && <h4>{t('emr_workspace.lab_order', { id: orderId })} · {t(
+            `emr_workspace.lab_${reportOrder.get(Number(group[0]?.id))?.status}`,
+            { defaultValue: reportOrder.get(Number(group[0]?.id))?.status },
+          )}</h4>}
+          {group.map((instance) => {
+            const details = reportDetails.get(Number(instance.id));
+            return <div key={instance.id} className="emr-workspace-group">
           <div
-            key={instance.id}
             style={{
               display: 'flex',
+              flexWrap: 'wrap',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '12px',
@@ -371,13 +407,18 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
               </Button>
             </div>
           </div>
-        ))}
+          {details && visitId && patientId && <LabVersionReview key={`${labScope}:${details.id}`} report={details}
+            visitId={visitId} patientId={patientId} reviewerId={reviewerId} retry={refreshWorkspaceLabs} />}
+          </div>;
+          })}
+        </section>)}
       </div>
     );
   };
 
   return (
     <>
+      {visitId && <LabWorkspaceState labs={labs} error={Boolean(activeLabState?.error)} retry={refreshWorkspaceLabs} />}
       {/* EMRLAB-FE-004: секция интерактивна для ЧТЕНИЯ даже в
           signed/read-only EMR (аккордеон раскрывается, PDF доступен);
           disabled больше не глушит pointer-events всего блока. */}
