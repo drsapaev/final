@@ -212,7 +212,7 @@ const PublicBookingSettingsManager = () => {
 
       {errorMessage && (
         <div className="flex flex-col items-start gap-2">
-          <Alert type="error" title={t('admin2.pbs_error_title')} message={errorMessage} className="mb-0 w-full" />
+          <Alert type="error" title={t('admin2.pbs_error_title')} description={errorMessage} className="mb-0 w-full" />
           {(error === 'load' || error === 'conflict') && (
             <Button variant="outline" onClick={() => setReloadToken((value) => value + 1)} disabled={loading || saving}>
               {t(error === 'conflict' ? 'admin2.pbs_reload' : 'admin2.pbs_retry')}
@@ -221,7 +221,7 @@ const PublicBookingSettingsManager = () => {
         </div>
       )}
       {message && (
-        <Alert type="success" title={t('admin2.pbs_success_title')} message={t('admin2.pbs_success_saved')} className="mb-0" />
+        <Alert type="success" title={t('admin2.pbs_success_title')} description={t('admin2.pbs_success_saved')} className="mb-0" />
       )}
 
       <Card className="flex flex-col gap-5 p-4">
