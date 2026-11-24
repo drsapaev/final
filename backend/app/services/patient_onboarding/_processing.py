@@ -1,4 +1,5 @@
 """Processing mixin for PatientOnboardingService. Split from patient_onboarding_service.py."""
+
 from __future__ import annotations
 
 from app.services.patient_onboarding._base import *  # noqa: F401, F403
@@ -33,7 +34,8 @@ class ProcessingMixin(PatientOnboardingServiceMixinBase):
                 "has_branch": bool(search_payload.branch),
                 "has_doctor": bool(search_payload.doctor_id),
                 "has_preferred_date": bool(
-                    search_payload.preferred_date_from or search_payload.preferred_date_to
+                    search_payload.preferred_date_from
+                    or search_payload.preferred_date_to
                 ),
             },
             "top_candidates": [
@@ -53,7 +55,6 @@ class ProcessingMixin(PatientOnboardingServiceMixinBase):
             ],
         }
 
-
     def _latest_duplicate_review_log(
         self,
         request_id: int,
@@ -68,7 +69,6 @@ class ProcessingMixin(PatientOnboardingServiceMixinBase):
             .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
             .first()
         )
-
 
     def _safe_duplicate_review_snapshot(
         self,
@@ -96,7 +96,6 @@ class ProcessingMixin(PatientOnboardingServiceMixinBase):
             "topCandidates": payload.get("top_candidates") or [],
         }
 
-
     def _build_audit_trail(self, request_id: int) -> list[dict[str, Any]]:
         rows = (
             self.db.query(AuditLog)
@@ -122,7 +121,6 @@ class ProcessingMixin(PatientOnboardingServiceMixinBase):
                 }
             )
         return items
-
 
     def _notification_preview(self, row: PatientOnboardingRequest) -> dict[str, Any]:
         messages = {
@@ -166,8 +164,9 @@ class ProcessingMixin(PatientOnboardingServiceMixinBase):
             },
         )
 
-
-    def _registrar_request_payload(self, row: PatientOnboardingRequest) -> dict[str, Any]:
+    def _registrar_request_payload(
+        self, row: PatientOnboardingRequest
+    ) -> dict[str, Any]:
         duplicate_snapshot = self._safe_duplicate_review_snapshot(row)
         return {
             **_request_payload(row),
@@ -186,24 +185,29 @@ class ProcessingMixin(PatientOnboardingServiceMixinBase):
             "notificationPreview": self._notification_preview(row),
         }
 
-
-    def latest_for_telegram_user(
-        self,
-        telegram_user: TelegramUser,
-    ) -> PatientOnboardingRequest | None:
-        row = (
+    def _latest_request_query(self, chat_id: int):
+        return (
             self.db.query(PatientOnboardingRequest)
-            .filter(PatientOnboardingRequest.telegram_chat_id == int(telegram_user.chat_id))
+            .filter(PatientOnboardingRequest.telegram_chat_id == chat_id)
             .order_by(
                 PatientOnboardingRequest.created_at.desc(),
                 PatientOnboardingRequest.id.desc(),
             )
-            .first()
         )
+
+    def latest_for_telegram_user(
+        self,
+        telegram_user: TelegramUser,
+        *,
+        for_update: bool = False,
+    ) -> PatientOnboardingRequest | None:
+        query = self._latest_request_query(telegram_user.chat_id)
+        if for_update:
+            query = query.with_for_update().populate_existing()
+        row = query.first()
         if row is None:
             return None
         return self._refresh_expired(row)
-
 
     def submit(
         self,
@@ -211,38 +215,70 @@ class ProcessingMixin(PatientOnboardingServiceMixinBase):
         telegram_user: TelegramUser,
         payload: PatientOnboardingSubmitRequest,
     ) -> tuple[PatientOnboardingRequest, bool]:
-        if getattr(telegram_user, "patient_id", None):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={"reason": "linked_patient_already_exists"},
-            )
-
         desired_doctor_id = payload.desired_doctor_id
         if desired_doctor_id is not None:
-            doctor = self.db.query(Doctor).filter(Doctor.id == desired_doctor_id).first()
+            doctor = (
+                self.db.query(Doctor).filter(Doctor.id == desired_doctor_id).first()
+            )
             if doctor is None:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail={"reason": "desired_doctor_not_found"},
                 )
 
-        existing = self.latest_for_telegram_user(telegram_user)
-        row = existing if existing is not None and existing.status in ONBOARDING_ACTIVE_STATUSES else None
+        # Match the registrar's request-before-profile lock order. Refresh
+        # the profile so a QR accepted after authentication still wins.
+        existing = self.latest_for_telegram_user(telegram_user, for_update=True)
+        profile = (
+            self.db.query(TelegramUser)
+            .filter(
+                TelegramUser.id == telegram_user.id,
+                TelegramUser.chat_id == telegram_user.chat_id,
+            )
+            .with_for_update()
+            .populate_existing()
+            .one_or_none()
+        )
+        if profile is None or not profile.active or profile.blocked:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"reason": "telegram_user_not_active"},
+            )
+        if profile.patient_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"reason": "linked_patient_already_exists"},
+            )
+
+        row = (
+            existing
+            if existing is not None and existing.status in ONBOARDING_ACTIVE_STATUSES
+            else None
+        )
         created = row is None
         if row is None:
+            # Two first submissions can both observe no row. The profile lock
+            # serializes them; require a fresh request if the other one won.
+            if self._latest_request_query(profile.chat_id).first() is not existing:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={"reason": "onboarding_request_changed"},
+                )
             row = PatientOnboardingRequest(
-                telegram_user_id=getattr(telegram_user, "id", None),
+                telegram_user_id=profile.id,
                 telegram_chat_id=int(telegram_user.chat_id),
                 status="pending_review",
                 expires_at=_utc_now() + timedelta(days=ONBOARDING_REQUEST_TTL_DAYS),
             )
             self.db.add(row)
 
-        row.language_code = _clean_text(payload.language_code, max_length=16) or getattr(
-            telegram_user, "language_code", "ru"
-        )
+        row.language_code = _clean_text(
+            payload.language_code, max_length=16
+        ) or getattr(telegram_user, "language_code", "ru")
         row.contact_phone = _clean_text(payload.contact_phone, max_length=32)
-        row.contact_name = _clean_text(payload.contact_name, max_length=256) or _clean_text(
+        row.contact_name = _clean_text(
+            payload.contact_name, max_length=256
+        ) or _clean_text(
             " ".join(
                 part
                 for part in (
@@ -276,7 +312,6 @@ class ProcessingMixin(PatientOnboardingServiceMixinBase):
         self.db.refresh(row)
         return row, created
 
-
     def own_status_response(self, telegram_user: TelegramUser) -> dict[str, Any]:
         row = self.latest_for_telegram_user(telegram_user)
         if row is None:
@@ -292,8 +327,6 @@ class ProcessingMixin(PatientOnboardingServiceMixinBase):
         }
 
     @staticmethod
-
-
     def safe_next_action(row: PatientOnboardingRequest) -> str:
         if row.status == "needs_more_info":
             return "submit_more_info"
@@ -302,5 +335,3 @@ class ProcessingMixin(PatientOnboardingServiceMixinBase):
         if row.status in {"rejected", "cancelled", "expired"}:
             return "contact_registrar_or_submit_new_request"
         return "wait_for_registrar_review"
-
-
