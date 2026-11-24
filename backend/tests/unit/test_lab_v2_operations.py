@@ -544,13 +544,16 @@ def test_critical_admin_route_retries_and_never_replaces_clinical_acknowledgment
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(("role", "is_active"), [("Doctor", True), ("Admin", False)])
+@pytest.mark.parametrize(("role", "is_active", "shared_deployment"), [
+    ("Doctor", True, False), ("Admin", False, False), ("Admin", True, True),
+])
 def test_critical_route_rejects_ineligible_configured_admin(
-    db_session, test_patient, test_visit, monkeypatch, role, is_active,
+    db_session, test_patient, test_visit, monkeypatch, role, is_active, shared_deployment,
 ):
     configured_user = synthetic_user(db_session, role)
     configured_user.is_active = is_active
     monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", configured_user.id)
+    monkeypatch.setattr(settings, "TENANT_SCOPE_ENFORCE_WRITES", shared_deployment)
     test_visit.doctor_id = None
     _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
     report.values.append(LabReportValue(
@@ -567,7 +570,7 @@ def test_critical_route_rejects_ineligible_configured_admin(
     assert run(dispatch_pending(db_session)) == 0
     assert task.state == "needs_assignment"
     assert task.attempts == 0
-    assert task.next_attempt_at is not None
+    assert (task.next_attempt_at is None) == shared_deployment
     sender.assert_not_awaited()
 
 

@@ -85,7 +85,7 @@ class Settings(BaseSettings):
     LAB_CRITICAL_ESCALATION_ADMIN_ID: int | None = Field(
         default=None,
         gt=0,
-        description="Approved local Admin account for unassigned or escalated critical Lab tasks.",
+        description="Approved Admin for unassigned or escalated critical Lab tasks on a dedicated clinic instance.",
     )
     ENABLE_FALLBACK_AUTH: bool = Field(
         default=False,

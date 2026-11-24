@@ -46,8 +46,15 @@ def _responsible_user_id(
     return db.scalar(query)
 
 
+def _configured_operations_admin_id() -> int | None:
+    # An unassigned Lab report has no authoritative branch identifier.
+    if settings.TENANT_SCOPE_ENFORCE_WRITES:
+        return None
+    return settings.LAB_CRITICAL_ESCALATION_ADMIN_ID
+
+
 def _first_attempt_at(doctor_id: int | None = None) -> datetime | None:
-    if doctor_id is not None or settings.LAB_CRITICAL_ESCALATION_ADMIN_ID is not None:
+    if doctor_id is not None or _configured_operations_admin_id() is not None:
         return datetime.now(UTC)
     return None
 
@@ -63,7 +70,7 @@ def _current_delivery_recipient(
         doctor_id = _responsible_user_id(db, instance, lock_ownership=True)
         if doctor_id is not None:
             return doctor_id, doctor_id
-    admin_id = settings.LAB_CRITICAL_ESCALATION_ADMIN_ID
+    admin_id = _configured_operations_admin_id()
     if admin_id is None:
         return doctor_id, None
     return doctor_id, db.scalar(
@@ -327,7 +334,7 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
             # visible and recheck later without counting a delivery attempt.
             task.next_attempt_at = (
                 now + timedelta(minutes=30)
-                if settings.LAB_CRITICAL_ESCALATION_ADMIN_ID is not None else None
+                if _configured_operations_admin_id() is not None else None
             )
             db.commit()
             continue
