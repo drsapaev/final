@@ -189,7 +189,6 @@ export const queueService = {
   // Вызвать следующего ожидающего пациента по специальности
   callNextWaiting: async (specialty: string) => {
     const queue = await apiRequest<{ entries?: Array<Record<string, unknown>>; next_call_entry_id?: unknown }>(`/doctor/${encodeURIComponent(specialty)}/queue/today`);
-    if (!queue?.entries?.length) return { success: false, message: 'Очередь пуста' };
     // QAPI-FE-001 (audit 3886): the backend's canonical next_call_entry_id
     // is the ONLY source for the call target — an explicit null stops the
     // call, and a missing field fails closed as a contract error. The old
@@ -200,7 +199,12 @@ export const queueService = {
       logger.error('[queueService] callNextWaiting refused:', contractError);
       return { success: false, message: contractError };
     }
-    if (!nextEntry?.id) return { success: false, message: 'Нет ожидающих пациентов' };
+    if (queue?.next_call_entry_id === null && Array.isArray(queue.entries)) {
+      return { success: false as const, noCandidate: true as const };
+    }
+    if (!nextEntry?.id || !Array.isArray(queue?.entries) || queue.entries.length === 0) {
+      return { success: false, message: 'Сервер не подтвердил кандидата для вызова' };
+    }
     // DOCFLOW-FE-003 (audit 3886): the call POST result is authoritative.
     // The old code ignored the response and always fabricated
     // `{success: true, entry: <pre-call GET snapshot>}`. Only a confirmed
