@@ -772,15 +772,11 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(catchBlock).toContain('instanceIdsMatch(currentUrlInstanceId, transitionSourceUrlId)');
   });
 
-  it('sends a persistent Idempotency-Key for report CREATE: bind/proceed on retry, clear on confirmed outcome (review round 9)', () => {
+  it('passes a persistent CREATE idempotency key and clears it on confirmed outcome (review round 9)', () => {
     const workbenchSource = fs.readFileSync(
       path.resolve(__dirname, '../../components/laboratory/LabReportWorkbench.tsx'),
       'utf8',
     );
-    const apiSource = fs.readFileSync(
-      path.resolve(__dirname, '../../api/labReporting.ts'),
-      'utf8',
-    ).replace(/\r\n/g, '\n');
     const idempotencySource = fs.readFileSync(
       path.resolve(__dirname, '../../components/laboratory/createInstanceIdempotency.ts'),
       'utf8',
@@ -793,9 +789,7 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(workbenchSource).toContain('const idempotencyKey = await resolveCreateInstanceIdempotencyKey(createPayload);');
     expect(workbenchSource).toContain('await labReportingApi.createInstance(createPayload, { idempotencyKey });');
     expect(workbenchSource).toContain('clearCreateInstanceIdempotencyKey(createPayload);');
-    // api-клиент: Idempotency-Key — opt-in заголовок (middleware без него
-    // пропускает POST без координации).
-    expect(apiSource).toContain('options.idempotencyKey\n        ? { headers: { \'Idempotency-Key\': options.idempotencyKey } }');
+    // Передачу заголовка POST проверяет API-тест labReporting.contract.test.ts.
     // Модуль: proceed (тот же payload digest → тот же ключ), rotate (изменённый
     // payload → новая операция), reload-safe sessionStorage-слоты; raw payload
     // в storage не пишется (CodeQL #1315, round 10) — только односторонний
