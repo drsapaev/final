@@ -153,6 +153,7 @@ jobs:
           workflow:
             - '.github/workflows/**'
             - '.github/actions/**'
+            - '.github/actionlint.yaml'
           skills:
             - '.agents/**'
             - 'skills-lock.json'
@@ -346,6 +347,17 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
+        # actionlint 1.7.12 predates Actions' concurrency.queue (rhysd/actionlint#746).
+        # Validate the two uses separately. Remove this compatibility check when upgrading actionlint.
+        ruby - <<'RUBY'
+        require "yaml"
+        app = YAML.load_file(".github/workflows/codex-pr-app.yml")
+        canary = YAML.load_file(".github/workflows/dependabot-guard-tests.yml")
+        [app.fetch("concurrency"), canary.fetch("jobs").fetch("queue-canary").fetch("concurrency")].each do |slot|
+          valid = slot.fetch("queue") == "max" && slot.fetch("cancel-in-progress") == false
+          abort "expected a persistent concurrency queue without cancellation" unless valid
+        end
+        RUBY
         docker run --rm \
           -v "${PWD}:/repo:ro" \
           -w /repo \
