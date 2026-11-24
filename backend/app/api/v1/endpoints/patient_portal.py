@@ -1040,7 +1040,27 @@ def create_patient_portal_booking(
     appointment_in = appointment_schemas.PatientPortalAppointmentCreate(
         **appointment_create_payload
     )
-    appointment = appointment_crud.create(db=db, obj_in=appointment_in)
+    try:
+        appointment = appointment_crud.create(
+            db=db,
+            obj_in=appointment_in,
+            slot_conflict=HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"reason": "appointment_time_slot_occupied"},
+            ),
+        )
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_409_CONFLICT:
+            _log_portal_denied(
+                db,
+                request=request,
+                current_user=current_user,
+                resource_type="appointment",
+                action="create",
+                reason=_deny_reason(exc.detail),
+                scope=scope,
+            )
+        raise
 
     log_patient_access(
         db=db,
