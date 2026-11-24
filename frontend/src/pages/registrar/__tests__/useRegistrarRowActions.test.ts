@@ -165,6 +165,15 @@ describe('useRegistrarRowActions (PR-UI-13-5)', () => {
     expect(updateAppointmentStatus).toHaveBeenCalledWith(9, 'done', '', row);
   });
 
+  it('complete from the table makes no mutation when confirmation is declined', async () => {
+    const confirm = vi.fn().mockResolvedValue(false);
+    const updateAppointmentStatus = vi.fn().mockResolvedValue(undefined);
+    const { hook } = renderRowActions({ confirm, updateAppointmentStatus });
+    await act(async () => { await hook.current.handleTableAction('complete', { id: 9 }); });
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(updateAppointmentStatus).not.toHaveBeenCalled();
+  });
+
   it('print action opens the print dialog with a ticket payload', async () => {
     const { hook, setters } = renderRowActions();
     await act(async () => { await hook.current.handleTableAction('print', { id: 7 }); });
