@@ -84063,7 +84063,7 @@
           },
           "quantity": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 0.0,
             "title": "Quantity",
             "default": 1
           },
@@ -92931,7 +92931,7 @@
           },
           "quantity": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 0.0,
             "title": "Quantity",
             "default": 1
           },

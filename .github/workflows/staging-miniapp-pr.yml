@@ -38,6 +38,9 @@ on:
       native-arq:
         type: boolean
         default: false
+      native-lab-arq:
+        type: boolean
+        default: false
     secrets:
       STAGING_TELEGRAM_BOT_TOKEN:
         required: true
@@ -700,6 +703,7 @@ jobs:
       github.ref == 'refs/heads/main' &&
       (inputs.native-protected || inputs.native-live || inputs.native-arq) &&
       !inputs.native-rehearsal &&
+      (!inputs.native-lab-arq || inputs.native-arq) &&
       (!(inputs.native-live || inputs.native-arq) ||
        (github.workflow_ref == 'drsapaev/final/.github/workflows/staging-miniapp-native-live.yml@refs/heads/main' &&
         !inputs.native-protected &&
@@ -713,10 +717,39 @@ jobs:
     env:
       REVIEWED_SHA: ${{ !inputs.native-arq && '33f35996a1f86726b17f8caa819d1ed99aa1729a' || inputs.source-sha }}
       RUN_ARQ_ACCEPTANCE: ${{ inputs.native-arq }}
+      RUN_LAB_ARQ_ACCEPTANCE: ${{ inputs.native-lab-arq }}
       WORKFLOW_SHA: ${{ github.workflow_sha }}
     steps:
+      - name: Verify the exact PR 4251 metadata
+        if: env.RUN_LAB_ARQ_ACCEPTANCE == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$REVIEWED_SHA" =~ ^[a-f0-9]{40}$ ]]; then
+            echo '::error::PR #4251 acceptance requires its full current head SHA.'
+            exit 1
+          fi
+          if ! gh api --hostname github.com repos/drsapaev/final/pulls/4251 | python3 -c '
+          import json
+          import sys
+
+          pr = json.load(sys.stdin)
+          head, base = pr["head"], pr["base"]
+          sys.exit(not (
+              pr["number"] == 4251 and pr["state"] == "open"
+              and head["repo"]["full_name"] == base["repo"]["full_name"] == "drsapaev/final"
+              and head["ref"] == "codex/laboratory-panel-v2" and base["ref"] == "main"
+              and head["sha"] == sys.argv[1] and base["sha"] == sys.argv[2]
+          ))
+          ' "$REVIEWED_SHA" "$WORKFLOW_SHA" 2>/dev/null; then
+            echo '::error::Could not verify open same-repository PR #4251 and its exact app head and current main base.'
+            exit 1
+          fi
+
       - name: Verify the current PR 4195 metadata
-        if: env.RUN_ARQ_ACCEPTANCE == 'true'
+        if: env.RUN_ARQ_ACCEPTANCE == 'true' && env.RUN_LAB_ARQ_ACCEPTANCE != 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -752,7 +785,59 @@ jobs:
           source="$d/source"
           origin=https://github.com/drsapaev/final.git
           git init -q "$source"
-          if [[ "$RUN_ARQ_ACCEPTANCE" == true ]]; then
+          if [[ "$RUN_LAB_ARQ_ACCEPTANCE" == true ]]; then
+            pinned_app=7a1d512e87bd052dd1ee06199fec7a82e7d27d0e
+            review_base=11d4a5edd1979ed167ae4acb6b75e7d72eda9239
+            for revision in "$sha" "$WORKFLOW_SHA"; do
+              if [[ ! "$revision" =~ ^[a-f0-9]{40}$ ]]; then
+                echo '::error::Full PR #4251 app and workflow commit SHAs are required.'
+                exit 1
+              fi
+            done
+            git -C "$source" fetch -q --no-tags --depth=64 "$origin" \
+              refs/heads/main:refs/remotes/origin/main \
+              refs/heads/codex/laboratory-panel-v2:refs/remotes/origin/laboratory-panel-v2 \
+              refs/pull/4251/head:refs/remotes/origin/pr-4251
+            if [[ "$(git -C "$source" rev-parse refs/remotes/origin/main)" != "$WORKFLOW_SHA" ||
+                  "$(git -C "$source" rev-parse refs/remotes/origin/laboratory-panel-v2)" != "$sha" ||
+                  "$(git -C "$source" rev-parse refs/remotes/origin/pr-4251)" != "$sha" ]] ||
+              ! git -C "$source" merge-base --is-ancestor "$review_base" "$sha"; then
+              echo '::error::PR #4251 or main changed, or the pinned app commit lacks the reviewed base.'
+              exit 1
+            fi
+            if [[ "$sha" != "$pinned_app" ]]; then
+              # Accept just the pinned app's direct merge of this workflow main.
+              if [[ "$(git -C "$source" show -s --format=%P "$sha")" != "$pinned_app $WORKFLOW_SHA" ]] ||
+                ! git -C "$source" merge-base --is-ancestor "$review_base" "$WORKFLOW_SHA"; then
+                echo '::error::PR #4251 head must be the reviewed app or its exact two-parent merge of current main.'
+                exit 1
+              fi
+
+              workflow_paths=(
+                '.github/workflows/staging-miniapp-pr.yml'
+                '.github/workflows/staging-miniapp-native-live.yml'
+                'docs/runbooks/STAGING_VALIDATION.md'
+              )
+              included=()
+              excluded=()
+              for path in "${workflow_paths[@]}"; do
+                git -C "$source" cat-file -e "$WORKFLOW_SHA:$path"
+                included+=(":(top,literal)$path")
+                excluded+=(":(top,exclude,literal)$path")
+              done
+              diff_options=(--quiet --no-ext-diff --no-textconv --no-renames --ignore-submodules=none)
+              if ! git -C "$source" diff "${diff_options[@]}" "$review_base" "$WORKFLOW_SHA" -- . "${excluded[@]}" ||
+                ! git -C "$source" diff "${diff_options[@]}" "$pinned_app" "$sha" -- . "${excluded[@]}" ||
+                ! git -C "$source" diff "${diff_options[@]}" "$WORKFLOW_SHA" "$sha" -- "${included[@]}"; then
+                echo '::error::PR #4251 merge changes the reviewed app, or main differs outside the three approved workflow and runbook paths.'
+                exit 1
+              fi
+            fi
+            git -C "$source" show "$WORKFLOW_SHA:ops/scripts/staging_miniapp_arq_check.py" > "$d/arq-check.py"
+            test -s "$d/arq-check.py"
+            printf 'PR #4251 source verification: PASS at `%s` (reviewed app `%s`, review base `%s`, current workflow `%s`).\n' \
+              "$sha" "$pinned_app" "$review_base" "$WORKFLOW_SHA" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$RUN_ARQ_ACCEPTANCE" == true ]]; then
             approved=10a8cac30b21b9885ef320257d7add032c6ef5ac
             for revision in "$sha" "$WORKFLOW_SHA" "$approved"; do
               if [[ ! "$revision" =~ ^[a-f0-9]{40}$ ]]; then
