@@ -735,6 +735,50 @@ def test_escalated_doctor_delivery_keeps_shared_tenant_admin_disabled(
 
 
 @pytest.mark.unit
+def test_escalated_doctor_retries_do_not_starve_unattempted_tasks(
+    db_session, test_patient, test_visit, monkeypatch,
+):
+    admin = synthetic_user(db_session, "Admin")
+    doctor = synthetic_user(db_session, "Doctor")
+    profile = Doctor(user_id=doctor.id, specialty="cardiology", active=True)
+    db_session.add(profile)
+    db_session.flush()
+    test_visit.doctor_id = profile.id
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", None)
+    tasks = []
+    for _ in range(2):
+        _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+        report.values.append(LabReportValue(
+            field_key="hgb", value_numeric=Decimal("1"),
+            evaluation_snapshot={"interpretation": "critical"},
+        ))
+        tasks.append(record_released_report(db_session, report))
+    db_session.commit()
+    for task in tasks:
+        escalate(db_session, task.id, actor_user_id=admin.id)
+
+    sender = AsyncMock(return_value=False)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    assert run(dispatch_pending(db_session, limit=1)) == 0
+    first_attempt = db_session.scalar(
+        select(LabCriticalCommunicationEvent)
+        .where(
+            LabCriticalCommunicationEvent.communication_id == tasks[0].id,
+            LabCriticalCommunicationEvent.event_type == "doctor_attempted",
+        )
+        .order_by(LabCriticalCommunicationEvent.id.desc())
+    )
+    first_attempt.occurred_at = datetime.now(UTC) - timedelta(minutes=2)
+    db_session.commit()
+    assert run(dispatch_pending(db_session, limit=1)) == 0
+    assert [call.kwargs["entity_id"] for call in sender.await_args_list] == [
+        tasks[0].id, tasks[1].id,
+    ]
+
+
+@pytest.mark.unit
 def test_escalated_doctor_delivery_retries_without_duplicate_attempts(
     db_session, test_patient, test_visit, monkeypatch,
 ):

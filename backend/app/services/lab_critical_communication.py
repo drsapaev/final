@@ -346,6 +346,17 @@ async def _dispatch_escalated_doctors(db: Session, *, limit: int) -> tuple[int, 
         .correlate(LabCriticalCommunication)
         .scalar_subquery()
     )
+    attempt_event = aliased(LabCriticalCommunicationEvent)
+    latest_attempt = (
+        select(func.max(attempt_event.occurred_at))
+        .where(
+            attempt_event.communication_id == LabCriticalCommunication.id,
+            attempt_event.event_type == "doctor_attempted",
+            attempt_event.id > func.coalesce(latest_route, 0),
+        )
+        .correlate(LabCriticalCommunication)
+        .scalar_subquery()
+    )
     current_owner = (
         _active_visit_doctor_query(
             LabReportInstance.visit_id, LabReportInstance.patient_id
@@ -357,17 +368,6 @@ async def _dispatch_escalated_doctors(db: Session, *, limit: int) -> tuple[int, 
     processed = 0
     for _ in range(limit):
         retry_after = datetime.now(UTC) - timedelta(minutes=1)
-        recent_attempt = (
-            select(LabCriticalCommunicationEvent.id)
-            .where(
-                LabCriticalCommunicationEvent.communication_id == LabCriticalCommunication.id,
-                LabCriticalCommunicationEvent.event_type == "doctor_attempted",
-                LabCriticalCommunicationEvent.id > func.coalesce(latest_route, 0),
-                LabCriticalCommunicationEvent.occurred_at >= retry_after,
-            )
-            .correlate(LabCriticalCommunication)
-            .exists()
-        )
         task = db.scalar(
             select(LabCriticalCommunication)
             .join(
@@ -378,9 +378,9 @@ async def _dispatch_escalated_doctors(db: Session, *, limit: int) -> tuple[int, 
                 LabCriticalCommunication.state == "escalated",
                 LabCriticalCommunication.recipient_user_id == current_owner,
                 LabCriticalCommunication.inbox_recorded_at.is_(None),
-                ~recent_attempt,
+                or_(latest_attempt.is_(None), latest_attempt < retry_after),
             )
-            .order_by(LabCriticalCommunication.id)
+            .order_by(latest_attempt.asc().nulls_first(), LabCriticalCommunication.id)
             .limit(1)
             .with_for_update(of=LabCriticalCommunication, skip_locked=True)
             .execution_options(populate_existing=True)
