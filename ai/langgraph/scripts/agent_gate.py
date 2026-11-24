@@ -30,9 +30,13 @@ MODEL_ALIASES = {
 }
 
 
+# Consume quoted rooted paths first so spaces cannot expose a relative suffix.
 EXPLICIT_PATH_RE = re.compile(
+    r"""(?<!\w)(?P<quote>["'`])(?:[\\/]|[A-Za-z]:(?=\S))"""
+    r"(?:(?!(?P=quote))[^\r\n])*(?P=quote)|"
+    r"(?<![A-Za-z0-9_.\\/-])(?<!\b[A-Za-z]:)"
     r"(?P<path>(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\."
-    r"(?:tsx|jsx|json|yaml|yml|toml|ps1|bat|sh|md|txt|ts|js|py)"
+    r"(?:tsx|jsx|json|yaml|yml|toml|css|ps1|bat|sh|md|txt|ts|js|py)"
     r"(?![A-Za-z0-9_-])(?!\.[A-Za-z0-9]))"
 )
 
@@ -285,12 +289,13 @@ def unique_paths(paths: list[str]) -> list[str]:
 
 
 def explicit_paths(task: str, repo_root: Path, tracked: set[str]) -> list[str]:
-    candidates = list(EXPLICIT_PATH_RE.finditer(task))
     seen: set[str] = set()
     result: list[str] = []
-    for match in candidates:
-        path = match.group("path").rstrip(".,;:!?)\\]}\"")
-        rel = normalize_rel_path(path)
+    for match in EXPLICIT_PATH_RE.finditer(task):
+        path = match.group("path")
+        if path is None:
+            continue
+        rel = normalize_rel_path(path.rstrip(".,;:!?)\\]}\""))
         if rel in seen:
             continue
         if not is_safe_repo_relative_path(repo_root, rel):

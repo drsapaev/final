@@ -57,6 +57,30 @@ class AclScope:
             )
         return qualified
 
+    def new_sequence(self, name, *, schema=None, creator=None):
+        qualified = f"{self.quote(schema or self.schema)}.{self.quote(name)}"
+        with self.admin.begin() as db:
+            db.exec_driver_sql(f"SET LOCAL ROLE {self.quote(creator or self.creator)}")
+            db.exec_driver_sql(
+                f"CREATE SEQUENCE {qualified}",
+                execution_options={"no_parameters": True},
+            )
+        return qualified
+
+    def sequence_privileges(self, role, sequence):
+        with self.admin.connect() as db:
+            return tuple(
+                db.execute(
+                    text("""
+                    SELECT
+                        pg_catalog.has_sequence_privilege(:role, :sequence, 'SELECT'),
+                        pg_catalog.has_sequence_privilege(:role, :sequence, 'UPDATE'),
+                        pg_catalog.has_sequence_privilege(:role, :sequence, 'USAGE')
+                """),
+                    {"role": role, "sequence": sequence},
+                ).one()
+            )
+
     def has_privilege(self, role, table, privilege):
         with self.admin.connect() as db:
             return db.scalar(
@@ -299,3 +323,82 @@ def test_indirect_schema_grant_causes_rollback(acl_scope, activation_chain):
     with pytest.raises(provisioner.DefaultAclError, match="Indirect default TRUNCATE"):
         scope.reconcile()
     assert scope.scoped_truncate_grantees() == before
+
+
+def test_sequence_defaults_are_scoped_to_new_sequences_from_the_selected_creator(
+    acl_scope,
+):
+    scope = acl_scope
+    quote = scope.quote
+    with scope.admin.begin() as db:
+        for creator, schema in (
+            (scope.creator, scope.schema),
+            (scope.creator, scope.other_schema),
+            (scope.other_creator, scope.schema),
+        ):
+            db.exec_driver_sql(
+                f"ALTER DEFAULT PRIVILEGES FOR ROLE {quote(creator)} IN SCHEMA {quote(schema)} "
+                f"GRANT SELECT, UPDATE, USAGE ON SEQUENCES TO PUBLIC, {quote(scope.gateway)}",
+                execution_options={"no_parameters": True},
+            )
+
+    existing = scope.new_sequence("synthetic_existing")
+    assert scope.sequence_privileges(scope.gateway, existing) == (True, True, True)
+    scope.reconcile(sequences=True)
+    scope.reconcile(sequences=True)
+
+    protected = scope.new_sequence("synthetic_protected")
+    assert scope.sequence_privileges(scope.gateway, protected) == (False, False, False)
+    assert scope.sequence_privileges(scope.delegate, protected) == (False, False, False)
+    assert scope.sequence_privileges(scope.gateway, existing) == (True, True, True)
+
+    for sequence in (
+        scope.new_sequence("synthetic_other_schema", schema=scope.other_schema),
+        scope.new_sequence("synthetic_other_creator", creator=scope.other_creator),
+    ):
+        assert scope.sequence_privileges(scope.gateway, sequence) == (True, True, True)
+
+    unrelated_table = scope.new_table("synthetic_unrelated_table")
+    assert scope.has_privilege(scope.gateway, unrelated_table, "TRUNCATE")
+
+    with scope.admin.begin() as db:
+        db.exec_driver_sql(
+            f"GRANT USAGE ON SEQUENCE {protected} TO {quote(scope.staff)}",
+            execution_options={"no_parameters": True},
+        )
+    assert scope.sequence_privileges(scope.staff, protected) == (False, False, True)
+
+
+@pytest.mark.parametrize(
+    ("global_default", "reason"),
+    (
+        (True, "Global default sequence access"),
+        (False, "Unreviewed default sequence access"),
+    ),
+    ids=("global", "unreviewed-schema-grantee"),
+)
+def test_sequence_default_scope_rolls_back_on_unreviewed_access(
+    acl_scope, global_default, reason
+):
+    scope = acl_scope
+    quote = scope.quote
+    defaults = f"ALTER DEFAULT PRIVILEGES FOR ROLE {quote(scope.creator)}"
+    schema = f"IN SCHEMA {quote(scope.schema)}"
+    unreviewed = defaults if global_default else f"{defaults} {schema}"
+    with scope.admin.begin() as db:
+        db.exec_driver_sql(
+            f"{defaults} {schema} GRANT SELECT, UPDATE, USAGE ON SEQUENCES TO {quote(scope.gateway)}",
+            execution_options={"no_parameters": True},
+        )
+        db.exec_driver_sql(
+            f"{unreviewed} GRANT USAGE ON SEQUENCES TO {quote(scope.staff)}",
+            execution_options={"no_parameters": True},
+        )
+
+    scope.owner = scope.owner.execution_options(isolation_level="AUTOCOMMIT")
+    with pytest.raises(provisioner.DefaultAclError, match=reason):
+        scope.reconcile(sequences=True)
+
+    sequence = scope.new_sequence("synthetic_after_rejected_change")
+    assert scope.sequence_privileges(scope.gateway, sequence) == (True, True, True)
+    assert scope.sequence_privileges(scope.staff, sequence) == (False, False, True)

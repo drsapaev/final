@@ -1,4 +1,4 @@
-"""Restrict default TRUNCATE grants for a PostgreSQL financial table creator."""
+"""Restrict default grants for protected PostgreSQL financial objects."""
 
 from __future__ import annotations
 
@@ -15,8 +15,9 @@ _TARGET = text("""
     SELECT namespaces.oid AS schema_oid, creator.oid AS creator_oid,
            pg_catalog.format(
                'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I '
-               'REVOKE TRUNCATE ON TABLES FROM %s RESTRICT',
+               'REVOKE %s FROM %s RESTRICT',
                creator.rolname, namespaces.nspname,
+               CAST(:privilege_clause AS text),
                pg_catalog.concat_ws(', ', 'PUBLIC', (
                    SELECT pg_catalog.string_agg(
                        pg_catalog.quote_ident(gateway.rolname), ', ' ORDER BY gateway.rolname
@@ -58,8 +59,13 @@ _REMAINING_ACCESS = text("""
     CROSS JOIN LATERAL pg_catalog.aclexplode(defaults.defaclacl) acl
     WHERE defaults.defaclrole = :creator_oid
       AND defaults.defaclnamespace IN (0, :schema_oid)
-      AND defaults.defaclobjtype = 'r' AND acl.privilege_type = 'TRUNCATE'
-      AND (acl.grantee = 0 OR acl.grantee IN (SELECT oid FROM gateway_access))
+      AND defaults.defaclobjtype = :object_type
+      AND acl.privilege_type = ANY(:privileges)
+      AND (
+          acl.grantee = 0
+          OR acl.grantee IN (SELECT oid FROM gateway_access)
+          OR (:sequences AND acl.grantee <> :creator_oid)
+      )
 """)
 
 
@@ -67,10 +73,23 @@ class DefaultAclError(RuntimeError):
     """The requested PostgreSQL privilege boundary could not be verified."""
 
 
-def provision(engine: Engine, *, database: str, schema: str, creator: str) -> None:
-    """Revoke the creator's scoped default grant between schema changes."""
+def provision(
+    engine: Engine, *, database: str, schema: str, creator: str, sequences: bool = False
+) -> None:
+    """Restrict the creator's named default grants between schema changes."""
     if engine.dialect.name != "postgresql":
         raise DefaultAclError("PostgreSQL required")
+
+    if sequences:
+        object_name = "sequence"
+        object_type = "S"
+        privileges = ["SELECT", "UPDATE", "USAGE"]
+    else:
+        object_name = "table"
+        object_type = "r"
+        privileges = ["TRUNCATE"]
+
+    privilege_clause = f"{', '.join(privileges)} ON {object_name.upper()}S"
 
     with (
         engine.connect() as connection,
@@ -84,6 +103,7 @@ def provision(engine: Engine, *, database: str, schema: str, creator: str) -> No
                     "database": database,
                     "schema": schema,
                     "creator": creator,
+                    "privilege_clause": privilege_clause,
                     "gateway_roles": roles,
                 },
             )
@@ -109,19 +129,24 @@ def provision(engine: Engine, *, database: str, schema: str, creator: str) -> No
                     "creator_oid": target["creator_oid"],
                     "activation": activation,
                     "gateway_roles": roles,
+                    "object_type": object_type,
+                    "privileges": privileges,
+                    "sequences": sequences,
                 },
             )
             .mappings()
             .one()
         )
         if remaining["creator_access"]:
-            raise DefaultAclError("A gateway role can act as the table creator")
+            raise DefaultAclError(f"A gateway role can act as the {object_name} creator")
+        grant = "sequence access" if sequences else "TRUNCATE"
         if remaining["global_grant"]:
-            raise DefaultAclError("Global default TRUNCATE requires separate review")
+            raise DefaultAclError(f"Global default {grant} requires separate review")
         if remaining["schema_grant"]:
-            raise DefaultAclError(
-                "Indirect default TRUNCATE remains in the requested schema"
+            reason = (
+                "Unreviewed default sequence access" if sequences else "Indirect default TRUNCATE"
             )
+            raise DefaultAclError(f"{reason} remains in the requested schema")
 
 
 def main() -> None:
@@ -129,6 +154,10 @@ def main() -> None:
     parser.add_argument("--database", required=True)
     parser.add_argument("--schema", required=True)
     parser.add_argument("--creator", required=True)
+    parser.add_argument(
+        "--sequences", action="store_true",
+        help="Restrict SELECT, UPDATE and USAGE on future sequences in the selected scope.",
+    )
     args = parser.parse_args()
     url = os.getenv("DATABASE_URL")
     if not url:
@@ -138,7 +167,8 @@ def main() -> None:
         engine = create_engine(url, hide_parameters=True)
         try:
             provision(
-                engine, database=args.database, schema=args.schema, creator=args.creator
+                engine, database=args.database, schema=args.schema, creator=args.creator,
+                sequences=args.sequences,
             )
         finally:
             engine.dispose()
