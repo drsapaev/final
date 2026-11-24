@@ -466,13 +466,12 @@ def create_or_update_prescription(
             detail=f"Рецепт доступен только во время приема. Текущий статус: {appointment.status}",
         )
 
-    revision = emr_v2_service.get_revision(db, canonical_emr.id, canonical_emr.version)
     item = crud_emr.prescription.store_for_visit(
         db,
         appointment_id=appointment.id,
         visit_id=visit_id,
         emr_record_id=canonical_emr.id,
-        emr_revision_id=revision.id if revision else None,
+        emr_revision_id=None,
         values=prescription_data.model_dump(include={"medications", "instructions", "doctor_notes", "is_draft"}),
     )
     db.commit()
