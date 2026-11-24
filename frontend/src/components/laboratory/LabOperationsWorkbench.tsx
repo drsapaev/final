@@ -11,7 +11,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import tokenManager from '../../utils/tokenManager';
 import { Button } from '../ui/macos';
 import { getLabOperationsLabels } from './labOperationsLabels';
-import { LAB_IMPORT_CSV_HEADER, parseLabImportCsv } from './utils/labImportCsv';
+import { LAB_IMPORT_CSV_HEADER, parseLabImportCsv, parseLabImportReportId } from './utils/labImportCsv';
 import './LabOperationsWorkbench.css';
 
 type Labels = ReturnType<typeof getLabOperationsLabels>;
@@ -31,11 +31,11 @@ function emptyRow(reportId: number | null): ManualRow {
 function prepareManualEntries(rows: ManualRow[], previousMessageIds: ReadonlyMap<string, string>) {
   const grouped = new Map<string, Omit<LabImportEntry, 'message_id'>>();
   for (const row of rows) {
-    const report = Number(row.report);
+    const report = parseLabImportReportId(row.report.trim());
     const barcode = row.barcode.trim().toUpperCase();
     const analyte = row.analyte.trim();
     const value = row.value.trim();
-    if (!Number.isSafeInteger(report) || report <= 0 || !barcode || !analyte || !value) throw new Error('row');
+    if (!report || !barcode || !analyte || !value) throw new Error('row');
     const key = `${report}/${barcode}`;
     const entry: Omit<LabImportEntry, 'message_id'> = grouped.get(key) ?? {
       report_instance_id: report,
@@ -329,6 +329,7 @@ export default function LabOperationsWorkbench({ reportId, onQueueChanged }: Lab
               <label>{labels.csv}<input type="file" aria-label={labels.csv} accept=".csv,text/csv" disabled={busy}
                 onChange={(event) => void chooseFile(event.target.files?.[0])} /></label>
               <p>{labels.csvFormat} <code>{LAB_IMPORT_CSV_HEADER}</code></p>
+              <p><code>{'instrument_flags → "[""Flag-H"",""H?""]"'}</code></p>
             </div>
           )}
           {error && <p role="alert">{labels[error]}</p>}

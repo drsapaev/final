@@ -4,7 +4,23 @@ const requiredHeaders = [
   'message_id', 'report_instance_id', 'specimen_barcode', 'analyte_code', 'unit_code', 'value',
 ];
 
-export const LAB_IMPORT_CSV_HEADER = [...requiredHeaders, 'method_code', 'observed_at'].join(',');
+export const LAB_IMPORT_CSV_HEADER = [...requiredHeaders, 'method_code', 'observed_at', 'instrument_flags'].join(',');
+
+export function parseLabImportReportId(value: string): number {
+  const id = /^[0-9]+$/.test(value) ? Number(value) : 0;
+  return id > 0 && id <= 2_147_483_647 ? id : 0;
+}
+
+function parseInstrumentFlags(value: string | undefined): string[] | null {
+  if (!value) return [];
+  try {
+    const flags: unknown = JSON.parse(value);
+    if (Array.isArray(flags) && flags.every((flag) => typeof flag === 'string')) return flags;
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 function parseRows(input: string): string[][] {
   const output: string[][] = [];
@@ -45,33 +61,46 @@ function parseRows(input: string): string[][] {
 
 export function parseLabImportCsv(text: string): LabImportEntry[] {
   const [headers, ...records] = parseRows(text.replace(/^\uFEFF/, ''));
-  if (!headers || !requiredHeaders.every((name) => headers.includes(name))) throw new Error('csv');
+  if (!headers || new Set(headers).size !== headers.length ||
+      !requiredHeaders.every((name) => headers.includes(name))) throw new Error('csv');
 
-  const entries = new Map<string, LabImportEntry>();
-  for (const record of records) {
-    if (record.length !== headers.length) throw new Error('csv');
+  const entries = new Map<string | number, LabImportEntry>();
+  const invalidMessages = new Set<string | number>();
+  for (const [index, record] of records.entries()) {
     const cells = Object.fromEntries(headers.map((name, index) => [name, record[index]]));
-    const reportId = Number(cells.report_instance_id);
-    if (!Number.isSafeInteger(reportId) || reportId <= 0 || !cells.message_id ||
-      !cells.specimen_barcode || !cells.analyte_code || !cells.value) throw new Error('csv');
-    const current = entries.get(cells.message_id) ?? {
-      message_id: cells.message_id,
+    const messageId = cells.message_id?.toLowerCase() || '';
+    const key = messageId || index;
+    if (invalidMessages.has(key)) continue;
+    const reportId = parseLabImportReportId(cells.report_instance_id ?? '');
+    const barcode = cells.specimen_barcode ?? '';
+    const method = cells.method_code || undefined;
+    const observedAt = cells.observed_at || undefined;
+    const flags = parseInstrumentFlags(cells.instrument_flags);
+    const current = entries.get(key) ?? {
+      message_id: messageId,
       report_instance_id: reportId,
-      specimen_barcode: cells.specimen_barcode,
-      method_code: cells.method_code || undefined,
-      observed_at: cells.observed_at || undefined,
+      specimen_barcode: barcode,
+      method_code: method,
+      observed_at: observedAt,
       values: [],
     };
-    if (current.report_instance_id !== reportId || current.specimen_barcode !== cells.specimen_barcode ||
-      current.method_code !== (cells.method_code || undefined) ||
-      current.observed_at !== (cells.observed_at || undefined)) throw new Error('csv');
+    const sameTarget = current.report_instance_id === reportId && current.specimen_barcode === barcode;
+    if (record.length !== headers.length || !messageId || !reportId || !barcode || !cells.analyte_code || !cells.value ||
+        flags == null || !sameTarget ||
+        current.method_code !== method || current.observed_at !== observedAt || current.values.length >= 100) {
+      // The API returns invalid_row for an empty message. Keep its position
+      // in preview and quarantine all its analytes together.
+      entries.set(key, { ...current, report_instance_id: sameTarget ? reportId : 0, values: [] });
+      invalidMessages.add(key);
+      continue;
+    }
     current.values.push({
       analyte_code: cells.analyte_code,
       unit_code: cells.unit_code || null,
       value_text: cells.value,
+      ...(flags.length > 0 ? { instrument_flags: flags } : {}),
     });
-    if (current.values.length > 100) throw new Error('csv');
-    entries.set(cells.message_id, current);
+    entries.set(key, current);
   }
   if (!entries.size || entries.size > 100) throw new Error('csv');
   return [...entries.values()];

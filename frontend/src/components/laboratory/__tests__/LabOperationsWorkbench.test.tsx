@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LabImportEntry, LabImportOutcome } from '../../../api/labOperations';
 import LabOperationsWorkbench from '../LabOperationsWorkbench';
+import { LAB_IMPORT_CSV_HEADER } from '../utils/labImportCsv';
 
 const api = vi.hoisted(() => ({ importRows: vi.fn(), metrics: vi.fn() }));
 
@@ -32,6 +33,43 @@ function importOutcomes(entries: LabImportEntry[], status: LabImportOutcome['sta
 
 describe('Laboratory operations', () => {
   beforeEach(() => vi.resetAllMocks());
+
+  it('previews a malformed CSV message and saves the flagged sibling in place', async () => {
+    const invalid = { row_index: 0, message_id: null, report_instance_id: null, status: 'error',
+      error_code: 'invalid_row', updated_at: null, existing_values: 0 };
+    const messageId = '00000000-0000-4000-8000-000000000002';
+    const valid = { row_index: 1, message_id: messageId, report_instance_id: 42, status: 'ready',
+      error_code: null, updated_at: updatedAt, existing_values: 0 };
+    api.importRows.mockResolvedValueOnce({ rows: [invalid, valid] })
+      .mockResolvedValueOnce({ rows: [{ ...valid, row_index: 0, status: 'saved' }] });
+    const file = new File([], 'synthetic.csv', { type: 'text/csv' });
+    Object.defineProperty(file, 'text', { value: async () => [
+      LAB_IMPORT_CSV_HEADER,
+      '00000000-0000-4000-8000-000000000001,0x2a,SP-SYNTHETIC,hgb,g_l,1,,,',
+      `${messageId},42,SP-SYNTHETIC,hgb,g_l,7,,,"[""H?""]"`,
+    ].join('\n') });
+
+    render(<LabOperationsWorkbench orderId={null} reportId={null} onQueueChanged={vi.fn().mockResolvedValue(undefined)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Импорт CSV' }));
+    fireEvent.change(screen.getByLabelText('Импорт CSV'), { target: { files: [file] } });
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Проверить строки' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить строки' }));
+    expect(await screen.findByText('Проверьте поля строки')).toBeInTheDocument();
+    expect(api.importRows).toHaveBeenNthCalledWith(1, 'csv', [
+      expect.objectContaining({ report_instance_id: 0, values: [] }),
+      expect.objectContaining({ report_instance_id: 42, values: [expect.objectContaining({ instrument_flags: ['H?'] })] }),
+    ], true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить проверенные строки' }));
+    expect(await screen.findByText('Сохранено')).toBeInTheDocument();
+    expect(api.importRows).toHaveBeenLastCalledWith('csv', [expect.objectContaining({
+      message_id: messageId, report_instance_id: 42, expected_updated_at: updatedAt,
+      values: [expect.objectContaining({ instrument_flags: ['H?'] })],
+    })], false);
+    const rows = within(screen.getByRole('list')).getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('Проверьте поля строки');
+    expect(rows[1]).toHaveTextContent('Сохранено');
+  });
 
   it('preserves the invalid row and applies the valid row at its original position', async () => {
     const onQueueChanged = vi.fn().mockResolvedValue(undefined);

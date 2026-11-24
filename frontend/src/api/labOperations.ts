@@ -14,6 +14,7 @@ export interface LabImportEntry {
     analyte_code: string;
     unit_code: string | null;
     value_text: string;
+    instrument_flags?: string[];
   }[];
 }
 
