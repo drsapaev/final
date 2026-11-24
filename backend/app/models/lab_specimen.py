@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import StrEnum
 
 from sqlalchemy import (
     JSON,
@@ -18,6 +19,20 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base
+
+
+class LabSpecimenRejectionReasonCode(StrEnum):
+    LABEL_MISMATCH = "label_mismatch"
+    CONTAINER_MISMATCH = "container_mismatch"
+    INSUFFICIENT_QUANTITY = "insufficient_quantity"
+    SPECIMEN_QUALITY = "specimen_quality"
+    TRANSPORT_ISSUE = "transport_issue"
+    OTHER = "other"
+
+
+_REJECTION_CODES_SQL = ", ".join(
+    repr(code.value) for code in LabSpecimenRejectionReasonCode
+)
 
 
 class LabSpecimen(Base):
@@ -117,6 +132,10 @@ class LabSpecimenEvent(Base):
             "specimen_id", "request_id", name="uq_lab_specimen_event_request"
         ),
         CheckConstraint("revision > 0", name="ck_lab_specimen_event_revision"),
+        CheckConstraint(
+            f"reason_code IS NULL OR (action = 'reject' AND reason_code IN ({_REJECTION_CODES_SQL}))",
+            name="ck_lab_specimen_event_rejection_reason",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -133,6 +152,7 @@ class LabSpecimenEvent(Base):
         DateTime(timezone=True), nullable=False
     )
     reason: Mapped[str | None] = mapped_column(String(300))
+    reason_code: Mapped[str | None] = mapped_column(String(32))
     request_id: Mapped[str] = mapped_column(String(36), nullable=False)
     request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     visit_service_ids: Mapped[list[int]] = mapped_column(

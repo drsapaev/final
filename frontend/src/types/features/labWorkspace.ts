@@ -31,6 +31,15 @@ export const LAB_WORKLIST_VIEWS: LabWorklistView[] = [
 
 export type LabSpecimenStatus = 'expected' | 'collected' | 'received' | 'accepted' | 'held' | 'rejected';
 export type LabSpecimenAction = 'collect' | 'receive' | 'accept' | 'hold' | 'reject';
+export const LAB_SPECIMEN_REJECTION_REASON_CODES = [
+  'label_mismatch',
+  'container_mismatch',
+  'insufficient_quantity',
+  'specimen_quality',
+  'transport_issue',
+  'other',
+] as const;
+export type LabSpecimenRejectionReasonCode = typeof LAB_SPECIMEN_REJECTION_REASON_CODES[number];
 export type LabSpecimenCreateAction = 'recollect' | 'aliquot';
 export type LabSpecimenAvailableAction = LabSpecimenAction | LabSpecimenCreateAction | 'assign' | 'print_label';
 
@@ -40,6 +49,7 @@ export interface LabSpecimenEvent {
   happened_at: string;
   actor_user_id: number | null;
   reason?: string | null;
+  reason_code?: LabSpecimenRejectionReasonCode | null;
 }
 
 export interface LabSpecimen {
@@ -83,6 +93,7 @@ export interface LabSpecimenEventInput {
   expected_revision: number;
   request_id: string;
   reason?: string;
+  reason_code?: LabSpecimenRejectionReasonCode;
 }
 
 export interface LabSpecimenMutationInput {

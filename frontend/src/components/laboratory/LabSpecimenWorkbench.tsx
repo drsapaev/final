@@ -3,8 +3,13 @@ import { ScanBarcode, TestTube2 } from 'lucide-react';
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from '../ui/macos';
 import { labSpecimensApi } from '../../api/labSpecimens';
 import { useTranslation } from '../../i18n/useTranslation';
-import type {
-  LabSpecimen, LabSpecimenAvailableAction, LabSpecimenPage, LabSpecimenStatus,
+import {
+  LAB_SPECIMEN_REJECTION_REASON_CODES,
+  type LabSpecimen,
+  type LabSpecimenAvailableAction,
+  type LabSpecimenPage,
+  type LabSpecimenRejectionReasonCode,
+  type LabSpecimenStatus,
 } from '../../types/features/labWorkspace';
 
 export interface LabSpecimenTarget {
@@ -59,6 +64,7 @@ export default function LabSpecimenWorkbench({
   const [material, setMaterial] = useState('');
   const [container, setContainer] = useState('');
   const [reason, setReason] = useState('');
+  const [rejectionCode, setRejectionCode] = useState<LabSpecimenRejectionReasonCode | ''>('');
   const [serviceIds, setServiceIds] = useState<number[]>([]);
   const [linkReport, setLinkReport] = useState(false);
   const mounted = useRef(false);
@@ -148,6 +154,7 @@ export default function LabSpecimenWorkbench({
     setMaterial(next.specimen?.material_code ?? '');
     setContainer(next.specimen?.container_code ?? '');
     setReason('');
+    setRejectionCode('');
     setServiceIds([]);
     setLinkReport(false);
     setError(null);
@@ -223,7 +230,12 @@ export default function LabSpecimenWorkbench({
     if (formSpecimen && form.action !== 'create' && !formSpecimen.available_actions.includes(form.action)) return;
     if (form.action === 'hold' || form.action === 'reject') {
       if (!formSpecimen || !reason.trim()) return;
-      const payload = { action: form.action, expected_revision: formSpecimen.revision, reason: reason.trim() };
+      const payload = {
+        action: form.action,
+        expected_revision: formSpecimen.revision,
+        reason: reason.trim(),
+        ...(form.action === 'reject' && rejectionCode ? { reason_code: rejectionCode } : {}),
+      };
       void perform({ ...payload, id: formSpecimen.id },
         (request_id) => labSpecimensApi.addEvent(formSpecimen.id, { ...payload, request_id }), selectResult);
       return;
@@ -300,10 +312,24 @@ export default function LabSpecimenWorkbench({
                 <h3>{t(`labWorkspace.action_${form.action}`)} {formSpecimen?.barcode}</h3>
                 {!actionStillAvailable && <Alert severity="warning">{t('labWorkspace.specimenActionChanged')}</Alert>}
                 {reasonRequired ? (
-                  <label>{t('labWorkspace.reason')}
-                    <Input autoFocus required value={reason} maxLength={300} disabled={actionsDisabled}
-                      onChange={(event) => setReason(event.target.value)} />
-                  </label>
+                  <>
+                    {form.action === 'reject' && (
+                      <label className="lab-worklist-field">
+                        {t('labWorkspace.rejectionCode')}
+                        <select className="macos-input" value={rejectionCode} disabled={actionsDisabled}
+                          onChange={(event) => setRejectionCode(event.target.value as LabSpecimenRejectionReasonCode | '')}>
+                          <option value="">{t('labWorkspace.rejection_unknown')}</option>
+                          {LAB_SPECIMEN_REJECTION_REASON_CODES.map((code) => (
+                            <option key={code} value={code}>{t(`labWorkspace.rejection_${code}`)}</option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    <label>{t('labWorkspace.reason')}
+                      <Input autoFocus required value={reason} maxLength={300} disabled={actionsDisabled}
+                        onChange={(event) => setReason(event.target.value)} />
+                    </label>
+                  </>
                 ) : (
                   <>
                     {form.action !== 'assign' && (
@@ -389,6 +415,7 @@ export default function LabSpecimenWorkbench({
                       {specimen.events.map((event) => (
                         <li key={event.id}>{dateTime.format(new Date(event.happened_at))} · {t(`labWorkspace.action_${event.action}`)}
                           {event.actor_user_id && <> · {t('labWorkspace.actor', { id: event.actor_user_id })}</>}
+                          {event.reason_code && <> · {t(`labWorkspace.rejection_${event.reason_code}`)}</>}
                           {event.reason && <> · {event.reason}</>}
                         </li>
                       ))}

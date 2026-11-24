@@ -46,6 +46,8 @@ from app.repositories.lab_ordered_test_repository import (
     LAB_DEPARTMENT_HINTS,
     active_lab_orders,
     lab_visit_services,
+    specimen_visit_service_orders,
+    unallocated_lab_release_history,
     unallocated_lab_report_visits,
 )
 from app.schemas.lab_worklist import (
@@ -116,16 +118,67 @@ def _local_day(db: Session, timestamp, now: datetime):
     return type_coerce(func.date(timestamp, f"{offset_minutes:+d} minutes"), Date)
 
 
-def _work_rows(db: Session, visit_services, tickets, now: datetime):
-    unallocated = ~exists().where(
-        LabOrderTest.visit_service_id == visit_services.c.visit_service_id
+def _worklist_service_lines():
+    specimen_orders = specimen_visit_service_orders().cte("lab_specimen_service_orders")
+    services = lab_visit_services(
+        include_previously_allocated=True,
+        specimen_orders=specimen_orders,
+    ).subquery()
+    custody = (
+        select(
+            specimen_orders.c.visit_service_id,
+            func.min(specimen_orders.c.order_id).label("order_id"),
+            func.count().label("orders"),
+        )
+        .group_by(specimen_orders.c.visit_service_id)
+        .subquery()
     )
+    # Backfill cannot prove which lines a legacy released report covered.
+    # A requisition recorded after every known release is independently new.
+    history = unallocated_lab_release_history().subquery()
+    coverage_hold = case(
+        (
+            and_(LabOrderTest.id.is_(None), custody.c.orders > 1),
+            "specimen_order_ambiguous",
+        ),
+        (
+            and_(
+                LabOrderTest.id.is_(None),
+                or_(
+                    history.c.missing_release_dates > 0,
+                    services.c.created_at <= history.c.latest_release,
+                ),
+            ),
+            "historical_allocation_unknown",
+        ),
+    )
+    return (
+        select(
+            *services.c,
+            func.coalesce(
+                LabOrderTest.order_id,
+                case((custody.c.orders == 1, custody.c.order_id)),
+            ).label("order_id"),
+            LabOrderTest.report_instance_id,
+            LabOrderTest.canceled_at,
+            coverage_hold.label("coverage_hold"),
+        )
+        .outerjoin(
+            LabOrderTest, LabOrderTest.visit_service_id == services.c.visit_service_id
+        )
+        .outerjoin(custody, custody.c.visit_service_id == services.c.visit_service_id)
+        .outerjoin(history, history.c.visit_id == services.c.visit_id)
+        .cte("lab_worklist_service_lines")
+    )
+
+
+def _work_rows(db: Session, visit_services, tickets, now: datetime):
     visit_has_unallocated = exists(
         select(1)
         .select_from(visit_services)
         .where(
             visit_services.c.visit_id == Visit.id,
-            unallocated,
+            visit_services.c.order_id.is_(None),
         )
     )
     visit_has_order = exists().where(LabOrder.visit_id == Visit.id)
@@ -378,25 +431,40 @@ def _reports(base):
     return chains, rollup, revisions
 
 
-def _test_rollup(chains):
+def _test_rollup(chains, visit_services):
     return (
         select(
-            LabOrderTest.order_id,
+            visit_services.c.order_id,
+            visit_services.c.visit_id,
             func.count().label("ordered_tests"),
             func.sum(func.coalesce(chains.c.released, 0)).label("released_tests"),
             func.count()
-            .filter(LabOrderTest.canceled_at.is_not(None))
+            .filter(visit_services.c.canceled_at.is_not(None))
             .label("canceled_tests"),
+            func.count()
+            .filter(visit_services.c.coverage_hold == "historical_allocation_unknown")
+            .label("historical_unknown"),
+            func.count()
+            .filter(visit_services.c.coverage_hold == "specimen_order_ambiguous")
+            .label("ambiguous_orders"),
+            func.count()
+            .filter(
+                visit_services.c.coverage_hold.is_(None),
+                visit_services.c.canceled_at.is_(None),
+                func.coalesce(chains.c.released, 0) == 0,
+            )
+            .label("unblocked_tests"),
         )
+        .select_from(visit_services)
         .outerjoin(
             chains,
             and_(
                 chains.c.source == "order",
-                chains.c.source_id == LabOrderTest.order_id,
-                chains.c.root_id == LabOrderTest.report_instance_id,
+                chains.c.source_id == visit_services.c.order_id,
+                chains.c.root_id == visit_services.c.report_instance_id,
             ),
         )
-        .group_by(LabOrderTest.order_id)
+        .group_by(visit_services.c.order_id, visit_services.c.visit_id)
         .cte("lab_tests_by_order")
     )
 
@@ -419,22 +487,13 @@ def _specimen_rollup():
 
 
 def _services_for_row(base, visit_services):
-    allocation = exists().where(
-        LabOrderTest.visit_service_id == visit_services.c.visit_service_id
-    )
-    order_allocation = (
-        exists()
-        .where(
-            LabOrderTest.visit_service_id == visit_services.c.visit_service_id,
-            LabOrderTest.order_id == base.c.order_id,
-        )
-        .correlate(base, visit_services)
-    )
     return and_(
         visit_services.c.visit_id == base.c.visit_id,
         or_(
-            and_(base.c.source == "visit", ~allocation),
-            and_(base.c.source == "order", order_allocation),
+            and_(base.c.source == "visit", visit_services.c.order_id.is_(None)),
+            and_(
+                base.c.source == "order", visit_services.c.order_id == base.c.order_id
+            ),
         ),
     )
 
@@ -523,13 +582,11 @@ def _search_predicate(db: Session, payload, base, visit_services, revisions):
 
 
 def _filtered_work_rows(db: Session, payload: LabWorklistSearch, now: datetime):
-    visit_services = lab_visit_services(include_previously_allocated=True).cte(
-        "lab_visit_services"
-    )
+    visit_services = _worklist_service_lines()
     tickets = _lab_tickets()
     base = _work_rows(db, visit_services, tickets, now)
     chains, reports, revisions = _reports(base)
-    tests = _test_rollup(chains)
+    tests = _test_rollup(chains, visit_services)
     specimens = _specimen_rollup()
     total_reports = func.coalesce(reports.c.total_reports, 0)
     released_reports = func.coalesce(reports.c.released_reports, 0)
@@ -537,10 +594,15 @@ def _filtered_work_rows(db: Session, payload: LabWorklistSearch, now: datetime):
     remaining_tests = (
         tests.c.ordered_tests - tests.c.released_tests - tests.c.canceled_tests
     )
-    hold = case(
+    specimen_hold = case(
         (specimens.c.held > 0, "specimen_held"),
         (specimens.c.rejected > 0, "specimen_rejected"),
     )
+    coverage_hold = case(
+        (tests.c.ambiguous_orders > 0, "specimen_order_ambiguous"),
+        (tests.c.historical_unknown > 0, "historical_allocation_unknown"),
+    )
+    hold = func.coalesce(specimen_hold, coverage_hold)
     ready = and_(
         unfinished == 0,
         or_(
@@ -568,8 +630,16 @@ def _filtered_work_rows(db: Session, payload: LabWorklistSearch, now: datetime):
             "canceled",
         ),
         (ready, "ready"),
-        (hold.is_not(None), "held"),
+        (specimen_hold.is_not(None), "held"),
         (reports.c.in_review > 0, "in_review"),
+        (
+            and_(
+                coverage_hold.is_not(None),
+                tests.c.unblocked_tests == 0,
+                unfinished == 0,
+            ),
+            "held",
+        ),
         (specimens.c.expected > 0, "awaiting_specimen"),
         (released_reports > 0, "partial"),
         (unfinished > 0, "in_progress"),
@@ -604,7 +674,13 @@ def _filtered_work_rows(db: Session, payload: LabWorklistSearch, now: datetime):
                 reports.c.source_id == base.c.source_id,
             ),
         )
-        .outerjoin(tests, tests.c.order_id == base.c.order_id)
+        .outerjoin(
+            tests,
+            and_(
+                tests.c.visit_id == base.c.visit_id,
+                tests.c.order_id.is_not_distinct_from(base.c.order_id),
+            ),
+        )
         .outerjoin(
             specimens,
             specimens.c.order_id == base.c.order_id,
@@ -697,9 +773,14 @@ def _attach_services(db: Session, rows) -> dict:
     services = defaultdict(list)
     if not visits and not orders:
         return services
-    source = lab_visit_services(include_previously_allocated=True).subquery()
-    unresolved = (
-        unallocated_lab_report_visits().where(Visit.id == source.c.visit_id).exists()
+    source = _worklist_service_lines()
+    unresolved_open_report = (
+        unallocated_lab_report_visits()
+        .where(
+            Visit.id == source.c.visit_id,
+            LabReportInstance.status.not_in(FINAL_INSTANCE_STATUSES),
+        )
+        .exists()
     )
     open_orders = active_lab_orders().subquery()
     order_count = (
@@ -710,19 +791,22 @@ def _attach_services(db: Session, rows) -> dict:
         )
         .scalar_subquery()
     )
-    can_cancel = and_(LabOrderTest.id.is_(None), ~unresolved, order_count <= 1).label(
-        "can_cancel"
+    assigned_open_order = (
+        select(open_orders.c.id).where(open_orders.c.id == source.c.order_id).exists()
     )
+    can_cancel = and_(
+        source.c.canceled_at.is_(None),
+        source.c.report_instance_id.is_(None),
+        source.c.coverage_hold.is_(None),
+        ~unresolved_open_report,
+        or_(assigned_open_order, and_(source.c.order_id.is_(None), order_count <= 1)),
+    ).label("can_cancel")
     matches = db.execute(
-        select(source, LabOrderTest.order_id, LabOrderTest.canceled_at, can_cancel)
-        .outerjoin(
-            LabOrderTest,
-            LabOrderTest.visit_service_id == source.c.visit_service_id,
-        )
+        select(source, can_cancel)
         .where(
             or_(
-                and_(source.c.visit_id.in_(visits), LabOrderTest.id.is_(None)),
-                LabOrderTest.order_id.in_(orders),
+                and_(source.c.visit_id.in_(visits), source.c.order_id.is_(None)),
+                source.c.order_id.in_(orders),
             )
         )
         .order_by(source.c.visit_service_id)
@@ -736,7 +820,9 @@ def _attach_services(db: Session, rows) -> dict:
         services[key].append(
             LabWorklistService(
                 id=item.service_id,
-                visit_service_id=item.visit_service_id,
+                visit_service_id=item.visit_service_id
+                if item.coverage_hold is None
+                else None,
                 code=normalize_service_code(item.code) if item.code else None,
                 name=item.name,
                 quantity=item.quantity,

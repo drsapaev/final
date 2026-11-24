@@ -3,7 +3,13 @@
 from sqlalchemy import and_, case, func, or_, select
 
 from app.models.department import Department
-from app.models.lab import LabOrder, LabOrderTest, LabReportInstance
+from app.models.lab import (
+    FINAL_INSTANCE_STATUSES,
+    LabOrder,
+    LabOrderTest,
+    LabReportInstance,
+)
+from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment
 from app.models.service import Service
 from app.models.visit import Visit, VisitService
 from app.services.service_mapping import (
@@ -54,6 +60,21 @@ def unallocated_lab_report_visits():
     )
 
 
+def unallocated_lab_release_history():
+    return (
+        unallocated_lab_report_visits()
+        .with_only_columns(
+            LabReportInstance.visit_id,
+            func.max(LabReportInstance.finalized_at).label("latest_release"),
+            func.count()
+            .filter(LabReportInstance.finalized_at.is_(None))
+            .label("missing_release_dates"),
+        )
+        .where(LabReportInstance.status.in_(FINAL_INSTANCE_STATUSES))
+        .group_by(LabReportInstance.visit_id)
+    )
+
+
 def active_lab_orders():
     return (
         select(LabOrder)
@@ -67,7 +88,33 @@ def active_lab_orders():
     )
 
 
-def lab_visit_services(*, include_previously_allocated: bool = False):
+def specimen_visit_service_orders():
+    """Explicit specimen custody links within the same order/visit/patient."""
+    return (
+        select(LabSpecimenAssignment.visit_service_id, LabSpecimen.order_id)
+        .join(LabSpecimen, LabSpecimen.id == LabSpecimenAssignment.specimen_id)
+        .join(LabOrder, LabOrder.id == LabSpecimen.order_id)
+        .join(
+            VisitService,
+            and_(
+                VisitService.id == LabSpecimenAssignment.visit_service_id,
+                VisitService.visit_id == LabOrder.visit_id,
+            ),
+        )
+        .join(
+            Visit,
+            and_(
+                Visit.id == LabOrder.visit_id, Visit.patient_id == LabOrder.patient_id
+            ),
+        )
+        .where(~func.lower(LabOrder.status).in_(INACTIVE_LAB_VISIT_STATUSES))
+        .distinct()
+    )
+
+
+def lab_visit_services(
+    *, include_previously_allocated: bool = False, specimen_orders=None
+):
     """SQL projection of laboratory VisitService rows, independent of payment.
 
     Match configured routing before falling back to the lab catalog code
@@ -105,13 +152,26 @@ def lab_visit_services(*, include_previously_allocated: bool = False):
         .outerjoin(Department, Department.id == Service.department_id)
     )
     if include_previously_allocated:
-        prior_allocation = (
+        prior_report_allocation = (
             select(LabOrderTest.id)
             .where(
                 LabOrderTest.visit_service_id == VisitService.id,
             )
             .exists()
         )
+        custody = (
+            specimen_orders
+            if specimen_orders is not None
+            else specimen_visit_service_orders().subquery()
+        )
+        prior_specimen_allocation = (
+            select(custody.c.visit_service_id)
+            .where(
+                custody.c.visit_service_id == VisitService.id,
+            )
+            .exists()
+        )
+        prior_allocation = or_(prior_report_allocation, prior_specimen_allocation)
     else:
         prior_allocation = False
     return source.where(

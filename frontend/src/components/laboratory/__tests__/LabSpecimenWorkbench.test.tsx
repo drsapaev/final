@@ -62,4 +62,21 @@ describe('Lab v2 specimen workbench', () => {
     expect(api.scan).toHaveBeenCalledWith(502, specimen.barcode, expect.any(AbortSignal));
     expect(screen.queryByText(/выбрана проба/)).toBeNull();
   });
+
+  it('submits the selected rejection category separately from its custody note', async () => {
+    api.list.mockResolvedValue({ items: [{ ...specimen, available_actions: ['reject'] }], data_status: 'known' });
+    api.addEvent.mockResolvedValue({ ...specimen, status: 'rejected', available_actions: [] });
+    render(<ThemeProvider><LabSpecimenWorkbench orderId={502} visitId={91} activeReportId={null} services={[]}
+      onChanged={vi.fn()} onPendingChange={vi.fn()} onOrderEstablished={vi.fn()} /></ThemeProvider>);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Отклонить пробу' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Категория отклонения' }), { target: { value: 'label_mismatch' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Причина' }), { target: { value: 'SYNTHETIC-CUSTODY-NOTE' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(api.addEvent).toHaveBeenCalledWith(701, {
+      action: 'reject', expected_revision: 3, reason: 'SYNTHETIC-CUSTODY-NOTE',
+      reason_code: 'label_mismatch', request_id: expect.any(String),
+    }));
+  });
 });

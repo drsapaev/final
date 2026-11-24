@@ -496,6 +496,14 @@ const ru = {
 
   // ─── Lab queue panel ─────────────────────────────────────────────────────
   labWorkspace: {
+    rejectionCode: 'Категория отклонения',
+    rejection_label_mismatch: 'Ошибка маркировки',
+    rejection_container_mismatch: 'Неподходящий контейнер',
+    rejection_insufficient_quantity: 'Недостаточный объём',
+    rejection_specimen_quality: 'Качество пробы',
+    rejection_transport_issue: 'Нарушение условий транспортировки',
+    rejection_other: 'Другая причина',
+    rejection_unknown: 'Категория не указана',
     orderedTests: 'Назначенные исследования',
     cancelTest: 'Отменить исследование',
     cancelTestError: 'Не удалось отменить исследование. Проверьте его текущее состояние.',
@@ -535,6 +543,8 @@ const ru = {
     progressReports: 'Отчёты: выпущено {released} из {total}',
     hold_specimen_held: 'Проба удержана',
     hold_specimen_rejected: 'Проба отклонена',
+    hold_historical_allocation_unknown: 'Проверьте, какие исследования вошли в предыдущий бланк',
+    hold_specimen_order_ambiguous: 'Уточните, к какому заказу относятся привязанные пробы',
     openFromQueue: 'Выберите заказ, чтобы открыть пробу и результаты.',
     backToQueue: 'К рабочему списку',
     skipToTabs: 'Перейти к вкладкам лаборатории',

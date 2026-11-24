@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.lab import LabOrder, LabReportInstance
+from app.models.lab import LabOrder, LabOrderTest, LabReportInstance
 from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment, LabSpecimenEvent
 from app.models.visit import Visit, VisitService
-from app.repositories.lab_ordered_test_repository import lab_visit_services
+from app.repositories.lab_ordered_test_repository import (
+    lab_visit_services,
+    specimen_visit_service_orders,
+)
 
 
 class SpecimenRepository:
@@ -168,15 +171,45 @@ class SpecimenRepository:
             )
         )
 
-    def list_visit_service_ids(self, visit_id: int, service_ids: list[int]) -> set[int]:
-        return set(
-            self.db.scalars(
-                lab_visit_services().where(
-                    VisitService.visit_id == visit_id,
-                    VisitService.id.in_(service_ids),
-                )
+    def list_visit_service_ids(
+        self,
+        visit_id: int,
+        patient_id: int,
+        service_ids: list[int],
+        *,
+        for_update: bool = False,
+    ) -> set[int]:
+        query = (
+            lab_visit_services(include_previously_allocated=for_update)
+            .join(
+                Visit,
+                Visit.id == VisitService.visit_id,
+            )
+            .where(
+                VisitService.visit_id == visit_id,
+                Visit.patient_id == patient_id,
+                VisitService.id.in_(service_ids),
             )
         )
+        if for_update:
+            query = query.order_by(VisitService.id).with_for_update(of=VisitService)
+        return set(self.db.scalars(query))
+
+    def has_visit_service_order_conflict(
+        self, order_id: int, service_ids: list[int]
+    ) -> bool:
+        recorded = select(LabOrderTest.visit_service_id).where(
+            LabOrderTest.visit_service_id.in_(service_ids),
+            or_(
+                LabOrderTest.order_id != order_id, LabOrderTest.canceled_at.is_not(None)
+            ),
+        )
+        custody = specimen_visit_service_orders().subquery()
+        other_order = select(custody.c.visit_service_id).where(
+            custody.c.visit_service_id.in_(service_ids),
+            custody.c.order_id != order_id,
+        )
+        return self.db.scalar(recorded.union_all(other_order).limit(1)) is not None
 
     def list_assignments(self, specimen_ids: list[int]) -> list[LabSpecimenAssignment]:
         return list(

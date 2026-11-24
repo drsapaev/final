@@ -1,7 +1,7 @@
 """Manual batch and structured file import for laboratory drafts."""
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_active_roles
 from app.crud.clinic import get_queue_settings
+from app.models.lab_specimen import LabSpecimenRejectionReasonCode
 from app.models.user import User
 from app.schemas.lab_import import LabImportBatch, LabImportBatchOut
 from app.services.lab_import import process_import_batch
@@ -48,6 +49,9 @@ class LabMetricsOut(BaseModel):
     actionable: int
     overdue: int
     rejected_samples: int
+    rejected_samples_by_reason: dict[
+        LabSpecimenRejectionReasonCode | Literal["unknown"], int
+    ]
     held_samples: int
     turnaround_pairs: int
     average_turnaround_minutes: float | None

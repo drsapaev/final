@@ -3,12 +3,17 @@
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import extract, func, select
+from sqlalchemy import case, extract, func, select
 from sqlalchemy.orm import Session
 
 from app.models.lab import LabReportInstance
 from app.models.lab_critical_communication import LabCriticalCommunication
-from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment, LabSpecimenEvent
+from app.models.lab_specimen import (
+    LabSpecimen,
+    LabSpecimenAssignment,
+    LabSpecimenEvent,
+    LabSpecimenRejectionReasonCode,
+)
 from app.repositories.lab_worklist_repository import count_lab_worklist
 
 
@@ -16,16 +21,31 @@ def laboratory_metrics(db: Session, timezone: ZoneInfo, *, days: int) -> dict:
     now = datetime.now(UTC)
     start = now - timedelta(days=days)
     totals = count_lab_worklist(db, timezone, now=now)
-    events = dict(
-        db.execute(
-            select(LabSpecimenEvent.action, func.count())
-            .where(
-                LabSpecimenEvent.happened_at >= start,
-                LabSpecimenEvent.happened_at < now,
-            )
-            .where(LabSpecimenEvent.action.in_(("reject", "hold")))
-            .group_by(LabSpecimenEvent.action)
-        ).all()
+    # Event notes are clinical free text. Categorize only explicit codes;
+    # uncategorized historical events contribute to the unknown bucket.
+    category = case(
+        (
+            LabSpecimenEvent.reason_code.in_(tuple(LabSpecimenRejectionReasonCode)),
+            LabSpecimenEvent.reason_code,
+        ),
+        else_="unknown",
+    )
+    specimen_event_counts = db.execute(
+        select(LabSpecimenEvent.action, category, func.count())
+        .where(
+            LabSpecimenEvent.happened_at >= start,
+            LabSpecimenEvent.happened_at < now,
+            LabSpecimenEvent.action.in_(("reject", "hold")),
+        )
+        .group_by(LabSpecimenEvent.action, category)
+    ).all()
+    rejection_counts = {
+        reason: count
+        for action, reason, count in specimen_event_counts
+        if action == "reject"
+    }
+    held_count = sum(
+        count for action, _, count in specimen_event_counts if action == "hold"
     )
 
     seconds = extract("epoch", LabReportInstance.finalized_at - LabSpecimen.received_at)
@@ -64,8 +84,9 @@ def laboratory_metrics(db: Session, timezone: ZoneInfo, *, days: int) -> dict:
         "until_at": now,
         "actionable": totals.actionable,
         "overdue": totals.overdue,
-        "rejected_samples": events.get("reject", 0),
-        "held_samples": events.get("hold", 0),
+        "rejected_samples": sum(rejection_counts.values()),
+        "rejected_samples_by_reason": rejection_counts,
+        "held_samples": held_count,
         "turnaround_pairs": sample_count,
         "average_turnaround_minutes": round(float(mean_seconds) / 60, 1)
         if mean_seconds is not None

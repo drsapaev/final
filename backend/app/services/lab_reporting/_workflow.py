@@ -6,6 +6,8 @@ from typing import Any
 from sqlalchemy import select
 
 from app.core.config import settings
+from app.crud import audit as audit_crud
+from app.models.audit import AuditLog
 from app.models.lab import FINAL_INSTANCE_STATUSES, LabOrderTest, LabReportInstance
 from app.models.lab_release import LabReportWorkflowEvent
 from app.models.lab_specimen import LabSpecimen
@@ -24,6 +26,8 @@ from app.services.service_mapping import normalize_service_code
 
 _MANAGED_DRAFT_STATUSES = {"DRAFT", "IN_PROGRESS"}
 _WORKFLOW_PERMISSIONS = {"lab:review", "lab:release", "lab:qc"}
+_DRAFT_EDIT_AUDIT_ACTION = "LAB_REPORT_DRAFT_EDITED"
+_REPORT_AUDIT_ENTITY = "lab_report"
 
 
 class WorkflowMixin(LabReportingServiceMixinBase):
@@ -108,21 +112,18 @@ class WorkflowMixin(LabReportingServiceMixinBase):
             )
         )
 
-    def _record_report_value_entry(
+    def _record_report_draft_edit(
         self,
         instance: LabReportInstance,
-        actor_user_id: int | None,
+        actor: User,
     ) -> None:
-        if actor_user_id is not None:
-            self._append_workflow_event(
-                instance,
-                kind="entered",
-                actor=self._workflow_actor(actor_user_id),
-            )
-        elif instance.managed_release:
-            raise LabReportingDomainError(
-                403, "Managed report requires an authenticated editor"
-            )
+        audit_crud.log(
+            self.db,
+            action=_DRAFT_EDIT_AUDIT_ACTION,
+            entity_type=_REPORT_AUDIT_ENTITY,
+            entity_id=instance.id,
+            actor_user_id=actor.id,
+        )
 
     def workflow_history(self, instance_id: int) -> list[LabReportWorkflowEvent]:
         return list(
@@ -186,7 +187,19 @@ class WorkflowMixin(LabReportingServiceMixinBase):
             )
             .limit(1)
         )
-        return authorship is None
+        if authorship is not None:
+            return False
+        draft_edit = self.db.scalar(
+            select(AuditLog.id)
+            .where(
+                AuditLog.action == _DRAFT_EDIT_AUDIT_ACTION,
+                AuditLog.entity_type == _REPORT_AUDIT_ENTITY,
+                AuditLog.entity_id == instance_id,
+                AuditLog.actor_user_id == actor.id,
+            )
+            .limit(1)
+        )
+        return draft_edit is None
 
     def managed_workflow_actions(
         self,
@@ -568,7 +581,50 @@ class WorkflowMixin(LabReportingServiceMixinBase):
                 409, "Ordered service has already been allocated or canceled"
             )
 
-        from app.repositories.lab_ordered_test_repository import lab_visit_services
+        from app.repositories.lab_ordered_test_repository import (
+            lab_visit_services,
+            specimen_visit_service_orders,
+            unallocated_lab_release_history,
+        )
+
+        custody = specimen_visit_service_orders().subquery()
+        if (
+            self.db.scalar(
+                select(custody.c.visit_service_id)
+                .where(
+                    custody.c.visit_service_id.in_(selected_ids),
+                    custody.c.order_id != instance.order_id,
+                )
+                .limit(1)
+            )
+            is not None
+        ):
+            raise LabReportingDomainError(
+                409, "Ordered service has specimen custody in another lab order"
+            )
+
+        history = unallocated_lab_release_history().subquery()
+        if (
+            self.db.scalar(
+                select(VisitService.id)
+                .join(
+                    history,
+                    history.c.visit_id == VisitService.visit_id,
+                )
+                .where(
+                    VisitService.id.in_(selected_ids),
+                    (
+                        (history.c.missing_release_dates > 0)
+                        | (VisitService.created_at <= history.c.latest_release)
+                    ),
+                )
+                .limit(1)
+            )
+            is not None
+        ):
+            raise LabReportingDomainError(
+                409, "Ordered service has unconfirmed historical report coverage"
+            )
 
         lab_services = lab_visit_services().subquery()
         codes_by_id = {

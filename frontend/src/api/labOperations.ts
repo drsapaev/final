@@ -1,4 +1,5 @@
 import { requestLab } from './labReporting';
+import type { LabSpecimenRejectionReasonCode } from '../types/features/labWorkspace';
 
 export type LabImportSource = 'manual' | 'csv';
 export interface LabImportEntry {
@@ -17,8 +18,9 @@ export interface LabImportEntry {
 }
 
 export interface LabImportOutcome {
-  message_id: string;
-  report_instance_id: number;
+  row_index: number;
+  message_id: string | null;
+  report_instance_id: number | null;
   status: 'ready' | 'saved' | 'duplicate' | 'error';
   updated_at: string | null;
   existing_values: number;
@@ -41,6 +43,7 @@ export interface LabMetrics {
   actionable: number;
   overdue: number;
   rejected_samples: number;
+  rejected_samples_by_reason?: Partial<Record<LabSpecimenRejectionReasonCode | 'unknown', number>>;
   held_samples: number;
   turnaround_pairs: number;
   average_turnaround_minutes: number | null;

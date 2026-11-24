@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from app.models.lab_specimen import LabSpecimenRejectionReasonCode
+
 SpecimenStatus = Literal[
     "expected", "collected", "received", "accepted", "held", "rejected"
 ]
@@ -80,11 +82,14 @@ class LabSpecimenCommand(SpecimenInput):
 class LabSpecimenTransitionCommand(LabSpecimenCommand):
     action: SpecimenTransition
     reason: SpecimenReason | None = None
+    reason_code: LabSpecimenRejectionReasonCode | None = None
 
     @model_validator(mode="after")
     def validate_reason(self) -> LabSpecimenTransitionCommand:
         if self.action in {"hold", "reject"} and self.reason is None:
             raise ValueError("A reason is required")
+        if self.reason_code is not None and self.action != "reject":
+            raise ValueError("Rejection reason codes require the reject action")
         return self
 
 
@@ -118,6 +123,7 @@ class LabSpecimenEventOut(BaseModel):
     actor_user_id: int
     happened_at: datetime
     reason: str | None
+    reason_code: LabSpecimenRejectionReasonCode | None = None
     visit_service_ids: list[int]
     report_instance_ids: list[int]
 

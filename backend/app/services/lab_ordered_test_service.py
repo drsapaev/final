@@ -2,16 +2,22 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.lab import LabOrder, LabOrderTest
+from app.models.lab import (
+    FINAL_INSTANCE_STATUSES,
+    LabOrder,
+    LabOrderTest,
+    LabReportInstance,
+)
 from app.models.patient import Patient
 from app.models.visit import Visit, VisitService
 from app.repositories.lab_ordered_test_repository import (
     INACTIVE_LAB_VISIT_STATUSES,
     active_lab_orders,
     lab_visit_services,
+    specimen_visit_service_orders,
     unallocated_lab_report_visits,
 )
 from app.schemas.lab_worklist import LabCanceledOrderedTest
@@ -80,7 +86,16 @@ def cancel_unreported_lab_test(
     # Older reports do not prove which exact visit-service IDs they cover.
     # Leave those lines available for manual reconciliation before canceling.
     unknown_report = (
-        unallocated_lab_report_visits().where(Visit.id == visit.id).exists()
+        unallocated_lab_report_visits()
+        .where(
+            Visit.id == visit.id,
+            or_(
+                LabReportInstance.status.not_in(FINAL_INSTANCE_STATUSES),
+                LabReportInstance.finalized_at.is_(None),
+                LabReportInstance.finalized_at >= line.created_at,
+            ),
+        )
+        .exists()
     )
     if db.execute(select(unknown_report)).scalar_one():
         raise LabReportingDomainError(
@@ -88,6 +103,25 @@ def cancel_unreported_lab_test(
         )
 
     if test is None:
+        custody = specimen_visit_service_orders().subquery()
+        custody_order_ids = list(
+            db.scalars(
+                select(custody.c.order_id).where(
+                    custody.c.visit_service_id == line.id,
+                )
+            )
+        )
+        if len(custody_order_ids) > 1:
+            raise LabReportingDomainError(
+                409, "Ordered test has ambiguous specimen custody"
+            )
+        if custody_order_ids:
+            custody_order_id = custody_order_ids[0]
+            if order_id is not None and order_id != custody_order_id:
+                raise LabReportingDomainError(
+                    409, "Ordered test has specimen custody in a different order"
+                )
+            order_id = custody_order_id
         orders = active_lab_orders().where(Visit.id == visit.id)
         if order_id is not None:
             order = db.execute(

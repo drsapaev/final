@@ -443,6 +443,14 @@ const en = {
     archive: 'Архивировать'
   },
   labWorkspace: {
+    rejectionCode: 'Rejection category',
+    rejection_label_mismatch: 'Label mismatch',
+    rejection_container_mismatch: 'Container mismatch',
+    rejection_insufficient_quantity: 'Insufficient quantity',
+    rejection_specimen_quality: 'Specimen quality',
+    rejection_transport_issue: 'Transport issue',
+    rejection_other: 'Other reason',
+    rejection_unknown: 'Reason not categorized',
     orderedTests: 'Ordered tests',
     cancelTest: 'Cancel test',
     cancelTestError: 'Could not cancel the test. Check its current status.',
@@ -482,6 +490,8 @@ const en = {
     progressReports: 'Reports: {released} of {total} released',
     hold_specimen_held: 'Specimen on hold',
     hold_specimen_rejected: 'Specimen rejected',
+    hold_historical_allocation_unknown: 'Verify which tests the previous report covers',
+    hold_specimen_order_ambiguous: 'Verify which order contains the assigned specimens',
     openFromQueue: 'Select an order to open specimens and results.',
     backToQueue: 'Back to worklist',
     skipToTabs: 'Skip to lab tabs',

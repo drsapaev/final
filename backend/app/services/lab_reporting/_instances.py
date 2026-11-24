@@ -169,24 +169,38 @@ class InstancesMixin(LabReportingServiceMixinBase):
         logger.info("[LAB] update_instance instance_id=%s", instance_id)
         instance = self._get_locked_instance(instance_id)
         self._assert_instance_mutable_draft(instance)
-        if instance.managed_release:
+        actor = (
             self._workflow_actor(actor_user_id)
+            if instance.managed_release or actor_user_id is not None
+            else None
+        )
+        if instance.managed_release:
             self._workflow_expected_version(expected_updated_at)
         self._assert_not_concurrently_modified(instance, expected_updated_at)
         changed = False
+        edited_metadata = False
         if "signer_snapshot" in payload and payload["signer_snapshot"] is not None:
+            edited_metadata = instance.signer_snapshot != payload["signer_snapshot"]
             instance.signer_snapshot = payload["signer_snapshot"]
             changed = True
         if "branding_snapshot" in payload and payload["branding_snapshot"] is not None:
+            edited_metadata |= instance.branding_snapshot != payload["branding_snapshot"]
             instance.branding_snapshot = payload["branding_snapshot"]
             changed = True
         if "study_date" in payload:
+            previous_study_date = (instance.patient_snapshot or {}).get("study_date")
             self._set_report_study_date(instance, payload["study_date"])
             self._refresh_result_evaluation(instance)
+            edited_metadata |= previous_study_date != instance.patient_snapshot.get(
+                "study_date"
+            )
             changed = True
+        # Accepted draft writes still advance the optimistic version. Only
+        # actual metadata edits belong in the audit trail.
         if changed:
             self._advance_instance_version(instance)
-            self._record_report_value_entry(instance, actor_user_id)
+        if edited_metadata and actor is not None:
+            self._record_report_draft_edit(instance, actor)
         self.repository.commit()
         return self.get_instance(instance.id)
 
@@ -204,8 +218,12 @@ class InstancesMixin(LabReportingServiceMixinBase):
         )
         instance = self._get_locked_instance(instance_id)
         self._assert_instance_mutable_draft(instance)
-        if instance.managed_release:
+        actor = (
             self._workflow_actor(actor_user_id)
+            if instance.managed_release or actor_user_id is not None
+            else None
+        )
+        if instance.managed_release:
             self._workflow_expected_version(expected_updated_at)
         self._assert_not_concurrently_modified(instance, expected_updated_at)
         field_map = self._field_map(instance.template_version)
@@ -229,6 +247,8 @@ class InstancesMixin(LabReportingServiceMixinBase):
                 specimen_id = next(iter(eligible_ids))
 
         updated_values: list[LabReportValue] = []
+        entered_result = False
+        edited_draft = False
         for field_key, normalized in normalized_by_key.items():
             lab_value = existing_by_key.get(field_key)
             if lab_value is None:
@@ -237,17 +257,34 @@ class InstancesMixin(LabReportingServiceMixinBase):
                 existing_by_key[field_key] = lab_value
 
             result = normalized["result_payload"]
+            same_measurement = self._same_measurement(
+                lab_value, normalized, field_map[field_key],
+            )
+            old_specimen_id = (lab_value.result_payload or {}).get("source_specimen_id")
             if result and result["kind"] != "absent":
                 # Saving a comment or resending the same result cannot silently
                 # move a measurement to a recollected specimen.
-                old_result = lab_value.result_payload or {}
                 result_specimen_id = specimen_id
-                if source_specimen_id is None and self._same_measurement(
-                    lab_value, normalized, field_map[field_key],
-                ):
-                    result_specimen_id = old_result.get("source_specimen_id")
+                if source_specimen_id is None and same_measurement:
+                    result_specimen_id = old_specimen_id
                 if result_specimen_id is not None:
                     result = {**result, "source_specimen_id": result_specimen_id}
+            # An explicit import anchored to a different accepted specimen is
+            # a new measurement even when its result equals the old one.
+            imported_measurement = (
+                source_specimen_id is not None
+                and result is not None
+                and result.get("source_specimen_id") == source_specimen_id
+                and source_specimen_id != old_specimen_id
+            )
+            if result and (not same_measurement or imported_measurement):
+                entered_result = True
+            edited_draft |= (
+                lab_value.value_text != normalized["value_text"]
+                or lab_value.value_numeric != normalized["value_numeric"]
+                or lab_value.comment != normalized["comment"]
+                or lab_value.result_payload != result
+            )
             lab_value.value_text = normalized["value_text"]
             lab_value.value_numeric = normalized["value_numeric"]
             lab_value.comment = normalized["comment"]
@@ -258,8 +295,11 @@ class InstancesMixin(LabReportingServiceMixinBase):
         if instance.status == "DRAFT" and updated_values:
             instance.status = "IN_PROGRESS"
         self._advance_instance_version(instance)
-        if updated_values and actor_user_id is not None:
-            self._record_report_value_entry(instance, actor_user_id)
+        if actor is not None:
+            if entered_result:
+                self._append_workflow_event(instance, kind="entered", actor=actor)
+            elif edited_draft:
+                self._record_report_draft_edit(instance, actor)
         if not commit:
             self.repository.flush()
             return instance, updated_values
@@ -271,7 +311,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
     ) -> bool:
         value_text = value.value_text
         value_numeric = value.value_numeric
-        before = value.result_payload
+        before = value.result_payload or None
         if before is None and (value_text is not None or value_numeric is not None):
             # Older copied corrections may have a measured value without
             # structured provenance. A matching resave still proves no source.
@@ -285,6 +325,8 @@ class InstancesMixin(LabReportingServiceMixinBase):
             value_text = legacy["value_text"]
             value_numeric = legacy["value_numeric"]
         after = normalized["result_payload"]
+        if after is None:
+            return before is None
         kind = after["kind"]
         if before is None or before.get("kind") != kind:
             return False
@@ -292,6 +334,8 @@ class InstancesMixin(LabReportingServiceMixinBase):
             return value_text == normalized["value_text"]
         if kind == "coded_qualitative":
             return before.get("qualitative_code") == after.get("qualitative_code")
+        if kind == "absent":
+            return before.get("absence_reason") == after.get("absence_reason")
         return (
             value_numeric == normalized["value_numeric"]
             and before.get("comparator") == after.get("comparator")

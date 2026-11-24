@@ -443,6 +443,14 @@ const kk = {
     archive: 'Архивировать'
   },
   labWorkspace: {
+    rejectionCode: 'Қабылдамау санаты',
+    rejection_label_mismatch: 'Жапсырма сәйкес емес',
+    rejection_container_mismatch: 'Контейнер сәйкес емес',
+    rejection_insufficient_quantity: 'Сынама мөлшері жеткіліксіз',
+    rejection_specimen_quality: 'Сынама сапасы',
+    rejection_transport_issue: 'Тасымалдау мәселесі',
+    rejection_other: 'Басқа себеп',
+    rejection_unknown: 'Себеп санатталмаған',
     orderedTests: 'Тағайындалған зерттеулер',
     cancelTest: 'Зерттеуден бас тарту',
     cancelTestError: 'Зерттеуден бас тарту мүмкін болмады. Ағымдағы күйін тексеріңіз.',
@@ -482,6 +490,8 @@ const kk = {
     progressReports: 'Есептер: {total} ішінен {released} шығарылды',
     hold_specimen_held: 'Сынама ұсталды',
     hold_specimen_rejected: 'Сынама қабылданбады',
+    hold_historical_allocation_unknown: 'Алдыңғы есепте қандай зерттеулер қамтылғанын тексеріңіз',
+    hold_specimen_order_ambiguous: 'Тіркелген сынамалар қай тапсырысқа тиесілі екенін тексеріңіз',
     openFromQueue: 'Сынамалар мен нәтижелерді ашу үшін тапсырысты таңдаңыз.',
     backToQueue: 'Жұмыс тізіміне оралу',
     skipToTabs: 'Зертхана қойындыларына өту',

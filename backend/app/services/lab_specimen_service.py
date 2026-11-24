@@ -14,7 +14,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.lab import LabOrder, LabReportInstance
-from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment, LabSpecimenEvent
+from app.models.lab_specimen import (
+    LabSpecimen,
+    LabSpecimenAssignment,
+    LabSpecimenEvent,
+    LabSpecimenRejectionReasonCode,
+)
 from app.repositories.lab_specimen_repository import SpecimenRepository
 from app.schemas.lab_specimen import (
     LabSpecimenAssignmentCommand,
@@ -51,6 +56,8 @@ def _status_transitions(specimen: LabSpecimen) -> dict[SpecimenAction, SpecimenS
 
 def _fingerprint(action: str, command: BaseModel) -> str:
     data = command.model_dump(mode="json", exclude={"request_id"})
+    if data.get("reason_code") is None:
+        data.pop("reason_code", None)
     for key in ("visit_service_ids", "report_instance_ids"):
         if key in data:
             data[key] = sorted(set(data[key]))
@@ -93,6 +100,8 @@ class LabSpecimenService:
         order: LabOrder,
         targets: LabSpecimenTargets,
         reports: list[LabReportInstance],
+        *,
+        removing_assignment: bool = False,
     ) -> None:
         if set(targets.report_instance_ids) != {report.id for report in reports} or any(
             report.order_id != order.id
@@ -109,11 +118,24 @@ class LabSpecimenService:
             order.visit_id is None
             or set(targets.visit_service_ids)
             != self.repository.list_visit_service_ids(
-                order.visit_id, targets.visit_service_ids
+                order.visit_id,
+                order.patient_id,
+                targets.visit_service_ids,
+                for_update=True,
             )
         ):
             raise LabReportingDomainError(
                 404, "Ordered test is outside the specimen order"
+            )
+        if (
+            targets.visit_service_ids
+            and not removing_assignment
+            and self.repository.has_visit_service_order_conflict(
+                order.id, targets.visit_service_ids
+            )
+        ):
+            raise LabReportingDomainError(
+                409, "Ordered test is canceled or belongs to another order"
             )
 
     def _add_assignments(
@@ -166,6 +188,7 @@ class LabSpecimenService:
         request_id: str,
         fingerprint: str,
         reason: str | None = None,
+        reason_code: LabSpecimenRejectionReasonCode | None = None,
         targets: LabSpecimenTargets | None = None,
     ) -> None:
         specimen.revision += 1
@@ -178,6 +201,7 @@ class LabSpecimenService:
                 actor_user_id=actor_user_id,
                 happened_at=happened_at,
                 reason=reason,
+                reason_code=reason_code,
                 request_id=request_id,
                 request_fingerprint=fingerprint,
                 visit_service_ids=sorted(set(targets.visit_service_ids))
@@ -244,7 +268,7 @@ class LabSpecimenService:
         if visit is None or visit.patient_id is None:
             raise LabReportingDomainError(404, "Visit not found")
         if set(command.visit_service_ids) != self.repository.list_visit_service_ids(
-            visit.id, command.visit_service_ids
+            visit.id, visit.patient_id, command.visit_service_ids
         ):
             raise LabReportingDomainError(
                 404, "Ordered test is outside the specimen visit"
@@ -285,7 +309,6 @@ class LabSpecimenService:
             return self._outputs(order, [existing])[0]
 
         self._check_order_editable(order)
-        self._check_targets(order, command, reports)
         origin_id = command.parent_specimen_id or command.replaces_specimen_id
         action = "create"
         if origin_id is not None:
@@ -309,6 +332,9 @@ class LabSpecimenService:
                     raise LabReportingDomainError(409, "Specimen cannot be recollected")
                 action = "recollect"
 
+        # Mutations sharing a specimen lock it before their visit-service
+        # rows. This also keeps recollection and assignment lock order aligned.
+        self._check_targets(order, command, reports)
         now = datetime.now(UTC)
         specimen = LabSpecimen(
             order_id=order.id,
@@ -386,6 +412,7 @@ class LabSpecimenService:
             request_id=request_id,
             fingerprint=fingerprint,
             reason=command.reason,
+            reason_code=command.reason_code,
         )
         return self._finish_mutation(order, specimen)
 
@@ -425,7 +452,9 @@ class LabSpecimenService:
 
         self._check_order_editable(order)
         self._check_revision(specimen, command)
-        self._check_targets(order, command, reports)
+        self._check_targets(
+            order, command, reports, removing_assignment=command.operation == "remove"
+        )
         if command.operation == "remove":
             self._remove_assignments(specimen, command)
         else:

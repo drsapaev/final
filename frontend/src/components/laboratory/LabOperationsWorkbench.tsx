@@ -110,6 +110,7 @@ function CriticalDesk({ labels }: { labels: Labels }) {
 }
 
 function MetricsDesk({ labels }: { labels: Labels }) {
+  const { t } = useTranslation();
   const [data, setData] = useState<LabMetrics | null>(null);
   const [days, setDays] = useState(7);
   const [error, setError] = useState(false);
@@ -127,6 +128,7 @@ function MetricsDesk({ labels }: { labels: Labels }) {
     return () => request.abort();
   }, [days]);
 
+  const rejectionCounts = Object.entries(data?.rejected_samples_by_reason ?? {});
   return (
     <section aria-label={labels.metrics}>
       <label>
@@ -143,12 +145,21 @@ function MetricsDesk({ labels }: { labels: Labels }) {
       </label>
       {error && <p role="alert">{labels.requestError}</p>}
       {data && !error && (
-        <dl className="lab-operations__metrics">
-          {(['actionable', 'overdue', 'rejected_samples', 'held_samples', 'turnaround_pairs',
-            'average_turnaround_minutes', 'released_corrections', 'communications_open'] as const).map((metric) => (
-              <div key={metric}><dt>{labels[metric]}</dt><dd>{data[metric] ?? '—'}</dd></div>
-          ))}
-        </dl>
+        <>
+          <dl className="lab-operations__metrics">
+            {(['actionable', 'overdue', 'rejected_samples', 'held_samples', 'turnaround_pairs',
+              'average_turnaround_minutes', 'released_corrections', 'communications_open'] as const).map((metric) => (
+                <div key={metric}><dt>{labels[metric]}</dt><dd>{data[metric] ?? '—'}</dd></div>
+            ))}
+          </dl>
+          {rejectionCounts.length > 0 && (
+            <dl className="lab-operations__metrics" aria-label={labels.rejectionReasons}>
+              {rejectionCounts.map(([reason, count]) => (
+                <div key={reason}><dt>{t(`labWorkspace.rejection_${reason}`)}</dt><dd>{count}</dd></div>
+              ))}
+            </dl>
+          )}
+        </>
       )}
     </section>
   );
@@ -228,20 +239,27 @@ export default function LabOperationsWorkbench({ reportId, onQueueChanged }: Lab
 
   async function commit() {
     if (tab !== 'manual' && tab !== 'csv') return;
-    const byMessage = new Map(outcomes.map((outcome) => [outcome.message_id, outcome]));
-    const rows = prepared.flatMap((row) => {
-      const outcome = byMessage.get(row.message_id);
+    const byIndex = new Map(outcomes.map((outcome) => [outcome.row_index, outcome]));
+    const entries = prepared.flatMap((row, originalIndex) => {
+      const outcome = byIndex.get(originalIndex);
       return outcome?.status === 'ready' && outcome.updated_at && (!outcome.existing_values || allowReplace)
-        ? [{ ...row, expected_updated_at: outcome.updated_at, replace_existing: allowReplace }]
+        ? [{ originalIndex, row: { ...row, expected_updated_at: outcome.updated_at, replace_existing: allowReplace } }]
         : [];
     });
-    if (!rows.length) return;
+    if (!entries.length) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await labOperationsApi.importRows(tab, rows, false);
-      const received = new Map(result.rows.map((row) => [row.message_id, row]));
-      setOutcomes((previous) => previous.map((row) => received.get(row.message_id) ?? row));
+      const result = await labOperationsApi.importRows(tab, entries.map((entry) => entry.row), false);
+      const received = new Map<number, LabImportOutcome>();
+      for (const outcome of result.rows) {
+        const submittedEntry = entries[outcome.row_index];
+        if (submittedEntry) {
+          const rowIndex = submittedEntry.originalIndex;
+          received.set(rowIndex, { ...outcome, row_index: rowIndex });
+        }
+      }
+      setOutcomes((previous) => previous.map((row) => received.get(row.row_index) ?? row));
       if (result.rows.some((row) => row.status === 'saved')) void onQueueChanged().catch(() => undefined);
     } catch {
       setError('requestError');
@@ -301,8 +319,8 @@ export default function LabOperationsWorkbench({ reportId, onQueueChanged }: Lab
           {outcomes.length > 0 && (
             <ul className="lab-operations__results" aria-live="polite">
               {outcomes.map((row) => (
-                <li key={row.message_id}>
-                  <strong>{labels.report} #{row.report_instance_id}</strong>
+                <li key={row.row_index}>
+                  <strong>{labels.row} {row.row_index + 1}{row.report_instance_id !== null && ` · ${labels.report} #${row.report_instance_id}`}</strong>
                   <span>{row.error_code ? (labels[row.error_code as keyof Labels] || labels.error) : labels[row.status]}</span>
                   {row.existing_values > 0 && <span>{labels.existing} {row.existing_values}</span>}
                 </li>

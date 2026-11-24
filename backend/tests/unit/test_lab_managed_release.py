@@ -1,11 +1,12 @@
 """The managed path never publishes a version the reviewer did not inspect."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
 
 from app.core.config import settings
+from app.crud import audit as audit_crud
 from app.models.lab import LabOrderTest
 from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment
 from app.models.role_permission import Permission, Role, user_roles_table
@@ -85,6 +86,7 @@ def test_managed_release_versions_permissions_and_correction_history(
         for code in ("lab:review", "lab:release", "lab:qc")
     ]
     entrant = _staff(db_session, "lab-entered", [permissions[0]])
+    editor = _staff(db_session, "lab-draft-editor", permissions)
     reviewer = _staff(db_session, "lab-reviewed", permissions)
     no_grant = _staff(db_session, "lab-no-grant", [])
     db_session.commit()
@@ -124,6 +126,40 @@ def test_managed_release_versions_permissions_and_correction_history(
     assert {value.result_payload["source_specimen_id"] for value in updated} == {
         specimen.id
     }
+    report = service.update_instance(
+        report_id,
+        {
+            "signer_snapshot": {"lab_technician_name": editor.full_name},
+            "branding_snapshot": {"clinic_name": "SYNTHETIC Branding"},
+            "study_date": date(2026, 11, 24),
+        },
+        expected_updated_at=report.updated_at.isoformat(),
+        actor_user_id=editor.id,
+    )
+    report, _ = service.bulk_upsert_values(
+        report_id,
+        [{"field_key": "hgb", "value_text": "100", "comment": "SYNTHETIC comment"}],
+        expected_updated_at=report.updated_at.isoformat(),
+        actor_user_id=editor.id,
+    )
+    report, _ = service.bulk_upsert_values(
+        report_id,
+        [{"field_key": "hgb", "value_text": "100", "comment": "SYNTHETIC comment"}],
+        expected_updated_at=report.updated_at.isoformat(),
+        actor_user_id=reviewer_id,
+    )
+    assert [
+        event.actor_user_id for event in service.workflow_history(report_id)
+        if event.kind == "entered"
+    ] == [actor_id]
+    draft_audit = audit_crud.list_logs(
+        db_session,
+        action="LAB_REPORT_DRAFT_EDITED",
+        entity_type="lab_report",
+        entity_id=report_id,
+    )
+    assert [entry.actor_user_id for entry in draft_audit] == [editor.id, editor.id]
+    assert all(entry.payload is None for entry in draft_audit)
     assert service.report_release_holds(report) == ["qc_missing"]
     draft_token = report.updated_at.isoformat()
     report = service.record_report_qc(
@@ -144,6 +180,7 @@ def test_managed_release_versions_permissions_and_correction_history(
     assert report.status == "IN_REVIEW"
     submitted_version = report.updated_at.isoformat()
     assert "review" not in service.instance_available_actions(report, actor_id)
+    assert "review" not in service.instance_available_actions(report, editor.id)
     assert "review" not in service.instance_available_actions(report, no_grant_id)
     assert "review" in service.instance_available_actions(report, reviewer_id)
     with pytest.raises(LabReportingDomainError, match="workflow permission required"):
@@ -244,6 +281,7 @@ def test_recollection_does_not_silently_rebind_a_measured_value(
 ):
     monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", True)
     entrant = _staff(db_session, "recollection", [])
+    importer = _staff(db_session, "recollection-import", [])
     db_session.commit()
     service = LabReportingService(db_session)
     template = next(item for item in service.list_templates() if item.code == "cbc_oak")
@@ -286,17 +324,66 @@ def test_recollection_does_not_silently_rebind_a_measured_value(
     report, values = service.bulk_upsert_values(
         report.id,
         [{"field_key": "hgb", "value_text": "100"}],
-        actor_user_id=entrant.id,
+        actor_user_id=importer.id,
         expected_updated_at=report.updated_at.isoformat(),
         source_specimen_id=replacement.id,
     )
     assert values[0].result_payload["source_specimen_id"] == replacement.id
+    assert [
+        event.actor_user_id for event in service.workflow_history(report.id)
+        if event.kind == "entered"
+    ] == [entrant.id, importer.id]
     report = service.submit_for_review(
         report.id,
         actor_user_id=entrant.id,
         expected_updated_at=report.updated_at.isoformat(),
     )
     assert report.values[0].result_payload["source_specimen_id"] == replacement.id
+
+
+@pytest.mark.unit
+def test_changed_absence_is_an_entry_but_resending_it_is_not(
+    db_session, test_patient, monkeypatch
+):
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", True)
+    entrant = _staff(db_session, "absence-entrant", [])
+    editor = _staff(db_session, "absence-editor", [])
+    db_session.commit()
+    service = LabReportingService(db_session)
+    template = next(item for item in service.list_templates() if item.code == "cbc_oak")
+    report = service.create_instance(
+        {"patient_id": test_patient.id, "template_id": template.id},
+        actor_user_id=entrant.id,
+    )
+    absence = {
+        "field_key": "hgb",
+        "result_kind": "absent",
+        "absence_reason": "SYNTHETIC no reading",
+    }
+    report, _ = service.bulk_upsert_values(
+        report.id,
+        [absence],
+        actor_user_id=entrant.id,
+        expected_updated_at=report.updated_at.isoformat(),
+    )
+    report, _ = service.bulk_upsert_values(
+        report.id,
+        [{**absence, "comment": "SYNTHETIC annotation"}],
+        actor_user_id=editor.id,
+        expected_updated_at=report.updated_at.isoformat(),
+    )
+    assert [event.actor_user_id for event in service.workflow_history(report.id)] == [
+        entrant.id
+    ]
+    report, _ = service.bulk_upsert_values(
+        report.id,
+        [{**absence, "absence_reason": "SYNTHETIC revised reason"}],
+        actor_user_id=editor.id,
+        expected_updated_at=report.updated_at.isoformat(),
+    )
+    assert [event.actor_user_id for event in service.workflow_history(report.id)] == [
+        entrant.id, editor.id,
+    ]
 
 
 @pytest.mark.unit

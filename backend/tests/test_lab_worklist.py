@@ -1,4 +1,6 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
+from types import SimpleNamespace
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -11,7 +13,7 @@ from app.models.lab import (
     LabReportTemplate,
     LabReportTemplateVersion,
 )
-from app.models.lab_specimen import LabSpecimen
+from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment
 from app.models.patient import Patient
 from app.models.patient_access_audit import PatientAccessAuditLog
 from app.models.service import Service
@@ -22,6 +24,7 @@ from app.repositories.lab_worklist_repository import (
     search_lab_worklist,
 )
 from app.schemas.lab_worklist import LabWorklistSearch
+from app.services.lab_reporting import LabReportingDomainError, LabReportingService
 
 CLINIC_TZ = ZoneInfo("Asia/Tashkent")
 NOW = datetime(2012, 1, 4, 19, 15, tzinfo=UTC)
@@ -195,6 +198,177 @@ def test_worklist_preserves_release_across_correction_and_scans_exact_specimen(
     }
 
 
+def test_first_specimen_moves_exact_requisition_to_its_order(
+    client, db_session, auth_headers
+):
+    lab, _ = _catalog(db_session)
+    patient, visit, line = _new_visit(db_session, "BEFORE-REPORT", lab)
+    assert [row.id for row in _search(db_session).entries] == [f"visit:{visit.id}"]
+
+    response = client.post(
+        f"/api/v1/lab/visits/{visit.id}/specimens",
+        headers=auth_headers,
+        json={
+            "material_code": "synthetic",
+            "container_code": "synthetic",
+            "request_id": str(uuid4()),
+            "visit_service_ids": [line.id],
+        },
+    )
+    assert response.is_success, response.text
+    specimen = response.json()
+    order_id = specimen["order_id"]
+    other = LabOrder(patient_id=patient.id, visit_id=visit.id)
+    db_session.add(other)
+    db_session.flush()
+
+    page = _search(db_session, q=f"visit:{visit.id}")
+    assert {row.id for row in page.entries} == {
+        f"order:{order_id}",
+        f"order:{other.id}",
+    }
+    assert page.total == 2
+    scoped = _search(db_session, barcode=specimen["barcode"])
+    row = scoped.entries[0]
+    assert scoped.total == 1 and row.order_id == order_id
+    assert row.status == "awaiting_specimen"
+    assert row.progress.ordered_tests == 1 and row.progress.released_tests == 0
+    assert row.service_details[0].visit_service_id == line.id
+    assert row.service_details[0].can_cancel
+    assert _search(db_session, q=lab.name).total == 1
+
+    conflicting_collection = client.post(
+        f"/api/v1/lab/orders/{other.id}/specimens",
+        headers=auth_headers,
+        json={
+            "material_code": "synthetic",
+            "container_code": "synthetic",
+            "request_id": str(uuid4()),
+            "visit_service_ids": [line.id],
+        },
+    )
+    assert conflicting_collection.status_code == 409
+    other_report = SimpleNamespace(
+        order=other, order_id=other.id, patient_id=patient.id, visit_id=visit.id
+    )
+    with pytest.raises(LabReportingDomainError, match="specimen custody in another"):
+        LabReportingService(db_session)._claim_ordered_services(
+            other_report, [line.id], "unused"
+        )
+    wrong_order = client.post(
+        f"/api/v1/lab/visits/{visit.id}/tests/{line.id}/cancel",
+        headers=auth_headers,
+        json={"order_id": other.id, "reason": "SYNTHETIC-CROSS-ORDER"},
+    )
+    assert wrong_order.status_code == 409
+
+    # Old inconsistent custody data remains visible without proposing either order.
+    competing_specimen = LabSpecimen(
+        order_id=other.id,
+        barcode="SYNTHETIC-COMPETITION",
+        material_code="synthetic",
+        container_code="synthetic",
+        status="expected",
+        revision=1,
+        created_at=NOW,
+        create_request_id=str(uuid4()),
+    )
+    db_session.add(competing_specimen)
+    db_session.flush()
+    db_session.add(
+        LabSpecimenAssignment(
+            specimen_id=competing_specimen.id, visit_service_id=line.id
+        )
+    )
+    db_session.flush()
+    disputed = next(
+        row for row in _search(db_session).entries if row.id == f"visit:{visit.id}"
+    )
+    assert disputed.status == "held"
+    assert disputed.hold_reason == "specimen_order_ambiguous"
+    assert disputed.service_details[0].visit_service_id is None
+
+    reconciled = client.post(
+        f"/api/v1/lab/specimens/{competing_specimen.id}/assignments",
+        headers=auth_headers,
+        json={
+            "operation": "remove",
+            "reason": "SYNTHETIC-CUSTODY-RECONCILED",
+            "expected_revision": 1,
+            "request_id": str(uuid4()),
+            "visit_service_ids": [line.id],
+        },
+    )
+    assert reconciled.is_success, reconciled.text
+    assert (
+        _search(db_session, barcode=specimen["barcode"])
+        .entries[0]
+        .service_details[0]
+        .visit_service_id
+        == line.id
+    )
+
+
+def test_legacy_release_marks_unknown_lines_and_preserves_new_requisitions(db_session):
+    lab, _ = _catalog(db_session)
+    patient, visit, old_line = _new_visit(db_session, "LEGACY-COVERAGE", lab)
+    old_line.created_at = NOW - timedelta(hours=2)
+    order = LabOrder(patient_id=patient.id, visit_id=visit.id)
+    template = LabReportTemplate(
+        code="SYNTHETIC-LEGACY", name="SYNTHETIC-LEGACY", family="SYNTHETIC"
+    )
+    db_session.add_all([order, template])
+    db_session.flush()
+    version = LabReportTemplateVersion(
+        template_id=template.id, version_no=1, layout_preset="standard"
+    )
+    db_session.add(version)
+    db_session.flush()
+    db_session.add(
+        LabReportInstance(
+            order_id=order.id,
+            visit_id=visit.id,
+            patient_id=patient.id,
+            template_id=template.id,
+            template_version_id=version.id,
+            status="FINALIZED",
+            finalized_at=NOW - timedelta(hours=1),
+        )
+    )
+    db_session.flush()
+
+    released = _search(db_session, view="ready").entries[0]
+    assert released.order_id == order.id and released.progress.ordered_tests is None
+    historical = _search(db_session).entries[0]
+    assert historical.id == f"visit:{visit.id}" and historical.status == "held"
+    assert historical.hold_reason == "historical_allocation_unknown"
+    assert historical.service_details[0].visit_service_id is None
+    assert not historical.service_details[0].can_cancel
+    proposed = SimpleNamespace(
+        order=order, order_id=order.id, patient_id=patient.id, visit_id=visit.id
+    )
+    with pytest.raises(LabReportingDomainError, match="unconfirmed historical"):
+        LabReportingService(db_session)._claim_ordered_services(
+            proposed, [old_line.id], template.code
+        )
+
+    new_line = VisitService(
+        visit_id=visit.id,
+        service_id=lab.id,
+        name="SYNTHETIC-NEW-REQUEST",
+        created_at=NOW,
+    )
+    db_session.add(new_line)
+    db_session.flush()
+    pending = _search(db_session, q="SYNTHETIC-NEW-REQUEST").entries[0]
+    assert pending.id == historical.id and pending.status == "pending"
+    assert [item.visit_service_id for item in pending.service_details] == [
+        None,
+        new_line.id,
+    ]
+    assert pending.service_details[1].can_cancel
+
+
 def test_worklist_api_audits_each_returned_patient_without_search_text(
     client, db_session, auth_headers, caplog
 ):
@@ -261,6 +435,18 @@ def test_cancel_unreported_line_is_idempotent_and_remains_out_of_active_list(
         == 409
     )
     assert _search(db_session).total == 0
+    canceled_order = response.json()["order_id"]
+    canceled_collection = client.post(
+        f"/api/v1/lab/orders/{canceled_order}/specimens",
+        headers=auth_headers,
+        json={
+            "material_code": "synthetic",
+            "container_code": "synthetic",
+            "request_id": str(uuid4()),
+            "visit_service_ids": [line.id],
+        },
+    )
+    assert canceled_collection.status_code == 409
 
 
 def test_order_schedule_is_explicit_and_rejects_missing_timezone(

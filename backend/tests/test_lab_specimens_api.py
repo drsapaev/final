@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -12,6 +12,7 @@ from app.models.lab import (
     LabReportTemplate,
     LabReportTemplateVersion,
 )
+from app.models.lab_specimen import LabSpecimenEvent
 from app.models.patient import Patient
 from app.models.patient_access_audit import PatientAccessAuditLog
 from app.models.user import User
@@ -467,3 +468,78 @@ def test_specimen_validation_does_not_echo_rejected_clinical_input(
     assert extra_field.status_code == 422
     assert marker not in extra_field.text
     assert marker not in caplog.text
+
+
+def test_rejection_metrics_count_only_coded_reasons_and_unknown_history(
+    client,
+    db_session,
+    specimen_context,
+    auth_headers,
+):
+    actor, _, _, visit, test, _, _ = specimen_context
+    headers = _headers(actor)
+    create_path = f"{LAB_API}/visits/{visit.id}/specimens"
+    private_note = "SYNTHETIC-PRIVATE-CUSTODY-NOTE"
+
+    def create():
+        result = client.post(create_path, json=_create(test.id), headers=headers)
+        assert result.status_code == 201, result.text
+        return result.json()
+
+    row = create()
+    invalid = _post_event(
+        client, headers, row, "reject", reason=private_note, reason_code=private_note
+    )
+    assert invalid.status_code == 422
+    assert private_note not in invalid.text
+    rejected_code_on_collect = _post_event(
+        client, headers, row, "collect", reason_code="label_mismatch"
+    )
+    assert rejected_code_on_collect.status_code == 422
+
+    command = {
+        "request_id": str(uuid4()),
+        "expected_revision": row["revision"],
+        "action": "reject",
+        "reason": private_note,
+        "reason_code": "label_mismatch",
+    }
+    events_path = f"{LAB_API}/specimens/{row['id']}/events"
+    coded = client.post(events_path, json=command, headers=headers)
+    assert coded.status_code == 200, coded.text
+    assert coded.json()["events"][-1]["reason_code"] == "label_mismatch"
+    assert client.post(events_path, json=command, headers=headers).status_code == 200
+
+    legacy = _post_event(client, headers, create(), "reject", reason=private_note)
+    assert legacy.status_code == 200, legacy.text
+    assert legacy.json()["events"][-1]["reason_code"] is None
+
+    old = _post_event(
+        client,
+        headers,
+        create(),
+        "reject",
+        reason=private_note,
+        reason_code="transport_issue",
+    )
+    assert old.status_code == 200, old.text
+    historic = db_session.get(LabSpecimenEvent, old.json()["events"][-1]["id"])
+    historic.happened_at = datetime.now(UTC) - timedelta(days=3)
+    db_session.commit()
+
+    collected = _post_event(client, headers, create(), "collect")
+    assert collected.status_code == 200, collected.text
+    held = _post_event(client, headers, collected.json(), "hold", reason=private_note)
+    assert held.status_code == 200, held.text
+
+    metrics_path = f"{LAB_API}/metrics?days=1"
+    assert client.get(metrics_path, headers=headers).status_code == 403
+    metrics = client.get(metrics_path, headers=auth_headers)
+    assert metrics.status_code == 200, metrics.text
+    assert private_note not in metrics.text
+    assert metrics.json()["rejected_samples"] == 2
+    assert metrics.json()["rejected_samples_by_reason"] == {
+        "label_mismatch": 1,
+        "unknown": 1,
+    }
+    assert metrics.json()["held_samples"] == 1

@@ -447,6 +447,14 @@ const uzCyrl = {
     archive: 'Архивировать'
   },
   labWorkspace: {
+    rejectionCode: 'Рад этиш тоифаси',
+    rejection_label_mismatch: 'Ёрлиқ мос эмас',
+    rejection_container_mismatch: 'Идиш мос эмас',
+    rejection_insufficient_quantity: 'Намуна миқдори етарли эмас',
+    rejection_specimen_quality: 'Намуна сифати',
+    rejection_transport_issue: 'Ташиш шароити бузилган',
+    rejection_other: 'Бошқа сабаб',
+    rejection_unknown: 'Тоифа кўрсатилмаган',
     orderedTests: 'Тайинланган текширувлар',
     cancelTest: 'Текширувни бекор қилиш',
     cancelTestError: 'Текширув бекор қилинмади. Жорий ҳолатини текширинг.',
@@ -486,6 +494,8 @@ const uzCyrl = {
     progressReports: 'Ҳисоботлар: {total} тадан {released} та чиқарилди',
     hold_specimen_held: 'Намуна ушлаб турилган',
     hold_specimen_rejected: 'Намуна рад этилган',
+    hold_historical_allocation_unknown: 'Олдинги бланкка қайси таҳлиллар киритилганини текширинг',
+    hold_specimen_order_ambiguous: 'Боғланган намуналар қайси буюртмага тегишли эканини текширинг',
     openFromQueue: 'Намуна ва натижаларни очиш учун буюртмани танланг.',
     backToQueue: 'Иш рўйхатига қайтиш',
     skipToTabs: 'Лаборатория бўлимларига ўтиш',
