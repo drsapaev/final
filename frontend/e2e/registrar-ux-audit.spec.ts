@@ -184,7 +184,7 @@ test.describe('UX Audit Registrar — new interactions', () => {
     const actions = page.locator('.registrar-welcome-actions').first().getByRole('button');
     await expect(actions).toHaveText(['Новая запись', 'Найти пациента', 'Открыть очередь']);
     await expect(actions.first()).toBeInViewport();
-    await expect(page.getByRole('button', { name: 'Обновить данные' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Обновить данные', exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 
