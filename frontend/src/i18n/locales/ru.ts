@@ -1432,7 +1432,7 @@ const ru = {
     cardio_panel_complete_anyway_confirm: 'Завершить всё равно',
     cardio_panel_back_to_filling_cancel: 'Вернуться к заполнению',
     cardio_panel_complete_visit_title: 'Завершить приём?',
-    cardio_panel_complete_visit_message: 'Приём будет сохранён, и система автоматически вызовет следующего пациента.',
+    cardio_panel_complete_visit_message: 'Приём будет сохранён и завершён.',
     cardio_panel_complete_visit_description: 'Перед завершением убедитесь, что диагноз, лечение и рекомендации заполнены корректно. После подписания EMR изменения возможны только через поправку.',
     cardio_panel_complete_visit_confirm: 'Завершить приём',
     cardio_panel_complete_visit_cancel: 'Отмена',
@@ -7234,6 +7234,10 @@ const ru = {
 
   // ─── Misc (file manager, queue mgmt, 2FA, settings, ECG, photos, etc.) ───
   misc: {
+    visit_completion_call_next_option: 'Позвать следующего пациента после завершения',
+    visit_completed_next_patient_called: 'Следующий пациент вызван.',
+    visit_completed_no_next_patient: 'Приём завершён. Нет пациента, доступного для вызова.',
+    visit_completed_call_next_unconfirmed: 'Приём завершён. Вызов следующего не подтверждён. Проверьте очередь перед повторным вызовом.',
     delete: 'Удалить',
     cancel: 'Отмена',
     close: 'Закрыть',

@@ -13,6 +13,7 @@ import { useCardiologistHotkeys } from '../hooks/useCardiologistHotkeys';
 // S-M-2 (история, ОТМЕНЕО Track 3-2): macos-Icon обёртка → lucide refs (§3.3)
 import { Card, Button } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
+import { reportVisitCompletionCall } from '../utils/visitCompletionChoice';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './cardiology.css';
 import BloodTestsTab from '../components/cardiology/BloodTestsTab';
@@ -1388,9 +1389,8 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     const notes = emrTextValue(savedEMRData.notes);
 
     // QW-10 (UX audit): confirm before completing the visit. completeVisit is
-    // an irreversible action that closes the encounter and auto-calls the next
-    // patient. Without a confirm, a doctor could accidentally complete a visit
-    // with an empty diagnosis or treatment, leaving the EMR incomplete. We
+    // an irreversible action that closes the encounter. Without a confirm, a doctor
+    // could accidentally leave an incomplete EMR. We
     // surface a stronger warning (intent='warning') when critical fields are
     // empty, and a normal confirmation otherwise.
     //
@@ -1441,6 +1441,12 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         intent: 'primary',
       };
     }
+
+    let callNext = false;
+    confirmOptions.confirmationOption = {
+      label: tI18n('misc.visit_completion_call_next_option'),
+      onConfirm: (checked: boolean) => { callNext = checked; },
+    };
 
     const ok = await confirm(confirmOptions);
     if (!ok) {
@@ -1518,17 +1524,12 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
       setActiveTab('queue');
 
-      // Автоматически вызвать следующего пациента для кардиолога
-      try {
-        const next = await queueService.callNextWaiting(SPECIALTY_KEYS.CARDIOLOGY);
-        if (next?.success && next.entry) {
-          notify.success(tI18n('cardio.cardio_panel_next_patient_called', { number: (next.entry as Record<string, unknown>).number }));
-        }
-      } catch (err) {
-        notify.warning(getErrorMessage(
-          err,
-          tI18n('cardio.cardio_panel_next_patient_call_failed')
-        ));
+      if (callNext) {
+        await reportVisitCompletionCall(
+          () => queueService.callNextWaiting(SPECIALTY_KEYS.CARDIOLOGY),
+          tI18n,
+          'cardio.cardio_panel_next_patient_called',
+        );
       }
 
     } catch (error: unknown) {
