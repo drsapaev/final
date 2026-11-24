@@ -22,12 +22,13 @@ import i18n from '@/i18n';
  */
 
 const listInstancesMock = vi.hoisted(() => vi.fn());
+const downloadPdfMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../../hooks/useLabReporting', () => ({
   useLabReporting: () => ({
     listInstances: listInstancesMock,
     createOrder: vi.fn(),
-    downloadPdf: vi.fn(),
+    downloadPdf: downloadPdfMock,
     listTemplates: vi.fn().mockResolvedValue([]),
     getInstance: vi.fn(),
     createInstance: vi.fn(),
@@ -167,6 +168,45 @@ describe('EMRLAB-FE-002: response ownership across context switches', () => {
       for (let i = 0; i < 6; i += 1) await Promise.resolve();
     });
     expect(screen.queryByText('Отчёт C')).toBeNull();
+  });
+
+  it('opens only the current chart PDF when an earlier patient request resolves last', async () => {
+    const stale = new Blob(['SYNTHETIC A'], { type: 'application/pdf' });
+    const current = new Blob(['SYNTHETIC B'], { type: 'application/pdf' });
+    let resolveEarlier!: (blob: Blob) => void;
+    const earlier = new Promise<Blob>((resolve) => { resolveEarlier = resolve; });
+    listInstancesMock.mockImplementation(({ patient_id, status }) => Promise.resolve(
+      status === 'FINALIZED' ? [finalized(patient_id === 1 ? 11 : 22, `Бланк ${patient_id}`)] : [],
+    ));
+    downloadPdfMock.mockImplementation((id) => (id === 11 ? earlier : Promise.resolve(current)));
+    const createObjectURL = vi.fn().mockReturnValue('blob:synthetic-current');
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    vi.stubGlobal('URL', class extends URL {
+      static createObjectURL = createObjectURL;
+      static revokeObjectURL = vi.fn();
+    });
+
+    const chart = (patientId: number, visitId: number) => (
+      <ThemeProvider><LabResultsSection patientId={patientId} visitId={visitId} /></ThemeProvider>
+    );
+
+    try {
+      const view = render(chart(1, 5));
+      await screen.findByText('Бланк 1');
+      fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Скачать PDF: Бланк 1' }));
+      view.rerender(chart(2, 6));
+      fireEvent.click(await screen.findByRole('button', { name: 'Скачать PDF: Бланк 2' }));
+      await waitFor(() => expect(open).toHaveBeenCalledWith('blob:synthetic-current', '_blank'));
+      await act(async () => resolveEarlier(stale));
+
+      expect(downloadPdfMock.mock.calls).toEqual([[11], [22]]);
+      expect(createObjectURL.mock.calls).toEqual([[current]]);
+      expect(open).toHaveBeenCalledTimes(1);
+    } finally {
+      open.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 });
 

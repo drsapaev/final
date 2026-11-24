@@ -208,12 +208,19 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
   }, [patientId, visitId, loadInstances]);
 
   const handleDownload = async (instanceId: string | number) => {
+    const epoch = requestEpochRef.current;
+    const { patientId: requestedPatient, visitId: requestedVisit } = contextRef.current;
+    const isCurrent = () => epoch === requestEpochRef.current
+      && requestedPatient === contextRef.current.patientId
+      && requestedVisit === contextRef.current.visitId;
     try {
       const blob = await labReportingApi.downloadPdf(instanceId);
+      if (!isCurrent()) return;
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err: unknown) {
+      if (!isCurrent()) return;
       const errShape = err as { message?: string };
       logger.error('[LabResultsSection] PDF download failed', { error: errShape?.message });
     }
