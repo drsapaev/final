@@ -6,6 +6,7 @@ from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from app.core.config import settings
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES
 from app.models.clinic import Doctor
 from app.models.lab import LabReportInstance
 from app.models.lab_critical_communication import (
@@ -18,7 +19,7 @@ from app.services.lab_reporting import LabReportingDomainError
 
 
 def _active_visit_doctor_query(
-    visit_id, patient_id, *, eligible_roles: tuple[str, ...] = ("doctor",),
+    visit_id, patient_id, *, eligible_roles: tuple[str, ...] = DOCTOR_FAMILY_GATE_ROLES,
 ):
     return (
         select(User.id)

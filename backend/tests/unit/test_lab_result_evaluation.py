@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.main import app
 from app.models.lab import LabCatalogReferenceRange, LabCatalogUnit, LabResult
+from app.models.lab_critical_communication import LabCriticalCommunication
 from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment
 from app.schemas.lab_reporting import LabReportRenderedFieldOut, LabReportValueIn
 from app.services.emr_lab_integration import EMRLabIntegrationService
@@ -227,6 +228,9 @@ def test_one_released_evaluation_drives_editor_pdf_emr_and_notification(
     db_session, test_patient, monkeypatch, entered, decimal_text, comparator, display,
     interpretation,
 ):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", False)
     monkeypatch.setattr(
         LabReportingService, "_emit_lab_results_ready_notification", lambda *_: None,
     )
@@ -275,6 +279,15 @@ def test_one_released_evaluation_drives_editor_pdf_emr_and_notification(
     assert LabReportRenderedFieldOut.model_validate(pdf_field) == editor
     is_critical = interpretation == "critical"
     assert len(pdf["critical_findings"]) == int(is_critical)
+    communication = db_session.scalar(
+        select(LabCriticalCommunication).where(
+            LabCriticalCommunication.report_instance_id == released.id
+        )
+    )
+    assert (communication is not None) is is_critical
+    if is_critical:
+        assert communication.field_keys == ["glucose"]
+        assert communication.state == "needs_assignment"
     [emr] = asyncio.run(
         EMRLabIntegrationService().get_patient_lab_results(db_session, test_patient.id)
     )

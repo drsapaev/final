@@ -23,6 +23,7 @@ from app.models.lab import (
     LabReportValue,
     LabResult,
 )
+from app.models.lab_critical_communication import LabCriticalCommunication
 from app.models.notification import NotificationDelivery, NotificationEvent
 from app.services import lab_notification_service as mod
 from app.services.notification_platform import NotificationPlatformService
@@ -161,6 +162,30 @@ def released_result(db_session, test_patient, test_visit):
         return result, source
 
     return create
+
+
+@pytest.mark.asyncio
+async def test_scheduler_preserves_historical_alerts_without_duplicating_task_routes(
+    db_session, released_result, monkeypatch,
+):
+    linked, source = released_result()
+    historic, historic_source = released_result()
+    db_session.add(LabCriticalCommunication(
+        report_instance_id=source.id, field_keys=["synthetic_analyte_slot"],
+        state="needs_assignment", attempts=0,
+    ))
+    db_session.flush()
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(mod.notification_sender_service, "send_lab_event_notification", sender)
+
+    outcome = await mod.LabNotificationService(db_session).check_critical_values()
+
+    assert outcome["critical_found"] == 1
+    assert outcome["critical_results"][0]["result_id"] == historic.id
+    assert [call.kwargs["metadata"]["report_instance_id"] for call in sender.await_args_list] == [
+        historic_source.id, historic_source.id,
+    ]
+    assert linked.source_instance_id == source.id
 
 
 @pytest.mark.asyncio

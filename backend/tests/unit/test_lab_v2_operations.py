@@ -13,7 +13,10 @@ from app.core.config import settings
 from app.models.audit import AuditLog
 from app.models.clinic import Doctor
 from app.models.lab import LabOrder, LabReportInstance, LabReportValue
-from app.models.lab_critical_communication import LabCriticalCommunicationEvent
+from app.models.lab_critical_communication import (
+    LabCriticalCommunication,
+    LabCriticalCommunicationEvent,
+)
 from app.models.lab_import import LabImportReceipt
 from app.models.lab_release import LabReportCreationReceipt
 from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment
@@ -1244,6 +1247,154 @@ def test_escalated_critical_task_follows_changed_visit_doctor(
     assert events.count("escalated") == 1
     assert events.count("escalation_notified") == 1
     assert events.count("needs_assignment" if change == "removed" else "assigned") == 1
+
+
+@pytest.mark.unit
+def test_standard_release_routes_critical_result_and_correction_without_legacy_duplicates(
+    db_session, test_patient, test_visit, monkeypatch,
+):
+    from app.services.lab_notification_service import LabNotificationService
+
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", False)
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", None)
+    doctor = synthetic_user(db_session, "cardio")
+    profile = Doctor(user_id=doctor.id, specialty="cardiology", active=True)
+    db_session.add(profile)
+    db_session.flush()
+    test_visit.doctor_id = profile.id
+    service = LabReportingService(db_session)
+    template = next(item for item in service.list_templates() if item.code == "glucose_panel")
+    published = next(version for version in template.versions if version.status == "PUBLISHED")
+    draft = service.create_template_version(template.id, published.id)
+    field = service._field_map(draft)["glucose"]
+    field.reference_mode = "static_text"
+    field.highlight_rule = {"mode": "range", "low": "2", "high": "7", "critical_high": "9"}
+    db_session.commit()
+    version = service.publish_template_version(draft.id)
+    report = service.create_instance({
+        "patient_id": test_patient.id, "visit_id": test_visit.id,
+        "template_id": template.id, "template_version_id": version.id,
+    })
+    assert report.managed_release is False
+    service.bulk_upsert_values(report.id, [{"field_key": "glucose", "value_text": "12"}])
+    monkeypatch.setattr(LabReportingService, "_emit_lab_results_ready_notification", lambda *_: None)
+    # Avoid launching a background scheduler in this synchronous test; the
+    # actual scheduler is invoked explicitly after each committed release.
+    with monkeypatch.context() as patch:
+        patch.setattr(LabNotificationService, "check_critical_values", lambda *_: None)
+        released = service.finalize(report.id)
+    task = db_session.scalar(select(LabCriticalCommunication).where(
+        LabCriticalCommunication.report_instance_id == released.id,
+    ))
+    assert task is not None and task.recipient_user_id == doctor.id
+    assert task.field_keys == ["glucose"] and task.state == "pending"
+
+    sender = AsyncMock(return_value=True)
+    legacy_sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    monkeypatch.setattr(notification_sender_service, "send_lab_event_notification", legacy_sender)
+    assert run(dispatch_pending(db_session)) == 1
+    assert run(LabNotificationService(db_session).check_critical_values())["critical_found"] == 0
+    assert run(dispatch_pending(db_session)) == 0
+    legacy_sender.assert_not_awaited()
+
+    revision = service.revise(released.id)
+    service.bulk_upsert_values(revision.id, [{"field_key": "glucose", "value_text": "5"}])
+    with monkeypatch.context() as patch:
+        patch.setattr(LabNotificationService, "check_critical_values", lambda *_: None)
+        corrected = service.finalize(revision.id)
+    correction = db_session.scalar(select(LabCriticalCommunication).where(
+        LabCriticalCommunication.report_instance_id == corrected.id,
+    ))
+    assert correction is not None and correction.supersedes_communication_id == task.id
+    assert correction.field_keys == [] and task.state == "superseded"
+    assert run(dispatch_pending(db_session)) == 1
+    assert run(LabNotificationService(db_session).check_critical_values())["critical_found"] == 0
+    assert run(dispatch_pending(db_session)) == 0
+    assert [call.kwargs["entity_id"] for call in sender.await_args_list] == [task.id, correction.id]
+    assert all(call.kwargs["recipient"].id == doctor.id for call in sender.await_args_list)
+    legacy_sender.assert_not_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("inactive", ["user", "profile", "role"])
+def test_critical_communication_does_not_route_to_ineligible_visit_staff(
+    db_session, test_patient, test_visit, monkeypatch, inactive,
+):
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", None)
+    user = synthetic_user(db_session, "Lab" if inactive == "role" else "cardio")
+    user.is_active = inactive != "user"
+    profile = Doctor(user_id=user.id, specialty="cardiology", active=inactive != "profile")
+    db_session.add(profile)
+    db_session.flush()
+    test_visit.doctor_id = profile.id
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+    assert task.recipient_user_id is None and task.state == "needs_assignment"
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    assert run(dispatch_pending(db_session)) == 0
+    sender.assert_not_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("role", ["Doctor", "cardio", "Dermatologist", "dentistry"])
+def test_critical_communication_reaches_assigned_doctor_family_only(
+    db_session, test_patient, test_visit, client, monkeypatch, role,
+):
+    doctor = synthetic_user(db_session, role)
+    other = synthetic_user(db_session, "Doctor")
+    profile = Doctor(user_id=doctor.id, specialty="cardiology", active=True)
+    db_session.add(profile)
+    db_session.flush()
+    test_visit.doctor_id = profile.id
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    assert task.recipient_user_id == doctor.id
+    db_session.commit()
+
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    assert run(dispatch_pending(db_session)) == 1
+    assert sender.await_args.kwargs["recipient"].id == doctor.id
+
+    def headers(user):
+        token = authentication_service.create_access_token({
+            "sub": str(user.id), "username": user.username, "role": user.role,
+            "is_active": user.is_active, "is_superuser": user.is_superuser,
+        })
+        return {"Authorization": f"Bearer {token}"}
+
+    route = "/api/v1/lab/critical-communications"
+    owner_headers = headers(doctor)
+    listed = client.get(route, params={"visit_id": test_visit.id}, headers=owner_headers)
+    assert listed.status_code == 200
+    assert listed.json()[0]["available_actions"] == ["acknowledge"]
+    assert client.post(f"{route}/{task.id}/acknowledge", headers=headers(other)).status_code == 404
+    doctor.is_active = False
+    db_session.commit()
+    assert client.post(f"{route}/{task.id}/acknowledge", headers=owner_headers).status_code in {
+        401, 403,
+    }
+    doctor.is_active = True
+    db_session.commit()
+    confirmed = client.post(f"{route}/{task.id}/acknowledge", headers=owner_headers)
+    assert confirmed.status_code == 200 and confirmed.json()["state"] == "acknowledged"
 
 
 @pytest.mark.unit

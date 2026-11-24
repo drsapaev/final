@@ -68,10 +68,9 @@ class FinalizeMixin(LabReportingServiceMixinBase):
                 expected_version=expected_version, evidence=evidence,
             )
         self._sync_legacy_lab_results(instance, self._field_map(instance.template_version))
-        if instance.managed_release:
-            from app.services.lab_critical_communication import record_released_report
+        from app.services.lab_critical_communication import record_released_report
 
-            record_released_report(self.db, instance, actor_user_id=actor_user_id)
+        record_released_report(self.db, instance, actor_user_id=actor_user_id)
         self.repository.commit()
 
         try:

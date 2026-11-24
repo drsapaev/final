@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.roles import DOCTOR_FAMILY_GATE_ROLES
@@ -20,6 +20,7 @@ from app.models.lab import (
     LabReportValue,
     LabResult,
 )
+from app.models.lab_critical_communication import LabCriticalCommunication
 from app.models.notification import (
     NotificationDelivery,
     NotificationEvent,
@@ -352,6 +353,11 @@ class LabNotificationService:
                             LabReportInstance.managed_release.is_(False),
                             LabReportInstance.status.in_(FINAL_INSTANCE_STATUSES),
                             LabReportInstance.finalized_at >= yesterday,
+                            # A released report with a durable communication
+                            # is delivered by that task, not this legacy scan.
+                            ~select(LabCriticalCommunication.id).where(
+                                LabCriticalCommunication.report_instance_id == LabReportInstance.id,
+                            ).exists(),
                         ),
                     ),
                 )

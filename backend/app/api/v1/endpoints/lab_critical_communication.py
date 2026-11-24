@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_active_roles
 from app.api.v1.endpoints.lab_reporting import _doctor_allowed_visit_ids
-from app.core.roles import normalize_role_value
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, normalize_role_value
 from app.models.lab import LabReportInstance
 from app.models.lab_critical_communication import (
     LabCriticalCommunication,
@@ -29,9 +29,9 @@ router = APIRouter(
     prefix="/lab/critical-communications", tags=["lab-critical-communications"]
 )
 Db = Annotated[Session, Depends(get_db)]
-Staff = Annotated[User, Depends(require_active_roles("Admin", "Lab", "Doctor"))]
+Staff = Annotated[User, Depends(require_active_roles("Admin", "Lab", *DOCTOR_FAMILY_GATE_ROLES))]
 Admin = Annotated[User, Depends(require_active_roles("Admin"))]
-Doctor = Annotated[User, Depends(require_active_roles("Doctor"))]
+Doctor = Annotated[User, Depends(require_active_roles(*DOCTOR_FAMILY_GATE_ROLES))]
 
 
 class CommunicationOut(BaseModel):
