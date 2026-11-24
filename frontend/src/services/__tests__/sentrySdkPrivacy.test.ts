@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react';
-import { describe, expect, it } from 'vitest';
-import { createSentryPrivacyCallbacks } from '../sentry';
+import { describe, expect, it, vi } from 'vitest';
+import { createSentryBrowserRequestTracingOptions, createSentryPrivacyCallbacks } from '../sentry';
 
 type InitOptions = NonNullable<Parameters<typeof Sentry.init>[0]>;
 
@@ -111,5 +111,82 @@ describe('Sentry SDK privacy callbacks (in-memory transport)', () => {
     expect(serialized).toContain('ai_provider_failure');
     expect(serialized).toContain('http.response.status_code');
     expect(serialized).toContain('[REDACTED TRANSACTION]');
+  });
+
+  it('keeps the anonymous analytics collector outside outgoing SDK tracing', async () => {
+    const collectorPath = '/api/v1/public-site/analytics/events';
+    const siblingPath = `${collectorPath}-summary`;
+    const nestedPath = `${collectorPath}/summary`;
+    const crossOrigin = 'https://outside.invalid';
+    const observedHeaders = new Map<string, Headers>();
+    const requestSpans: string[] = [];
+    vi.stubGlobal('fetch', (url: string, options?: RequestInit) => {
+      observedHeaders.set(url, new Headers(options?.headers));
+      return Promise.resolve(new Response(null, { status: 204 }));
+    });
+
+    try {
+      const client = Sentry.init({
+        dsn: ['https:', '', ['public', 'dsn.invalid'].join('@'), '1'].join('/'),
+        defaultIntegrations: false,
+        integrations: [],
+        sendClientReports: false,
+        tracesSampleRate: 1,
+        transport: () => ({
+          send: () => Promise.resolve({ statusCode: 200 }),
+          flush: () => Promise.resolve(true),
+        }),
+        beforeSendSpan(span) {
+          if (span.op === 'http.client' && span.description) {
+            requestSpans.push(span.description);
+          }
+          return span;
+        },
+      });
+      expect(client).toBeDefined();
+      const options = createSentryBrowserRequestTracingOptions();
+      Sentry.instrumentOutgoingRequests(client!, { ...options, traceXHR: false });
+
+      const anonymousRequests = [
+        collectorPath,
+        `${collectorPath}/?retry=1`,
+        collectorPath.slice(1),
+        new URL(collectorPath, window.location.href).href,
+        new URL(collectorPath, crossOrigin).href,
+      ];
+      const sameOriginRequests = [
+        siblingPath,
+        nestedPath,
+        new URL('/api/v1/health', window.location.href).href,
+        `${window.location.origin}//api/v1/health`,
+      ];
+      const crossOriginRequests = [
+        new URL(siblingPath, crossOrigin).href,
+        `//${new URL(crossOrigin).host}${nestedPath}`,
+      ];
+      const requests = [...anonymousRequests, ...sameOriginRequests, ...crossOriginRequests];
+      await Sentry.startSpan({ name: 'SDK request tracing test' }, async () => {
+        for (const url of requests) {
+          await globalThis.fetch(url, { method: 'POST' });
+        }
+      });
+      await Sentry.flush(2_000);
+
+      expect(observedHeaders.size).toBe(requests.length);
+      for (const url of [...anonymousRequests, ...crossOriginRequests]) {
+        expect(observedHeaders.get(url)?.has('sentry-trace')).toBe(false);
+        expect(observedHeaders.get(url)?.has('baggage')).toBe(false);
+      }
+      for (const url of sameOriginRequests) {
+        expect(observedHeaders.get(url)?.has('sentry-trace')).toBe(true);
+        expect(observedHeaders.get(url)?.has('baggage')).toBe(true);
+      }
+      expect(requestSpans).toEqual(
+        [...sameOriginRequests, ...crossOriginRequests].map((url) => `POST ${url}`),
+      );
+      expect(options.shouldCreateSpanForRequest('http://[')).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

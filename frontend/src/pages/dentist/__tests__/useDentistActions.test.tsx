@@ -73,6 +73,11 @@ const makeDeps = (overrides: Partial<Deps> = {}): Deps => ({
   ...overrides,
 });
 
+const optIn = async (options: Record<string, unknown>) => {
+  (options.confirmationOption as { onConfirm: (checked: boolean) => void }).onConfirm(true);
+  return true;
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -278,8 +283,9 @@ describe('useDentistActions (PR-UI-15-5) — handleCompleteVisit C-1 tiered conf
     expect((confirm.mock.calls[0][0] as Record<string, unknown>).intent).toBe('danger');
   });
 
-  it('completes the visit, resets state and auto-invites the next patient', async () => {
+  it('completes the visit, resets state and calls the next patient when opted in', async () => {
     const deps = makeDeps({
+      confirm: optIn,
       selectedPatient: patientWith({
         patient_id: 42,
         visitData: { diagnosis: 'stale diagnosis', icd10: 'K04.7', complaint: 'stale complaint' },
@@ -310,14 +316,36 @@ describe('useDentistActions (PR-UI-15-5) — handleCompleteVisit C-1 tiered conf
     expect(deps.setLoading).toHaveBeenCalledWith(false);
   });
 
-  it('does not break the flow when callNextWaiting fails (visit already completed)', async () => {
-    vi.mocked(queueService.callNextWaiting).mockRejectedValueOnce(new Error('boom'));
+  it('completes without calling the next patient by default', async () => {
     const deps = makeDeps({ selectedPatient: patientWith({}) });
     const { result } = renderHook(() => useDentistActions(deps));
-    await result.current.handleCompleteVisit({});
+    expect(await result.current.handleCompleteVisit({})).toBe(true);
+    expect(queueService.completeVisit).toHaveBeenCalledTimes(1);
+    expect(queueService.callNextWaiting).not.toHaveBeenCalled();
+  });
+
+  it('does not break the flow when callNextWaiting fails (visit already completed)', async () => {
+    vi.mocked(queueService.callNextWaiting).mockRejectedValueOnce(new Error('boom'));
+    const deps = makeDeps({ selectedPatient: patientWith({}), confirm: optIn });
+    const { result } = renderHook(() => useDentistActions(deps));
+    expect(await result.current.handleCompleteVisit({})).toBe(true);
     expect(queueService.completeVisit).toHaveBeenCalledTimes(1);
     expect(deps.handleTabChange).toHaveBeenCalledWith('queue');
-    expect(logger.warn).toHaveBeenCalled();
+    expect(notify.warning).toHaveBeenCalledWith('misc.visit_completed_call_next_unconfirmed');
+    expect(notify.error).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ success: false, noCandidate: true }, 'info', 'misc.visit_completed_no_next_patient'],
+    [{ success: false, unknown: true }, 'warning', 'misc.visit_completed_call_next_unconfirmed'],
+  ] as const)('reports the optional call result separately: %j', async (ack, level, key) => {
+    vi.mocked(queueService.callNextWaiting).mockResolvedValueOnce(ack as never);
+    const deps = makeDeps({ selectedPatient: patientWith({}), confirm: optIn });
+    const { result } = renderHook(() => useDentistActions(deps));
+    expect(await result.current.handleCompleteVisit({})).toBe(true);
+    expect(notify[level]).toHaveBeenCalledWith(key);
+    expect(notify.error).not.toHaveBeenCalled();
+    expect(queueService.callNextWaiting).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -565,7 +593,7 @@ describe('useDentistActions — DOCFLOW-FE-001/002 (audit 3886): honest completi
       unknown: true,
       message: 'Не подтверждено сервером / Not confirmed by the server',
     } as never);
-    const deps = makeDeps({ selectedPatient: patientA });
+    const deps = makeDeps({ selectedPatient: patientA, confirm: optIn });
     const { result } = renderHook(() => useDentistActions(deps));
 
     await result.current.handleCompleteVisit({ diagnosis: 'd', icd10_code: 'K02.1' });
@@ -585,7 +613,7 @@ describe('useDentistActions — DOCFLOW-FE-001/002 (audit 3886): honest completi
       success: false,
       message: 'Сервер отклонил завершение визита. / The server rejected the visit completion.',
     } as never);
-    const deps = makeDeps({ selectedPatient: patientA });
+    const deps = makeDeps({ selectedPatient: patientA, confirm: optIn });
     const { result } = renderHook(() => useDentistActions(deps));
 
     await result.current.handleCompleteVisit({ diagnosis: 'd', icd10_code: 'K02.1' });
@@ -603,7 +631,7 @@ describe('useDentistActions — DOCFLOW-FE-001/002 (audit 3886): honest completi
       unknown: true,
       message: 'ambiguous',
     } as never);
-    const deps = makeDeps({ selectedPatient: patientA });
+    const deps = makeDeps({ selectedPatient: patientA, confirm: optIn });
     const { result } = renderHook(() => useDentistActions(deps));
 
     await result.current.handleCompleteVisit({ diagnosis: 'd', icd10_code: 'K02.1' });
@@ -635,6 +663,26 @@ describe('useDentistActions — DOCFLOW-FE-001/002 (audit 3886): honest completi
     expect(notify.success).not.toHaveBeenCalledWith('dental.visit_completed');
   });
 
+  it('ignores a late completion acknowledgement after another patient was selected, even with opt-in', async () => {
+    let resolveAck!: (value: { success: true }) => void;
+    vi.mocked(queueService.completeVisit).mockImplementationOnce(
+      () => new Promise((resolve) => { resolveAck = resolve; }),
+    );
+    const depsA = makeDeps({ confirm: optIn, selectedPatient: patientA });
+    const { result, rerender } = renderHook(
+      ({ deps }: { deps: Deps }) => useDentistActions(deps),
+      { initialProps: { deps: depsA } },
+    );
+    const completion = result.current.handleCompleteVisit({ diagnosis: 'd' });
+    await waitFor(() => expect(queueService.completeVisit).toHaveBeenCalledTimes(1));
+    rerender({ deps: makeDeps({ selectedPatient: patientB }) });
+    resolveAck({ success: true });
+    expect(await completion).toBe(true);
+    expect(depsA.setSelectedPatient).not.toHaveBeenCalled();
+    expect(depsA.handleTabChange).not.toHaveBeenCalled();
+    expect(queueService.callNextWaiting).not.toHaveBeenCalled();
+  });
+
   it('DOCFLOW-FE-002 positive control: an unchanged selection across the confirm still completes normally', async () => {
     let resolveConfirm!: (value: boolean) => void;
     const confirm = vi.fn(
@@ -654,6 +702,6 @@ describe('useDentistActions — DOCFLOW-FE-001/002 (audit 3886): honest completi
 
     expect(queueService.completeVisit).toHaveBeenCalledWith(91, expect.objectContaining({ patient_id: 11 }));
     expect(depsA.setSelectedPatient).toHaveBeenCalledWith(null);
-    expect(queueService.callNextWaiting).toHaveBeenCalledWith('dentistry');
+    expect(queueService.callNextWaiting).not.toHaveBeenCalled();
   });
 });

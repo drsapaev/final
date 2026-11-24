@@ -40,6 +40,7 @@ from datetime import date
 from typing import Any
 
 import sqlalchemy as sa
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.online_queue import DailyQueue, QueueResource
@@ -201,8 +202,11 @@ def ensure_daily_queue_identity_is_new(
     query = db.query(DailyQueue).filter(DailyQueue.day == day)
     if specialist_id is not None:
         query = query.filter(DailyQueue.specialist_id == specialist_id)
-        if queue_tag is None:
-            query = query.filter(DailyQueue.queue_tag.is_(None))
+        if queue_tag in (None, ""):
+            # Match the doctor/day index, including archived legacy empty tags.
+            query = query.filter(
+                or_(DailyQueue.queue_tag.is_(None), DailyQueue.queue_tag == "")
+            )
         else:
             query = query.filter(DailyQueue.queue_tag == queue_tag)
     else:
@@ -372,6 +376,23 @@ def resource_start_number(db: Session, daily_queue: DailyQueue) -> int | None:
     if resource is None or not resource.start_number_online:
         return None
     return int(resource.start_number_online)
+
+
+def effective_queue_cabinet(queue: DailyQueue | None) -> str | None:
+    """Resolve the cabinet of one proven daily queue, not a specialty group."""
+    if queue is None:
+        return None
+    daily_cabinet = getattr(queue, "cabinet_number", None)
+    if isinstance(daily_cabinet, str) and daily_cabinet.strip() not in {"", "N/A"}:
+        return daily_cabinet.strip()
+
+    if getattr(queue, "queue_resource_id", None) is not None:
+        owner_cabinet = getattr(getattr(queue, "queue_resource", None), "default_cabinet", None)
+    else:
+        owner_cabinet = getattr(getattr(queue, "specialist", None), "cabinet", None)
+    if isinstance(owner_cabinet, str) and owner_cabinet.strip() not in {"", "N/A"}:
+        return owner_cabinet.strip()
+    return None
 
 
 def effective_day_start_number(

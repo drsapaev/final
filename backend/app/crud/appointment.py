@@ -1,8 +1,8 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session, selectinload
 
 from app.crud.base import CRUDBase
@@ -19,6 +19,13 @@ from app.services.appointment_duration_snapshot import (
     InvalidServiceSelection,
     resolve_exact_service_selection,
 )
+from app.services.appointment_intervals import (
+    clock_seconds,
+    intervals_overlap,
+    valid_duration,
+)
+
+_SECONDS_PER_DAY = 24 * 60 * 60
 
 
 def _department_id_for_service_selection(
@@ -46,6 +53,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         *,
         obj_in: AppointmentCreate,
         commit: bool = True,
+        slot_conflict: HTTPException | None = None,
     ) -> Appointment:
         data = obj_in.model_dump(exclude_unset=True)
         service_ids = data.pop("service_ids", None)
@@ -65,6 +73,20 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
             data["services"] = list(selection.names)
             data["duration_minutes_snapshot"] = selection.duration_minutes_snapshot
 
+        if (
+            slot_conflict is not None
+            and data.get("doctor_id") is not None
+            and data.get("appointment_time")
+            and valid_duration(data.get("duration_minutes_snapshot"))
+            and self.is_time_slot_occupied(
+                db,
+                doctor_id=data["doctor_id"],
+                appointment_date=data["appointment_date"],
+                appointment_time=data["appointment_time"],
+                duration_minutes_snapshot=data.get("duration_minutes_snapshot"),
+            )
+        ):
+            raise slot_conflict
         appointment = self.model(**data)
         db.add(appointment)
         if commit:
@@ -83,6 +105,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         *,
         db_obj: Appointment,
         obj_in: AppointmentUpdate | dict[str, Any],
+        slot_conflict: HTTPException | None = None,
     ) -> Appointment:
         if isinstance(obj_in, AppointmentUpdate):
             data = obj_in.model_dump(exclude_unset=True)
@@ -116,7 +139,41 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
             # not keep an old duration if the service list or doctor changes.
             data["duration_minutes_snapshot"] = None
 
+        if slot_conflict is not None:
+            doctor_id = data.get("doctor_id", db_obj.doctor_id)
+            appointment_date = data.get("appointment_date", db_obj.appointment_date)
+            appointment_time = data.get("appointment_time", db_obj.appointment_time)
+            if (
+                doctor_id is not None
+                and appointment_date is not None
+                and appointment_time
+                and self.is_time_slot_occupied(
+                    db,
+                    doctor_id=doctor_id,
+                    appointment_date=appointment_date,
+                    appointment_time=appointment_time,
+                    duration_minutes_snapshot=data.get(
+                        "duration_minutes_snapshot", db_obj.duration_minutes_snapshot
+                    ),
+                    exclude_appointment_id=db_obj.id,
+                )
+            ):
+                raise slot_conflict
+
         return super().update(db, db_obj=db_obj, obj_in=data)
+
+    def get_for_slot_change(
+        self, db: Session, *, appointment_id: int, patient_id: int | None = None
+    ) -> Appointment | None:
+        """Serialize changes to the same appointment before choosing a doctor."""
+        query = db.query(self.model).filter(self.model.id == appointment_id)
+        if patient_id is not None:
+            query = query.filter(self.model.patient_id == patient_id)
+        return (
+            query.populate_existing()
+            .with_for_update(key_share=True, of=self.model)
+            .first()
+        )
 
     def get_patient_history(
         self,
@@ -195,13 +252,16 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         self,
         db: Session,
         *,
-        doctor_id: int,
+        doctor_id: int | None,
         appointment_date: str | date,
-        appointment_time: str,
+        appointment_time: str | None,
         exclude_appointment_id: int | None = None,
+        duration_minutes_snapshot: int | None = None,
     ) -> bool:
-        """
-        Проверить, занято ли время у врача
+        """Check the proposed start and any provable overlap under the doctor lock.
+
+        Legacy paths still reserve the exact start when either duration is
+        unknown. Public availability has its own conservative unknown-day rule.
         """
         if isinstance(appointment_date, str):
             try:
@@ -211,19 +271,47 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
             except ValueError:
                 return False
 
-        query = db.query(self.model).filter(
-            and_(
-                self.model.doctor_id == doctor_id,
-                self.model.appointment_date == appointment_date,
-                self.model.appointment_time == appointment_time,
-                self.model.status != "cancelled",
-            )
+        query = db.query(
+            self.model.appointment_date,
+            self.model.appointment_time,
+            self.model.duration_minutes_snapshot,
+        ).filter(
+            self.model.doctor_id == doctor_id,
+            func.lower(func.trim(self.model.status)) != AppointmentStatus.CANCELLED,
         )
-
-        if exclude_appointment_id:
+        if exclude_appointment_id is not None:
             query = query.filter(self.model.id != exclude_appointment_id)
 
-        return query.first() is not None
+        start = clock_seconds(appointment_time)
+        if start is None or not valid_duration(duration_minutes_snapshot):
+            return (
+                query.filter(
+                    self.model.appointment_date == appointment_date,
+                    self.model.appointment_time == appointment_time,
+                ).first()
+                is not None
+            )
+
+        end = start + duration_minutes_snapshot * 60
+        first_day = max(date.min.toordinal(), appointment_date.toordinal() - 1)
+        last_day = appointment_date
+        if end > _SECONDS_PER_DAY and appointment_date < date.max:
+            last_day += timedelta(days=1)
+        rows = query.filter(
+            self.model.appointment_date.between(date.fromordinal(first_day), last_day)
+        ).all()
+        for existing_date, existing_time, existing_duration in rows:
+            if existing_date == appointment_date and existing_time == appointment_time:
+                return True
+            existing_start = clock_seconds(existing_time)
+            if existing_start is None or not valid_duration(existing_duration):
+                continue
+            existing_start += (existing_date - appointment_date).days * _SECONDS_PER_DAY
+            if intervals_overlap(
+                start, end, existing_start, existing_start + existing_duration * 60
+            ):
+                return True
+        return False
 
     def get_doctor_schedule(
         self, db: Session, *, doctor_id: int, date: str

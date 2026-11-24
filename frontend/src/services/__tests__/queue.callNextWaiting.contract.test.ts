@@ -63,10 +63,21 @@ describe('QAPI-FE-001: the server null choice is not second-guessed', () => {
 
     const result = await queueService.callNextWaiting('cardiology');
 
-    expect(result.success).toBe(false);
+    expect(result).toMatchObject({ success: false, noCandidate: true });
     expect(postedCallUrls()).toEqual([]);
     // Only the GET ever happened.
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('an explicitly empty canonical queue needs no POST; a malformed snapshot is not empty', async () => {
+    fetchMock.mockResolvedValueOnce(queueResponse({ entries: [], next_call_entry_id: null }));
+    fetchMock.mockResolvedValueOnce(queueResponse({ entries: [] }));
+
+    await expect(queueService.callNextWaiting('cardiology')).resolves.toMatchObject({
+      success: false, noCandidate: true,
+    });
+    await expect(queueService.callNextWaiting('cardiology')).resolves.not.toHaveProperty('noCandidate');
+    expect(postedCallUrls()).toEqual([]);
   });
 
   it('missing next_call_entry_id is a contract failure — no POST, explicit message', async () => {
