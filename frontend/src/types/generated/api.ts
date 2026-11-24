@@ -33424,12 +33424,41 @@ export type components = {
             /**
              * Result Date
              * Format: date-time
+             * @description Дата выпуска версии или дата записи legacy-результата
              */
             result_date: string;
-            /** Status */
+            /**
+             * Status
+             * @description Статус для отображения. unknown означает отсутствие подтверждённой оценки
+             */
             status: string;
             /** Notes */
             notes?: string | null;
+            /**
+             * Source Root Instance Id
+             * @description Идентификатор исходного бланка
+             */
+            source_root_instance_id?: number | null;
+            /**
+             * Source Instance Id
+             * @description Идентификатор выпущенной версии бланка
+             */
+            source_instance_id?: number | null;
+            /**
+             * Supersedes Instance Id
+             * @description Идентификатор заменённой версии бланка
+             */
+            supersedes_instance_id?: number | null;
+            /**
+             * Evaluation Status
+             * @description Статус оценки из снимка выпущенной версии
+             */
+            evaluation_status?: string | null;
+            /**
+             * Interpretation
+             * @description Интерпретация из снимка выпущенной версии
+             */
+            interpretation?: string | null;
         };
         /** LabResultSearchResult */
         LabResultSearchResult: {

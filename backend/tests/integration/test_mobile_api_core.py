@@ -18,16 +18,23 @@ schema/model drift:
 
 This file asserts 200 (not 500) for each endpoint.
 """
+
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
-
-import pytest
 
 from app.core.security import get_password_hash
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
+from app.models.lab import (
+    LabOrder,
+    LabReportInstance,
+    LabReportTemplate,
+    LabReportTemplateVersion,
+    LabReportValue,
+    LabResult,
+)
 from app.models.patient import Patient
 from app.models.user import User
 
@@ -168,6 +175,183 @@ def test_get_lab_results_returns_200(client, db_session):
     assert response.status_code == 200, response.text
     body = response.json()
     assert isinstance(body, list)
+
+
+def test_mobile_lab_result_uses_exact_release_snapshot_and_preserves_legacy(
+    client, db_session
+):
+    user, patient = _make_patient_user(db_session)
+    other_user, other_patient = _make_patient_user(db_session)
+    original_date = datetime(2025, 1, 1, tzinfo=UTC)
+    revised_date = original_date + timedelta(days=3)
+    order = LabOrder(patient_id=patient.id, status="done")
+    other_order = LabOrder(patient_id=other_patient.id, status="done")
+    template = LabReportTemplate(
+        code=f"mobile_{_suffix()}", name="Mobile parity", family="test"
+    )
+    version = LabReportTemplateVersion(
+        template=template,
+        version_no=1,
+        status="PUBLISHED",
+        layout_preset="standard",
+    )
+    db_session.add_all([order, other_order, version])
+    db_session.flush()
+
+    def create_instance(
+        lab_order, *, status, finalized_at=None, supersedes_instance_id=None
+    ):
+        instance = LabReportInstance(
+            order_id=lab_order.id,
+            patient_id=lab_order.patient_id,
+            template_id=template.id,
+            template_version_id=version.id,
+            status=status,
+            finalized_at=finalized_at,
+            supersedes_instance_id=supersedes_instance_id,
+        )
+        db_session.add(instance)
+        db_session.flush()
+        return instance
+
+    original = create_instance(order, status="FINALIZED", finalized_at=original_date)
+    revised = create_instance(
+        order,
+        status="PRINTED",
+        finalized_at=revised_date,
+        supersedes_instance_id=original.id,
+    )
+    draft = create_instance(order, status="DRAFT", supersedes_instance_id=revised.id)
+    other_report = create_instance(
+        other_order, status="FINALIZED", finalized_at=original_date
+    )
+
+    values = [
+        ("qualified", "<1", "not_evaluated", None),
+        ("without_rules", "3.2", "not_applicable", None),
+        ("cleared", None, "missing", None),
+        ("normal", "7", "evaluated", "normal"),
+        ("high", "20", "evaluated", "high"),
+    ]
+    db_session.add(
+        LabReportValue(
+            instance_id=original.id,
+            field_key="qualified",
+            value_text="5",
+            evaluation_snapshot={
+                "status": "evaluated",
+                "interpretation": "normal",
+                "unit": "U/L",
+            },
+        )
+    )
+    for field, raw_value, evaluation_status, interpretation in values:
+        db_session.add_all(
+            [
+                LabReportValue(
+                    instance_id=revised.id,
+                    field_key=field,
+                    value_text=raw_value,
+                    resolved_reference_text="1–10" if raw_value else None,
+                    evaluation_snapshot={
+                        "status": evaluation_status,
+                        "interpretation": interpretation,
+                        "unit": "mg/L",
+                    },
+                ),
+                LabResult(
+                    order_id=order.id,
+                    test_code=field,
+                    test_name=field,
+                    value=raw_value,
+                    unit="U/L",
+                    ref_range="old range",
+                    abnormal=(field == "high"),
+                    source_root_instance_id=original.id,
+                    source_instance_id=revised.id,
+                    created_at=original_date,
+                ),
+            ]
+        )
+    db_session.add_all(
+        [
+            LabResult(
+                order_id=order.id,
+                test_code="qualified",
+                test_name="legacy",
+                value="10",
+                abnormal=True,
+                created_at=original_date,
+            ),
+            LabResult(
+                order_id=order.id,
+                test_code="old",
+                test_name="no_snapshot",
+                value="3",
+                source_root_instance_id=original.id,
+                source_instance_id=original.id,
+            ),
+            LabResult(
+                order_id=order.id,
+                test_code="draft",
+                test_name="draft",
+                value="40",
+                source_root_instance_id=original.id,
+                source_instance_id=draft.id,
+            ),
+            LabResult(
+                order_id=order.id,
+                test_code="wrong_patient",
+                test_name="wrong_patient",
+                value="4",
+                source_root_instance_id=other_report.id,
+                source_instance_id=other_report.id,
+            ),
+            LabResult(
+                order_id=other_order.id, test_code="other", test_name="other", value="8"
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get("/api/v1/mobile/lab/results", headers=_login(client, user))
+    assert response.status_code == 200, response.text
+    rows = {row["test_name"]: row for row in response.json()}
+    assert set(rows) == {"legacy", "no_snapshot", *(field for field, *_ in values)}
+    assert rows["legacy"] == {
+        "id": rows["legacy"]["id"],
+        "test_name": "legacy",
+        "result_value": "10",
+        "reference_range": "",
+        "unit": "",
+        "result_date": original_date.replace(tzinfo=None).isoformat(),
+        "status": "abnormal",
+        "notes": None,
+    }
+    assert rows["no_snapshot"]["status"] == "unknown"
+    for field, raw_value, evaluation_status, interpretation in values:
+        row = rows[field]
+        assert row["result_value"] == (raw_value or "")
+        assert row["reference_range"] == ("1–10" if raw_value else "")
+        assert row["unit"] == "mg/L"
+        assert row["evaluation_status"] == evaluation_status
+        assert row["interpretation"] == interpretation
+        assert row["status"] == {"normal": "normal", "high": "abnormal"}.get(
+            field, evaluation_status
+        )
+        assert row["source_instance_id"] == revised.id
+        assert row["source_root_instance_id"] == original.id
+        assert row["supersedes_instance_id"] == original.id
+        assert (
+            datetime.fromisoformat(row["result_date"]).replace(tzinfo=UTC)
+            == revised_date
+        )
+
+    other_response = client.get(
+        "/api/v1/mobile/lab/results", headers=_login(client, other_user)
+    )
+    assert other_response.status_code == 200, other_response.text
+    assert [row["test_name"] for row in other_response.json()] == ["other"]
 
 
 def test_get_mobile_quick_stats_returns_200(client, db_session):

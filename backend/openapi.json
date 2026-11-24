@@ -101603,11 +101603,13 @@
           "result_date": {
             "type": "string",
             "format": "date-time",
-            "title": "Result Date"
+            "title": "Result Date",
+            "description": "Дата выпуска версии или дата записи legacy-результата"
           },
           "status": {
             "type": "string",
-            "title": "Status"
+            "title": "Status",
+            "description": "Статус для отображения. unknown означает отсутствие подтверждённой оценки"
           },
           "notes": {
             "anyOf": [
@@ -101619,6 +101621,66 @@
               }
             ],
             "title": "Notes"
+          },
+          "source_root_instance_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Root Instance Id",
+            "description": "Идентификатор исходного бланка"
+          },
+          "source_instance_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Instance Id",
+            "description": "Идентификатор выпущенной версии бланка"
+          },
+          "supersedes_instance_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Instance Id",
+            "description": "Идентификатор заменённой версии бланка"
+          },
+          "evaluation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Status",
+            "description": "Статус оценки из снимка выпущенной версии"
+          },
+          "interpretation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interpretation",
+            "description": "Интерпретация из снимка выпущенной версии"
           }
         },
         "type": "object",

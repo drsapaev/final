@@ -627,7 +627,58 @@ async def book_mobile_appointment(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/lab/results", response_model=list[LabResultOut])
+def _mobile_lab_result(result: dict) -> LabResultOut:
+    fields = {
+        "id": result["id"],
+        "test_name": result["test_name"] or "",
+        "result_value": result["value"] or "",
+        "reference_range": result["ref_range"] or "",
+        "unit": result["unit"] or "",
+        "result_date": result["created_at"],
+        "status": "abnormal" if result["abnormal"] else "normal",
+        "notes": result["notes"],
+    }
+    if result["source_instance_id"] is not None:
+        fields.update(
+            source_root_instance_id=result["source_root_instance_id"],
+            source_instance_id=result["source_instance_id"],
+            supersedes_instance_id=result["supersedes_instance_id"],
+            result_date=result["released_at"] or result["created_at"],
+            status="unknown",
+        )
+        snapshot = result["evaluation_snapshot"]
+        if isinstance(snapshot, dict):
+            evaluation_status = snapshot.get("status")
+            interpretation = snapshot.get("interpretation")
+            fields.update(
+                evaluation_status=evaluation_status, interpretation=interpretation
+            )
+
+            if evaluation_status in ("not_evaluated", "not_applicable", "missing"):
+                fields["status"] = evaluation_status
+            elif evaluation_status == "evaluated" and result["value"]:
+                if interpretation in ("low", "high", "warning", "abnormal", "critical"):
+                    fields["status"] = "abnormal"
+                elif interpretation in (
+                    "normal",
+                    "negative",
+                    "positive",
+                    "indeterminate",
+                ):
+                    fields["status"] = interpretation
+
+            # Cleared projections may still hold the preceding version's unit/range.
+            fields.update(
+                unit=snapshot.get("unit") or "",
+                reference_range=result["resolved_reference_text"] or "",
+            )
+
+    return LabResultOut(**fields)
+
+
+@router.get(
+    "/lab/results", response_model=list[LabResultOut], response_model_exclude_unset=True
+)
 def get_lab_results(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -645,21 +696,7 @@ def get_lab_results(
             db, patient_id=patient.id, limit=limit, offset=offset
         )
 
-        # PR-3: get_patient_lab_results returns list[dict] (Core Table autoload),
-        # not ORM objects. Field names also differ from the schema — adapt.
-        return [
-            LabResultOut(
-                id=result["id"] if "id" in result else result.get("lab_results_id", 0),
-                test_name=result.get("test_name") or "",
-                result_value=result.get("value") or "",
-                reference_range=result.get("ref_range") or "",
-                unit=result.get("unit") or "",
-                result_date=result.get("created_at") or datetime.utcnow(),
-                status="abnormal" if result.get("abnormal") else "normal",
-                notes=result.get("notes"),
-            )
-            for result in results
-        ]
+        return [_mobile_lab_result(result) for result in results]
 
     except HTTPException:
         raise
