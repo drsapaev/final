@@ -49,6 +49,7 @@ from pathlib import Path
 import psycopg
 import pytest
 import sqlalchemy as sa
+from alembic.script import ScriptDirectory
 from sqlalchemy.engine import make_url
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -330,7 +331,8 @@ def test_0088_backfill_skips_rejected_and_amended_0087_allows_retry() -> None:
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar_one()
                 # The fixture must reach the current repository head.
-                assert version == "0107_lab_rejection_reason", version
+                expected_head = ScriptDirectory(str(BACKEND_ROOT / "alembic")).get_current_head()
+                assert version == expected_head, version
 
                 def _claims(payment_id: int) -> list[tuple]:
                     return conn.execute(
