@@ -119,6 +119,9 @@ environment, `miniapp-staging.finalclinic.fyi` hostname, and default
 For PR #4251, use `acceptance=pr-4251-arq-reminder` from protected `main`
 and pass the full current PR head as `source-sha`. It must match the open
 same-repository PR head and the remote `codex/laboratory-panel-v2` branch tip.
+The checkout verifies the live `refs/heads/main` against the workflow SHA.
+The PR's REST metadata identifies the base branch by name because its
+recorded `base.sha` can lag the live ref.
 The reviewed app is `7a1d512e87bd052dd1ee06199fec7a82e7d27d0e`, which descends
 from review base `11d4a5edd1979ed167ae4acb6b75e7d72eda9239`. The workflow also
 accepts an exact two-parent merge whose first parent is the reviewed app
