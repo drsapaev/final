@@ -15,7 +15,7 @@ from app.schemas.lab_import import LabImportBatch, LabImportRow
 from app.schemas.lab_release import LabReportQCIn
 from app.services import lab_import
 from app.services.lab_import import _digest
-from app.services.lab_reporting import LabReportingService
+from app.services.lab_reporting import LabReportingDomainError, LabReportingService
 from tests.unit.test_lab_managed_release import _staff
 from tests.unit.test_lab_v2_operations import accepted_specimen, synthetic_report
 
@@ -359,11 +359,21 @@ def test_warning_codes_follow_exact_imported_value_through_release_and_correctio
     )
     assert response.status_code == 200
     assert response.json()["rows"][0]["error_code"] == "report_locked"
+    with pytest.raises(LabReportingDomainError, match="instrument_warning"):
+        service.review_report(
+            report.id,
+            actor_user_id=reviewer.id,
+            expected_updated_at=report.updated_at.isoformat(),
+        )
+    reason = "SYNTHETIC reviewed instrument warnings"
     report = service.review_report(
         report.id,
         actor_user_id=reviewer.id,
         expected_updated_at=report.updated_at.isoformat(),
+        reason=reason,
     )
+    reviewed = next(event for event in service.workflow_history(report.id) if event.kind == "reviewed")
+    assert reviewed.actor_user_id == reviewer.id and reviewed.reason == reason
     released = service.finalize(
         report.id,
         actor_user_id=reviewer.id,
