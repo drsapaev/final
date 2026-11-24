@@ -108,17 +108,12 @@ class DisplayWebSocketManager:
                     websocket._user_info = {}
                 websocket._user_info["user"] = user
                 websocket._user_info["authenticated"] = True
-                logger.info(
-                    f"Аутентифицированный WebSocket подключен к табло {board_id} (пользователь: {user.username})"
-                )
+                logger.info("Authenticated display WebSocket connected")
             elif device_id is not None:
                 logger.info("Display device connected")
             else:
-                logger.info(f"Анонимный WebSocket подключен к табло {board_id}")
+                logger.info("Anonymous display WebSocket connected")
 
-            logger.info(
-                f"Всего соединений к табло {board_id}: {len(self.connections[board_id])}"
-            )
             await self._ensure_redis_subscription(board_id)
             # DISPLAYPRIVACY-BE-001 (audit PR #3961): подписка control-канала
             # инвалидации кэша формата имён — до первого резолва политики
@@ -143,7 +138,7 @@ class DisplayWebSocketManager:
                     del self.connections[board_id]
                     await self._remove_redis_subscription(board_id)
 
-            logger.info(f"WebSocket отключен от табло {board_id}")
+            logger.info("Display WebSocket disconnected")
 
         except Exception as e:
             logger.error(f"Ошибка отключения WebSocket: {e}")
@@ -173,12 +168,12 @@ class DisplayWebSocketManager:
             if not isinstance(sent, int):
                 sent = int(sent or 0)
         except Exception as e:
-            logger.error(f"Ошибка локальной отправки для табло {board_id}: {e}")
+            logger.error("Display local send failed: %s", type(e).__name__)
             return "failed"
         try:
             await self._pubsub.publish(self._board_channel(board_id), message)
         except Exception as e:
-            logger.error(f"Ошибка publish для табло {board_id}: {e}")
+            logger.error("Display publish failed: %s", type(e).__name__)
             return "failed"
         if sent > 0:
             return "delivered_local"
@@ -204,14 +199,11 @@ class DisplayWebSocketManager:
                 await self._pubsub.subscribe(self._board_channel(board_id), _handler)
             )
         except Exception as e:
-            logger.error(f"Ошибка Redis-подписки для табло {board_id}: {e}")
+            logger.error("Display Redis subscription failed: %s", type(e).__name__)
         if subscribed:
             self._redis_handlers[board_id] = _handler
         else:
-            logger.warning(
-                f"Redis-подписка табло {board_id} не выполнена; "
-                "повтор при следующем подключении"
-            )
+            logger.warning("Display Redis subscription failed; retry on next connection")
 
     async def _remove_redis_subscription(self, board_id: str) -> None:
         handler = self._redis_handlers.pop(board_id, None)
