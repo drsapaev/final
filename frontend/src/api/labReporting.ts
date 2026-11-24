@@ -270,8 +270,8 @@ export const labReportingApi = {
     return request(`/lab/report-instances?${search.toString()}`);
   },
 
-  getInstance(instanceId: string | number) {
-    return request(`/lab/report-instances/${instanceId}`);
+  getInstance(instanceId: string | number, options?: Pick<RequestOptions, 'signal'>) {
+    return request(`/lab/report-instances/${instanceId}`, options);
   },
 
   createInstance(

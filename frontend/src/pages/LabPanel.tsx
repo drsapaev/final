@@ -1713,8 +1713,10 @@ export default function LabPanel() {
 
     const epoch = labOperationEpochRef.current;
     const stillCurrent = () => activeInstanceRef.current === report && labOperationEpochRef.current === epoch;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15_000);
     try {
-      const fresh = await labReportingApi.getInstance(reportId) as Record<string, unknown>;
+      const fresh = await labReportingApi.getInstance(reportId, { signal: controller.signal }) as Record<string, unknown>;
       if (!stillCurrent()) return;
       if (getPositiveId(fresh.id) !== reportId || getPositiveId(fresh.order_id) !== selectedOrderId
         || !instanceIdsMatch(getInstancePatientId(fresh), getInstancePatientId(report))) return;
@@ -1736,6 +1738,8 @@ export default function LabPanel() {
       setActiveInstance(refreshed);
     } catch {
       if (stillCurrent()) notify('error', t('misc.lp_ne_udalos_otkryt_laboratorny'));
+    } finally {
+      window.clearTimeout(timeout);
     }
   }, [loadLabAppointments, notify, selectedOrderId, t]);
 
