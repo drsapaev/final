@@ -15,9 +15,9 @@ describe('EchoForm EMR contract', () => {
 
     expect(source).not.toContain('/cardiology/echo-results');
     expect(source).toContain('api.get(`/v2/emr/${visitId}`)');
-    expect(source).toContain('api.post(`/v2/emr/${visitId}`, buildEchoEmrPayload(existingEmr, echoData))');
+    expect(source).toContain('api.post(`/v2/emr/${visitId}`, buildEchoEmrPayload(existingEmr, echoData, visitId))');
     expect(source).toContain('specialty_data: {');
-    expect(source).toContain('echo: echoData');
+    expect(source).toContain('echo: { ...echoData, measurement_metadata: metadata }');
   });
 
   it('preserves backend-owned EMR locking data instead of inventing command state', () => {

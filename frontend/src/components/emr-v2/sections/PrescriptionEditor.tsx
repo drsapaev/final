@@ -307,14 +307,16 @@ const PrescriptionEditor = ({
                                 </div>
                             </div>
 
+                            <label className="emr-workspace-field">{t('emr_workspace.prescription_quantity')}
                             <Input
                                 type="number"
                                 min={1}
                                 step={1}
-                                label={t('emr_workspace.prescription_quantity')}
+                                aria-label={t('emr_workspace.prescription_quantity')}
                                 value={newItem.quantity}
                                 onChange={event => handleInputChange('quantity', event.target.value)}
                             />
+                            </label>
                             <button className="prescription-add-btn" onClick={handleAdd}>
                                 {t(editedItem ? 'common.save' : 'emr_workspace.add')}
                             </button>

@@ -69,6 +69,8 @@ class DoctorSectionTemplate(Base):
     pinned_at = Column(DateTime, nullable=True)
     last_used_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    template_revision = Column(Integer, default=1, nullable=False)
 
     # Relationship
     doctor = relationship("User", backref="section_templates")
@@ -128,6 +130,8 @@ class DoctorSectionTemplateResponse(BaseModel):
     is_stale: bool = False  # True if not used > 12 months
     last_used_at: datetime | None = None
     created_at: datetime | None = None
+    reviewed_at: datetime | None = None
+    template_revision: int = 1
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -64,7 +64,7 @@ describe('EMRVITAL-FE-001: BMI integrity', () => {
 
   it('positive control: valid adult anthropometry still renders the correct BMI', () => {
     renderVitals({ height: '170', weight: '70' });
-    expect(screen.getByText('ИМТ: 24.2')).toBeInTheDocument();
+    expect(screen.getByText('ИМТ 24.2')).toBeInTheDocument();
     expect(document.querySelectorAll('.emr-vitals__field--invalid').length).toBe(0);
   });
 

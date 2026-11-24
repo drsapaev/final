@@ -40,3 +40,23 @@ export function normalizeEchoForEditor(source: unknown): Record<string, unknown>
     },
   };
 }
+
+export function echoMeasurementFacts(source: unknown) {
+  const echo = record(source);
+  const metadata = record(echo.measurement_metadata);
+  const selected = selectEchoMeasurements(echo);
+  const units = { edd: 'mm', esd: 'mm', ef: '%', la: 'mm', aorticPeakVelocity: 'm/s' } as const;
+  return (Object.keys(units) as Array<keyof typeof units>).flatMap(key => {
+    const raw = selected[key];
+    const value = Number(raw.replace(',', '.'));
+    if (!raw || !Number.isFinite(value)) return [];
+    return [{
+      key, value, unit: units[key],
+      method: key === 'ef' ? text(metadata.ef_method) || null : null,
+      measuredAt: text(metadata.measured_at) || null,
+      recordedAt: text(metadata.recorded_at) || null,
+      sourceVisitId: metadata.source_visit_id ?? null,
+      definitionVersion: metadata.definition_version ?? null,
+    }];
+  });
+}

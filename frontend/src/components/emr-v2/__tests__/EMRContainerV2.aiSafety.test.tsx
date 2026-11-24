@@ -56,7 +56,7 @@ vi.mock('../../../hooks/useVisitLifecycle', () => ({ useVisitLifecycle: () => ({
 vi.mock('../../../hooks/useDebouncedCallback', () => ({ useDebouncedCallback: (callback: unknown) => callback }));
 vi.mock('../../../contexts/AppDataContext', () => ({ useAppData: () => ({ currentUser: { id: 1 } }) }));
 vi.mock('../../../hooks/useMcpClient', () => ({ useMcpClient: () => ({ suggestICD10: mocks.suggest }) }));
-vi.mock('../../../i18n/useTranslation', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('../../../i18n/useTranslation', () => ({ useTranslation: () => ({ t: (key: string) => key, language: 'ru' }) }));
 vi.mock('../../common/ConfirmDialog', () => ({ useConfirm: () => [async () => false, null] }));
 vi.mock('../../../core/cache', () => ({
   cacheService: { get: mocks.cacheGet, set: mocks.cacheSet, cacheEMR: vi.fn(),
@@ -109,7 +109,7 @@ describe('EMR AI results stay with the clinical input that requested them', () =
     expect(screen.getByTestId('suggestions').textContent).not.toContain('OLD SUGGESTION');
     expect(mocks.cacheSet).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('manual complaints'), { target: { value: 'manual entry' } });
-    expect(mocks.setField).toHaveBeenCalledWith('complaints', 'manual entry');
+    expect(mocks.setField).toHaveBeenCalledWith('complaints', 'manual entry', undefined);
   });
 
   it('keeps B cache hit when an earlier request A resolves late', async () => {

@@ -531,6 +531,12 @@ def get_prescription(
         prescription = crud_emr.prescription.get_by_appointment(
             db, appointment_id=appointment.id
         )
+    if prescription is not None and prescription.appointment_id is None:
+        # Keep this appointment-based response compatible for prescriptions
+        # issued directly from the canonical visit.
+        result = {key: getattr(prescription, key) for key in Prescription.model_fields}
+        result["appointment_id"] = appointment.id
+        return result
     return prescription
 
 

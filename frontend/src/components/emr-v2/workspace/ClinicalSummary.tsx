@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { ComponentProps, FormEvent } from 'react';
 import {
   getClinicalHistory, saveClinicalEntry,
   type ClinicalEntry, type ClinicalFact, type ClinicalSource, type EMRWorkspaceData,
@@ -17,6 +17,10 @@ const states = {
 const groups = ['problem', 'medication', 'allergy'] as const;
 type FactKind = ClinicalFact['kind'];
 type Editor = { id: string; kind: FactKind; current?: ClinicalEntry };
+
+function ClinicalInput({ label, ...props }: ComponentProps<typeof Input> & { label: string }) {
+  return <label className="emr-workspace-field">{label}<Input {...props} aria-label={label} /></label>;
+}
 
 function optionalText(form: FormData, name: string): string | null {
   return String(form.get(name) ?? '').trim() || null;
@@ -194,23 +198,23 @@ export function ClinicalSummary({
         <form key={editor.id} className="emr-workspace-form" onSubmit={event => void save(event)}>
           <h4>{t(`emr_workspace.${editor.kind}`)}</h4>
           <fieldset disabled={readOnly || busy}>
-            {editor.kind !== 'allergy_check' && <Input autoFocus name="name" label={t('emr_workspace.name')}
+            {editor.kind !== 'allergy_check' && <ClinicalInput autoFocus name="name" label={t('emr_workspace.name')}
               maxLength={240} required defaultValue={fact && 'name' in fact ? fact.name : ''} />}
             <label>{t('emr_workspace.status')}
               <select name="status" defaultValue={fact?.status}>
                 {states[editor.kind].map(status => <option key={status} value={status}>{t(`emr_workspace.${status}`)}</option>)}
               </select>
             </label>
-            {editor.kind === 'problem' && <Input name="code" label={t('emr_workspace.code')}
+            {editor.kind === 'problem' && <ClinicalInput name="code" label={t('emr_workspace.code')}
               maxLength={32} defaultValue={fact?.kind === 'problem' ? fact.code ?? '' : ''} />}
             {editor.kind === 'medication' && <>
-              <Input name="dose" label={t('emr_workspace.dose')} maxLength={120}
+              <ClinicalInput name="dose" label={t('emr_workspace.dose')} maxLength={120}
                 defaultValue={fact?.kind === 'medication' ? fact.dose ?? '' : ''} />
-              <Input name="regimen" label={t('emr_workspace.regimen')} maxLength={240}
+              <ClinicalInput name="regimen" label={t('emr_workspace.regimen')} maxLength={240}
                 defaultValue={fact?.kind === 'medication' ? fact.regimen ?? '' : ''} />
             </>}
             {editor.kind === 'allergy' && <>
-              <Input name="reaction" label={t('emr_workspace.reaction')} maxLength={240}
+              <ClinicalInput name="reaction" label={t('emr_workspace.reaction')} maxLength={240}
                 defaultValue={fact?.kind === 'allergy' ? fact.reaction ?? '' : ''} />
               <label>{t('emr_workspace.severity')}
                 <select name="severity" defaultValue={fact?.kind === 'allergy' ? fact.severity ?? '' : ''}>
@@ -221,9 +225,9 @@ export function ClinicalSummary({
                 </select>
               </label>
             </>}
-            <Input name="event_on" label={t('emr_workspace.event_on')} placeholder="YYYY-MM-DD" maxLength={10}
+            <ClinicalInput name="event_on" label={t('emr_workspace.event_on')} placeholder="YYYY-MM-DD" maxLength={10}
               defaultValue={fact?.event_on ?? ''} />
-            {editor.kind !== 'allergy_check' && <Input name="ended_on" label={t('emr_workspace.ended_on')}
+            {editor.kind !== 'allergy_check' && <ClinicalInput name="ended_on" label={t('emr_workspace.ended_on')}
               placeholder="YYYY-MM-DD" maxLength={10} defaultValue={fact?.ended_on ?? ''} />}
             <label>{t('emr_workspace.source')}
               <select name="source" defaultValue={editor.current?.source ?? 'clinician'}>
@@ -232,7 +236,10 @@ export function ClinicalSummary({
                 ))}
               </select>
             </label>
-            <label className="emr-workspace-check"><input name="confirmed" type="checkbox" />{t('emr_workspace.confirm_now')}</label>
+            <label className="emr-workspace-check">
+              <input name="confirmed" type="checkbox" aria-label={t('emr_workspace.confirm_now')} />
+              {t('emr_workspace.confirm_now')}
+            </label>
             <div className="emr-workspace-controls">
               <Button type="submit" size="small">{t('common.save')}</Button>
               <Button type="button" size="small" variant="ghost" onClick={() => setEditor(undefined)}>{t('misc.cancel')}</Button>

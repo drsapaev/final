@@ -38,7 +38,15 @@ def fail_workspace(error: WorkspaceError) -> HTTPException:
     return HTTPException(status_code=error.status_code, detail={"code": error.code})
 
 
-def audit_workspace(db: Session, request: Request, user: User, patient_id: int, visit_id: int, action: str, resource_id: str):
+def audit_workspace(
+    db: Session,
+    request: Request,
+    user: User,
+    patient_id: int,
+    visit_id: int,
+    action: str,
+    resource_id: str,
+):
     log_audit_event(
         db=db,
         event_type="EMR_WORKSPACE",
@@ -55,7 +63,9 @@ def audit_workspace(db: Session, request: Request, user: User, patient_id: int, 
 
 def get_history_doctor_id(db: Session, user: User) -> int | None:
     staff = staff_authorization_service
-    if staff.has_permission(user, "emr:read") and (staff.has_permission(user, "emr:delete") or user.is_superuser):
+    if staff.has_permission(user, "emr:read") and (
+        staff.has_permission(user, "emr:delete") or user.is_superuser
+    ):
         return None
     doctor = get_current_active_doctor(db, user)
     if doctor is None:
@@ -77,10 +87,14 @@ def get_emr_workspace(
     service = EMRWorkspaceService(db)
     try:
         visit, patient = service.context(visit_id, patient_id)
-        data = service.read(visit, patient, get_history_doctor_id(db, current_user), offset, limit)
+        data = service.read(
+            visit, patient, get_history_doctor_id(db, current_user), offset, limit
+        )
     except WorkspaceError as error:
         raise fail_workspace(error) from error
-    audit_workspace(db, request, current_user, patient.id, visit.id, "view", str(visit.id))
+    audit_workspace(
+        db, request, current_user, patient.id, visit.id, "view", str(visit.id)
+    )
     return data
 
 
@@ -104,7 +118,9 @@ def put_clinical_entry(
     except WorkspaceError as error:
         db.rollback()
         raise fail_workspace(error) from error
-    audit_workspace(db, request, current_user, patient.id, visit_id, "edit", str(entry_id))
+    audit_workspace(
+        db, request, current_user, patient.id, visit_id, "edit", str(entry_id)
+    )
     return data
 
 
@@ -123,14 +139,21 @@ def get_clinical_entry_history(
         visit, patient = service.context(visit_id, patient_id)
     except WorkspaceError as error:
         raise fail_workspace(error) from error
-    data = [ClinicalEntryOut.model_validate(row) for row in service.repository.entry_history(patient.id, entry_id)]
+    data = [
+        ClinicalEntryOut.model_validate(row)
+        for row in service.repository.entry_history(patient.id, entry_id)
+    ]
     if not data:
         raise HTTPException(status_code=404, detail="Clinical entry not found")
-    audit_workspace(db, request, current_user, patient.id, visit.id, "view", str(entry_id))
+    audit_workspace(
+        db, request, current_user, patient.id, visit.id, "view", str(entry_id)
+    )
     return data
 
 
-@router.get("/history/{source_visit_id}/{version}", response_model=WorkspaceHistoryDocument)
+@router.get(
+    "/history/{source_visit_id}/{version}", response_model=WorkspaceHistoryDocument
+)
 def get_workspace_history_document(
     visit_id: int,
     source_visit_id: int,
@@ -148,7 +171,9 @@ def get_workspace_history_document(
         result = service.history_document(visit, source_visit_id, version)
     except WorkspaceError as error:
         raise fail_workspace(error) from error
-    audit_workspace(db, request, current_user, patient.id, visit_id, "view", str(result.id))
+    audit_workspace(
+        db, request, current_user, patient.id, visit_id, "view", str(result.id)
+    )
     return result
 
 
@@ -166,7 +191,9 @@ def get_workspace_prescription(
         result = read_prescription(db, visit)
     except WorkspaceError as error:
         raise fail_workspace(error) from error
-    audit_workspace(db, request, current_user, patient.id, visit_id, "view", str(visit_id))
+    audit_workspace(
+        db, request, current_user, patient.id, visit_id, "view", str(visit_id)
+    )
     return result
 
 
@@ -188,7 +215,9 @@ def post_workspace_prescription(
     except WorkspaceError as error:
         db.rollback()
         raise fail_workspace(error) from error
-    audit_workspace(db, request, current_user, patient.id, visit_id, "edit", str(result.id))
+    audit_workspace(
+        db, request, current_user, patient.id, visit_id, "edit", str(result.id)
+    )
     return result
 
 
@@ -206,7 +235,9 @@ def get_workspace_labs(
         result = read_visit_labs(db, visit)
     except WorkspaceError as error:
         raise fail_workspace(error) from error
-    audit_workspace(db, request, current_user, patient.id, visit_id, "view", str(visit_id))
+    audit_workspace(
+        db, request, current_user, patient.id, visit_id, "view", str(visit_id)
+    )
     return result
 
 
@@ -222,10 +253,14 @@ def post_workspace_lab_review(
     ensure_emr_visit_access(db, visit_id, current_user)
     try:
         visit, patient = EMRWorkspaceService(db).context(visit_id, payload.patient_id)
-        result = record_lab_review(db, visit, instance_id, current_user.id, payload.next_action)
+        result = record_lab_review(
+            db, visit, instance_id, current_user.id, payload.next_action
+        )
         db.commit()
     except WorkspaceError as error:
         db.rollback()
         raise fail_workspace(error) from error
-    audit_workspace(db, request, current_user, patient.id, visit_id, "edit", str(instance_id))
+    audit_workspace(
+        db, request, current_user, patient.id, visit_id, "edit", str(instance_id)
+    )
     return result

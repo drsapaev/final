@@ -15,9 +15,16 @@ def read_prescription(db: Session, visit: Visit) -> WorkspacePrescription | None
     item = prescription.get_by_visit(db, visit_id=visit.id)
     if item is None:
         return None
-    revision = db.get(EMRRevision, item.emr_revision_id) if item.emr_revision_id is not None else None
+    revision = (
+        db.get(EMRRevision, item.emr_revision_id)
+        if item.emr_revision_id is not None
+        else None
+    )
     return WorkspacePrescription(
-        id=item.id, visit_id=visit.id, emr_version=revision.version if revision else None, is_draft=item.is_draft,
+        id=item.id,
+        visit_id=visit.id,
+        emr_version=revision.version if revision else None,
+        is_draft=item.is_draft,
     )
 
 
@@ -39,8 +46,10 @@ def prescription_medications(data: dict) -> list[dict]:
             "instructions": row.get("instructions") or row.get("note"),
             "quantity": row.get("quantity"),
         }
-        if any(not isinstance(values[key], str) or not values[key].strip()
-               for key in ("name", "dosage", "frequency", "duration")) or isinstance(values["quantity"], bool):
+        if any(
+            not isinstance(values[key], str) or not values[key].strip()
+            for key in ("name", "dosage", "frequency", "duration")
+        ) or isinstance(values["quantity"], bool):
             raise WorkspaceError(422, "PRESCRIPTION_MEDICATIONS_INCOMPLETE")
         try:
             result.append(MedicationItem.model_validate(values).model_dump())
@@ -49,7 +58,9 @@ def prescription_medications(data: dict) -> list[dict]:
     return result
 
 
-def issue_prescription(db: Session, visit: Visit, expected_row_version: int) -> WorkspacePrescription:
+def issue_prescription(
+    db: Session, visit: Visit, expected_row_version: int
+) -> WorkspacePrescription:
     # Lock in the same order as the shared upsert: visit, then source record.
     db.query(Visit.id).filter(Visit.id == visit.id).with_for_update().one()
     record = (
@@ -59,13 +70,32 @@ def issue_prescription(db: Session, visit: Visit, expected_row_version: int) -> 
         .with_for_update()
         .one_or_none()
     )
-    if record is None or record.status == "draft" or record.row_version != expected_row_version:
+    if (
+        record is None
+        or record.status == "draft"
+        or record.row_version != expected_row_version
+    ):
         raise WorkspaceError(409, "PRESCRIPTION_STALE_EMR")
-    revision = db.query(EMRRevision).filter_by(emr_id=record.id, version=record.version).one_or_none()
+    revision = (
+        db.query(EMRRevision)
+        .filter_by(emr_id=record.id, version=record.version)
+        .one_or_none()
+    )
     if revision is None:
         raise WorkspaceError(409, "PRESCRIPTION_STALE_EMR")
     item = prescription.store_for_visit(
-        db, visit_id=visit.id, emr_record_id=record.id, emr_revision_id=revision.id,
-        values={"medications": prescription_medications(revision.data), "is_draft": False},
+        db,
+        visit_id=visit.id,
+        emr_record_id=record.id,
+        emr_revision_id=revision.id,
+        values={
+            "medications": prescription_medications(revision.data),
+            "is_draft": False,
+        },
     )
-    return WorkspacePrescription(id=item.id, visit_id=visit.id, emr_version=revision.version, is_draft=item.is_draft)
+    return WorkspacePrescription(
+        id=item.id,
+        visit_id=visit.id,
+        emr_version=revision.version,
+        is_draft=item.is_draft,
+    )

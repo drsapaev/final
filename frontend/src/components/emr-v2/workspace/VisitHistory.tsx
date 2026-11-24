@@ -5,6 +5,7 @@ import {
 } from '@/api/emrWorkspace';
 import { useTranslation } from '@/i18n/useTranslation';
 import { selectEchoMeasurements } from '@/utils/echoMeasurements';
+import { useLabReporting } from '@/hooks/useLabReporting';
 import { Button, Input, Textarea } from '../../ui/macos';
 import { ClinicalSummary } from './ClinicalSummary';
 
@@ -29,9 +30,12 @@ export function FollowUpEditor({
       </label>
       {(value.mode === 'follow_up' || followUpNotes.some(field => value[field])) && (
         <div className="emr-workspace-follow-up">
-          {followUpNotes.map(field => <Textarea key={field} label={t(`emr_workspace.${field}`)}
-            value={value[field] ?? ''} rows={2} maxLength={5000} disabled={disabled}
-            onChange={event => onChange({ ...value, [field]: event.target.value })} />)}
+          {followUpNotes.map(field => <label key={field} className="emr-workspace-field">
+            {t(`emr_workspace.${field}`)}
+            <Textarea value={value[field] ?? ''} rows={2} maxLength={5000} disabled={disabled}
+              aria-label={t(`emr_workspace.${field}`)}
+              onChange={event => onChange({ ...value, [field]: event.target.value })} />
+          </label>)}
         </div>
       )}
       {!!value.transferred_fields?.length && (
@@ -96,7 +100,8 @@ function HistoryDetails({
           <h4>{t(`emr_workspace.${field}`)}</h4>
           <p className="emr-workspace-document-text">{document[field]}</p>
           {!disabled && <label className="emr-workspace-check">
-            <input type="checkbox" checked={chosen.includes(field)} onChange={event => {
+            <input type="checkbox" aria-label={t('emr_workspace.choose_field', { field: t(`emr_workspace.${field}`) })}
+              checked={chosen.includes(field)} onChange={event => {
               setChosen(event.target.checked ? [...chosen, field] : chosen.filter(item => item !== field));
             }} />
             {t('emr_workspace.choose_field', { field: t(`emr_workspace.${field}`) })}
@@ -105,7 +110,8 @@ function HistoryDetails({
       ))}
       {!disabled && <>
         <label className="emr-workspace-check">
-          <input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />
+          <input type="checkbox" aria-label={t('emr_workspace.confirm_today')}
+            checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />
           {t('emr_workspace.confirm_today')}
         </label>
         <Button type="button" size="small" disabled={chosen.length === 0}
@@ -128,6 +134,7 @@ export function WorkspaceSidePanel({
   onFollowUpChange: (value: FollowUp) => void;
 }) {
   const { t } = useTranslation();
+  const labReporting = useLabReporting();
   const [extra, setExtra] = useState<HistorySummary[]>([]);
   const [hasExtra, setHasExtra] = useState<boolean>();
   const [pagination, setPagination] = useState<'loading' | 'error'>();
@@ -136,6 +143,7 @@ export function WorkspaceSidePanel({
   const [document, setDocument] = useState<HistoryDocument>();
   const [historyStatus, setHistoryStatus] = useState<'loading' | 'error'>();
   const [transferLimit, setTransferLimit] = useState(false);
+  const [labDownloadFailed, setLabDownloadFailed] = useState(false);
   const selectionRequest = useRef(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -206,6 +214,7 @@ export function WorkspaceSidePanel({
           <ClinicalSummary workspace={workspace} readOnly={readOnly} reload={reload} />
           <section className="emr-workspace-group">
             <h3>{t('emr_workspace.patient_history')}</h3>
+            {labDownloadFailed && <p role="alert">{t('emr_workspace.load_error')}</p>}
             {workspace.history.length === 0 && <p>{t('emr_workspace.no_history')}</p>}
             <ol className="emr-workspace-list">
               {[...new Map([...workspace.history, ...extra].map(item => [item.id, item])).values()].map((item, index) => (
@@ -215,6 +224,28 @@ export function WorkspaceSidePanel({
                   </Button>
                   {item.complaints && <span>{item.complaints}</span>}
                   {item.diagnosis && <strong>{item.diagnosis}</strong>}
+                  {Boolean(item.laboratory?.length) && <details>
+                    <summary>{t('emr_workspace.previous_labs')}</summary>
+                    <ul>
+                      {item.laboratory.map((value, index) => <li key={`${value.instance_id}:${index}`}>
+                        <span>{value.name} {value.value} {value.unit} {value.abnormal && t('emr_workspace.lab_abnormal')}</span>
+                        <Button type="button" size="small" variant="ghost" onClick={async () => {
+                          setLabDownloadFailed(false);
+                          try {
+                            const blob = await labReporting.downloadPdf(value.instance_id);
+                            const url = URL.createObjectURL(blob);
+                            const link = window.document.createElement('a');
+                            link.href = url;
+                            link.download = `lab-${value.instance_id}.pdf`;
+                            link.click();
+                            window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+                          } catch {
+                            setLabDownloadFailed(true);
+                          }
+                        }}>{t('emr_workspace.lab_report', { id: value.instance_id })}</Button>
+                      </li>)}
+                    </ul>
+                  </details>}
                   {index === 0 && (item.treatment || item.recommendations) && <details open>
                     <summary>{t('emr_workspace.previous_plan')}</summary>
                     {item.treatment && <p className="emr-workspace-document-text">{item.treatment}</p>}
@@ -232,8 +263,10 @@ export function WorkspaceSidePanel({
               <div className="emr-workspace-group">
                 <h4 tabIndex={-1} ref={headingRef}>{t('emr_workspace.source_document')}</h4>
                 <form onSubmit={event => { event.preventDefault(); void openHistory(source, Number(version)); }}>
-                  <Input type="number" label={t('emr_workspace.document_version')} min={1} max={source.version} required
-                    value={version} onChange={event => setVersion(event.target.value)} />
+                  <label className="emr-workspace-field">{t('emr_workspace.document_version')}
+                    <Input type="number" aria-label={t('emr_workspace.document_version')} min={1} max={source.version} required
+                      value={version} onChange={event => setVersion(event.target.value)} />
+                  </label>
                   <Button type="submit" size="small" variant="outline">{t('emr_workspace.open_version')}</Button>
                   <Button type="button" size="small" variant="ghost" onClick={() => {
                     selectionRequest.current += 1;

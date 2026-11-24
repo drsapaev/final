@@ -15,12 +15,13 @@ import i18n from '../../i18n';
  * - Stale warning (давно не использовал)
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { History, Pin, Edit2, Trash2, X, Save, Plus } from 'lucide-react';
 import { useDoctorSectionTemplates, SECTION_LABELS } from '../../hooks/useDoctorSectionTemplates';
 import './DoctorTemplatesPanel.css';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Input, Textarea } from '../ui/macos';
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 /** EMRTEMPL-FE-001 (audit 3886 round 23): module-level style constant —
@@ -51,7 +52,7 @@ export function DoctorTemplatesPanel({
 }: {
     section: string;
     icd10Code?: string | null;
-    onApply?: (text: string) => void;
+    onApply?: (text: string, source?: Record<string, unknown>) => void;
     onClose?: () => void;
     isOpen?: boolean;
 }) {
@@ -65,6 +66,7 @@ export function DoctorTemplatesPanel({
         pinTemplate,
         unpinTemplate,
         updateTemplate,
+        reviewTemplate,
         deleteTemplate,
     } = useDoctorSectionTemplates({ section, icd10Code });
 
@@ -75,14 +77,38 @@ export function DoctorTemplatesPanel({
     // dialog open with the typed revision — never silently discard it.
     const [editError, setEditError] = useState('');
     const [editSaving, setEditSaving] = useState(false);
+    const [search, setSearch] = useState('');
+    const [preview, setPreview] = useState<{ item: Record<string, unknown>; text: string }>();
+    const [reviewBusy, setReviewBusy] = useState(false);
+    const [reviewFailed, setReviewFailed] = useState(false);
+    const previewTextarea = useRef<HTMLTextAreaElement>(null);
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
 
     // Handle template click (apply)
-    const handleApply = useCallback((template: Record<string, unknown>) => {
-        onApply?.(template.template_text as string);
+    const handleApply = useCallback((template: Record<string, unknown>, text = String(template.template_text ?? '')) => {
+        if (!template.reviewed_at || !text.trim()) return;
+        onApply?.(text, {
+            source: 'section_template',
+            templateId: String(template.id),
+            templateRevision: Number(template.template_revision),
+        });
+        setPreview(undefined);
         onClose?.();
     }, [onApply, onClose]);
+
+    async function handleReview(template: Record<string, unknown>) {
+        setReviewFailed(false);
+        setReviewBusy(true);
+        try {
+            await reviewTemplate(String(template.id), Number(template.template_revision), !template.reviewed_at);
+            setPreview(undefined);
+        } catch {
+            setReviewFailed(true);
+        } finally {
+            setReviewBusy(false);
+        }
+    }
 
     // Handle pin toggle
     const handlePinToggle = useCallback(async (template: Record<string, unknown>, e: React.MouseEvent<HTMLElement>) => {
@@ -100,6 +126,8 @@ export function DoctorTemplatesPanel({
         setEditingTemplate(template);
         setEditText(template.template_text as string);
         setEditError('');
+        setPreview(undefined);
+        setSearch('');
     }, []);
 
     // Handle edit save
@@ -146,6 +174,8 @@ export function DoctorTemplatesPanel({
         setEditingTemplate(null);
         setEditText('');
         setEditError('');
+        setPreview(undefined);
+        setSearch('');
         onClose?.();
     }, [onClose]);
 
@@ -215,13 +245,17 @@ export function DoctorTemplatesPanel({
                                     ? t18('misc.dtp_dlya_diagnoza_icd10code', { icd10Code: icd10Code })
                                     : t18('misc.dtp_dlya_etoy_sektsii')}
                             </small>
-                            <small style={{ marginTop: 'var(--mac-spacing-2)', opacity: 0.7 }}>
-                                Шаблоны создаются автоматически при подписании EMR
-                            </small>
+                            <small>{t('emr_workspace.template_learned')}</small>
                         </div>
                     ) : (
                         <div className="doctor-templates-list">
-                            {templates.map((template: unknown) => {
+                            <label className="emr-workspace-field">{t('emr_workspace.template_search')}
+                                <Input aria-label={t('emr_workspace.template_search')} value={search}
+                                    onChange={event => setSearch(event.target.value)} />
+                            </label>
+                            {templates.filter((template: unknown) => String(
+                                (template as Record<string, unknown>).template_text,
+                            ).toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())).map((template: unknown) => {
                                 const tmpl = template as Record<string, unknown>;
                                 return (
                                 <div
@@ -263,7 +297,10 @@ export function DoctorTemplatesPanel({
                                     <button
                                         type="button"
                                         className="doctor-templates-item-content"
-                                        onClick={() => handleApply(tmpl)}
+                                        onClick={() => {
+                                            setReviewFailed(false);
+                                            setPreview({ item: tmpl, text: String(tmpl.template_text ?? '') });
+                                        }}
                                     >
                                         <div className="doctor-templates-item-text">
                                             {(tmpl.template_text as string).substring(0, 200)}
@@ -272,6 +309,9 @@ export function DoctorTemplatesPanel({
 
                                         {/* Badges */}
                                         <div className="doctor-templates-item-badges">
+                                            <span className="doctor-templates-badge">
+                                                {t(tmpl.reviewed_at ? 'emr_workspace.template_reviewed' : 'emr_workspace.template_needs_review')}
+                                            </span>
                                             {Boolean(tmpl.is_stale) && (
                                                 <span className="doctor-templates-badge doctor-templates-badge--stale">
                                                     Давно не использовал
@@ -289,12 +329,45 @@ export function DoctorTemplatesPanel({
                                             )}
                                         </div>
                                     </button>
+                                    {Boolean(tmpl.reviewed_at) && String(tmpl.template_text).length <= 100
+                                      && !/[\n\r]|\{\{/.test(String(tmpl.template_text)) && (
+                                        <Button type="button" size="small" variant="outline" onClick={() => handleApply(tmpl)}>
+                                            {t('emr_workspace.template_quick_insert')}
+                                        </Button>
+                                    )}
                                 </div>
                                 );
                             })}
                         </div>
                     )}
                 </div>
+
+                {preview && <Dialog open onClose={() => setPreview(undefined)} maxWidth="md" fullWidth>
+                    <DialogTitle>{t('emr_workspace.template_preview')}</DialogTitle>
+                    <DialogContent>
+                        <label className="emr-workspace-field">{t('emr_workspace.template_text')}
+                            <Textarea ref={previewTextarea} aria-label={t('emr_workspace.template_text')}
+                                rows={9} value={preview.text} readOnly={!preview.item.reviewed_at}
+                                onChange={event => setPreview({ ...preview, text: event.target.value })} />
+                        </label>
+                        <p>{t(preview.item.reviewed_at ? 'emr_workspace.template_select_help' : 'emr_workspace.template_review_help')}</p>
+                        {reviewFailed && <p role="alert">{t('emr_workspace.save_error')}</p>}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button type="button" size="small" variant="ghost" onClick={() => setPreview(undefined)}>{t('misc.cancel')}</Button>
+                        <Button type="button" size="small" variant="outline" disabled={reviewBusy}
+                            onClick={() => void handleReview(preview.item)}>
+                            {t(preview.item.reviewed_at ? 'emr_workspace.template_revoke' : 'emr_workspace.template_approve')}
+                        </Button>
+                        {Boolean(preview.item.reviewed_at) && <Button type="button" size="small"
+                            disabled={!preview.text.trim() || /\{\{[^}]*\}\}/.test(preview.text)} onClick={() => {
+                                const field = previewTextarea.current;
+                                const selection = field && field.selectionStart !== field.selectionEnd
+                                    ? preview.text.slice(field.selectionStart, field.selectionEnd) : preview.text;
+                                handleApply(preview.item, selection);
+                            }}>{t('emr_workspace.template_insert')}</Button>}
+                    </DialogActions>
+                </Dialog>}
 
                 {/* Edit Modal */}
                 {editingTemplate && (

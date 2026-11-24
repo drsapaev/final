@@ -13,7 +13,7 @@ Endpoints:
 
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
@@ -36,6 +36,28 @@ class MessageResponse(BaseModel):
     """Simple message response"""
     success: bool
     message: str
+
+
+class TemplateReviewRequest(BaseModel):
+    expected_revision: int = Field(gt=0)
+    reviewed: bool = True
+
+
+@router.post("/{section_type}/{template_id}/review", response_model=DoctorSectionTemplateResponse)
+def review_section_template(
+    section_type: SectionType,
+    template_id: str,
+    payload: TemplateReviewRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    service = DoctorSectionTemplatesService(db)
+    template = service.review_template(
+        current_user.id, section_type.value, template_id, payload.expected_revision, payload.reviewed,
+    )
+    if template is None:
+        raise HTTPException(status_code=409, detail="Template unavailable or version changed")
+    return DoctorSectionTemplateResponse.model_validate(template)
 
 
 @router.get(
@@ -172,6 +194,8 @@ async def update_template(
         is_pinned=template.is_pinned,
         last_used_at=template.last_used_at,
         created_at=template.created_at,
+        reviewed_at=template.reviewed_at,
+        template_revision=template.template_revision,
     )
 
 

@@ -67,6 +67,7 @@ PII_FIELD_PATTERNS = [
     "follow_up",
     "transferred_fields",
     "next_action",
+    "laboratory",
     # Visit
     "visit_reason",
     "patient_name",

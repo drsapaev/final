@@ -1,7 +1,7 @@
 """Patient facts and signed visit history for the EMR workspace."""
 
-from datetime import UTC, datetime
 from collections.abc import Callable
+from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -21,6 +21,7 @@ from app.schemas.emr_workspace import (
     TransferredField,
     WorkspaceHistoryDocument,
     WorkspaceHistoryItem,
+    WorkspaceLabValue,
     WorkspaceOut,
     WorkspacePatient,
     WorkspaceVisit,
@@ -54,7 +55,15 @@ def prepare_workspace_document(
         raise WorkspaceError(422, "INVALID_FOLLOW_UP") from None
 
     def key(source: dict) -> tuple:
-        return tuple(source.get(field) for field in ("source_visit_id", "source_version", "field", "confirmed_current"))
+        return tuple(
+            source.get(field)
+            for field in (
+                "source_visit_id",
+                "source_version",
+                "field",
+                "confirmed_current",
+            )
+        )
 
     retained = {}
     prior_transfers = stored.get("transferred_fields")
@@ -95,7 +104,11 @@ def prepare_workspace_document(
             transferred_by=actor_id,
             transferred_at=datetime.now(UTC),
         ).model_dump(mode="json")
-    follow_up = {**stored, **request.model_dump(exclude_unset=True), "transferred_fields": list(verified.values())}
+    follow_up = {
+        **stored,
+        **request.model_dump(exclude_unset=True),
+        "transferred_fields": list(verified.values()),
+    }
     return {**data, "follow_up": follow_up}
 
 
@@ -111,7 +124,9 @@ def get_allergy_state(entries: list[PatientClinicalRevision]) -> AllergyState:
     return "not_checked"
 
 
-def summarize_history(record: EMRRecord, visit: Visit, data: dict, version: int) -> WorkspaceHistoryItem:
+def summarize_history(
+    record: EMRRecord, visit: Visit, data: dict, version: int
+) -> WorkspaceHistoryItem:
     specialty = data.get("specialty_data")
     echo = specialty.get("echo") if isinstance(specialty, dict) else None
     vitals = data.get("vitals")
@@ -136,7 +151,9 @@ class EMRWorkspaceService:
         self.db = db
         self.repository = EMRWorkspaceRepository(db)
 
-    def context(self, visit_id: int, expected_patient_id: int | None) -> tuple[Visit, Patient]:
+    def context(
+        self, visit_id: int, expected_patient_id: int | None
+    ) -> tuple[Visit, Patient]:
         context = self.repository.visit_and_patient(visit_id)
         if context is None:
             raise WorkspaceError(404, "VISIT_NOT_FOUND")
@@ -145,9 +162,34 @@ class EMRWorkspaceService:
             raise WorkspaceError(409, "PATIENT_CONTEXT_CHANGED")
         return visit, patient
 
-    def read(self, visit: Visit, patient: Patient, doctor_id: int | None, offset: int, limit: int) -> WorkspaceOut:
+    def read(
+        self,
+        visit: Visit,
+        patient: Patient,
+        doctor_id: int | None,
+        offset: int,
+        limit: int,
+    ) -> WorkspaceOut:
         entries = self.repository.current_entries(patient.id)
         history = self.repository.prior_documents(visit, doctor_id, limit + 1, offset)
+        history_items = [
+            summarize_history(record, source_visit, record.data, record.version)
+            for record, source_visit in history[:limit]
+        ]
+        items_by_visit = {item.visit_id: item for item in history_items}
+        for visit_id, finalized_at, value in self.repository.history_lab_values(
+            patient.id, list(items_by_visit)
+        ):
+            items_by_visit[visit_id].laboratory.append(
+                WorkspaceLabValue(
+                    instance_id=value.source_instance_id,
+                    name=value.test_name,
+                    value=value.value,
+                    unit=value.unit,
+                    finalized_at=finalized_at,
+                    abnormal=value.abnormal,
+                )
+            )
         return WorkspaceOut(
             patient=WorkspacePatient(
                 id=patient.id,
@@ -156,16 +198,26 @@ class EMRWorkspaceService:
                 legacy_allergies=patient.allergies,
                 legacy_conditions=patient.chronic_conditions,
             ),
-            visit=WorkspaceVisit(id=visit.id, date=visit.visit_date, status=visit.status),
+            visit=WorkspaceVisit(
+                id=visit.id, date=visit.visit_date, status=visit.status
+            ),
             allergy_state=get_allergy_state(entries),
-            clinical_entries=[ClinicalEntryOut.model_validate(entry) for entry in entries],
-            history=[summarize_history(record, source_visit, record.data, record.version) for record, source_visit in history[:limit]],
+            clinical_entries=[
+                ClinicalEntryOut.model_validate(entry) for entry in entries
+            ],
+            history=history_items,
             has_more_history=len(history) > limit,
         )
 
-    def history_document(self, visit: Visit, source_visit_id: int, version: int) -> WorkspaceHistoryDocument:
+    def history_document(
+        self, visit: Visit, source_visit_id: int, version: int
+    ) -> WorkspaceHistoryDocument:
         source, _ = self.context(source_visit_id, visit.patient_id)
-        if source.id == visit.id or (visit.visit_date and source.visit_date and source.visit_date > visit.visit_date):
+        if source.id == visit.id or (
+            visit.visit_date
+            and source.visit_date
+            and source.visit_date > visit.visit_date
+        ):
             raise WorkspaceError(404, "HISTORY_DOCUMENT_NOT_FOUND")
         record = emr_v2_service.get_by_visit(self.db, source.id)
         if record is None or record.patient_id != visit.patient_id:
@@ -176,12 +228,16 @@ class EMRWorkspaceService:
         summary = summarize_history(record, source, revision.data, revision.version)
         return WorkspaceHistoryDocument(**summary.model_dump(), data=revision.data)
 
-    def update(self, visit: Visit, entry_id: UUID, payload: ClinicalEntryWrite, author_id: int) -> ClinicalEntryOut:
+    def update(
+        self, visit: Visit, entry_id: UUID, payload: ClinicalEntryWrite, author_id: int
+    ) -> ClinicalEntryOut:
         if payload.source == "legacy_verified" and not payload.confirmed:
             raise WorkspaceError(422, "LEGACY_REQUIRES_CONFIRMATION")
         self.repository.lock_patient(visit.patient_id)
         entries = self.repository.current_entries(visit.patient_id)
-        previous = next((entry for entry in entries if entry.entry_id == entry_id), None)
+        previous = next(
+            (entry for entry in entries if entry.entry_id == entry_id), None
+        )
         current_version = previous.version if previous else 0
         if payload.expected_version != current_version or (
             previous is None and self.repository.entry_exists(entry_id)
@@ -192,9 +248,16 @@ class EMRWorkspaceService:
         if previous and previous.clinical_details["kind"] != details["kind"]:
             raise WorkspaceError(409, "CLINICAL_ENTRY_KIND_CHANGED")
         if details["kind"] == "allergy_check":
-            if any(entry.clinical_details["kind"] == "allergy_check" and entry.entry_id != entry_id for entry in entries):
+            if any(
+                entry.clinical_details["kind"] == "allergy_check"
+                and entry.entry_id != entry_id
+                for entry in entries
+            ):
                 raise WorkspaceError(409, "ALLERGY_CHECK_EXISTS")
-            if details["status"] == "none_reported" and get_allergy_state(entries) == "specific":
+            if (
+                details["status"] == "none_reported"
+                and get_allergy_state(entries) == "specific"
+            ):
                 raise WorkspaceError(409, "ACTIVE_ALLERGY_EXISTS")
 
         now = datetime.now(UTC)
@@ -207,8 +270,14 @@ class EMRWorkspaceService:
             source=payload.source,
             clinical_details=details,
             recorded_at=now,
-            confirmed_at=now if payload.confirmed else (
-                previous.confirmed_at if previous and previous.clinical_details == details and previous.source == payload.source else None
+            confirmed_at=now
+            if payload.confirmed
+            else (
+                previous.confirmed_at
+                if previous
+                and previous.clinical_details == details
+                and previous.source == payload.source
+                else None
             ),
         )
         try:

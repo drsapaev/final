@@ -25,6 +25,7 @@ export function VisitTab({
   onComplete,
   onCompletionBlocked,
   onGoToAppointments,
+  onOpenStudy,
   getColor,
   getFontSize,
 }: {
@@ -50,6 +51,7 @@ export function VisitTab({
   onComplete: (savedData: Record<string, unknown>) => Promise<void> | void;
   onCompletionBlocked?: () => void;
   onGoToAppointments: () => void;
+  onOpenStudy?: (study: 'ecg' | 'echo') => void;
   getColor: (key: string) => string;
   getFontSize: (key: string) => string;
 }): React.JSX.Element | null {
@@ -155,6 +157,7 @@ export function VisitTab({
           completionBusy={loading}
           onComplete={isCompleted ? undefined : onComplete}
           onCompletionBlocked={onCompletionBlocked}
+          onOpenCardiacStudy={onOpenStudy}
         />
       </Card>
 

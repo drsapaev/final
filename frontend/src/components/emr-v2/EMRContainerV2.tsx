@@ -35,7 +35,7 @@ import { useAppData } from '../../contexts/AppDataContext';
 // ADR-0015: use useMcpClient hook instead of importing api/mcpClient directly.
 import { useMcpClient } from '../../hooks/useMcpClient';
 import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecialty';
-import { readSavedEMRForCompletion, emrTextValue, emrTreatmentText } from './emrCompletion';
+import { readSavedEMRForCompletion, emrTextValue } from './emrCompletion';
 import { assertMedicalAiSafety, hasMedicalAiSafety } from '../../utils/aiSafety';
 // Analytics is handled via handleTelemetry callback
 
@@ -66,6 +66,8 @@ import LabResultsSection from './sections/LabResultsSection';
 import VitalsWidget from './sections/VitalsWidget';
 import { FollowUpEditor, WorkspaceSidePanel } from './workspace/VisitHistory';
 import { PrescriptionAction } from './workspace/PrescriptionAction';
+import { DocumentPreview } from './workspace/DocumentPreview';
+import { FieldDictation } from './workspace/FieldDictation';
 
 import './EMRContainerV2.css';
 import './workspace/EMRWorkspace.css';
@@ -73,7 +75,7 @@ import './workspace/EMRWorkspace.css';
 import { useConfirm } from '../common/ConfirmDialog';
 // QW-03 (UX audit): replace native alert() in Ghost Mode with notify.warning.
 import notify from '../../services/notify';
-import { Button } from '../ui/macos';
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Textarea } from '../ui/macos';
 import logger from '../../utils/logger';
 
 // QW-04 (UX audit): replace emoji toolbar buttons with lucide-react icons
@@ -122,6 +124,7 @@ interface EMRContainerV2Props {
     ICD10Component?: React.ComponentType<Record<string, unknown>> | null;
     onPersisted?: () => void | Promise<void>;
     onDirtyChange?: (dirty: boolean) => void;
+    onOpenCardiacStudy?: (study: 'ecg' | 'echo') => void;
 }
 
 interface EMRDataShape {
@@ -245,7 +248,7 @@ export async function signSavedEMR(actions: {
 }
 
 interface EMRHookResult {
-    emr: { id?: string | number; status?: string } | null;
+    emr: { id?: string | number; visit_id?: number; patient_id?: number; status?: string; data?: Record<string, unknown>; signed_at?: string; signed_by?: number } | null;
     data: EMRDataShape | null;
     status: string;
     isDirty: boolean;
@@ -267,8 +270,8 @@ interface EMRHookResult {
     loadEMR: (forceRefresh?: boolean) => Promise<unknown>;
     saveEMR: (opts?: Record<string, unknown>) => Promise<unknown>;
     signEMR: (opts?: { rowVersion?: number; data?: Record<string, unknown> }) => Promise<unknown>;
-    amendEMR: (reason: string, opts?: Record<string, unknown>) => Promise<unknown>;
-    setField: (field: string, value: unknown) => void;
+    amendEMR: (reason: string, opts?: { data?: Record<string, unknown> }) => Promise<unknown>;
+    setField: (field: string, value: unknown, source?: Record<string, unknown>) => void;
     setNestedField: (path: string, value: unknown) => void;
     undo: () => void;
     redo: () => void;
@@ -287,6 +290,7 @@ export function EMRContainerV2({
     ICD10Component = null,
     onPersisted,
     onDirtyChange,
+    onOpenCardiacStudy,
 }: EMRContainerV2Props) {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
@@ -381,7 +385,7 @@ export function EMRContainerV2({
         saveEMR,
         debounceMs: DEBOUNCE.autosave,
         maxWaitMs: 30000,
-        enabled: !editingDisabled && !accessDenied,
+        enabled: Boolean(emr) && !editingDisabled && !accessDenied,
     });
 
     // RETRO-3971-04 residual (post-merge re-review of 4009): the unmount
@@ -426,6 +430,11 @@ export function EMRContainerV2({
     const [showDiff, setShowDiff] = useState(false);
     const [amendReason, setAmendReason] = useState('');
     const [showAmendForm, setShowAmendForm] = useState(false);
+    const [amendField, setAmendField] = useState<'complaints' | 'examination' | 'recommendations' | 'notes'>('notes');
+    const [amendPatch, setAmendPatch] = useState<Record<string, string>>({});
+    const [amendError, setAmendError] = useState(false);
+    const amending = useRef(false);
+    const [showPreview, setShowPreview] = useState(false);
     const [experimentalGhostMode, setExperimentalGhostMode] = useState(false);
 
     // AI Suggestions state — keyed by EMR field name (examination/diagnosis/treatment).
@@ -754,9 +763,9 @@ export function EMRContainerV2({
     };
 
     // Field change handlers
-    const handleFieldChange = useCallback((field: string) => (value: unknown) => {
-        setField(field, value);
-    }, [setField]);
+    const handleFieldChange = useCallback((field: string) => (value: unknown, source?: Record<string, unknown>) => {
+        if (!editingDisabled && signingScopeRef.current !== completionScopeRef.current) setField(field, value, source);
+    }, [editingDisabled, setField]);
 
     const handleNestedFieldChange = useCallback((path: string) => (value: unknown) => {
         setNestedField(path, value);
@@ -950,7 +959,7 @@ export function EMRContainerV2({
     // a skeleton stack mirroring the section layout instead of empty clinical
     // fields. Subsequent saves/refreshes keep the real sections mounted
     // (autosave must not flash skeletons over a doctor's in-progress input).
-    if (isLoading && !data) {
+    if ((!emr && !error) || (emr?.visit_id != null && String(emr.visit_id) !== String(visitId))) {
         return (
             <div className="emr-v2-container">
                 <div className="emr-v2-main">
@@ -959,17 +968,29 @@ export function EMRContainerV2({
             </div>
         );
     }
+    if (emr?.patient_id != null && patientId != null && String(emr.patient_id) !== String(patientId)) {
+        return <div className="emr-v2-container" role="alert">{t('emr_workspace.patient_context_changed')}</div>;
+    }
 
     const handleAmend = async () => {
-        // EMRAMEND-FE-001 (audit 3886 round 17): the guard must NOT use
-        // `editingDisabled` — that flag contains `isSigned`/`isAmended` by
-        // definition of the amendment workflow, so the old check made this
-        // handler unreachable dead code. Only true blockers apply.
-        if (isReadOnly || isPreparingCompletion || completionBusy) return;
-        if (amendReason.trim().length >= 10) {
-            await amendEMR(amendReason);
+        if (!amendAllowed || isSaving || amending.current || amendReason.trim().length < 10 || !data) return;
+        const scope = completionScopeRef.current;
+        amending.current = true;
+        setAmendError(false);
+        try {
+            const result = await amendEMR(amendReason, { data: { ...data, ...amendPatch } });
+            if (!scope.active) return;
+            if (isRejectedEMRWrite(result)) {
+                setAmendError(true);
+                return;
+            }
             setShowAmendForm(false);
             setAmendReason('');
+            await refreshParentStatus();
+        } catch {
+            if (scope.active) setAmendError(true);
+        } finally {
+            amending.current = false;
         }
     };
 
@@ -1099,49 +1120,26 @@ export function EMRContainerV2({
                     <Button variant="ghost" size="small" onClick={() => { void handleToolbarRefresh(); }} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
                         <RefreshCw size={14} aria-hidden="true" /> {t('misc.emr_refresh')}
                     </Button>
+                    <Button type="button" variant="outline" size="small" disabled={!data || accessDenied}
+                      onClick={() => setShowPreview(true)}>{t('emr_workspace.preview')}</Button>
                 </div>
 
                 <div className="emr-workspace-layout">
                 <div className="emr-v2-sections">
                     <section className="emr-workspace-visit-section" aria-label={t('emr_workspace.today_vitals')}>
                         <h3>{t('emr_workspace.today_vitals')}</h3>
-                        <VitalsWidget vitals={data?.vitals || {}} onChange={handleFieldChange('vitals')} disabled={editingDisabled} />
+                        <VitalsWidget vitals={data?.vitals || {}} onChange={handleFieldChange('vitals')}
+                            disabled={editingDisabled} collapseAdditional />
                     </section>
                     <FollowUpEditor value={followUp} disabled={editingDisabled}
                         onChange={handleFieldChange('follow_up')} />
-                    {/* UX Audit Doctor M-48: progress indicator for EMR sections. */}
-                    {(() => {
-                        const sections = [
-                            { name: t('misc.emr_sec_complaints'), filled: emrTextValue(data?.complaints).trim() !== '' },
-                            { name: t('misc.emr_sec_anamnesis'), filled: emrTextValue(data?.anamnesis_morbi).trim() !== '' },
-                            { name: t('misc.emr_sec_examination'), filled: emrTextValue(data?.examination).trim() !== '' },
-                            { name: t('misc.emr_sec_diagnosis'), filled: emrTextValue(data?.diagnosis).trim() !== '' },
-                            // EMRTREAT-FE-001 (audit 3886): the treatment row counts
-                            // the CANONICAL treatment text (treatment →
-                            // medications.text → plan.treatment, mirroring the
-                            // backend's get_emr_text_field chain) — the visible
-                            // TreatmentSection editor is bound to
-                            // medications.text, so a genuine treatment plan typed
-                            // there must mark «Лечение» as filled.
-                            { name: t('misc.emr_sec_treatment'), filled: emrTreatmentText(data) !== '' },
-                            { name: t('misc.emr_sec_recommendations'), filled: emrTextValue(data?.recommendations).trim() !== '' },
-                            { name: t('misc.emr_sec_notes'), filled: emrTextValue(data?.notes).trim() !== '' },
-                        ];
-                        const filledCount = sections.filter(s => s.filled).length;
-                        return (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
-                                <span>{t('misc.emr_filled', { filled: filledCount, total: sections.length })}</span>
-                                <div style={{ flex: 1, maxWidth: '200px', height: '6px', borderRadius: '3px', background: 'var(--mac-bg-tertiary)' }}>
-                                    <div style={{ width: `${(filledCount / sections.length) * 100}%`, height: '100%', borderRadius: '3px', background: 'var(--mac-success)', transition: 'width 0.3s ease' }} />
-                                </div>
-                                {sections.filter(s => !s.filled).length > 0 && (
-                                    <span style={{ fontSize: '12px' }}>
-                                        {t('misc.emr_remaining', { sections: sections.filter(s => !s.filled).map(s => s.name).join(', ') })}
-                                    </span>
-                                )}
-                            </div>
-                        );
-                    })()}
+                    {onComplete && !isReadOnly && (
+                      <section className="emr-workspace-visit-section" aria-label={t('emr_workspace.readiness')}>
+                        <h3>{t('emr_workspace.readiness')}</h3>
+                        <p>{t(isDirty || !emr?.id || savedEMRStatus === 'draft'
+                          ? 'emr_workspace.save_before_finish' : 'emr_workspace.ready_for_finish')}</p>
+                      </section>
+                    )}
                     {/* Phase 4+ cognitive load reduction: sections are collapsible.
                         Default-open: Complaints + Examination + Diagnosis (the 3
                         sections a doctor fills on every visit).
@@ -1155,6 +1153,10 @@ export function EMRContainerV2({
                         doctorId={doctorId}
                         specialty={canonicalSpecialty}
                     />
+                    <FieldDictation key={workspaceState.scope} disabled={editingDisabled || accessDenied}
+                        onInsert={text => handleFieldChange('complaints')(
+                            [emrTextValue(data?.complaints).trimEnd(), text].filter(Boolean).join('\n'),
+                        )} />
 
                     <AnamnesisMorbiSection
                         value={data?.anamnesis_morbi}
@@ -1205,10 +1207,10 @@ export function EMRContainerV2({
 
                     <TreatmentSection
                         value={data?.medications?.text || ''}
-                        onChange={(text) => handleFieldChange('medications')({
+                        onChange={(text, source) => handleFieldChange('medications')({
                             ...(data?.medications || {}),
                             text
-                        })}
+                        }, source)}
                         medications={data?.medications?.list || []}
                         onMedicationsChange={(list) => handleFieldChange('medications')({
                             ...(data?.medications || {}),
@@ -1274,6 +1276,7 @@ export function EMRContainerV2({
                             ecgData={(data?.specialty_data?.ecg as Record<string, unknown>) || {}}
                             echoData={(data?.specialty_data?.echo as Record<string, unknown>) || {}}
                             labResults={(data?.specialty_data?.cardio_labs as Record<string, unknown>) || {}}
+                            onOpenStudy={onOpenCardiacStudy}
                             onChange={(field, value) => handleFieldChange('specialty_data')({
                                 ...(data?.specialty_data || {}),
                                 [field]: value
@@ -1396,42 +1399,16 @@ export function EMRContainerV2({
                                 <CheckCircle2 size={14} aria-hidden="true" /> {t('misc.emr_signed')} {isAmended && t('misc.emr_with_amendments')}
                             </div>
 
-                            {!showAmendForm ? (
-                                <button
-                                    className="emr-v2-btn emr-v2-btn--warning"
-                                    onClick={() => setShowAmendForm(true)}
-                                    disabled={!amendAllowed || isSaving}
-                                    aria-label={t('misc.emr_amend_aria')}
-                                >
-                                    <FilePenLine size={14} aria-hidden="true" /> {t('misc.emr_amend')}
-                                </button>
-                            ) : (
-                                <div className="emr-v2-amend-form">
-                                    <textarea
-                                        aria-label={t('misc.emr_amend_reason_aria')}
-                                        value={amendReason}
-                                        onChange={(e) => setAmendReason(e.target.value)}
-                                        placeholder={t('misc.emr_amend_reason_ph')}
-                                        disabled={!amendAllowed}
-                                    />
-                                    <div className="emr-v2-amend-actions">
-                                        <button
-                                            className="emr-v2-btn emr-v2-btn--primary"
-                                            onClick={handleAmend}
-                                            disabled={amendReason.trim().length < 10 || !amendAllowed || isSaving}
-                                        >
-                                            {t('misc.emr_save')}
-                                        </button>
-                                        <button
-                                            className="emr-v2-btn"
-                                            onClick={() => setShowAmendForm(false)}
-                                            disabled={!amendAllowed}
-                                        >
-                                            {t('misc.cancel')}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            <button className="emr-v2-btn emr-v2-btn--warning" type="button"
+                                onClick={() => {
+                                    setAmendField('notes');
+                                    setAmendPatch({});
+                                    setAmendReason('');
+                                    setAmendError(false);
+                                    setShowAmendForm(true);
+                                }} disabled={!amendAllowed || isSaving} aria-label={t('misc.emr_amend_aria')}>
+                                <FilePenLine size={14} aria-hidden="true" /> {t('misc.emr_amend')}
+                            </button>
                         </>
                     )}
                     {!isReadOnly && onComplete && (
@@ -1458,6 +1435,46 @@ export function EMRContainerV2({
                     )}
                 </div>
             </div>
+
+            {showPreview && data && (
+                <DocumentPreview visitId={visitId} patientId={patientId} patientName={patientName}
+                    workspace={workspace} version={version} signedAt={emr?.signed_at} signedBy={emr?.signed_by}
+                    status={emr?.status} dirty={isDirty} data={isSigned || isAmended ? emr?.data ?? data : data}
+                    onClose={() => setShowPreview(false)} />
+            )}
+            {showAmendForm && (
+                <Dialog open onClose={() => { if (!isSaving) setShowAmendForm(false); }} fullWidth maxWidth="md">
+                    <DialogTitle>{t('misc.emr_amend')}</DialogTitle>
+                    <DialogContent>
+                        <label>{t('emr_workspace.amend_field')}
+                            <select value={amendField} disabled={isSaving} onChange={event => {
+                                const field = event.target.value as typeof amendField;
+                                setAmendField(field);
+                            }}>
+                                {['notes', 'complaints', 'examination', 'recommendations'].map(field => (
+                                    <option key={field} value={field}>{t(`emr_workspace.${field}`)}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="emr-workspace-field">{t(`emr_workspace.${amendField}`)}
+                            <Textarea value={amendPatch[amendField] ?? emrTextValue(data?.[amendField])} rows={5} disabled={isSaving}
+                                aria-label={t(`emr_workspace.${amendField}`)}
+                                onChange={event => setAmendPatch({ ...amendPatch, [amendField]: event.target.value })} />
+                        </label>
+                        <label className="emr-workspace-field">{t('misc.emr_amend_reason_aria')}
+                            <Textarea aria-label={t('misc.emr_amend_reason_aria')} value={amendReason} maxLength={1000}
+                                rows={3} disabled={isSaving} onChange={event => setAmendReason(event.target.value)} />
+                        </label>
+                        {amendError && <p role="alert">{t('emr_workspace.save_error')}</p>}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button type="button" variant="ghost" disabled={isSaving}
+                            onClick={() => setShowAmendForm(false)}>{t('misc.cancel')}</Button>
+                        <Button type="button" disabled={amendReason.trim().length < 10 || isSaving || !amendAllowed}
+                            onClick={() => void handleAmend()}>{t('common.save')}</Button>
+                    </DialogActions>
+                </Dialog>
+            )}
 
             {/* History sidebar */}
             {renderHistoryPanel()}

@@ -66,6 +66,14 @@ const syncCachePrincipal = (): void => {
     }
 };
 
+export function invalidateEMRCache(visitId: string | number) {
+    syncCachePrincipal();
+    const prefix = `${emrCachePrincipal ?? 'anonymous'}:${visitId}:`;
+    for (const key of emrCache.keys()) {
+        if (key.startsWith(prefix)) emrCache.delete(key);
+    }
+}
+
 const isAccessDeniedStatus = (status: EMRHttpStatus | undefined) => status === 401 || status === 403;
 
 const getAccessDeniedMessage = (error?: EMRApiError): string => {
@@ -595,7 +603,8 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     // =========================================================================
     // AMEND EMR
     // =========================================================================
-    const amendEMR = useCallback(async (reason: string) => {
+    const amendEMR = useCallback(async (reason: string, options: { data?: Record<string, unknown> } = {}) => {
+        if (visitIdentityRef.current !== visitId || draftSaveEpochRef.current === visitEpochRef.current) return null;
         if (!reason || reason.trim().length < 10) {
             const error = 'Причина поправки должна быть не менее 10 символов';
             dispatch(emrActions.saveError(error));
@@ -621,7 +630,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         try {
             const payload = {
                 // EMRSIGN-FE-001: amendments serialize the live document too.
-                data: normalizeEMRData(stateRef.current.data, specialty),
+                data: normalizeEMRData(options.data ?? stateRef.current.data, specialty),
                 reason: reason.trim(),
                 row_version: stateRef.current.rowVersion,
             };
@@ -638,7 +647,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
                 // RETRO-4007-01: the reasoned amendment landed — the amended
                 // server record supersedes the stale-local window.
                 clearServerFinalized();
-                dispatch(emrActions.saveSuccess(response.data));
+                dispatch(emrActions.load({ ...response.data, data: normalizeEMRData(response.data?.data, specialty) }));
             }
             return response.data;
         } catch (error) {
@@ -701,8 +710,8 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     // =========================================================================
     // FIELD SETTERS
     // =========================================================================
-    const setField = useCallback((field: string, value: unknown) => {
-        dispatch(emrActions.setField(field, value));
+    const setField = useCallback((field: string, value: unknown, source?: Record<string, unknown>) => {
+        dispatch(emrActions.setField(field, value, source));
     }, []);
 
     const setNestedField = useCallback((path: string, value: unknown) => {

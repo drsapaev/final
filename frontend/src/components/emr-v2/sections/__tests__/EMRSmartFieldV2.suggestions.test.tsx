@@ -163,17 +163,16 @@ describe('EMRAI-FE-003: dismissed suggestions disappear and stay dismissed', () 
         expect(onChange.mock.calls[0][0]).toContain('S-one');
     });
 
-    it('C14 (control): Tab in the focused field still accepts the first visible suggestion', () => {
+    it('C14 (control): Tab leaves the draft unchanged', () => {
         const { onChange } = renderField();
         focusField();
 
-        fireEvent.keyDown(document, { key: 'Tab' });
+        fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Tab' });
 
-        expect(onChange).toHaveBeenCalledTimes(1);
-        expect(onChange.mock.calls[0][0]).toContain('S-one');
+        expect(onChange).not.toHaveBeenCalled();
     });
 
-    it('C15 (control): Tab accepts the first suggestion after another was dismissed', async () => {
+    it('C15 (control): Alt+Enter accepts the first visible suggestion after a dismissal', async () => {
         const { onChange } = renderField();
         focusField();
 
@@ -182,7 +181,7 @@ describe('EMRAI-FE-003: dismissed suggestions disappear and stay dismissed', () 
             expect(screen.queryByText('S-one')).not.toBeInTheDocument();
         });
 
-        fireEvent.keyDown(document, { key: 'Tab' });
+        fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', altKey: true });
 
         expect(onChange).toHaveBeenCalledTimes(1);
         expect(onChange.mock.calls[0][0]).toContain('S-two');

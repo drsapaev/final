@@ -26,6 +26,7 @@ import './CardiologySection.css';
 import { Heart, FileText } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
 import { selectEchoMeasurements } from '@/utils/echoMeasurements';
+import { Button } from '../../../ui/macos';
 
 /**
  * CardiologySection Component
@@ -45,6 +46,7 @@ interface CardiologySectionProps {
   disabled?: boolean;
   visitId?: string | number | null | undefined;
   patientId?: string | number | null | undefined;
+  onOpenStudy?: (study: 'ecg' | 'echo') => void;
 }
 
 
@@ -54,6 +56,7 @@ export function CardiologySection({
   labResults: labResultsRaw = {},
   onChange,
   disabled = false,
+  onOpenStudy,
 }: CardiologySectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
   const ecgData = ecgDataRaw as Record<string, any>;
@@ -123,6 +126,8 @@ export function CardiologySection({
                                 <p>
                                     {t('misc.cs_ecg_separate_tab_desc')}
                                 </p>
+                                {onOpenStudy && <Button type="button" size="small" variant="outline"
+                                    onClick={() => onOpenStudy('ecg')}>{t('emr_workspace.open_ecg')}</Button>}
                             </div>
                         </div>
 
@@ -173,6 +178,8 @@ export function CardiologySection({
                                 <p>
                                     {t('misc.cs_echo_separate_tab_desc')}
                                 </p>
+                                {onOpenStudy && <Button type="button" size="small" variant="outline"
+                                    onClick={() => onOpenStudy('echo')}>{t('emr_workspace.open_echo')}</Button>}
                             </div>
                         </div>
 

@@ -2064,6 +2064,8 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
 
   // Keep this dynamic JSX slot as `any`; narrowing its inferred result to a
   // ReactNode currently makes the legacy parent fail strict child checking.
+  const [focusStudy, setFocusStudy] = useState<'ecg' | 'echo'>();
+
   const cardiologyQueuePanel: any = activeTab === 'queue'
     ? createElement(CardiologyQueueTab, {
       onStartVisit: handleDoctorQueueStartVisit,
@@ -2140,6 +2142,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
                 onComplete={handleCompleteVisitFromEMR}
                 onCompletionBlocked={handleEMRCompletionBlocked}
                 onGoToAppointments={() => goToTab('patients')}
+                onOpenStudy={study => goToTab('ecg', () => setFocusStudy(study))}
                 getColor={getColor}
                 getFontSize={getFontSize}
               />
@@ -2152,6 +2155,8 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
               <EcgTab
                 selectedPatient={selectedPatient}
                 onAddEcg={() => setShowForm({ open: true, type: 'ecg' })}
+                focusStudy={focusStudy}
+                onReturn={() => goToTab('visit', () => setFocusStudy(undefined))}
                 onDataUpdate={loadPatientData}
                 getSpacing={getSpacing}
               />

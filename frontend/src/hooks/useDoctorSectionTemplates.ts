@@ -611,6 +611,13 @@ export function useDoctorSectionTemplates({
      * Delete a template
      * @param {string} templateId
      */
+    const reviewTemplate = useCallback(async (templateId: string, revision: number, reviewed: boolean) => {
+        await apiClient.post(`/section-templates/${section}/${templateId}/review`, {
+            expected_revision: revision, reviewed,
+        }, { silent: true });
+        await liveFetchRef.current?.(true);
+    }, [section]);
+
     const deleteTemplate = useCallback(async (templateId: string) => {
         try {
             await apiClient.delete(`/section-templates/${section}/${templateId}`);
@@ -635,6 +642,7 @@ export function useDoctorSectionTemplates({
         pinTemplate,
         unpinTemplate,
         updateTemplate,
+        reviewTemplate,
         deleteTemplate,
 
         // Metadata

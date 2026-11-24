@@ -148,6 +148,11 @@
     align-items: flex-start;
 }
 
+.emr-workspace-field {
+    display: grid;
+    gap: var(--mac-spacing-1);
+}
+
 .emr-workspace-document-text {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -189,5 +194,52 @@
 
     .emr-workspace-visit-section .emr-vitals__row {
         flex-wrap: wrap;
+    }
+}
+
+.emr-workspace-print > section {
+    padding-block: var(--mac-spacing-2);
+    border-top: 1px solid var(--mac-separator);
+}
+
+.emr-workspace-print h3 {
+    margin-bottom: var(--mac-spacing-1);
+}
+
+.emr-workspace-preview-body {
+    max-block-size: 60vh;
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+@media print {
+    body:has([data-emr-print]) :not(:has([data-emr-print]), [data-emr-print], [data-emr-print] *) {
+        display: none !important;
+    }
+
+    body:has([data-emr-print]) :has([data-emr-print]) {
+        position: static !important;
+        display: block !important;
+        overflow: visible !important;
+        max-width: none !important;
+        max-height: none !important;
+        max-block-size: none !important;
+        height: auto !important;
+        transform: none !important;
+    }
+
+    [data-emr-print], [data-emr-print] * {
+        visibility: visible !important;
+        color: #000 !important;
+    }
+
+    [data-emr-print] {
+        background: #fff;
+        padding: var(--mac-spacing-6);
+    }
+
+    [data-emr-print] h2,
+    [data-emr-print] h3 {
+        break-after: avoid;
     }
 }

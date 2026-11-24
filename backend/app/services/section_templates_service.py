@@ -242,6 +242,8 @@ class DoctorSectionTemplatesService:
                 is_stale=is_stale(t.last_used_at),
                 last_used_at=t.last_used_at,
                 created_at=t.created_at,
+                reviewed_at=t.reviewed_at,
+                template_revision=t.template_revision,
             )
             for t in templates
         ]
@@ -361,6 +363,23 @@ class DoctorSectionTemplatesService:
             self.db.rollback()
             return False, str(e)
 
+    def review_template(
+        self, doctor_id: int, section_type: str, template_id: str, expected_revision: int, reviewed: bool,
+    ) -> DoctorSectionTemplate | None:
+        template = self.db.execute(
+            select(DoctorSectionTemplate).where(
+                DoctorSectionTemplate.id == template_id,
+                DoctorSectionTemplate.doctor_id == doctor_id,
+                DoctorSectionTemplate.section_type == section_type,
+            ).with_for_update()
+        ).scalar_one_or_none()
+        if template is None or template.template_revision != expected_revision:
+            return None
+        template.reviewed_at = (template.reviewed_at or datetime.now(UTC)) if reviewed else None
+        self.db.commit()
+        self.db.refresh(template)
+        return template
+
     def update_template(
         self,
         doctor_id: int,
@@ -392,7 +411,7 @@ class DoctorSectionTemplatesService:
                     DoctorSectionTemplate.id == template_id,
                     DoctorSectionTemplate.doctor_id == doctor_id,
                 )
-            )
+            ).with_for_update()
             result = self.db.execute(stmt)
             original = result.scalar_one_or_none()
 
@@ -403,6 +422,9 @@ class DoctorSectionTemplatesService:
 
             if mode == "replace":
                 # Update existing template
+                if original.template_text != new_text.strip():
+                    original.template_revision += 1
+                    original.reviewed_at = None
                 original.template_text = new_text.strip()
                 original.template_hash = new_hash
                 original.last_used_at = datetime.now(UTC)

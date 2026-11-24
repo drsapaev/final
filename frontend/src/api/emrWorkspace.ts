@@ -42,6 +42,10 @@ export interface HistorySummary {
   recommendations: string;
   vitals: Record<string, unknown>;
   echo: Record<string, unknown>;
+  laboratory: {
+    instance_id: number; name: string; value: string; unit: string | null;
+    finalized_at: string | null; abnormal: boolean;
+  }[];
 }
 
 export interface HistoryDocument extends HistorySummary {

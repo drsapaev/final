@@ -20,10 +20,12 @@ export function LabWorkspaceState({
     <Button type="button" size="small" variant="outline" onClick={retry}>{t('emr_workspace.retry')}</Button>
   </div>;
   if (!labs) return <p role="status">{t('emr_workspace.loading')}</p>;
+  const isPending = (report: WorkspaceLabReport) => !['FINALIZED', 'PRINTED'].includes(report.status);
   const pendingOrders = labs.orders.filter(order =>
-    order.status === 'ordered' || order.status === 'in_progress'
-    || order.reports.some(report => !report.finalized_at));
-  const pendingUnlinked = labs.unlinked_reports.filter(report => !report.finalized_at);
+    order.status !== 'canceled' && (
+      order.status === 'ordered' || order.status === 'in_progress' || order.reports.some(isPending)
+    ));
+  const pendingUnlinked = labs.unlinked_reports.filter(isPending);
   const renderReport = (report: WorkspaceLabReport) => (
     <li key={report.id}>
       {report.template_name} · {t('emr_workspace.lab_report', { id: report.id })} · {status(report.status)}
@@ -41,10 +43,16 @@ export function LabWorkspaceState({
       <ul className="emr-workspace-list">
         {pendingOrders.map(order => <li key={order.id} className="emr-workspace-entry">
           <strong>{t('emr_workspace.lab_order', { id: order.id })} · {status(order.status)}</strong>
-          <ul>{order.reports.filter(report => !report.finalized_at).map(renderReport)}</ul>
+          <ul>{order.reports.filter(isPending).map(renderReport)}</ul>
         </li>)}
         {pendingUnlinked.map(renderReport)}
       </ul>
+      {labs.orders.some(order => order.status === 'canceled') && <details>
+        <summary>{t('emr_workspace.canceled_lab_orders')}</summary>
+        <ul>{labs.orders.filter(order => order.status === 'canceled').map(order => (
+          <li key={order.id}>{t('emr_workspace.lab_order', { id: order.id })} · {status(order.status)}</li>
+        ))}</ul>
+      </details>}
       {labs.executions.length > 0 && <details className="emr-workspace-group">
         <summary>{t('emr_workspace.service_executions')}</summary>
         <ul>
@@ -103,8 +111,10 @@ export function LabVersionReview({
       {report.is_current_final && report.reviews.length === 0 && <p>{t('emr_workspace.lab_unreviewed')}</p>}
       {report.is_current_final && !alreadyReviewed && reviewerId && (
         <form onSubmit={event => { event.preventDefault(); void submitReview(); }}>
-          <Input label={t('emr_workspace.lab_next_action')} value={nextAction} disabled={busy}
-            maxLength={500} onChange={event => setNextAction(event.target.value)} />
+          <label className="emr-workspace-field">{t('emr_workspace.lab_next_action')}
+            <Input aria-label={t('emr_workspace.lab_next_action')} value={nextAction} disabled={busy}
+              maxLength={500} onChange={event => setNextAction(event.target.value)} />
+          </label>
           <Button type="submit" size="small" variant="outline" disabled={busy}>
             {t(busy ? 'emr_workspace.saving' : 'emr_workspace.lab_review')}
           </Button>

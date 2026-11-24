@@ -43,7 +43,7 @@ const MEDICAL_PII_KEYS = [
   'diagnosis', 'diagnoses', 'icd10', 'icd10_codes', 'complaints', 'complaint',
   'examination', 'prescription', 'medications', 'allergies',
   'clinical_entries', 'clinical_details', 'legacy_allergies', 'legacy_conditions',
-  'follow_up', 'transferred_fields', 'next_action',
+  'follow_up', 'transferred_fields', 'next_action', 'laboratory',
   'medical_history', 'symptoms', 'treatment', 'lab_results', 'blood_type',
   // Visit
   'visit_reason', 'patient_name', 'patient_id', 'doctor_notes',

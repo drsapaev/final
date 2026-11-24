@@ -28,7 +28,8 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from 'react';
 import type { HttpApiError } from '../../types/errors';
-import { normalizeEchoForEditor } from '../../utils/echoMeasurements';
+import { echoMeasurementFacts, normalizeEchoForEditor } from '../../utils/echoMeasurements';
+import { invalidateEMRCache } from '../../hooks/useEMR';
 
 // === Domain types ===
 // EchoForm tracks echocardiography measurements grouped by anatomical
@@ -63,6 +64,13 @@ export interface EchoData {
     comments: string;
   };
   conclusion: string;
+  measurement_metadata?: {
+    ef_method?: string;
+    measured_at?: string;
+    recorded_at?: string;
+    source_visit_id?: string | number | null;
+    definition_version?: number;
+  };
   [key: string]: unknown;
 }
 
@@ -194,15 +202,21 @@ async function loadExistingEmrDraft(visitId: string | number | null | undefined)
   }
 }
 
-function buildEchoEmrPayload(existingEmr: Record<string, unknown> | null, echoData: EchoData) {
+function buildEchoEmrPayload(existingEmr: Record<string, unknown> | null, echoData: EchoData, visitId: string | number) {
   const currentData = (existingEmr?.data as Record<string, unknown>) || {};
+  const metadata = {
+    ...echoData.measurement_metadata,
+    recorded_at: new Date().toISOString(),
+    source_visit_id: visitId,
+    definition_version: 1,
+  };
   return {
     data: {
       ...currentData,
       specialty: currentData.specialty || 'cardiology',
       specialty_data: {
         ...((currentData.specialty_data as Record<string, unknown>) || {}),
-        echo: echoData
+        echo: { ...echoData, measurement_metadata: metadata }
       }
     },
     row_version: existingEmr?.row_version ?? 0,
@@ -231,6 +245,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   // replaced `specialty_data.echo` with the local state — an untouched
   // Save could wipe stored EF/EDD/conclusion with a blank revision.
   const [hydrating, setHydrating] = useState(false);
+  const [readOnly, setReadOnly] = useState(false);
   const [info, setInfo] = useState('');
   const dirtyRef = useRef(false);
   const formEpochRef = useRef(0);
@@ -302,9 +317,11 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
     setSuccess('');
     setError('');
     setHydrationFailed(false);
+    setReadOnly(false);
     loadExistingEmrDraft(visitId)
       .then((existing) => {
         if (epoch !== formEpochRef.current) return; // visit switched mid-flight
+        setReadOnly(['signed', 'amended', 'locked'].includes(String(existing?.status)));
         const storedData = (existing as Record<string, unknown> | null)?.data as Record<string, unknown> | undefined;
         const specialtyData = storedData?.specialty_data as Record<string, unknown> | undefined;
         const storedEcho = specialtyData?.echo;
@@ -370,6 +387,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   }, [visitId, initialData, hydrationAttempt]);
 
   const handleChange = (section: string, field: string, value: unknown) => {
+    if (readOnly) return;
     dirtyRef.current = true;
     editEpochRef.current += 1; // RETRO-3941-03: count every edit
     // RETRO-3947-01: edits typed while the canonical EMR state is unknown
@@ -397,6 +415,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   };
 
   const handleSave = async () => {
+    if (readOnly) return;
     const epoch = formEpochRef.current;
     // RETRO-3941-03: snapshot the edit counter at submission start. If the
     // doctor edits while the GET/POST is in flight, the request persists
@@ -439,11 +458,12 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         return;
       }
 
-      const response = await api.post(`/v2/emr/${visitId}`, buildEchoEmrPayload(existingEmr, echoData));
+      const response = await api.post(`/v2/emr/${visitId}`, buildEchoEmrPayload(existingEmr, echoData, visitId));
 
       if (epoch !== formEpochRef.current) return; // visit switched mid-save
 
       if (response.status === 200) {
+        invalidateEMRCache(visitId);
         if (editEpochRef.current !== editEpochAtSubmit) {
           // RETRO-3941-03: edits happened after the submission started. The
           // POST persisted the submitted snapshot, NOT the values now on
@@ -457,8 +477,12 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         // The server-side state now matches the form: reset dirty tracking.
         dirtyRef.current = false;
         setSuccess(t('cardio.cardio_echo_saved_success'));
+        const savedEcho = response.data?.data?.specialty_data?.echo;
+        if (savedEcho && typeof savedEcho === 'object') {
+          applyEchoData(deepMerge(DEFAULT_ECHO_DATA, normalizeEchoForEditor(savedEcho)) as EchoData);
+        }
         if (onSave) {
-          onSave(response.data?.data?.specialty_data?.echo || echoData);
+          onSave(savedEcho || echoData);
         }
         onDataUpdate?.();
       }
@@ -517,6 +541,8 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         <div key={field.key}>
                 <Input
             label={field.label}
+            readOnly={readOnly}
+            inputMode={section === 'additional' ? 'text' : 'decimal'}
             value={getNestedValue(echoData[section], field.key)}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange(section, field.key, e.target.value)}
             placeholder={field.placeholder} />
@@ -546,7 +572,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={loading || hydrating || hydrationFailed}>
+              disabled={readOnly || loading || hydrating || hydrationFailed}>
               
               <Save style={{ width: 16, height: 16, marginRight: 8 }} />
               {hydrating ? t('cardio.cardio_echo_loading_existing') : t('cardio.cardio_echo_save_button')}
@@ -666,12 +692,24 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         </div>
 
         {/* Заключение */}
+        <Input label={t('emr_workspace.ef_method')}
+          value={echoData.measurement_metadata?.ef_method ?? ''} maxLength={120} readOnly={readOnly}
+          onChange={event => handleChange('measurement_metadata', 'ef_method', event.target.value)} />
+        <Input label={t('emr_workspace.measurement_date')} type="date" readOnly={readOnly}
+          value={echoData.measurement_metadata?.measured_at ?? ''}
+          onChange={event => handleChange('measurement_metadata', 'measured_at', event.target.value)} />
+        {echoMeasurementFacts(echoData).find(fact => fact.key === 'ef')?.recordedAt && (
+          <p>{t('emr_workspace.measurement_recorded', {
+            date: new Date(echoData.measurement_metadata?.recorded_at ?? '').toLocaleString(),
+          })}</p>
+        )}
         <div style={{ marginTop: 24 }}>
           <Typography variant="subtitle1" style={{ marginBottom: 8 }}>
             {t('cardio.cardio_echo_conclusion_title')}
           </Typography>
           <Textarea
             value={echoData.conclusion}
+            readOnly={readOnly}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               dirtyRef.current = true;
               editEpochRef.current += 1; // RETRO-3941-03: count every edit

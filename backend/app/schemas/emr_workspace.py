@@ -7,7 +7,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
-NamedClinicalValue = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240)]
+NamedClinicalValue = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240)
+]
 ClinicalSource = Literal["clinician", "patient_report", "legacy_verified"]
 TransferField = Literal["complaints", "diagnosis", "treatment", "recommendations"]
 AllergyState = Literal["specific", "none_reported", "unknown", "not_checked"]
@@ -57,7 +59,10 @@ class AllergyCheckFact(DatedClinicalFact):
     status: Literal["none_reported", "unknown", "not_checked"]
 
 
-ClinicalFact = Annotated[ProblemFact | MedicationFact | AllergyFact | AllergyCheckFact, Field(discriminator="kind")]
+ClinicalFact = Annotated[
+    ProblemFact | MedicationFact | AllergyFact | AllergyCheckFact,
+    Field(discriminator="kind"),
+]
 
 
 class ClinicalEntryWrite(BaseModel):
@@ -96,6 +101,15 @@ class WorkspaceVisit(BaseModel):
     status: str
 
 
+class WorkspaceLabValue(BaseModel):
+    instance_id: int
+    name: str
+    value: str
+    unit: str | None
+    finalized_at: datetime | None
+    abnormal: bool
+
+
 class WorkspaceHistoryItem(BaseModel):
     id: int
     visit_id: int
@@ -109,6 +123,7 @@ class WorkspaceHistoryItem(BaseModel):
     recommendations: str
     vitals: dict[str, Any]
     echo: dict[str, Any]
+    laboratory: list[WorkspaceLabValue] = Field(default_factory=list)
 
 
 class WorkspaceHistoryDocument(WorkspaceHistoryItem):
@@ -147,7 +162,9 @@ class FollowUpWrite(BaseModel):
     actual_treatment: str | None = Field(None, max_length=5000)
     prior_plan_follow_through: str | None = Field(None, max_length=5000)
     new_results: str | None = Field(None, max_length=5000)
-    transferred_fields: list[TransferSelection] = Field(default_factory=list, max_length=24)
+    transferred_fields: list[TransferSelection] = Field(
+        default_factory=list, max_length=24
+    )
 
 
 class IssuePrescription(BaseModel):
