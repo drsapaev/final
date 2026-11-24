@@ -6,7 +6,7 @@ from fastapi.routing import APIRoute
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_db, require_active_roles
 from app.crud.clinic import get_queue_settings
 from app.repositories.lab_worklist_repository import (
     InvalidWorklistCursor,
@@ -54,7 +54,7 @@ def list_lab_worklist(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab")),
+    user=Depends(require_active_roles("Admin", "Lab")),
 ):
     """Read a page of work and counters across the same search scope.
 
@@ -89,7 +89,7 @@ def cancel_lab_ordered_test(
     visit_service_id: int,
     payload: LabOrderedTestCancellation,
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab")),
+    user=Depends(require_active_roles("Admin", "Lab")),
 ):
     try:
         return cancel_unreported_lab_test(

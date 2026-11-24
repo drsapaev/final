@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
@@ -25,6 +25,7 @@ def _responsible_user_id(db: Session, instance: LabReportInstance) -> int | None
             Visit.id == instance.visit_id,
             Visit.patient_id == instance.patient_id,
             User.is_active.is_(True),
+            func.lower(func.trim(User.role)) == "doctor",
             Doctor.active.is_(True),
         )
     )
@@ -109,6 +110,7 @@ def _locked_task(db: Session, task_id: int) -> LabCriticalCommunication:
             LabCriticalCommunication.id == task_id,
         )
         .with_for_update()
+        .execution_options(populate_existing=True)
     )
     if task is None:
         raise LabReportingDomainError(404, "Critical communication not found")

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_db, require_active_roles
 from app.crud.clinic import get_queue_settings
 from app.models.user import User
 from app.schemas.lab_import import LabImportBatch, LabImportBatchOut
@@ -23,7 +23,7 @@ def import_lab_values(
     payload: LabImportBatch,
     response: Response,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("Admin", "Lab")),
+    user: User = Depends(require_active_roles("Admin", "Lab")),
 ):
     response.headers["Cache-Control"] = "private, no-store"
     return LabImportBatchOut(rows=process_import_batch(db, payload, actor_id=user.id))
@@ -34,7 +34,7 @@ def preview_lab_import(
     payload: LabImportBatch,
     response: Response,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("Admin", "Lab")),
+    user: User = Depends(require_active_roles("Admin", "Lab")),
 ):
     response.headers["Cache-Control"] = "private, no-store"
     return LabImportBatchOut(
@@ -60,7 +60,7 @@ def lab_metrics(
     response: Response,
     days: Annotated[int, Query(ge=1, le=90)] = 7,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("Admin")),
+    user: User = Depends(require_active_roles("Admin")),
 ):
     timezone = ZoneInfo(get_queue_settings(db).get("timezone", "Asia/Tashkent"))
     response.headers["Cache-Control"] = "private, no-store"

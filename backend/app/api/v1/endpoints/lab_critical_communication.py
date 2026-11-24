@@ -8,8 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_db, require_active_roles
 from app.api.v1.endpoints.lab_reporting import _doctor_allowed_visit_ids
+from app.core.roles import normalize_role_value
 from app.models.lab import LabReportInstance
 from app.models.lab_critical_communication import LabCriticalCommunication
 from app.models.user import User
@@ -25,9 +26,9 @@ router = APIRouter(
     prefix="/lab/critical-communications", tags=["lab-critical-communications"]
 )
 Db = Annotated[Session, Depends(get_db)]
-Staff = Annotated[User, Depends(require_roles("Admin", "Lab", "Doctor"))]
-Admin = Annotated[User, Depends(require_roles("Admin"))]
-Doctor = Annotated[User, Depends(require_roles("Doctor"))]
+Staff = Annotated[User, Depends(require_active_roles("Admin", "Lab", "Doctor"))]
+Admin = Annotated[User, Depends(require_active_roles("Admin"))]
+Doctor = Annotated[User, Depends(require_active_roles("Doctor"))]
 
 
 class CommunicationOut(BaseModel):
@@ -57,7 +58,7 @@ class CommunicationOut(BaseModel):
 def _out(task: LabCriticalCommunication, user: User) -> CommunicationOut:
     actions = []
     if task.state not in {"acknowledged", "superseded"}:
-        if user.role == "Admin":
+        if user.is_superuser or normalize_role_value(user.role) == "admin":
             if task.state in {"needs_assignment", "escalated"}:
                 actions.append("assign")
             if task.state != "escalated":
@@ -83,7 +84,7 @@ def list_communications(
         LabReportInstance,
         LabReportInstance.id == LabCriticalCommunication.report_instance_id,
     )
-    if user.role not in {"Admin", "Lab"}:
+    if not user.is_superuser and normalize_role_value(user.role) not in {"admin", "lab"}:
         if visit_id is None:
             raise HTTPException(422, "Visit is required")
         _doctor_allowed_visit_ids(db, user, requested_visit_ids=[visit_id])
