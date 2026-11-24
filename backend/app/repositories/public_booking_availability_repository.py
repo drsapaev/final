@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date, time, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -41,7 +41,10 @@ class PublicBookingAvailabilityRepository:
     def list_appointment_occupancy_for_day(
         self, *, doctor_id: int, target_date: date
     ) -> list[tuple[date, str | None, int | None, str | None]]:
-        """Read no appointment notes, patient details, or payment fields."""
+        """Read target-day occupancy and candidates that may continue past midnight."""
+        prior_date = (
+            target_date - timedelta(days=1) if target_date > date.min else target_date
+        )
         statement = (
             select(
                 Appointment.appointment_date,
@@ -51,9 +54,13 @@ class PublicBookingAvailabilityRepository:
             )
             .where(
                 Appointment.doctor_id == doctor_id,
-                Appointment.appointment_date == target_date,
+                Appointment.appointment_date.between(prior_date, target_date),
             )
-            .order_by(Appointment.appointment_time, Appointment.id)
+            .order_by(
+                Appointment.appointment_date,
+                Appointment.appointment_time,
+                Appointment.id,
+            )
         )
         return [
             (row[0], row[1], row[2], row[3]) for row in self.db.execute(statement).all()
