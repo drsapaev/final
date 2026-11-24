@@ -865,6 +865,7 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
 
   // The first-visit draft uses the workspace patient identity and empty longitudinal data.
   test('PR-UI-12-4 EMR screen — dermatology visit workspace', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
     await installAuth(page, doctorProfile);
     const dermaQueueEntry = {
       id: 1001,
@@ -952,11 +953,20 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     // Deep link: visitId opens the visit tab and resolves the patient from
     // the mocked derma queue (URL resolution in DermatologistPanelUnified).
     await page.goto('/doctor/dermatology?visitId=501&patientId=101');
-    await page.locator('.emr-v2-container').first().waitFor({ state: 'visible', timeout: 20000 });
-    await expect(page.getByRole('heading', { name: 'SYNTHETIC-EMR', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Клиническая сводка', exact: true })).toBeVisible();
+    const editor = page.locator('.emr-v2-container');
+    const identity = editor.getByRole('heading', { name: 'SYNTHETIC-EMR', exact: true });
+    await expect(identity).toBeVisible({ timeout: 20000 });
+    await editor.evaluate(element => element.scrollIntoView({ block: 'start', inline: 'nearest' }));
+    await expect(identity).toBeInViewport();
+    await expect(editor.getByRole('heading', { name: 'Клиническая сводка', exact: true })).toBeInViewport();
+    await expect(editor.getByRole('region', { name: 'Показатели текущего приёма' })).toBeInViewport();
+    await expect(editor.getByRole('spinbutton', { name: 'Pulse' })).toHaveValue('');
 
-    await expect(page.locator('.emr-v2-container').first()).toHaveScreenshot('pr124-emr-screen.png', {
+    // Capture the visible editor, where the identity, vitals and summary are rendered.
+    const bounds = await editor.boundingBox();
+    if (!bounds) throw new Error('EMR editor has no layout bounds');
+    await expect(page).toHaveScreenshot('pr124-emr-screen.png', {
+      clip: { x: Math.ceil(bounds.x), y: Math.max(0, Math.ceil(bounds.y)), width: Math.floor(bounds.width), height: 540 },
       maxDiffPixelRatio: 0.01,
       animations: 'disabled',
     });

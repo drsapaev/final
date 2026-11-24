@@ -11,6 +11,13 @@ depends_on = None
 
 
 def upgrade() -> None:
+    if op.get_context().as_sql:
+        op.execute(
+            "ALTER TABLE doctor_section_templates "
+            "ADD COLUMN IF NOT EXISTS shortcut VARCHAR(16)"
+        )
+        return
+
     # Revision 0003 can create this table from the current model on a fresh install.
     columns = sa.inspect(op.get_bind()).get_columns("doctor_section_templates")
     if not any(column["name"] == "shortcut" for column in columns):

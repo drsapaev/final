@@ -11,6 +11,32 @@ depends_on = None
 
 
 def upgrade() -> None:
+    if op.get_context().as_sql:
+        # Defer the schema checks until PostgreSQL applies the generated SQL.
+        op.execute(
+            "ALTER TABLE doctor_section_templates "
+            "ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP WITH TIME ZONE, "
+            "ADD COLUMN IF NOT EXISTS template_revision INTEGER DEFAULT 1 NOT NULL"
+        )
+        op.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_attribute
+                    WHERE attrelid = 'doctor_section_templates'::regclass
+                    AND attname = 'template_revision'
+                    AND atthasdef
+                ) THEN
+                    ALTER TABLE doctor_section_templates
+                        ALTER COLUMN template_revision SET DEFAULT 1;
+                END IF;
+            END;
+            $$
+            """
+        )
+        return
+
     # Revision 0003 can bootstrap the table from current model metadata.
     columns = {
         column["name"]: column
