@@ -411,8 +411,17 @@ export default function DisplayBoardUnified({
         : 0.7;
       const previousAudio = audioProfileRef.current;
       let voiceReady = previousAudio?.voiceLanguage === voiceLanguage ? previousAudio.voiceReady : undefined;
-      if (state.voice_announcements === true && !voiceReady) {
-        voiceReady = i18n.loadLanguages(voiceLocale(voiceLanguage)).then(() => {}, () => {});
+      const locale = voiceLocale(voiceLanguage);
+      if (state.voice_announcements === true && !i18n.hasResourceBundle(locale, 'translation') && !voiceReady) {
+        // A failed i18next load remains marked as failed; reloadResources is
+        // required to retry it after connectivity returns.
+        const pending = i18n.reloadResources([locale], ['translation']).then(() => {}, () => {});
+        voiceReady = pending;
+        void pending.then(() => {
+          if (audioProfileRef.current?.voiceReady === pending) {
+            audioProfileRef.current.voiceReady = undefined;
+          }
+        });
       }
       audioProfileRef.current = {
         enabled: presentation.sound_default,

@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DisplayTestReply } from '../../api/ws';
+import i18n from '../../i18n';
 
 const wsMock = vi.hoisted(() => ({
   openDisplayBoardWS: vi.fn(),
@@ -288,6 +289,66 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
       }));
     },
   );
+
+  it('recovers Uzbek voice after a temporary locale load failure without replaying the old call', async () => {
+    const locale = 'uz-Latn';
+    const connector = i18n.services.backendConnector as unknown as {
+      state: Record<string, number>;
+      backend: { read: (language: string, namespace: string, callback: (error: Error | null, data: object | null) => void) => void };
+    };
+    const stateKey = `${locale}|translation`;
+    const previousState = connector.state[stateKey];
+    const previousBundle = i18n.getResourceBundle(locale, 'translation');
+    const previousPreload = i18n.options.preload;
+    i18n.removeResourceBundle(locale, 'translation');
+    // This is i18next's real state after the locale backend failed once.
+    connector.state[stateKey] = -1;
+    i18n.options.preload = [
+      ...(Array.isArray(previousPreload) ? previousPreload.filter((language) => language !== locale) : []),
+      locale,
+    ];
+
+    let networkAvailable = false;
+    const read = vi.spyOn(connector.backend, 'read').mockImplementation((language, namespace, callback) => {
+      if (language !== locale || namespace !== 'translation') throw new Error('Unexpected locale request');
+      if (!networkAvailable) callback(new Error('Synthetic network outage'), null);
+      else callback(null, { misc: { dbu_voice_patient_call: '{number}-raqamli talon, {cabinet}-xonaga oʻting' } });
+    });
+    const speak = vi.fn((utterance: { onstart?: () => void }) => utterance.onstart?.());
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'uz-UZ' }], speak, cancel: vi.fn() });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
+
+    try {
+      const { push } = await renderBoard({}, {
+        sound_enabled: true, voice_announcements: true, voice_language: 'uz', volume_level: 50,
+      });
+      await act(async () => {});
+      push({ type: 'patient_call', data: {
+        event_id: 'outage-call', issued_at: new Date().toISOString(),
+        queue_number: 21, cabinet: '701', expires_at: new Date(Date.now() + 5000).toISOString(),
+      } });
+      expect(screen.getByText(/№\s*21/)).toBeInTheDocument();
+      expect(speak).not.toHaveBeenCalled();
+
+      networkAvailable = true;
+      await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+      await waitFor(() => expect(i18n.hasResourceBundle(locale, 'translation')).toBe(true));
+      expect(speak).not.toHaveBeenCalled();
+      push({ type: 'patient_call', data: {
+        event_id: 'recovered-call', issued_at: new Date().toISOString(),
+        queue_number: 22, cabinet: '702', expires_at: new Date(Date.now() + 5000).toISOString(),
+      } });
+      await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+      expect(speak).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringMatching(/22-raqamli talon.*702/) }));
+    } finally {
+      read.mockRestore();
+      i18n.removeResourceBundle(locale, 'translation');
+      if (previousBundle) i18n.addResourceBundle(locale, 'translation', previousBundle);
+      if (previousState === undefined) delete connector.state[stateKey];
+      else connector.state[stateKey] = previousState;
+      i18n.options.preload = previousPreload;
+    }
+  });
 
   it('acknowledges a visibly rendered test and yields to an active clinical call', async () => {
     const { push } = await renderBoard({}, { sound_enabled: false });
