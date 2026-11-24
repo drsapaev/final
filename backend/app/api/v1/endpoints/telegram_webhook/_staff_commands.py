@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.admin_telegram import (
@@ -23,6 +24,10 @@ from app.models.patient import Patient
 from app.models.payment import Payment, PaymentVisit
 from app.models.telegram_config import TelegramMessage, TelegramUser
 from app.models.visit import Visit
+from app.services.telegram_patient_link import (
+    TelegramPatientLinkConflict,
+    link_telegram_patient,
+)
 
 logger = logging.getLogger(__name__)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
@@ -278,61 +283,67 @@ async def _handle_ticket_qr_start(
         return False
 
     token, message = extracted
-    chat_id = (message.get("chat") or {}).get("id")
+    chat_id = _private_patient_chat_id(message)
+    if chat_id is None:
+        return True
+
     # Резолвим ``consume_telegram_ticket_start_token`` через атрибут пакета
     # ``telegram_webhook`` во время вызова, чтобы monkeypatch-и, выполненные
     # тестами на ``telegram_webhook.consume_telegram_ticket_start_token``,
     # реально подменяли функцию, которая используется в этом обработчике.
     from app.api.v1.endpoints import telegram_webhook as _telegram_webhook_pkg
 
-    visit = _telegram_webhook_pkg.consume_telegram_ticket_start_token(db, token)
-    if visit:
-        if chat_id is None:
-            db.rollback()
-            return True
-
-        try:
-            existing_telegram_user = crud_telegram.get_telegram_user_by_chat_id(
-                db, int(chat_id)
+    try:
+        visit = _telegram_webhook_pkg.consume_telegram_ticket_start_token(db, token)
+        if visit is not None:
+            telegram_user = link_telegram_patient(
+                db,
+                patient_id=visit.patient_id,
+                chat_id=chat_id,
+                create_missing_profile=lambda: _upsert_ticket_qr_telegram_user(
+                    db, message
+                ),
             )
-            notifications_already_enabled = bool(
-                getattr(existing_telegram_user, "notifications_enabled", False)
-            )
-            _upsert_ticket_qr_telegram_user(db, message, visit.patient_id)
+            notifications_already_enabled = telegram_user.notifications_enabled
             db.commit()
-        except Exception as exc:
-            db.rollback()
+    except Exception as exc:
+        db.rollback()
+        if not isinstance(exc, TelegramPatientLinkConflict):
             logger.warning(
                 "Telegram ticket QR user link failed error_type=%s",
                 type(exc).__name__,
             )
-            language = _normalize_patient_language(
-                (message.get("from") or {}).get("language_code")
-            )
-            await bot_service._send_message(
-                int(chat_id),
-                _localized_text("ticket_qr_link_failed", language),
-                _localized_main_menu(language),
-            )
-            return True
-
-        language = _telegram_chat_language(db, int(chat_id))
-        reply_text = _telegram_chat_text(db, int(chat_id), "ticket_qr_linked")
-        reply_markup = _telegram_chat_menu(db, int(chat_id))
-        if not notifications_already_enabled:
-            reply_text = (
-                f"{reply_text}\n\n{_localized_text('notification_consent', language)}"
-            )
-            reply_markup = _localized_notification_consent_menu(language)
-        await bot_service._send_message(int(chat_id), reply_text, reply_markup)
-    elif chat_id is not None:
-        language = _telegram_chat_language(db, int(chat_id))
+        profile = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
+        language = _normalize_patient_language(
+            getattr(profile, "language_code", None)
+            or (message.get("from") or {}).get("language_code")
+        )
         await bot_service._send_message(
-            int(chat_id),
+            chat_id,
+            _localized_text("ticket_qr_link_failed", language),
+            _localized_main_menu(language),
+        )
+        return True
+
+    if visit is None:
+        db.rollback()
+        language = _telegram_chat_language(db, chat_id)
+        await bot_service._send_message(
+            chat_id,
             _localized_text("ticket_qr_expired", language),
             _localized_main_menu(language),
         )
+        return True
 
+    language = _telegram_chat_language(db, chat_id)
+    reply_text = _localized_text("ticket_qr_linked", language)
+    reply_markup = _telegram_chat_menu(db, chat_id)
+    if not notifications_already_enabled:
+        reply_text = (
+            f"{reply_text}\n\n{_localized_text('notification_consent', language)}"
+        )
+        reply_markup = _localized_notification_consent_menu(language)
+    await bot_service._send_message(chat_id, reply_text, reply_markup)
     return True
 
 
@@ -436,21 +447,27 @@ def _message_chat_id(message: dict[str, Any]) -> int | None:
     return int(chat_id) if chat_id is not None else None
 
 
+def _private_patient_chat_id(message: dict[str, Any]) -> int | None:
+    chat = message.get("chat")
+    sender = message.get("from")
+    if not isinstance(chat, dict) or not isinstance(sender, dict):
+        return None
+
+    sender_id = sender.get("id")
+    chat_id = chat.get("id")
+    if (
+        chat.get("type") == "private"
+        and type(chat_id) is int
+        and chat_id > 0
+        and type(sender_id) is int
+        and sender_id == chat_id
+    ):
+        return chat_id
+    return None
+
+
 def _message_text(message: dict[str, Any]) -> str:
     return str(message.get("text") or "").strip()
-
-
-def _find_patient_by_phone(db: Session, phone: str) -> Patient | None:
-    normalized_phone = normalize_phone_uz(phone)
-    if not normalized_phone:
-        return None
-
-    patient_info = crud_telegram.find_patient_by_phone(db, normalized_phone)
-    patient_id = patient_info.get("id") if patient_info else None
-    if not patient_id:
-        return None
-
-    return db.query(Patient).filter(Patient.id == int(patient_id)).first()
 
 
 def _patient_display_name(patient: Patient | None) -> str:
@@ -1104,21 +1121,6 @@ async def _send_notification_consent(
     )
 
 
-def _patient_contact_linked_text(
-    language_code: str,
-    patient_label: str,
-    patient_name: str,
-    include_notification_consent: bool,
-) -> str:
-    text = (
-        f"{_localized_text('contact_linked', language_code)}\n"
-        f"{patient_label}: {patient_name}"
-    )
-    if include_notification_consent:
-        return f"{text}\n\n{_localized_text('notification_consent', language_code)}"
-    return text
-
-
 async def _set_notification_consent(
     db: Session, bot_service, chat_id: int, enabled: bool
 ) -> None:
@@ -1157,16 +1159,25 @@ async def _handle_contact_link(
     message: dict[str, Any], db: Session, bot_service
 ) -> bool:
     contact = message.get("contact")
-    if not contact:
+    if contact is None:
         return False
 
-    chat_id = _message_chat_id(message)
-    from_user_id = (message.get("from") or {}).get("id")
-    contact_user_id = contact.get("user_id")
+    chat_id = _private_patient_chat_id(message)
     if chat_id is None:
         return True
 
-    if from_user_id is None or contact_user_id != from_user_id:
+    if not isinstance(contact, dict):
+        return True
+    contact_user_id = contact.get("user_id")
+    phone_number = contact.get("phone_number")
+    if (
+        type(contact_user_id) is not int
+        or contact_user_id != chat_id
+        or not isinstance(phone_number, str)
+        or not phone_number.strip()
+        or message.get("forward_origin")
+        or message.get("forward_date")
+    ):
         await _send_patient_bot_reply(
             db,
             bot_service,
@@ -1177,70 +1188,24 @@ async def _handle_contact_link(
         )
         return True
 
-    patient = _find_patient_by_phone(db, str(contact.get("phone_number") or ""))
-    if not patient:
-        existing_telegram_user = crud_telegram.get_telegram_user_by_chat_id(
-            db, int(chat_id)
-        )
-        _upsert_ticket_qr_telegram_user(
-            db,
-            message,
-            notifications_enabled=False if existing_telegram_user is None else None,
-        )
-        db.commit()
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _telegram_chat_text(db, chat_id, "patient_not_found"),
-            _telegram_onboarding_entry_markup(db, chat_id)
-            or _telegram_chat_menu(db, chat_id),
-            "telegram_patient_not_found",
-        )
-        return True
+    if crud_telegram.get_telegram_user_by_chat_id(db, chat_id) is None:
+        try:
+            _upsert_ticket_qr_telegram_user(db, message)
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            # Another update may have created this profile first.
+            if crud_telegram.get_telegram_user_by_chat_id(db, chat_id) is None:
+                raise
 
-    try:
-        existing_telegram_user = crud_telegram.get_telegram_user_by_chat_id(
-            db, int(chat_id)
-        )
-        notifications_already_enabled = bool(
-            getattr(existing_telegram_user, "notifications_enabled", False)
-        )
-        _upsert_ticket_qr_telegram_user(db, message, patient.id)
-        db.commit()
-    except Exception as exc:
-        db.rollback()
-        logger.warning(
-            "Telegram contact link failed error_type=%s",
-            type(exc).__name__,
-        )
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _telegram_chat_text(db, chat_id, "ticket_qr_link_failed"),
-            _telegram_chat_menu(db, chat_id),
-            "telegram_patient_ticket_qr_link_failed",
-        )
-        return True
-
-    language = _telegram_chat_language(db, chat_id)
-    reply_markup = _localized_main_menu(language)
-    if not notifications_already_enabled:
-        reply_markup = _localized_notification_consent_menu(language)
-    patient_label = "Bemor" if language == TELEGRAM_LANGUAGE_UZ else "Пациент"
     await _send_patient_bot_reply(
         db,
         bot_service,
         chat_id,
-        _patient_contact_linked_text(
-            language,
-            patient_label,
-            _patient_display_name(patient),
-            not notifications_already_enabled,
-        ),
-        reply_markup,
-        "telegram_patient_contact_linked",
+        _telegram_chat_text(db, chat_id, "contact_verification_required"),
+        _telegram_onboarding_entry_markup(db, chat_id)
+        or _telegram_chat_menu(db, chat_id),
+        "telegram_patient_contact_verification_required",
     )
     return True
 

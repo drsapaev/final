@@ -22,7 +22,7 @@ Run: pytest backend/tests/integration/test_qrrestore_cancelled_visit_guard.py -v
 from __future__ import annotations
 
 import asyncio
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
@@ -246,3 +246,51 @@ class TestRestoreNextCancelledVisitGuard:
         assert result["success"] is True
         db_session.refresh(entry)
         assert entry.status == "waiting"
+
+
+    @pytest.mark.parametrize("competing_priority", [2, 1])
+    def test_priority_return_does_not_promise_next_slot(
+        self, db_session, monkeypatch, competing_priority,
+    ):
+        from app.api.v1.endpoints.qr_queue._entries import restore_entry_to_next
+        from app.api.v1.endpoints.qr_queue._tokens import RestoreToNextRequest
+        from app.services.queue_service import queue_service
+
+        _install_fake_ws(monkeypatch)
+        owner = _mk_user(db_session, role="Doctor")
+        doctor = _mk_doctor(db_session, owner)
+        queue = _mk_queue(db_session, doctor)
+        returning = _mk_entry(
+            db_session, queue, _mk_patient(db_session), visit=None, status="no_show",
+        )
+        waiting = _mk_entry(
+            db_session, queue, _mk_patient(db_session), visit=None, number=2,
+        )
+        waiting.priority = competing_priority
+        # Priority 2 must win even with a newer timestamp. Equal priority
+        # remains FIFO, including when the later ticket was restored.
+        returning.queue_time = datetime.combine(
+            queue.day, datetime.min.time(), tzinfo=UTC,
+        ).replace(hour=10)
+        waiting.queue_time = returning.queue_time.replace(
+            hour=11 if competing_priority == 2 else 9,
+        )
+        db_session.commit()
+        original_time = returning.queue_time
+
+        response = asyncio.run(restore_entry_to_next(
+            returning.id,
+            request=RestoreToNextRequest(reason="SYNTHETIC RETURN"),
+            db=db_session,
+            current_user=owner,
+        ))
+        assert response["message"] == "Пациент возвращён в очередь с приоритетом"
+        assert response["priority"] == 1
+        assert returning.status == "waiting"
+        assert returning.queue_time == original_time
+
+        next_call = queue_service.staff_call_next_patient(
+            db_session, queue_id=queue.id, target_date=queue.day, actor_user_id=owner.id,
+        )
+        assert next_call["entry_id"] == waiting.id
+        assert returning.status == "waiting"

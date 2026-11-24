@@ -1,9 +1,19 @@
+html.public-site-document body {
+  /* Preserve document scrolling so Firefox reaches the skip link on the first Tab. */
+  overflow-x: clip;
+}
+
 .public-site {
   --public-site-nav-gap: clamp(14px, 2.5vw, 32px);
   --public-site-main-padding-block: 52px 78px;
   --public-site-hero-padding: clamp(28px, 6vw, 68px);
   --public-site-section-gap: clamp(38px, 6vw, 68px);
   --public-site-runtime-padding: clamp(24px, 5vw, 48px);
+  --public-site-hover-ink: color-mix(
+    in srgb,
+    var(--mac-success-strong, rgb(20, 122, 56)),
+    var(--mac-text-primary, rgb(0, 0, 0)) 18%
+  );
   min-height: 100vh;
   background: var(--mac-bg-primary, rgb(238, 243, 250));
   color: var(--mac-text-primary, rgb(0, 0, 0));
@@ -18,11 +28,14 @@
 }
 
 .public-site a:hover {
-  color: color-mix(
-    in srgb,
-    var(--mac-success-strong, rgb(20, 122, 56)),
-    var(--mac-text-primary, rgb(0, 0, 0)) 18%
-  );
+  color: var(--public-site-hover-ink);
+}
+
+:where(html.public-site-document) .public-site a:hover {
+  color: var(--mac-link-ink, rgb(0, 102, 214));
+  @supports (color: light-dark(black, white)) {
+    color: light-dark(var(--public-site-hover-ink), var(--mac-link-ink, rgb(90, 200, 250)));
+  }
 }
 
 .public-site a:focus-visible {
@@ -58,26 +71,31 @@
 
 .public-site__header {
   display: flex;
+  box-sizing: border-box;
   min-height: 82px;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 12px 24px;
+  padding-block: 6px;
   border-bottom: 1px solid var(--mac-border, rgb(184, 200, 218));
 }
 
 .public-site .public-site__brand {
   display: inline-flex;
-  min-width: max-content;
+  min-inline-size: 0;
   align-items: center;
   gap: 10px;
   color: var(--mac-text-primary, rgb(0, 0, 0));
   font-size: 1rem;
   font-weight: 700;
+  overflow-wrap: anywhere;
   text-decoration: none;
 }
 
 .public-site__brand-mark {
   display: grid;
+  flex: none;
   width: 38px;
   height: 38px;
   place-items: center;
@@ -87,11 +105,26 @@
   font-size: 1.15rem;
 }
 
+.public-site__brand-logo {
+  flex: none;
+  object-fit: contain;
+}
+
+.public-site__brand-logo[data-public-site-image="unavailable"],
+.public-site__brand-logo:not([data-public-site-image="unavailable"]) + .public-site__brand-mark {
+  display: none;
+}
+
 .public-site__nav {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: var(--public-site-nav-gap);
+  gap: 8px var(--public-site-nav-gap);
+}
+
+.public-site__nav a {
+  overflow-wrap: anywhere;
 }
 
 .public-site__mobile-menu {
@@ -254,6 +287,39 @@
   margin-bottom: 18px;
 }
 
+.public-site__catalog {
+  display: block;
+}
+
+.public-site__catalog-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-block-end: 16px;
+}
+
+.public-site__catalog-field {
+  display: grid;
+  flex: 1 1 190px;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.public-site__catalog-control {
+  min-width: 0;
+}
+
+.public-site__catalog-status {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.public-site__catalog [hidden] {
+  display: none;
+}
+
 .public-site__list {
   display: grid;
   gap: 12px;
@@ -297,6 +363,10 @@
   flex: none;
   border-radius: 12px;
   object-fit: cover;
+}
+
+.public-site__doctor-portrait[data-public-site-image="unavailable"] {
+  visibility: hidden;
 }
 
 .public-site a.public-site__list-title {
@@ -343,6 +413,7 @@
   font-weight: 600;
 }
 
+.public-site__catalog-control,
 .public-site__booking-control {
   box-sizing: border-box;
   width: 100%;
@@ -402,6 +473,13 @@
   outline-offset: 3px;
 }
 
+:where(html.public-site-document) .public-site :is(a, button, input, select):focus-visible {
+  outline-color: var(--mac-link-ink, rgb(0, 102, 214));
+  @supports (color: light-dark(black, white)) {
+    outline-color: light-dark(var(--mac-warning-strong, rgb(168, 98, 0)), var(--mac-link-ink, rgb(90, 200, 250)));
+  }
+}
+
 .public-site__contact-list {
   display: grid;
   gap: 16px;
@@ -439,6 +517,10 @@
   color: var(--mac-link-ink, rgb(0, 102, 214));
 }
 
+:where(html.public-site-document[data-theme="light"]) .public-site__footer a {
+  color: var(--mac-accent-blue-hover, var(--mac-text-primary, currentColor));
+}
+
 .public-site__footer-links {
   display: flex;
   flex-wrap: wrap;
@@ -464,8 +546,6 @@
 @media (max-width: 760px) {
   .public-site__header {
     min-height: auto;
-    flex-wrap: wrap;
-    justify-content: space-between;
     gap: 12px;
     padding-block: 16px;
   }
@@ -475,16 +555,20 @@
   }
 
   .public-site__mobile-menu {
-    position: relative;
     display: block;
-    order: 2;
-    margin-left: auto;
+    margin-inline-start: auto;
+  }
+
+  .public-site__mobile-menu[open] {
+    flex-basis: 100%;
   }
 
   .public-site__mobile-menu summary {
     display: flex;
+    inline-size: fit-content;
     min-height: 44px;
     align-items: center;
+    margin-inline-start: auto;
     padding: 0 12px;
     border: 1px solid var(--mac-border, rgb(184, 200, 218));
     border-radius: 10px;
@@ -500,13 +584,12 @@
   }
 
   .public-site__mobile-nav {
-    position: absolute;
-    z-index: 2;
-    top: calc(100% + 8px);
-    right: 0;
     display: grid;
-    min-width: 190px;
+    box-sizing: border-box;
+    inline-size: min(100%, 240px);
     gap: 4px;
+    margin-block-start: 8px;
+    margin-inline-start: auto;
     padding: 8px;
     border: 1px solid var(--mac-border, rgb(184, 200, 218));
     border-radius: 12px;
@@ -520,7 +603,7 @@
     align-items: center;
     padding: 0 12px;
     border-radius: 8px;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .public-site__mobile-nav a:hover {
