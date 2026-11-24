@@ -740,6 +740,60 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     expect(finalizePostCount).toBe(0);
   });
 
+  test('keeps the latest draft and caret when a delayed autosave loses its connection', async ({ page }) => {
+    await page.clock.install();
+    state.instances.push(makeInstanceRecord(CREATED_INSTANCE_ID, 'DRAFT', {
+      wbcValue: '4.2',
+      supersedesInstanceId: null,
+      createdAt: '2026-09-26T08:00:00.000000+00:00',
+    }));
+    let receivedAutosave = false;
+    let disconnect!: () => void;
+    const response = new Promise<void>((resolve) => { disconnect = resolve; });
+    await page.route(`**/api/v1/lab/report-instances/${CREATED_INSTANCE_ID}/bulk-values**`, async (route) => {
+      if (receivedAutosave) {
+        await route.fallback();
+        return;
+      }
+      receivedAutosave = true;
+      await response;
+      await route.abort('internetdisconnected');
+    });
+
+    await page.goto('/lab');
+    await page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) }).click();
+    const report = page.getByRole('tabpanel', { name: /Отчёты/ });
+    const value = report.getByRole('textbox', { name: 'Результат: Лейкоциты' });
+    const saveStatus = report.getByRole('status').filter({ hasText: /изменения|сохранен|сохранить/i });
+    await expect(value).toHaveValue('4.2');
+    try {
+      await value.fill('6.1');
+      await expect(saveStatus).toContainText(/несохранённые изменения/i);
+      await page.clock.fastForward(31_000);
+      await expect.poll(() => receivedAutosave).toBe(true);
+      await value.fill('6.12');
+      await value.press('ArrowLeft');
+    } finally {
+      disconnect();
+    }
+
+    await expect(saveStatus).toContainText('Не удалось сохранить');
+    await expect(value).toHaveValue('6.12');
+    await expect(value).toBeFocused();
+    expect(await value.evaluate((input: HTMLInputElement) => input.selectionStart)).toBe(3);
+    expect(bulkSavePostCount).toBe(0);
+    await report.getByRole('button', { name: 'Повторить сохранение' }).click();
+    await expect.poll(() => bulkSavePostCount).toBe(1);
+    expect(lastBulkSavePayload).toEqual([expect.objectContaining({ field_key: 'wbc', value_text: '6.1' })]);
+    await expect(saveStatus).toContainText(/несохранённые изменения/i);
+    await expect(value).toHaveValue('6.12');
+    await page.clock.fastForward(31_000);
+    await expect(saveStatus).toContainText('Сохранено в');
+    expect(bulkSavePostCount).toBe(2);
+    expect(lastBulkSavePayload).toEqual([expect.objectContaining({ field_key: 'wbc', value_text: '6.12' })]);
+    expect(finalizePostCount).toBe(0);
+  });
+
   test('queue -> create -> fill -> save -> preview -> finalize -> print(PDF) -> revise -> history, one instance lineage', async ({ page }) => {
     // Все 3 tabpanel смонтированы постоянно (hidden-секции PR5), а панель
     // очереди рендерит свою копию истории (lqw-history-*) — скрытую при
