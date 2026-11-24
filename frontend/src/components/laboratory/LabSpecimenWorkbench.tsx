@@ -24,7 +24,7 @@ interface Props {
   services: LabSpecimenTarget[];
   disabled?: boolean;
   onPendingChange: (pending: boolean) => void;
-  onChanged: () => void;
+  onChanged: () => void | Promise<void>;
   onOrderEstablished: (orderId: number, visitId: number) => void;
 }
 
@@ -134,7 +134,7 @@ export default function LabSpecimenWorkbench({
         setForm(null);
         restoreFocus.current = true;
         await load();
-        onChanged();
+        await onChanged();
       }
     } catch (failure) {
       if (!mounted.current) return;

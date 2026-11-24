@@ -575,6 +575,77 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     await expect(queue.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) })).toHaveAttribute('aria-current', 'true');
   });
 
+  test('refreshes managed report holds after accepting its specimen and preserves draft edits', async ({ page }) => {
+    const orderId = 501;
+    const specimenId = 701;
+    const record = {
+      ...makeInstanceRecord(CREATED_INSTANCE_ID, 'IN_PROGRESS', {
+        wbcValue: 'SYNTHETIC initial', createdAt: '2026-09-26T08:00:00+00:00',
+      }),
+      order_id: orderId,
+      managed_release: true,
+      available_actions: ['edit', 'save_draft', 'preview', 'submit_review', 'record_qc'],
+      workflow_events: [],
+    };
+    let accepted = false;
+    let reportReads = 0;
+    await page.route('**/api/v1/lab/worklist/search', (route) => json(route, {
+      entries: [{ ...QUEUE_ENTRY, id: `order:${orderId}`, order_id: orderId, report_instance_id: record.id }],
+      total: 1,
+      counts: { actionable: 1, today: 0, overdue: 0, awaiting_specimen: 1, in_review: 0, ready: 0 },
+      next_cursor: null,
+      date: '2026-09-26',
+      timezone: 'Asia/Tashkent',
+    }));
+    const specimen = () => ({
+      id: specimenId,
+      order_id: orderId,
+      visit_id: VISIT_ID,
+      barcode: 'SP-0123456789ABCDEF',
+      material_code: 'blood',
+      container_code: 'tube',
+      status: accepted ? 'accepted' : 'received',
+      revision: accepted ? 4 : 3,
+      collected_at: null,
+      received_at: null,
+      accepted_at: null,
+      latest_reason: null,
+      parent_specimen_id: null,
+      replaces_specimen_id: null,
+      visit_service_ids: [],
+      report_instance_ids: [CREATED_INSTANCE_ID],
+      events: [],
+      available_actions: accepted ? [] : ['accept'],
+    });
+    await page.route(`**/api/v1/lab/report-instances/${CREATED_INSTANCE_ID}`, (route) => {
+      reportReads += 1;
+      return json(route, { ...record, release_holds: accepted ? [] : ['specimen_not_accepted'] });
+    });
+    await page.route(`**/api/v1/lab/orders/${orderId}/specimens`, (route) => json(route, {
+      items: [specimen()], data_status: 'known',
+    }));
+    await page.route(`**/api/v1/lab/specimens/${specimenId}/events`, (route) => {
+      expect(route.request().postDataJSON()).toMatchObject({ action: 'accept', expected_revision: 3 });
+      accepted = true;
+      return json(route, specimen());
+    });
+
+    await page.goto('/lab');
+    await page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) }).click();
+    const report = page.locator('#lab-panel-tabpanel-reports');
+    const releaseHold = report.getByText(/Связанная проба ещё не принята/);
+    await expect(releaseHold).toBeVisible();
+    const result = report.getByRole('textbox', { name: /Лейкоциты/ });
+    await result.fill('SYNTHETIC unsaved change');
+    await report.getByRole('button', { name: 'Принять пробу' }).click();
+    await expect(report.getByRole('button', { name: 'Принять пробу' })).toHaveCount(0);
+
+    await expect(releaseHold).toHaveCount(0);
+    await expect(result).toHaveValue('SYNTHETIC unsaved change');
+    expect(reportReads).toBe(2);
+    expect(bulkSavePostCount).toBe(0);
+  });
+
   test('keeps identity and one save action available in a tall report with a critical finding', async ({ page }) => {
     const record = makeInstanceRecord(CREATED_INSTANCE_ID, 'IN_PROGRESS');
     const originalField = record.sections[0].fields[0];

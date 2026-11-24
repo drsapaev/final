@@ -1704,6 +1704,41 @@ export default function LabPanel() {
     setSelectedAppointment(updated);
   }, []);
 
+  const handleSpecimenChanged = useCallback(async () => {
+    void loadLabAppointments();
+    const report = activeInstanceRef.current;
+    const reportId = getPositiveId(report?.id);
+    if (!report?.managed_release || reportId == null || selectedOrderId == null
+      || getPositiveId(report.order_id) !== selectedOrderId) return;
+
+    const epoch = labOperationEpochRef.current;
+    const stillCurrent = () => activeInstanceRef.current === report && labOperationEpochRef.current === epoch;
+    try {
+      const fresh = await labReportingApi.getInstance(reportId) as Record<string, unknown>;
+      if (!stillCurrent()) return;
+      if (getPositiveId(fresh.id) !== reportId || getPositiveId(fresh.order_id) !== selectedOrderId
+        || !instanceIdsMatch(getInstancePatientId(fresh), getInstancePatientId(report))) return;
+      if (typeof report.updated_at !== 'string' || fresh.updated_at !== report.updated_at) {
+        notify('error', t('workbench.save_conflict'));
+        return;
+      }
+      if (fresh.managed_release !== true || !Array.isArray(fresh.release_holds)
+        || !Array.isArray(fresh.available_actions)) {
+        notify('error', t('misc.lp_ne_udalos_otkryt_laboratorny'));
+        return;
+      }
+      // Specimen evidence can change without modifying the report version.
+      // Update the server's workflow metadata and retain the draft snapshot.
+      if (JSON.stringify(fresh.release_holds) === JSON.stringify(report.release_holds)
+        && JSON.stringify(fresh.available_actions) === JSON.stringify(report.available_actions)) return;
+      const refreshed = { ...report, release_holds: fresh.release_holds, available_actions: fresh.available_actions };
+      activeInstanceRef.current = refreshed;
+      setActiveInstance(refreshed);
+    } catch {
+      if (stillCurrent()) notify('error', t('misc.lp_ne_udalos_otkryt_laboratorny'));
+    }
+  }, [loadLabAppointments, notify, selectedOrderId, t]);
+
   const handleOrderedTestChanged = useCallback((testId?: number) => {
     const current = selectedAppointmentRef.current;
     if (testId != null && current && getPositiveId(current.visit_id) === selectedVisitId && Array.isArray(current.service_details)) {
@@ -1933,7 +1968,7 @@ export default function LabPanel() {
             disabled={selectedAppointment?.status === 'canceled' || orderedTestPending
               || instanceTransitionPending || pendingOperationSourcesRef.current.has('report')}
             onPendingChange={handleSpecimenOperationPendingChange}
-            onChanged={loadLabAppointments}
+            onChanged={handleSpecimenChanged}
             onOrderEstablished={establishSpecimenOrder}
           />
         )}
