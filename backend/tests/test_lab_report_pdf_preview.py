@@ -20,6 +20,8 @@
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 import zlib
 from typing import Any
 
@@ -319,6 +321,39 @@ def test_render_long_content_paginates_and_keeps_signers() -> None:
     assert (
         _pdf_page_count(payload) >= 2
     ), "150 long synthetic rows must paginate onto multiple A4 pages"
+
+
+@pytest.mark.integration
+def test_weasyprint_keeps_complete_mixed_script_observation_in_pdf() -> None:
+    pdf_text = shutil.which("pdftotext")
+    if not pdf_text:
+        pytest.skip("pdftotext is required to extract the actual PDF text")
+    pytest.importorskip("weasyprint")
+    context = _preview_context()
+    field = context["sections"][0]["fields"][0]
+    observation = " ".join(
+        f"SYNTHETIC Oʻzbek натижа {index}" for index in range(12)
+    )
+    field.update(value_type="text", value_display=observation)
+    payload = LabReportPDFService().render_report(context)
+    text = subprocess.check_output([pdf_text, "-raw", "-", "-"], input=payload)
+    assert observation in " ".join(text.decode("utf-8").split())
+
+
+@pytest.mark.integration
+def test_reportlab_keeps_observation_taller_than_one_page() -> None:
+    pdf_text = shutil.which("pdftotext")
+    if not pdf_text:
+        pytest.skip("pdftotext is required to extract the actual PDF text")
+
+    context = _preview_context(template_name="SYNTHETIC classic")
+    field = context["sections"][0]["fields"][0]
+    tokens = [f"SYNTHETIC{index:03}" for index in range(400)]
+    field.update(value_type="text", value_display=" ".join(tokens))
+    payload = LabReportPDFService()._render_reportlab(context)
+    text = subprocess.check_output([pdf_text, "-raw", "-", "-"], input=payload)
+    assert _pdf_page_count(payload) > 1
+    assert re.findall(r"SYNTHETIC[0-9]{3}", text.decode("utf-8")) == tokens
 
 
 @pytest.mark.integration

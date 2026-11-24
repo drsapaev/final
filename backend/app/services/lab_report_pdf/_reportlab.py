@@ -294,6 +294,7 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
                 critical_rows,
                 colWidths=[5.0 * cm, 3.0 * cm, 4.0 * cm, 3.0 * cm, doc.width - 15.0 * cm],
                 repeatRows=1,
+                splitInRow=1,
             )
             critical_table.setStyle(
                 TableStyle(
@@ -338,6 +339,7 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
                 rows,
                 colWidths=[6.0 * cm, 3.2 * cm, 1.8 * cm, 5.4 * cm, doc.width - 16.4 * cm],
                 repeatRows=1,
+                splitInRow=1,
             )
             section_table.setStyle(
                 TableStyle(
@@ -564,6 +566,7 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
             rows,
             colWidths=[7.6 * cm, 3.8 * cm, doc.width - 11.4 * cm],
             repeatRows=1,
+            splitInRow=1,
         )
         table.setStyle(
             TableStyle(
@@ -793,6 +796,7 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
             rows,
             colWidths=[7.6 * cm, 3.8 * cm, doc.width - 11.4 * cm],
             repeatRows=1,
+            splitInRow=1,
         )
         table_style_commands = [
             ("GRID", (0, 0), (-1, -1), 0.7, colors.HexColor("#111827")),

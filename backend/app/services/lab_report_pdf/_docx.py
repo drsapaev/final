@@ -172,6 +172,7 @@ class DocxMixin(LabReportPDFServiceMixinBase):
                 matrix_rows,
                 colWidths=[5.0 * cm] + [(doc.width - 5.0 * cm) / max(1, len(sections))] * len(sections),
                 repeatRows=1,
+                splitInRow=1,
             )
             matrix_table.setStyle(
                 TableStyle(
@@ -402,8 +403,11 @@ body {{
 .lab-table .col-unit,
 .lab-table .col-flag {{
   text-align: center;
-  white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}}
+.lab-table .col-unit,
+.lab-table .col-flag {{
+  white-space: nowrap;
 }}
 .lab-table tr {{
   break-inside: avoid;
@@ -473,7 +477,6 @@ body {{
 }}
 .smear-matrix-table .smear-site-cell {{
   text-align: center;
-  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }}
 .smear-signature {{
