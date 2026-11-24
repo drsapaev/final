@@ -105,6 +105,7 @@ def get_patient_lab_results(
     *,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
+    include_observation: bool = False,
 ) -> list[dict]:
     """Read patient results and the exact released evaluation behind each projection."""
     r = _results(db)
@@ -119,6 +120,9 @@ def get_patient_lab_results(
         date_filters.append(result_date >= date_from)
     if date_to is not None:
         date_filters.append(result_date <= date_to)
+    observation = (
+        (value.c.result_payload, value.c.value_numeric) if include_observation else ()
+    )
 
     rows = (
         db.execute(
@@ -128,6 +132,7 @@ def get_patient_lab_results(
                 source.c.supersedes_instance_id,
                 value.c.evaluation_snapshot,
                 value.c.resolved_reference_text,
+                *observation,
             )
             .join(o, r.c.order_id == o.c.id)
             .outerjoin(

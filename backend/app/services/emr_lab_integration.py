@@ -4,6 +4,7 @@
 
 import logging
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -36,11 +37,18 @@ class EMRLabIntegrationService:
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         test_types: list[str] | None = None,
+        *,
+        _include_trend_evidence: bool = False,
     ) -> list[dict[str, Any]]:
         """Получить лабораторные результаты пациента"""
         try:
             results = lab.get_patient_lab_results(
-                db, patient_id, limit=None, date_from=date_from, date_to=date_to
+                db,
+                patient_id,
+                limit=None,
+                date_from=date_from,
+                date_to=date_to,
+                include_observation=_include_trend_evidence,
             )
 
             # Фильтруем по типам тестов если указано
@@ -102,6 +110,12 @@ class EMRLabIntegrationService:
                             unit=snapshot.get("unit"),
                             ref_range=result["resolved_reference_text"],
                         )
+                    if _include_trend_evidence:
+                        formatted_result["_trend_evidence"] = (
+                            result["result_payload"],
+                            snapshot,
+                            result["value_numeric"],
+                        )
                 formatted_results.append(formatted_result)
 
             return formatted_results
@@ -109,6 +123,117 @@ class EMRLabIntegrationService:
         except Exception as e:
             logger.error(f"Ошибка получения лабораторных результатов: {e}")
             raise
+
+    async def get_lab_result_trend(
+        self, db: Session, *, patient_id: int, test_type: str, period_days: int
+    ) -> dict[str, Any]:
+        results = await self.get_patient_lab_results(
+            db,
+            patient_id,
+            date_from=datetime.now(UTC) - timedelta(days=period_days),
+            test_types=[test_type],
+            _include_trend_evidence=True,
+        )
+
+        def result_date(result: dict[str, Any]) -> datetime:
+            timestamp = result.get("released_at") or result["created_at"]
+            return (
+                timestamp.replace(tzinfo=UTC)
+                if timestamp.tzinfo is None
+                else timestamp.astimezone(UTC)
+            )
+
+        results.sort(key=lambda result: (result_date(result), result["id"]))
+        trend_data = [
+            {
+                "date": result_date(result).date().isoformat(),
+                "value": result["value"],
+                "unit": result["unit"],
+                "is_abnormal": result["is_abnormal"],
+                "normal_range": result["ref_range"],
+            }
+            for result in results
+        ]
+        return {
+            "patient_id": patient_id,
+            "test_type": test_type,
+            "period_days": period_days,
+            "trend_data": trend_data,
+            "trend_stats": self._comparable_numeric_trend(results),
+            "total_measurements": len(trend_data),
+        }
+
+    @staticmethod
+    def _comparable_numeric_trend(results: list[dict[str, Any]]) -> dict[str, Any]:
+        # A single summary needs matching measurement context and a known
+        # ordering between the numerical observations.
+        comparison = None
+        previous_release = None
+        values: list[Decimal] = []
+        assessments: list[bool] = []
+        for result in results:
+            if not result["value"]:
+                continue
+            evidence = result.get("_trend_evidence")
+            if evidence is None:
+                return {}
+            payload, snapshot, numeric = evidence
+            kind = payload.get("kind") if isinstance(payload, dict) else None
+            if kind in ("qualified_numeric", "coded_qualitative", "text", "absent"):
+                continue
+            released_at = result["released_at"]
+            if (
+                kind != "numeric"
+                or payload.get("comparator") is not None
+                or released_at is None
+                or released_at == previous_release
+                or snapshot.get("visible") is not True
+                or snapshot.get("status")
+                not in ("evaluated", "not_evaluated", "not_applicable")
+                or not isinstance(numeric, Decimal)
+                or not numeric.is_finite()
+            ):
+                return {}
+            context = tuple(
+                snapshot.get(key)
+                for key in (
+                    "analyte_code",
+                    "unit_code",
+                    "unit",
+                    "material_code",
+                    "method_code",
+                )
+            )
+            if not all(isinstance(code, str) and code.strip() for code in context):
+                return {}
+            if comparison is not None and context != comparison:
+                return {}
+            try:
+                if Decimal(result["value"]) != numeric:
+                    return {}
+            except (InvalidOperation, TypeError):
+                return {}
+            comparison = context
+            previous_release = released_at
+            values.append(numeric)
+            if result["is_abnormal"] is not None:
+                assessments.append(result["is_abnormal"])
+
+        if len(values) < 2:
+            return {}
+        if values[-1] == values[0]:
+            direction = "stable"
+        else:
+            direction = "increasing" if values[-1] > values[0] else "decreasing"
+        return {
+            "min_value": float(min(values)),
+            "max_value": float(max(values)),
+            "avg_value": float(sum(values) / len(values)),
+            "trend_direction": direction,
+            "abnormal_percentage": sum(assessments) / len(assessments) * 100
+            if assessments
+            else None,
+        }
 
     async def integrate_lab_results_with_emr(
         self, db: Session, emr_id: int, lab_result_ids: list[int]

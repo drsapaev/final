@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta, timezone
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import quote
@@ -1113,6 +1114,160 @@ def test_emr_lab_uses_current_frozen_assessment_and_release_date(
     assert summary["total_tests"] == 2
     assert summary["abnormal_count"] == int(is_abnormal is True)
     assert summary["recommendations"] == []
+
+    response = client.get(
+        "/api/v1/emr/lab/lab-results/trends",
+        params={"patient_id": patient.id, "test_type": "hemoglobin"},
+        headers=headers,
+    )
+    assert response.is_success, response.text
+    trend = response.json()
+    assert [point["value"] for point in trend["trend_data"]] == [value, "130"]
+    assert trend["trend_data"][0] == {
+        "date": released_at.date().isoformat(),
+        "value": value,
+        "unit": "g/L",
+        "is_abnormal": is_abnormal,
+        "normal_range": "SYNTHETIC current range",
+    }
+    assert trend["total_measurements"] == 2
+    assert trend["trend_stats"] == {}
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("changed_context", "same_release_time"),
+    [
+        ({}, False),
+        ({"analyte_code": "other-analyte"}, False),
+        ({"unit_code": "other-unit"}, False),
+        ({"material_code": "other-material"}, False),
+        ({"method_code": "other-method"}, False),
+        ({"method_code": None}, False),
+        ({"status": "missing"}, False),
+        ({}, True),
+    ],
+)
+def test_emr_lab_trends_only_aggregate_matching_numeric_observations(
+    client, db_session, changed_context, same_release_time
+) -> None:
+    user, doctor = _create_doctor_user(db_session, label="trend_exact")
+    patient = _create_patient(db_session)
+    visit = _create_visit(db_session, patient_id=patient.id, doctor_id=doctor.id)
+    now = datetime.now(UTC)
+    order = LabOrder(patient_id=patient.id, visit_id=visit.id)
+    template = LabReportTemplate(
+        code=f"synthetic-trend-{_suffix()}", name="SYNTHETIC trend", family="synthetic"
+    )
+    version = LabReportTemplateVersion(
+        template=template,
+        version_no=1,
+        layout_preset="default",
+        status="PUBLISHED",
+        published_at=now - timedelta(days=5),
+    )
+    db_session.add_all([order, version])
+    db_session.flush()
+
+    test_code = "synthetic-series"
+    observations = [
+        ("0", Decimal("0"), "numeric", "evaluated", "normal"),
+        ("<1", Decimal("1"), "qualified_numeric", "not_evaluated", None),
+        ("positive", None, "coded_qualitative", "evaluated", "positive"),
+        ("8", Decimal("8"), "numeric", "evaluated", "high"),
+    ]
+    for index, (raw, numeric, kind, state, interpretation) in enumerate(observations):
+        released_at = now - timedelta(
+            days=1 if same_release_time else len(observations) - index
+        )
+        report = LabReportInstance(
+            order_id=order.id,
+            visit_id=visit.id,
+            patient_id=patient.id,
+            template_id=template.id,
+            template_version_id=version.id,
+            status="FINALIZED",
+            finalized_at=released_at,
+        )
+        db_session.add(report)
+        db_session.flush()
+        snapshot = {
+            "status": state,
+            "interpretation": interpretation,
+            "visible": True,
+            "analyte_code": "synthetic-analyte",
+            "unit": "mg/L",
+            "unit_code": "synthetic-unit",
+            "material_code": "synthetic-material",
+            "method_code": "synthetic-method",
+        }
+        if index == len(observations) - 1:
+            snapshot.update(changed_context)
+        result_payload = {"kind": kind}
+        if kind == "qualified_numeric":
+            result_payload["comparator"] = "lt"
+        db_session.add_all(
+            [
+                LabReportValue(
+                    instance_id=report.id,
+                    field_key=test_code,
+                    value_numeric=numeric,
+                    value_text=raw if numeric is None else None,
+                    resolved_reference_text="SYNTHETIC frozen reference",
+                    evaluation_snapshot=snapshot,
+                    result_payload=result_payload,
+                ),
+                LabResult(
+                    order_id=order.id,
+                    test_code=test_code,
+                    test_name="SYNTHETIC trend result",
+                    value=raw,
+                    unit="previous unit",
+                    ref_range="previous range",
+                    source_instance_id=report.id,
+                    source_root_instance_id=report.id,
+                    created_at=released_at,
+                ),
+            ]
+        )
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/emr/lab/lab-results/trends",
+        params={"patient_id": patient.id, "test_type": test_code, "period_days": 7},
+        headers=_doctor_headers(client, user),
+    )
+    assert response.is_success, response.text
+    trend = response.json()
+    assert trend["patient_id"] == patient.id and trend["test_type"] == test_code
+    assert trend["period_days"] == 7 and trend["total_measurements"] == 4
+    assert [point["value"] for point in trend["trend_data"]] == [
+        "0",
+        "<1",
+        "positive",
+        "8",
+    ]
+    assert [point["is_abnormal"] for point in trend["trend_data"]] == [
+        False,
+        None,
+        None,
+        None if changed_context.get("status") == "missing" else True,
+    ]
+    assert {point["unit"] for point in trend["trend_data"]} == {"mg/L"}
+    assert {point["normal_range"] for point in trend["trend_data"]} == {
+        "SYNTHETIC frozen reference"
+    }
+    assert trend["trend_stats"] == (
+        {}
+        if changed_context or same_release_time
+        else {
+            "min_value": 0,
+            "max_value": 8,
+            "avg_value": 4,
+            "trend_direction": "increasing",
+            "abnormal_percentage": 50,
+        }
+    )
 
 
 @pytest.mark.integration
