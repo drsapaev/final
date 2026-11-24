@@ -14,6 +14,204 @@
   min-height: 100%;
 }
 
+.lab-workspace {
+  min-width: 0;
+}
+
+.lab-workspace-queue,
+.lab-workspace-report {
+  min-width: 0;
+}
+
+.lab-workspace-report:not([hidden]) {
+  display: grid;
+  gap: var(--mac-spacing-3);
+  align-content: start;
+}
+
+.lab-workspace-empty {
+  display: none;
+}
+
+.lab-worklist-filters,
+.lab-specimen-content,
+.lab-specimen-form {
+  display: grid;
+  gap: var(--mac-spacing-2);
+}
+
+.lab-worklist-filters {
+  margin-top: var(--mac-spacing-3);
+}
+
+.lab-worklist-toolbar,
+.lab-specimen-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--mac-spacing-2);
+  min-width: 0;
+}
+
+.lab-worklist-toolbar > div:has(input:not([type=checkbox])) {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.lab-worklist-field {
+  display: grid;
+  flex: 1 1 120px;
+  gap: var(--mac-spacing-1);
+  min-width: 0;
+}
+
+.lab-worklist-field select {
+  width: 100%;
+}
+
+.lab-worklist-scan:not([hidden]) {
+  display: grid;
+  gap: var(--mac-spacing-1);
+}
+
+.lab-order-identity {
+  display: grid;
+  justify-items: start;
+  gap: var(--mac-spacing-2);
+  padding: var(--mac-spacing-3);
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  overflow-wrap: anywhere;
+}
+
+.lab-order-identity h2,
+.lab-order-identifiers,
+.lab-order-identifiers dd,
+.lab-specimen-form h3,
+.lab-specimen-content p {
+  margin: 0;
+}
+
+.lab-order-identifiers {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--mac-spacing-4);
+  row-gap: var(--mac-spacing-2);
+}
+
+.lab-order-identifiers dt {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-sm);
+}
+
+.lab-specimen-header {
+  justify-content: space-between;
+}
+
+.lab-ordered-tests {
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+}
+
+.lab-ordered-tests > ul {
+  margin-top: var(--mac-spacing-2);
+}
+
+.lab-specimen-list,
+.lab-specimen-events {
+  margin: 0;
+}
+
+.lab-specimen-list {
+  display: grid;
+  gap: var(--mac-spacing-2);
+  padding: 0;
+  list-style: none;
+}
+
+.lab-specimen-list > li,
+.lab-specimen-form {
+  display: grid;
+  gap: var(--mac-spacing-2);
+  padding: var(--mac-spacing-3);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  overflow-wrap: anywhere;
+}
+
+.lab-specimen-list > .lab-specimen-selected {
+  border-color: var(--mac-accent);
+}
+
+.lab-specimen-targets {
+  display: grid;
+  gap: var(--mac-spacing-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--mac-spacing-2);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+}
+
+.lab-specimen-targets label {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+@media (max-width: 1099px) {
+  .lab-workspace--reports > .lab-workspace-queue {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .lab-main {
+    padding: var(--mac-spacing-2);
+  }
+
+  .lab-workspace .lqw-search-wrapper {
+    min-width: 0;
+  }
+
+  .lab-workspace .lqw-status-filter-group {
+    flex-wrap: wrap;
+  }
+}
+
+@media (min-width: 1100px) {
+  .lab-workspace:not([hidden]) {
+    --lab-queue-max-height: max(220px, calc(100dvh - 390px));
+
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(0, 2.2fr);
+    gap: var(--mac-spacing-3);
+    align-items: start;
+  }
+
+  .lab-workspace-queue,
+  .lab-order-identity {
+    position: sticky;
+    top: var(--mac-spacing-2);
+  }
+
+  .lab-order-identity {
+    z-index: 2;
+  }
+
+  .lab-workspace-empty {
+    display: block;
+    padding: var(--mac-spacing-4);
+    color: var(--mac-text-secondary);
+  }
+
+  .lab-workspace-back {
+    display: none;
+  }
+}
+
 /* ─── Skip-to-content link (visually hidden until focused) ─── */
 .lab-skip-link {
   position: absolute;

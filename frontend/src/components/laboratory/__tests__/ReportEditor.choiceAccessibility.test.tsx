@@ -48,14 +48,6 @@ vi.mock('../../../hooks/useLabReporting', () => ({
   }),
 }));
 
-vi.mock('./hooks/useLabToast', () => ({
-  useLabToast: () => ({
-    interactiveInfo: vi.fn(),
-    interactiveWarning: vi.fn(),
-    interactiveError: vi.fn(),
-  }),
-}));
-
 import ReportEditorRaw from '../ReportEditor';
 
 const ReportEditor = ReportEditorRaw as unknown as React.ComponentType<Record<string, unknown>>;

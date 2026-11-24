@@ -112,7 +112,7 @@ export default function VirtualizedQueueList({
       className="lqw-virtualized-list"
       style={{
         height: '100%',
-        maxHeight: '70vh',
+        maxHeight: 'var(--lab-queue-max-height, 70vh)',
         overflow: 'auto',
         position: 'relative',
       }}

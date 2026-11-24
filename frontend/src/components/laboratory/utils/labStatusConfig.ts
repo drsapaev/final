@@ -25,6 +25,8 @@ export const LAB_REPORT_STATUS_CONFIG = [
   { key: 'DRAFT',       label: 'Черновик',          variant: 'warning' },
   { key: 'IN_PROGRESS', label: 'Заполняется',       variant: 'primary' },
   { key: 'READY',       label: 'Готов к проверке',  variant: 'primary' },
+  { key: 'IN_REVIEW',   label: 'На проверке',      variant: 'warning' },
+  { key: 'REVIEWED',    label: 'Проверен',         variant: 'primary' },
   { key: 'FINALIZED',   label: 'Утверждён',         variant: 'success' },
   { key: 'PRINTED',     label: 'Напечатан',         variant: 'success' },
 ];

@@ -23,6 +23,8 @@ import EMRSection from './EMRSection';
 import React from 'react';
 // ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
 import { useLabReporting } from '@/hooks/useLabReporting';
+import LabCriticalAcknowledgement from '../../laboratory/LabCriticalAcknowledgement';
+import { getLabOperationsLabels } from '../../laboratory/labOperationsLabels';
 import { Badge, Button, Dialog, DialogTitle, DialogContent, DialogActions } from '../../ui/macos';
 import { useConfirm } from '../../common/ConfirmDialog';
 // UX-AUDIT-FIX10: ранее STATUS_LABELS / STATUS_VARIANTS дублировались локально.
@@ -48,6 +50,8 @@ interface LabReportInstance {
   finalized_at?: string;
   updated_at?: string;
   flagged_findings_count?: number;
+  managed_release?: boolean;
+  supersedes_instance_id?: number | null;
   status?: string;
 }
 
@@ -79,7 +83,8 @@ function formatDate(dateStr: unknown): string {
 }
 
 export function LabResultsSection({ patientId, visitId, disabled = false }: LabResultsSectionProps) {
-  const { t: rawT } = useTranslation(); const t = rawT;
+  const { t: rawT, language } = useTranslation(); const t = rawT;
+  const labLabels = getLabOperationsLabels(language);
   // ADR-0015: lab reporting API accessed via hook.
   const labReportingApi = useLabReporting();
   const [instances, setInstances] = useState<LabReportInstance[]>([]);
@@ -354,6 +359,11 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              {instances.some((item) => String(item.supersedes_instance_id ?? '') === String(instance.id)) ? (
+                <Badge variant="default" size="small">{labLabels.replaced}</Badge>
+              ) : instance.supersedes_instance_id ? (
+                <Badge variant="default" size="small">{labLabels.corrected} #{instance.supersedes_instance_id}</Badge>
+              ) : null}
               <Badge variant={getLabStatusVariant(instance.status || '') || 'default'} size="small">
                 {formatLabStatus(instance.status || '') || instance.status}
               </Badge>
@@ -393,6 +403,14 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
         ) : null}
       >
         {renderContent()}
+        {visitId && instances.some((instance) => instance.managed_release) && (
+          <LabCriticalAcknowledgement
+            key={String(visitId)}
+            visitId={Number(visitId)}
+            reportIds={instances.map((instance) => Number(instance.id))}
+            labels={labLabels}
+          />
+        )}
       </EMRSection>
 
       {/* P1 fix: Order lab tests modal */}

@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Badge, Button, Card, CardContent, CardHeader } from '../components/ui/macos';
 import LabQueueWorkbench from '../components/laboratory/LabQueueWorkbench';
+import LabSpecimenWorkbench from '../components/laboratory/LabSpecimenWorkbench';
+import LabOrderIdentity from '../components/laboratory/LabOrderIdentity';
+import LabOperationsWorkbench from '../components/laboratory/LabOperationsWorkbench';
+import LabOrderedTests from '../components/laboratory/LabOrderedTests';
 import LabReportWorkbench, {
   type LabInstanceChangeContext,
   type LabReportOperationContext,
@@ -9,9 +13,9 @@ import LabReportWorkbench, {
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
 import type { DirtyGuardTransitionOptions } from '../components/laboratory/hooks/useDirtyTransitionGuard';
 import { useLabDirtyGuard } from '../components/laboratory/LabDirtyGuardContext';
-import type { LabOperationPendingState } from '../components/laboratory/operationPending';
-import { formatLabStatus } from '../components/laboratory/labUiLabels';
+import { LAB_OPERATION_PENDING_ALL, type LabOperationPendingState } from '../components/laboratory/operationPending';
 import { labReportingApi } from '../api/labReporting';
+import { INITIAL_LAB_WORKLIST_QUERY, type LabWorklistPage, type LabWorklistQuery } from '../types/features/labWorkspace';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import { usePendingAwareSessionExpiry } from '../hooks/usePendingAwareSessionExpiry';
@@ -21,7 +25,7 @@ import { useLabHotkeys } from '../hooks/useLabHotkeys';
 import notifyService from '../services/notify';
 import './lab.css';
 import { useTranslation } from '../i18n/useTranslation';
-import { BriefcaseMedical, FileText, RotateCw, SquareStack, TestTube2, X } from 'lucide-react';
+import { BriefcaseMedical, FileText, ListChecks, RotateCw, SquareStack, TestTube2, X } from 'lucide-react';
 
 // P-03 fix: API_V1_BASE и tokenManager больше не нужны — loadLabAppointments
 // использует labReportingApi.listQueueToday() с собственным auth-токеном.
@@ -97,8 +101,14 @@ function getInstancePatientId(instance: Record<string, unknown> | null) {
   ) as string | number | null;
 }
 
+function getPositiveId(value: unknown): number | null {
+  const id = typeof value === 'string' || typeof value === 'number' ? Number(value) : 0;
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
 function getAppointmentSelectionKey(appointment: Record<string, unknown> | null) {
   if (!appointment) return null;
+  if (appointment.order_id != null) return `order:${String(appointment.order_id)}`;
   if (appointment.appointment_id != null) return `appointment:${String(appointment.appointment_id)}`;
   if (appointment.id != null) return `row:${String(appointment.id)}`;
   if (appointment.visit_id != null) return `visit:${String(appointment.visit_id)}`;
@@ -111,8 +121,11 @@ function appointmentMatchesInstance(
   instance: Record<string, unknown>,
 ) {
   const patientId = getInstancePatientId(instance);
-  if (!instanceIdsMatch(appointment.patient_id as string | number | null | undefined, patientId)) {
+  if (patientId == null || !instanceIdsMatch(appointment.patient_id as string | number | null | undefined, patientId)) {
     return false;
+  }
+  if (appointment.order_id != null && instance.order_id != null) {
+    return String(appointment.order_id) === String(instance.order_id);
   }
   if (
     appointment.report_instance_id != null
@@ -137,12 +150,13 @@ function buildTemplateResolutionPayload(appointment: Record<string, unknown> | n
     return null;
   }
   const serviceDetails = (appointment.service_details || []) as Array<Record<string, unknown>>;
+  const activeDetails = serviceDetails.filter((item) => item.canceled !== true);
   return {
     patient_id: appointment.patient_id || null,
     appointment_id: appointment.appointment_id || null,
     visit_id: appointment.visit_id || null,
-    service_codes: appointment.service_codes || [],
-    service_items: serviceDetails.map((item) => ({
+    service_codes: activeDetails.length === serviceDetails.length ? appointment.service_codes || [] : activeDetails.map((item) => item.code).filter(Boolean),
+    service_items: activeDetails.map((item) => ({
       service_id: item.id || null,
       code: item.code || null,
       name: item.name || null
@@ -161,7 +175,7 @@ function getTemplateResolutionContextKey(appointment: Record<string, unknown> | 
 // оставался Templates — URL показывал одно (Queue после reload), экран —
 // другое (Templates); адрес нельзя было ни сохранить, ни скопировать, ни
 // восстановить.
-const LAB_TAB_IDS = ['queue', 'templates', 'reports'] as const;
+const LAB_TAB_IDS = ['queue', 'templates', 'reports', 'operations'] as const;
 
 function resolveLabTabId(requested: string | null): string {
   return (LAB_TAB_IDS as readonly string[]).includes(requested ?? '')
@@ -196,6 +210,7 @@ export default function LabPanel() {
     { id: 'queue', label: t('misc.lp_ochered'), icon: TestTube2 },
     { id: 'templates', label: t('misc.lp_shablony'), icon: SquareStack },
     { id: 'reports', label: t('misc.lp_otchety'), icon: FileText },
+    { id: 'operations', label: t('labWorkspace.operations'), icon: ListChecks },
   ];
   const location = useLocation();
   const navigate = useNavigate();
@@ -207,6 +222,10 @@ export default function LabPanel() {
     : null;
 
   const [activeTab, setActiveTab] = useState(() => resolveLabTabId(searchParams.get('tab')));
+  const [operationsOpened, setOperationsOpened] = useState(false);
+  useEffect(() => {
+    if (activeTab === 'operations') setOperationsOpened(true);
+  }, [activeTab]);
   // PR 3351 (review round 6, P2): render-time ref активной вкладки —
   // захват pre-intent вкладки в loadInstance читает значение ДО того, как
   // tab-sync effect закоммитит нормализацию (эффекты одного прохода
@@ -219,6 +238,11 @@ export default function LabPanel() {
   const preUrlIntentTabRef = useRef<string | null>(null);
   const [appointments, setAppointments] = useState<Record<string, unknown>[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState(false);
+  const worklistQueryRef = useRef<LabWorklistQuery>(INITIAL_LAB_WORKLIST_QUERY);
+  const nextWorklistCursorRef = useRef<string | null>(null);
+  const [worklistPage, setWorklistPage] = useState<LabWorklistPage | null>(null);
+  const worklistAvailableRef = useRef(typeof labReportingApi.listWorklist === 'function');
   // STRAT#7: server-side pagination state для очереди.
   // queueTotal — общее количество записей на сервере (из payload.total).
   // queueOffset — текущий offset для следующей страницы.
@@ -539,6 +563,7 @@ export default function LabPanel() {
       currentInstanceId != null
       && item.report_instance_id != null
       && instanceIdsMatch(item.report_instance_id as string | number, currentInstanceId)
+      && appointmentMatchesInstance(item, currentInstance)
     )) ?? entries.find((item) => appointmentMatchesInstance(item, currentInstance)) ?? null;
     if (!matchingAppointment) return false;
     selectedAppointmentRef.current = matchingAppointment;
@@ -556,9 +581,13 @@ export default function LabPanel() {
     const current = selectedAppointmentRef.current;
     if (!current) return false;
     const refreshed = entries.find(
-      (item) =>
-        item.id === current.id
-        || (current.appointment_id && item.appointment_id === current.appointment_id)
+      (item) => {
+        if (item.order_id != null || current.order_id != null) {
+          return item.order_id != null && current.order_id != null && String(item.order_id) === String(current.order_id);
+        }
+        return (current.id != null && item.id === current.id)
+          || (current.appointment_id != null && item.appointment_id === current.appointment_id);
+      }
     );
     if (!refreshed) return false;
     selectedAppointmentRef.current = refreshed;
@@ -600,7 +629,20 @@ export default function LabPanel() {
     queueAbortControllerRef.current = controller;
 
     setAppointmentsLoading(true);
+    setAppointmentsError(false);
     try {
+      let worklist: LabWorklistPage | null = null;
+      if (worklistAvailableRef.current) {
+        try {
+          worklist = await labReportingApi.listWorklist(worklistQueryRef.current, { signal: controller.signal });
+        } catch (error) {
+          if (queueGenerationRef.current !== generation) return;
+          const status = (error as { status?: number } | null)?.status;
+          // During a staggered upgrade the old API exposes only today's queue.
+          if (status !== 404 && status !== 405) throw error;
+          worklistAvailableRef.current = false;
+        }
+      }
       // P-03 fix: используем lab-specific façade endpoint вместо прямого
       // fetch к registrar endpoint. Façade имеет собственный контракт,
       // собственную RBAC и нормализует ответ в плоский формат — это убирает
@@ -613,7 +655,7 @@ export default function LabPanel() {
       // loadMoreAppointments() догружает следующие.
       //
       // STRAT#16: передаём signal для отмены запроса при быстром повторе.
-      const payload = (await labReportingApi.listQueueToday(null, {
+      const payload = worklist ?? (await labReportingApi.listQueueToday(null, {
         limit: LAB_QUEUE_PAGE_SIZE,
         offset: 0,
         signal: controller.signal,
@@ -630,9 +672,11 @@ export default function LabPanel() {
       setAppointments(queueEntries);
       const totalCount = typeof payload?.total === 'number' ? payload.total : queueEntries.length;
       setQueueTotal(totalCount);
+      setWorklistPage(worklist);
+      nextWorklistCursorRef.current = worklist?.next_cursor ?? null;
       setQueueOffset(queueEntries.length);
       // STRAT#7: помечаем, есть ли ещё записи для load-more
-      setHasMoreQueue(totalCount > queueEntries.length);
+      setHasMoreQueue(worklist ? worklist.next_cursor != null : totalCount > queueEntries.length);
       if (!bindAppointmentForActiveInstance(queueEntries)) {
         refreshSelectedAppointmentFromEntries(queueEntries);
       }
@@ -642,6 +686,7 @@ export default function LabPanel() {
       // LABQ-FE-001/002: a stale generation's failure is not the current
       // snapshot's failure.
       if (isAbortLikeError(error) || queueGenerationRef.current !== generation) return;
+      setAppointmentsError(true);
       logger.error('[LabPanel] loadLabAppointments failed', error);
       notify(
         'error',
@@ -658,12 +703,20 @@ export default function LabPanel() {
     }
   }, [bindAppointmentForActiveInstance, notify, refreshSelectedAppointmentFromEntries]);
 
+  const changeWorklistQuery = useCallback((query: LabWorklistQuery) => {
+    worklistQueryRef.current = query;
+    appointmentsRef.current = [];
+    setAppointments([]);
+    setHasMoreQueue(false);
+    void loadLabAppointments();
+  }, [loadLabAppointments]);
+
   // STRAT#7: loadMoreAppointments — incremental server-side pagination.
   // Догружает следующую страницу (offset = queueOffset) и аппендит к
   // существующему списку. Используется кнопкой «Показать ещё» в
   // LabQueueWorkbench (заменит client-side load-more из FIX#13).
   const loadMoreAppointments = useCallback(async () => {
-    if (loadingMore || !hasMoreQueue) return;
+    if (loadingMore || !hasMoreQueue || appointmentsLoading) return;
     // LABQ-FE-001 (audit 3886): the page belongs to the CURRENT queue
     // generation — if a refresh opens a new one while this page is in
     // flight, its completion must not append into the newer snapshot.
@@ -677,7 +730,11 @@ export default function LabPanel() {
 
     setLoadingMore(true);
     try {
-      const payload = (await labReportingApi.listQueueToday(null, {
+      const cursor = nextWorklistCursorRef.current;
+      const worklist = cursor == null ? null : await labReportingApi.listWorklist(worklistQueryRef.current, {
+        cursor, signal: controller.signal,
+      });
+      const payload = worklist ?? (await labReportingApi.listQueueToday(null, {
         limit: LAB_QUEUE_PAGE_SIZE,
         offset: queueOffset,
         signal: controller.signal,
@@ -689,21 +746,29 @@ export default function LabPanel() {
         return;
       }
       const newEntries = normalizeListPayload(payload?.entries ?? []);
-      appointmentsRef.current = [...appointmentsRef.current, ...newEntries];
-      setAppointments((current) => [...current, ...newEntries]);
+      const seen = new Set(appointmentsRef.current.map((entry) => entry.id));
+      const merged = [...appointmentsRef.current, ...newEntries.filter((entry) => !seen.has(entry.id))];
+      appointmentsRef.current = merged;
+      setAppointments(merged);
       if (!refreshSelectedAppointmentFromEntries(newEntries)) {
         bindAppointmentForActiveInstance(newEntries);
       }
       setQueueOffset((current) => current + newEntries.length);
       const totalCount = typeof payload?.total === 'number' ? payload.total : 0;
-      setHasMoreQueue(totalCount > queueOffset + newEntries.length);
+      nextWorklistCursorRef.current = worklist?.next_cursor ?? null;
+      setHasMoreQueue(worklist ? worklist.next_cursor != null : totalCount > queueOffset + newEntries.length);
       logger.info('[LabPanel] loaded more lab queue entries', newEntries.length);
     } catch (error) {
       // STRAT#16: не показываем error notification для отменённых запросов.
       // LABQ-FE-001: a stale page's failure belongs to the old generation.
       if (isAbortLikeError(error) || queueGenerationRef.current !== generation) return;
       logger.error('[LabPanel] loadMoreAppointments failed', error);
-      notify('error', getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_dopolnite')));
+      if ((error as { status?: number } | null)?.status === 409 && nextWorklistCursorRef.current != null) {
+        notify('info', t('labWorkspace.cursorExpired'));
+        await loadLabAppointments();
+      } else {
+        notify('error', getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_dopolnite')));
+      }
     } finally {
       // LABQ-FE-002: only the current generation's page may unset the
       // incremental loading flag.
@@ -713,9 +778,11 @@ export default function LabPanel() {
     }
   }, [
     bindAppointmentForActiveInstance,
+    appointmentsLoading,
     loadingMore,
     hasMoreQueue,
     queueOffset,
+    loadLabAppointments,
     notify,
     refreshSelectedAppointmentFromEntries,
   ]);
@@ -784,6 +851,16 @@ export default function LabPanel() {
     (state: LabOperationPendingState | null) => setOperationSourcePending('template', state),
     [setOperationSourcePending],
   );
+  const [specimenPending, setSpecimenPending] = useState(false);
+  const [orderedTestPending, setOrderedTestPending] = useState(false);
+  const handleSpecimenOperationPendingChange = useCallback((pending: boolean) => {
+    setSpecimenPending(pending);
+    setOperationSourcePending('specimen', pending ? LAB_OPERATION_PENDING_ALL : null);
+  }, [setOperationSourcePending]);
+  const handleOrderedTestPendingChange = useCallback((pending: boolean) => {
+    setOrderedTestPending(pending);
+    setOperationSourcePending('ordered-test', pending ? LAB_OPERATION_PENDING_ALL : null);
+  }, [setOperationSourcePending]);
   // PR 3351 (review round 6, P1): истечение сессии больше не делает hard
   // navigation поверх незавершённой операции. Прежний код вызывал
   // window.location.href = '/login' прямо из onExpired опроса — это полная
@@ -825,7 +902,8 @@ export default function LabPanel() {
     options?: DirtyGuardTransitionOptions,
   ) => {
     const blockedBy = options?.sourceIds
-      ? [...pendingOperationSourcesRef.current].filter((source) => options.sourceIds?.includes(source))
+      ? [...pendingOperationSourcesRef.current].filter((source) => options.sourceIds?.includes(source)
+        || ((source === 'specimen' || source === 'ordered-test') && options.sourceIds?.includes('report')))
       : [...pendingOperationSourcesRef.current];
     if (blockedBy.length > 0) {
       notify('info', t('workbench.saving'));
@@ -1057,6 +1135,9 @@ export default function LabPanel() {
       && resultPatientId != null
       && !instanceIdsMatch(change.operation.patientId, resultPatientId)
     ) return false;
+    const expectedOrderId = getPositiveId(selectedAppointmentRef.current?.order_id);
+    const resultOrderId = getPositiveId(instance.order_id);
+    if (expectedOrderId != null && resultOrderId != null && expectedOrderId !== resultOrderId) return false;
 
     if (change.kind === 'update') {
       // A committed update may finish while a newer target GET is still
@@ -1568,10 +1649,63 @@ export default function LabPanel() {
     : recentReports.length;
 
   const statusCounters = useMemo<Record<string, number>>(() => ({
-    queue: appointments.length,
+    queue: worklistPage ? queueTotal : appointments.length,
     templates: templates.length,
     reports: reportsCounter
-  }), [appointments.length, reportsCounter, templates.length]);
+  }), [appointments.length, queueTotal, reportsCounter, templates.length, worklistPage]);
+
+  const expectedOrderId = getPositiveId(selectedAppointment?.order_id);
+  const activeOrderId = getPositiveId(activeInstance?.order_id);
+  const activePatientId = getInstancePatientId(activeInstance);
+  const scopedInstance = activeInstance && (!selectedAppointment || (
+    activePatientId != null && String(selectedAppointment.patient_id) === String(activePatientId)
+    && (expectedOrderId == null || expectedOrderId === activeOrderId)
+  )) ? activeInstance : null;
+  const selectedOrderId = getPositiveId(selectedAppointment?.order_id ?? scopedInstance?.order_id);
+  const selectedVisitId = getPositiveId(selectedAppointment?.visit_id ?? scopedInstance?.visit_id);
+  const selectedReportId = getPositiveId(scopedInstance?.id);
+  const orderedTests = Array.isArray(selectedAppointment?.service_details)
+    ? (selectedAppointment.service_details as Record<string, unknown>[]).flatMap((service) => {
+        const id = getPositiveId(service.visit_service_id);
+        return id == null ? [] : [{
+          id, label: String(service.name ?? service.code ?? `#${id}`),
+          canceled: service.canceled === true, canCancel: service.can_cancel === true,
+        }];
+      }) : [];
+  const selectedServices = orderedTests.filter((test) => !test.canceled);
+  const awaitingVisit = typeof selectedAppointment?.id === 'string' && selectedAppointment.id.startsWith('queue:')
+    && selectedAppointment.visit_id == null && selectedAppointment.appointment_id == null && selectedOrderId == null;
+
+  const establishSpecimenOrder = useCallback((orderId: number, visitId: number) => {
+    const current = selectedAppointmentRef.current;
+    if (!current || getPositiveId(current.visit_id) !== visitId || current.order_id != null) return;
+    const updated = { ...current, order_id: orderId, id: `order:${orderId}` };
+    selectedAppointmentRef.current = updated;
+    setSelectedAppointment(updated);
+  }, []);
+
+  const handleOrderedTestChanged = useCallback((testId?: number) => {
+    const current = selectedAppointmentRef.current;
+    if (testId != null && current && getPositiveId(current.visit_id) === selectedVisitId && Array.isArray(current.service_details)) {
+      const updated = {
+        ...current,
+        service_details: (current.service_details as Record<string, unknown>[]).map((item) => (
+          getPositiveId(item.visit_service_id) === testId ? { ...item, canceled: true, can_cancel: false } : item
+        )),
+      };
+      selectedAppointmentRef.current = updated;
+      setSelectedAppointment(updated);
+    }
+    void loadLabAppointments();
+  }, [loadLabAppointments, selectedVisitId]);
+
+  const focusReportAfterOpen = useRef(false);
+  useEffect(() => {
+    if (activeTab === 'reports' && focusReportAfterOpen.current) {
+      focusReportAfterOpen.current = false;
+      document.getElementById('lab-order-title')?.focus({ preventScroll: true });
+    }
+  }, [activeTab, selectedAppointment]);
 
   return (
     <main
@@ -1585,7 +1719,7 @@ export default function LabPanel() {
         href={`#${LAB_PANEL_TABLIST_ID}`}
         className="lab-skip-link"
       >
-        Перейти к навигации по табам
+        {t('labWorkspace.skipToTabs')}
       </a>
       <Card variant="filled" padding="none">
         <CardHeader
@@ -1613,7 +1747,9 @@ export default function LabPanel() {
                   role="tab"
                   aria-selected={activeTab === tab.id}
                   aria-controls={getLabPanelTabPanelId(tab.id)}
-                  aria-label={t('misc.lp_tab_label_statuscounters_tab', { label: tab.label, id: statusCounters[tab.id] })}
+                  aria-label={statusCounters[tab.id] == null ? tab.label : t('misc.lp_tab_label_statuscounters_tab', {
+                    label: tab.label, id: statusCounters[tab.id],
+                  })}
                   tabIndex={activeTab === tab.id ? 0 : -1}
                   variant={activeTab === tab.id ? 'primary' : 'outline'}
                   onClick={() => switchTab(tab.id)}
@@ -1621,12 +1757,12 @@ export default function LabPanel() {
                 >
                   <tab.icon size={16} aria-hidden="true" />
                   {tab.label}
-                  <Badge
+                  {statusCounters[tab.id] != null && <Badge
                     aria-hidden="true"
                     variant={activeTab === tab.id ? 'success' : 'info'}
                   >
                     {statusCounters[tab.id]}
-                  </Badge>
+                  </Badge>}
                 </Button>
               ))}
             </div>
@@ -1683,17 +1819,13 @@ export default function LabPanel() {
         )}
       </Card>
 
-      {/* WF-14 fix: используем hidden вместо conditional render.
-          Раньше activeTab === 'queue' && (...) размонтировало компонент
-          при переключении — searchQuery и statusFilter терялись.
-          Теперь все 3 секции смонтированы, скрытые через hidden —
-          local state сохраняется. aria-hidden для accessibility. */}
+      <div className={`lab-workspace lab-workspace--${activeTab}`} hidden={activeTab !== 'queue' && activeTab !== 'reports'}>
       <section
         id={getLabPanelTabPanelId('queue')}
-        role="tabpanel"
+        role={activeTab === 'queue' ? 'tabpanel' : 'region'}
         aria-labelledby={getLabPanelTabId('queue')}
         tabIndex={0}
-        hidden={activeTab !== 'queue'}
+        className="lab-workspace-queue"
       >
         <LabQueueWorkbench
           appointments={appointments}
@@ -1704,12 +1836,17 @@ export default function LabPanel() {
           hasMore={hasMoreQueue}
           loadingMore={loadingMore}
           queueTotal={queueTotal}
+          worklist={worklistPage}
+          scanned={Boolean(worklistQueryRef.current.barcode)}
+          error={appointmentsError}
+          onQueryChange={changeWorklistQuery}
           onOpenAppointment={(appointment) => {
+            const nextAppointment = appointment as Record<string, unknown>;
             // PR5: смена пациента — переход через dirty-guard. Затрагивает
             // только report-draft: шаблонный редактор живёт в отдельном
             // табе и не уничтожается сменой пациента.
             guardTransition(() => {
-              const nextAppointment = appointment as Record<string, unknown>;
+              focusReportAfterOpen.current = true;
               selectedAppointmentRef.current = nextAppointment;
               selectedAppointmentPatientIdRef.current = (
                 nextAppointment.patient_id as string | number | null | undefined
@@ -1736,6 +1873,77 @@ export default function LabPanel() {
           reportHistory={reportHistory as unknown as Array<Record<string, unknown> & { id: string | number; created_at: string; status: string; flagged_findings_count: number; critical_findings_count: number; max_flag_severity?: number }>}
         />
       </section>
+
+      <section
+        id={getLabPanelTabPanelId('reports')}
+        role="tabpanel"
+        aria-labelledby={getLabPanelTabId('reports')}
+        tabIndex={0}
+        className="lab-workspace-report"
+        hidden={activeTab !== 'reports'}
+      >
+        {(selectedAppointment || activeInstance) && (
+          <div className="lab-workspace-back">
+            <Button type="button" variant="ghost" onClick={() => {
+              switchTab('queue');
+              window.requestAnimationFrame(() => {
+                const queue = document.getElementById(getLabPanelTabPanelId('queue'));
+                (queue?.querySelector<HTMLElement>('[aria-current="true"]') ?? queue)?.focus();
+              });
+            }}>{t('labWorkspace.backToQueue')}</Button>
+          </div>
+        )}
+        {(selectedAppointment || scopedInstance) && (
+          <LabOrderIdentity appointment={selectedAppointment} report={scopedInstance} orderId={selectedOrderId} />
+        )}
+        {selectedVisitId != null && orderedTests.length > 0 && (
+          <LabOrderedTests key={`${selectedVisitId}:${selectedOrderId ?? ''}`} visitId={selectedVisitId}
+            orderId={selectedOrderId} tests={orderedTests}
+            disabled={specimenPending || instanceTransitionPending || pendingOperationSourcesRef.current.has('report')}
+            onPendingChange={handleOrderedTestPendingChange} onChanged={handleOrderedTestChanged} />
+        )}
+        {(selectedOrderId != null || (selectedVisitId != null && selectedServices.length > 0)) && (
+          <LabSpecimenWorkbench
+            key={selectedOrderId == null ? `visit:${selectedVisitId}` : `order:${selectedOrderId}`}
+            orderId={selectedOrderId}
+            visitId={selectedVisitId}
+            activeReportId={scopedInstance?.available_actions && Array.isArray(scopedInstance.available_actions)
+              && scopedInstance.available_actions.includes('edit') ? selectedReportId : null}
+            services={selectedServices}
+            disabled={selectedAppointment?.status === 'canceled' || orderedTestPending
+              || instanceTransitionPending || pendingOperationSourcesRef.current.has('report')}
+            onPendingChange={handleSpecimenOperationPendingChange}
+            onChanged={loadLabAppointments}
+            onOrderEstablished={establishSpecimenOrder}
+          />
+        )}
+        {awaitingVisit && <Alert severity="info">{t('labWorkspace.awaitingVisit')}</Alert>}
+        <div hidden={awaitingVisit} inert={specimenPending || orderedTestPending}>
+        <LabReportWorkbench
+          selectedAppointment={awaitingVisit ? null : selectedAppointment}
+          templates={templates}
+          templateResolution={templateResolution as unknown as null}
+          templateResolutionLoading={templateResolutionLoading}
+          reportHistory={reportHistory as unknown as never[]}
+          recentReports={recentReports as unknown as never[]}
+          registerDirtySource={registerDirtySource}
+          onDirtyStateChange={notifyDirtyStateChange}
+          onOperationPendingChange={handleReportOperationPendingChange}
+          activeInstance={scopedInstance}
+          instanceTransitionPending={instanceTransitionPending}
+          pauseAutoSave={isDialogOpen || specimenPending || orderedTestPending}
+          getOperationContext={getReportOperationContext}
+          onInstanceChange={handleInstanceChange}
+          onOpenInstance={loadInstance}
+          onRefreshHistory={loadReportHistory as unknown as (patientId: string | number) => Promise<void>}
+          onRefreshRecentReports={loadRecentReports as unknown as undefined}
+          onQueueChanged={loadLabAppointments as unknown as undefined}
+          notify={notify}
+        />
+        </div>
+      </section>
+      {activeTab === 'queue' && <aside className="lab-workspace-empty">{t('labWorkspace.openFromQueue')}</aside>}
+      </div>
 
       <section
         id={getLabPanelTabPanelId('templates')}
@@ -1795,63 +2003,15 @@ export default function LabPanel() {
       </section>
 
       <section
-        id={getLabPanelTabPanelId('reports')}
+        id={getLabPanelTabPanelId('operations')}
         role="tabpanel"
-        aria-labelledby={getLabPanelTabId('reports')}
+        aria-labelledby={getLabPanelTabId('operations')}
         tabIndex={0}
-        hidden={activeTab !== 'reports'}
+        hidden={activeTab !== 'operations'}
       >
-        {/* WF-16 fix: breadcrumb навигация для wayfinding.
-            Показывает путь: Очередь → Пациент → Отчёт #N (статус). */}
-        {(selectedAppointment || activeInstance) && (
-          <nav aria-label={t('misc.lp_navigatsiya')} className="lab-breadcrumb-nav">
-            <button
-              type="button"
-              onClick={() => switchTab('queue')}
-              className="lab-breadcrumb-link"
-            >
-              Очередь
-            </button>
-            {selectedAppointment && (
-              <>
-                <span>›</span>
-                <span>{String(selectedAppointment.patient_fio || t('misc.lp_patsient_selectedappointment', { patient_id: selectedAppointment.patient_id }))}</span>
-              </>
-            )}
-            {activeInstance && (
-              <>
-                <span>›</span>
-                <span>
-                  Отчёт #{String(activeInstance.id)}
-                  <span className="lab-text-muted-ml">
-                    ({formatLabStatus(activeInstance.status as string)})
-                  </span>
-                </span>
-              </>
-            )}
-          </nav>
+        {(operationsOpened || activeTab === 'operations') && (
+          <LabOperationsWorkbench orderId={selectedOrderId} reportId={selectedReportId} onQueueChanged={loadLabAppointments} />
         )}
-        <LabReportWorkbench
-          selectedAppointment={selectedAppointment as unknown as null}
-          templates={templates}
-          templateResolution={templateResolution as unknown as null}
-          templateResolutionLoading={templateResolutionLoading}
-          reportHistory={reportHistory as unknown as never[]}
-          recentReports={recentReports as unknown as never[]}
-          registerDirtySource={registerDirtySource}
-          onDirtyStateChange={notifyDirtyStateChange}
-          onOperationPendingChange={handleReportOperationPendingChange}
-          activeInstance={activeInstance as unknown as null}
-          instanceTransitionPending={instanceTransitionPending}
-          pauseAutoSave={isDialogOpen}
-          getOperationContext={getReportOperationContext}
-          onInstanceChange={handleInstanceChange}
-          onOpenInstance={loadInstance}
-          onRefreshHistory={loadReportHistory as unknown as (patientId: string | number) => Promise<void>}
-          onRefreshRecentReports={loadRecentReports as unknown as undefined}
-          onQueueChanged={loadLabAppointments as unknown as undefined}
-          notify={notify}
-        />
       </section>
 
               {/* PR5: единый dirty-guard диалог */}

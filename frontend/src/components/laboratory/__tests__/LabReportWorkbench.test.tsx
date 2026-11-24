@@ -342,11 +342,11 @@ describe('LabReportWorkbench', () => {
     expect(source).toContain("t('confirm.finalize_description')");
     expect(source).toContain("t('confirm.finalize_confirm')");
 
-    // Revise dialog
-    expect(source).toContain("t('confirm.revise_title')");
-    expect(source).toContain("t('confirm.revise_message')");
-    expect(source).toContain("t('confirm.revise_description')");
-    expect(source).toContain("t('confirm.revise_confirm')");
+    const revisionDialog = fs.readFileSync(path.resolve(__dirname, '../ReportWorkflowDialog.tsx'), 'utf8');
+    expect(revisionDialog).toContain("t('confirm.revise_title')");
+    expect(revisionDialog).toContain("t('confirm.revise_message')");
+    expect(revisionDialog).toContain("t('confirm.revise_description')");
+    expect(revisionDialog).toContain("t('confirm.revise_confirm')");
 
     // Notify dialog
     expect(source).toContain("t('confirm.notify_title')");
@@ -382,7 +382,7 @@ describe('LabReportWorkbench', () => {
     // Error messages
     expect(source).toContain("t('errors.select_patient_template')");
     expect(source).toContain("t('errors.no_template_for_services')");
-    expect(source).toContain("t('errors.open_or_create_first')");
+    expect(source).toContain("t('workbench.save_error')");
     expect(source).toContain("t('errors.print_failed')");
     expect(source).toContain("t('errors.notify_failed')");
 
@@ -1092,21 +1092,81 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(mockedApi.bulkSaveValues.mock.calls[1][2]).toBe('2026-09-13T08:00:08.000000+00:00');
   });
 
-  it('locks values and signer inputs until an in-flight manual save settles', async () => {
-    let resolveBulk: ((value: unknown) => void) | null = null;
-    mockedApi.bulkSaveValues.mockReset().mockImplementationOnce(() => new Promise((resolve) => {
-      resolveBulk = resolve;
-    }));
+  it('keeps typing during a manual save and uses the accepted version for the newer edit', async () => {
+    let resolveBulk: ((value: unknown) => void) | undefined;
+    const phaseOne = new Promise((resolve) => { resolveBulk = resolve; });
+    const updatedAt = '2026-09-13T08:00:10.000000+00:00';
+    const reportVersion = (value: string, token: string) => ({
+      ...reopenedDraftInstance,
+      updated_at: token,
+      sections: reopenedDraftInstance.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => ({ ...field, value_text: value })),
+      })),
+    });
+    mockedApi.bulkSaveValues.mockReset()
+      .mockImplementationOnce(() => phaseOne)
+      .mockResolvedValueOnce({ instance: reportVersion('6.2', '2026-09-13T08:00:11.000000+00:00') });
     renderWithActiveInstance();
+    const input = screen.getByLabelText('Результат: Лейкоциты') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '6.1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
     await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(1));
-    expect(screen.getByLabelText('Результат: Лейкоциты')).toBeDisabled();
-    expect(screen.getByLabelText('ФИО лаборанта')).toBeDisabled();
-    await act(async () => {
-      resolveBulk?.({ instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:10.000000+00:00' } });
-      await Promise.resolve();
-    });
-    await waitFor(() => expect(screen.getByLabelText('Результат: Лейкоциты')).toBeEnabled());
+    expect(input).toBeEnabled();
+    expect(screen.getByLabelText('ФИО лаборанта')).toBeEnabled();
+    act(() => { input.focus(); });
+    fireEvent.change(input, { target: { value: '6.2' } });
+    input.setSelectionRange(2, 2);
+    await act(async () => { resolveBulk?.({ instance: reportVersion('6.1', updatedAt) }); });
+    expect(input).toHaveValue('6.2');
+    expect(input).toHaveFocus();
+    expect(input.selectionStart).toBe(2);
+    expect(screen.getByRole('status')).toHaveTextContent(/несохранённые изменения/i);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(2));
+    expect(mockedApi.bulkSaveValues.mock.calls[1][2]).toBe(updatedAt);
+    expect(mockedApi.bulkSaveValues.mock.calls[1][1]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field_key: 'wbc', value_text: '6.2' }),
+    ]));
+  });
+
+  it('compares a stale draft and keeps local edits without overwriting untouched server fields', async () => {
+    const updatedAt = '2026-09-13T08:01:00.123456+00:00';
+    const serverReport = {
+      ...reopenedDraftInstance,
+      updated_at: updatedAt,
+      sections: reopenedDraftInstance.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => ({
+          ...field,
+          value_text: field.field_key === 'wbc' ? '7.1' : '145',
+        })),
+      })),
+    };
+    mockedApi.bulkSaveValues.mockReset()
+      .mockRejectedValueOnce(Object.assign(new Error('Version conflict'), { status: 409 }))
+      .mockResolvedValueOnce({ instance: serverReport });
+    mockedApi.getInstance.mockReset().mockResolvedValueOnce(serverReport);
+    renderWithActiveInstance();
+
+    fireEvent.change(screen.getByLabelText('Результат: Лейкоциты'), { target: { value: '6.3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Сравнить версии' }));
+    expect(await screen.findByRole('table', { name: 'Изменения в бланке' })).toBeInTheDocument();
+    expect(screen.getByText('Изменено в обеих версиях')).toBeInTheDocument();
+    expect(screen.getByLabelText('Результат: Лейкоциты')).toHaveValue('6.3');
+    fireEvent.click(screen.getByRole('button', { name: 'Перенести мои правки' }));
+    expect(screen.getByLabelText('Результат: Лейкоциты')).toHaveValue('6.3');
+    expect(screen.getByLabelText('Результат: Гемоглобин')).toHaveValue('145');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(2));
+    expect(mockedApi.bulkSaveValues.mock.calls[1][2]).toBe(updatedAt);
+    expect(mockedApi.bulkSaveValues.mock.calls[1][1]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field_key: 'wbc', value_text: '6.3' }),
+      expect.objectContaining({ field_key: 'hgb', value_text: '145' }),
+    ]));
   });
 
   it('does not open a stale PDF fallback after the report context changes', async () => {
@@ -1263,7 +1323,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
         await Promise.resolve();
       });
 
-      expect(screen.queryByText((content) => content.includes('✓ сохранено'))).toBeNull();
+      expect(screen.getByRole('status')).toHaveTextContent('Изменений нет');
     } finally {
       vi.useRealTimers();
       vi.clearAllMocks();

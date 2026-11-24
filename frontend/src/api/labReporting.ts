@@ -1,8 +1,10 @@
 import { getApiBaseUrl } from './runtime';
 import tokenManager from '../utils/tokenManager';
 import { forceRefreshToken } from './client';
+import type { LabWorklistPage, LabWorklistQuery } from '../types/features/labWorkspace';
 
 const API_V1_BASE = getApiBaseUrl();
+const DRAFT_WRITE_TIMEOUT_MS = 25_000;
 
 /**
  * UX-AUDIT-FIX12: добавлена поддержка AbortSignal во все запросы.
@@ -24,6 +26,7 @@ interface RequestOptions {
   headers?: Record<string, string>;
   signal?: AbortSignal;
   method?: string;
+  responseType?: 'blob';
 }
 
 /** LABR-FE-001 (audit 3886): true for a rejected 401 from an expired access JWT. */
@@ -59,6 +62,7 @@ async function withAuthRetry<T>(perform: () => Promise<T>): Promise<T> {
 }
 
 async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
+  const { responseType, ...requestOptions } = options;
   const run = async (): Promise<unknown> => {
     const token = tokenManager.getAccessToken();
     const headers: Record<string, string> = {
@@ -68,7 +72,7 @@ async function request(path: string, options: RequestOptions = {}): Promise<unkn
     };
 
     const fetchInit: RequestInit = {
-      ...(options as Record<string, unknown>),
+      ...(requestOptions as Record<string, unknown>),
       headers,
       // UX-AUDIT-FIX12: пробрасываем signal в fetch, если передан.
       // Если signal уже отменён — fetch выбросит AbortError сразу.
@@ -91,13 +95,38 @@ async function request(path: string, options: RequestOptions = {}): Promise<unkn
     if (response.status === 204) {
       return null;
     }
+    if (responseType === 'blob') return response.blob();
     return response.json();
   };
 
   return withAuthRetry(run);
 }
 
+export { request as requestLab };
+
 export const labReportingApi = {
+  listWorklist(query: LabWorklistQuery, options: { cursor?: string; signal?: AbortSignal } = {}) {
+    return request('/lab/worklist/search', {
+      method: 'POST',
+      body: JSON.stringify({
+        view: query.view,
+        sort: query.sort,
+        limit: 50,
+        q: query.q.trim() || undefined,
+        barcode: query.barcode,
+        from_date: query.fromDate,
+        to_date: query.toDate,
+        cursor: options.cursor,
+      }),
+      signal: options.signal,
+    }) as Promise<LabWorklistPage>;
+  },
+
+  cancelOrderedTest(visitId: number, visitServiceId: number, orderId: number | null, reason: string) {
+    return request(`/lab/visits/${visitId}/tests/${visitServiceId}/cancel`, {
+      method: 'POST', body: JSON.stringify({ order_id: orderId, reason }),
+    });
+  },
   // P-03 fix: lab-specific façade для очереди лаборатории.
   // Раньше LabPanel делал прямой fetch к /registrar/queues/today?department=lab.
   // Теперь использует этот метод — собственный контракт, собственная RBAC,
@@ -273,7 +302,8 @@ export const labReportingApi = {
       : '';
     return request(`/lab/report-instances/${instanceId}${search}`, {
       method: 'PUT',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout?.(DRAFT_WRITE_TIMEOUT_MS),
     });
   },
 
@@ -283,7 +313,8 @@ export const labReportingApi = {
       : '';
     return request(`/lab/report-instances/${instanceId}/bulk-values${search}`, {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout?.(DRAFT_WRITE_TIMEOUT_MS),
     });
   },
 
@@ -292,15 +323,48 @@ export const labReportingApi = {
   // backend разрешал одинаковые действия для DRAFT/IN_PROGRESS/READY).
   // Если backend endpoint потребуется снова — добавлять вместе с UI-кнопкой.
 
-  finalize(instanceId: string | number) {
+  finalize(instanceId: string | number, expectedUpdatedAt?: string) {
     return request(`/lab/report-instances/${instanceId}/finalize`, {
-      method: 'POST'
+      method: 'POST',
+      ...(expectedUpdatedAt ? { body: JSON.stringify({ expected_updated_at: expectedUpdatedAt }) } : {}),
     });
   },
 
-  revise(instanceId: string | number) {
+  revise(instanceId: string | number, payload?: { expected_updated_at?: string; reason: string }) {
     return request(`/lab/report-instances/${instanceId}/revise`, {
-      method: 'POST'
+      method: 'POST',
+      ...(payload ? { body: JSON.stringify(payload) } : {}),
+    });
+  },
+
+  submitReview(instanceId: string | number, expectedUpdatedAt: string) {
+    return request(`/lab/report-instances/${instanceId}/submit-review`, {
+      method: 'POST', body: JSON.stringify({ expected_updated_at: expectedUpdatedAt }),
+    });
+  },
+
+  review(instanceId: string | number, expectedUpdatedAt: string) {
+    return request(`/lab/report-instances/${instanceId}/review`, {
+      method: 'POST', body: JSON.stringify({ expected_updated_at: expectedUpdatedAt }),
+    });
+  },
+
+  returnToDraft(instanceId: string | number, payload: { expected_updated_at: string; reason: string }) {
+    return request(`/lab/report-instances/${instanceId}/return-to-draft`, {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+  },
+
+  recordQC(instanceId: string | number, payload: {
+    expected_updated_at: string;
+    status: 'accepted' | 'rejected' | 'not_applicable';
+    reason?: string;
+    method?: string;
+    instrument_ref?: string;
+    series_ref?: string;
+  }) {
+    return request(`/lab/report-instances/${instanceId}/qc`, {
+      method: 'POST', body: JSON.stringify(payload),
     });
   },
 

@@ -54,6 +54,10 @@ interface NormalizedLabSection {
 }
 
 export function extractFieldValue(field: LabFieldInput): string {
+  if (field.result_kind === 'absent') return '';
+  if (field.result_kind === 'qualified_numeric' && typeof field.value_display === 'string') {
+    return field.value_display;
+  }
   if (field.value_numeric !== null && field.value_numeric !== undefined) {
     return formatDecimalInputValue(field.value_numeric);
   }
@@ -73,29 +77,42 @@ export function formatDecimalInputValue(value: number | string | null | undefine
   return trimmedDecimal ? `${integerPart}.${trimmedDecimal}` : integerPart;
 }
 
-export function formatFlagLabel(field: {
+export function getEvaluationLabelKey(field: {
+  evaluation_status?: string | null;
+  interpretation?: string | null;
   resolved_flag?: string | null;
-  resolved_flag_meta?: { direction?: string } | null;
+  value_text?: string | null;
+  value_numeric?: number | string | null;
 }): string {
-  if (!field?.resolved_flag) {
-    return 'норма';
+  const status = field.evaluation_status;
+  if (status === 'missing') return 'workbench.result_missing';
+  if (status === 'not_applicable') return 'workbench.result_not_applicable';
+  if (status === 'unknown') return 'workbench.result_unknown';
+  if (status === 'not_evaluated') return 'workbench.result_not_evaluated';
+  const interpretation = field.interpretation || field.resolved_flag;
+  switch (interpretation) {
+    case 'normal':
+    case 'high':
+    case 'low':
+    case 'warning':
+    case 'abnormal':
+    case 'critical':
+    case 'positive':
+    case 'negative':
+    case 'indeterminate':
+      return `workbench.result_${interpretation}`;
+    default:
+      return field.value_text || field.value_numeric != null
+        ? 'workbench.result_not_evaluated'
+        : 'workbench.result_missing';
   }
-  const label = {
-    high: 'выше нормы',
-    low: 'ниже нормы',
-    warning: 'предупреждение',
-    abnormal: 'отклонение',
-    critical: 'критично'
-  }[field.resolved_flag] || field.resolved_flag;
-  const direction = field?.resolved_flag_meta?.direction;
-  return direction ? `${label} ${direction}` : label;
 }
 
 export function formatThreshold(meta?: {
   matched_threshold?: { value?: number | string | null; operator?: string } | null;
 } | null): string {
   const matchedThreshold = meta?.matched_threshold;
-  if (!matchedThreshold?.value) {
+  if (matchedThreshold?.value == null || matchedThreshold.value === '') {
     return '';
   }
   const operator = {

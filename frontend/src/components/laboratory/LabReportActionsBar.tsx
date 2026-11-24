@@ -61,8 +61,8 @@ export default function LabReportActionsBar({
   onPreview,
 }: LabReportActionsBarProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
-  const showPrimaryGroup = canSaveDraft || canFinalize;
-  const showSecondaryGroup = canRevise || canPrint || canNotify || canPreview;
+  const showPrimaryGroup = canSaveDraft || canFinalize || canPreview;
+  const showSecondaryGroup = canRevise || canPrint || canNotify;
 
   if (!showPrimaryGroup && !showSecondaryGroup) {
     return null;

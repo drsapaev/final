@@ -1,0 +1,62 @@
+.lab-operations {
+  display: grid;
+  gap: 1rem;
+}
+
+.lab-operations form,
+.lab-operations__file,
+.lab-operations__row {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.lab-operations__row {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  align-items: end;
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+}
+
+.lab-operations__row label,
+.lab-operations__file label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.lab-operations__row input {
+  max-width: 100%;
+  min-height: 2rem;
+  font: inherit;
+}
+
+.lab-operations__file code {
+  overflow-wrap: anywhere;
+}
+
+.lab-operations__actions,
+.lab-operations__results li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.lab-operations__results {
+  display: grid;
+  gap: 0.75rem;
+  padding-inline-start: 0;
+}
+
+.lab-operations__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 1rem;
+}
+
+.lab-operations__metrics dd {
+  margin: 0.25rem 0 0;
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}

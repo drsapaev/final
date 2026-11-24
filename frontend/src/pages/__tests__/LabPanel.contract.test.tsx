@@ -65,7 +65,8 @@ describe('LabPanel queue/report status contract', () => {
     expect(loadMoreBlock).toContain('limit: LAB_QUEUE_PAGE_SIZE');
     expect(loadMoreBlock).toContain('offset: queueOffset');
     // Аппендит к существующему списку, не заменяет
-    expect(loadMoreBlock).toContain('setAppointments((current) => [...current, ...newEntries])');
+    expect(loadMoreBlock).toContain('const merged = [...appointmentsRef.current, ...newEntries.filter');
+    expect(loadMoreBlock).toContain('setAppointments(merged)');
     // Обновляет offset и hasMore
     expect(loadMoreBlock).toContain('setQueueOffset((current) => current + newEntries.length)');
     expect(loadMoreBlock).toContain('setHasMoreQueue(');
@@ -516,7 +517,7 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     // canonical /lab рассинхронизировали адрес и экран.
     const labPanelSource = readLabPanelSource();
     expect(labPanelSource).toContain('function resolveLabTabId(');
-    expect(labPanelSource).toContain('const LAB_TAB_IDS = [\'queue\', \'templates\', \'reports\'] as const;');
+    expect(labPanelSource).toContain('const LAB_TAB_IDS = [\'queue\', \'templates\', \'reports\', \'operations\'] as const;');
     // Ранний выход «нет таба → ничего не делать» удалён.
     expect(labPanelSource).not.toContain('if (!nextTab) {');
     // Нормализация применяется и к initial state, и к tab-sync эффекту.
@@ -562,8 +563,8 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     // дубль. Теперь CREATE блокирует ОБА уровня наравне с save/autosave/
     // finalize/revise/print.
     expect(workbenchSource)
-      .toContain('const reportBlocksContextTransition = saving || autoSaving;');
-    expect(workbenchSource).toContain('const reportBlocksDocumentLeave = saving || autoSaving;');
+      .toContain('const reportBlocksContextTransition = saving;');
+    expect(workbenchSource).toContain('const reportBlocksDocumentLeave = saving;');
     expect(workbenchSource).toContain('blocksContextTransition: reportBlocksContextTransition,');
     expect(workbenchSource).toContain('blocksDocumentLeave: reportBlocksDocumentLeave,');
     // Stale-ветка (onInstanceChange отклонил поздний ответ) не теряет

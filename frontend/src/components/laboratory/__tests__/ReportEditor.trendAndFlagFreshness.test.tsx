@@ -57,14 +57,6 @@ vi.mock('../../../hooks/useLabReporting', () => ({
   }),
 }));
 
-vi.mock('./hooks/useLabToast', () => ({
-  useLabToast: () => ({
-    interactiveInfo: vi.fn(),
-    interactiveWarning: vi.fn(),
-    interactiveError: vi.fn(),
-  }),
-}));
-
 import ReportEditorRaw from '../ReportEditor';
 
 const ReportEditor = ReportEditorRaw as unknown as React.ComponentType<Record<string, unknown>>;
@@ -92,6 +84,8 @@ const ACTIVE_INSTANCE = {
           reference_text: '130-170',
           resolved_flag: null,
           resolved_flag_severity: null,
+          evaluation_status: 'evaluated',
+          interpretation: 'normal',
           required: true,
         },
       ],
@@ -176,7 +170,7 @@ describe('LABEDIT-FE-001 — the previous-value trend reads the preceding same-t
 
     await new Promise((resolve) => { setTimeout(resolve, 80); });
     expect(getInstanceMock).not.toHaveBeenCalled();
-    expect(screen.queryByText(/↗/)).toBeNull();
+    expect(screen.queryByText(/Ранее /)).toBeNull();
   });
 });
 
@@ -208,6 +202,18 @@ describe('LABEDIT-FE-002 — the persisted flag badge is not presented beside a 
       expect(screen.getByText('норма')).toBeInTheDocument();
     });
     expect(screen.queryByText(/черновик/i)).toBeNull();
+  });
+
+  it('does not present an absent evaluation as normal', () => {
+    const section = ACTIVE_INSTANCE.sections[0];
+    const field = { ...section.fields[0], evaluation_status: 'unknown', interpretation: null };
+    render(
+      <ThemeProvider>
+        <ReportEditor {...baseProps} activeInstance={{ ...ACTIVE_INSTANCE, sections: [{ ...section, fields: [field] }] }} draftValues={{ hgb: '5.0' }} />
+      </ThemeProvider>
+    );
+    expect(screen.getByText('нет сведений об оценке')).toBeInTheDocument();
+    expect(screen.queryByText('норма')).toBeNull();
   });
 
   it('editing the value live swaps the authoritative badge for the unsaved marker', async () => {

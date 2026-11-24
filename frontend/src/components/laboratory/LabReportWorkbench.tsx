@@ -1,8 +1,5 @@
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
-import { toast } from 'react-toastify';  // STRAT#2: retained for backward-compat;
-// новые callers должны использовать useLabToast.interactive* вместо прямого toast.
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from '../ui/macos';
 // ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
 import { useLabReporting } from '../../hooks/useLabReporting';
@@ -25,13 +22,8 @@ import {
 // WF-08 fix: confirmation dialog для irreversible actions (Finalize, Revise).
 import { useConfirm } from '../common/ConfirmDialog';
 
-                  // P-04 fix: декомпозиция монолитного компонента (969 → ~530 строк).
-// Helper-функции и подкомпоненты вынесены в отдельные модули:
 import {
-  extractFieldValue,
-  formatFlagLabel,
-  formatThreshold,
-  getServiceContextItems,
+  getEvaluationLabelKey,
 } from './utils/labReportNormalize';
 import {
   hasLabReportAction,
@@ -46,11 +38,12 @@ import ReportSidebar from './ReportSidebar';
 // STRAT#1: state-логика вынесена в useLabReportState hook.
 // Компонент теперь содержит только handlers + JSX. Это уменьшает
 // god-компонент на ~200 строк и изолирует state для тестирования.
-import { useLabReportState } from './hooks/useLabReportState';
-// STRAT#2: единый хук для нотификаций. Простые messages идут через notify
-// callback (parent inline Alert), interactive toasts (с onClick undo) —
-// через toast.* напрямую. Соответствует Nielsen Heuristic #4.
-import { useLabToast } from './hooks/useLabToast';
+import { hasDraftDifference, useLabReportState } from './hooks/useLabReportState';
+import type { LabReportInstance, ReportDraftSnapshot } from './hooks/useLabReportState';
+import ReportSaveStatus from './ReportSaveStatus';
+import ReportWorkflowPanel from './ReportWorkflowPanel';
+import ReportWorkflowDialog from './ReportWorkflowDialog';
+import type { LabWorkflowDetails, LabWorkflowPrompt } from './ReportWorkflowDialog';
 // STRAT#9: t() для i18n — confirm dialogs мигрированы на translation keys.
 import { useTranslation } from '../../i18n/useTranslation';
 import { getErrorMessage } from '../../utils/type-guards';
@@ -74,6 +67,15 @@ interface PersistDraftResult {
 }
 
 class StaleLabReportContextError extends Error {}
+
+function getRequestStatus(error: unknown) {
+  return typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined;
+}
+
+function isSaveConflict(error: unknown) {
+  return getRequestStatus(error) === 409
+    || (error instanceof Error && error.message.includes('другим пользователем'));
+}
 
 const EMPTY_OPERATION_CONTEXT: LabReportOperationContext = {
   epoch: 0,
@@ -148,7 +150,7 @@ export default function LabReportWorkbench({
   onOperationPendingChange?: (state: LabOperationPendingState | null) => void;
   [k: string]: unknown;
 }) {
-  const { t: rawT } = useTranslation();
+  const { t: rawT, language } = useTranslation();
   const t = rawT;
   // WF-08 fix: confirmation dialog для irreversible actions.
   // Finalize делает бланк immutable (можно только revise). Revise создаёт
@@ -162,6 +164,20 @@ export default function LabReportWorkbench({
     baseUpdatedAt: string | null;
     updatedAt: string;
     signerSnapshot: Record<string, unknown>;
+    studyDate: string;
+  } | null>(null);
+  const draftSaveInFlightRef = useRef(false);
+  const editSequenceRef = useRef(0);
+  const visibleReportRef = useRef(activeInstance);
+  visibleReportRef.current = activeInstance;
+  const [conflictReport, setConflictReport] = useState<LabReportInstance | null>(null);
+  const [loadingConflict, setLoadingConflict] = useState(false);
+  const conflictAttemptRef = useRef(0);
+  const [workflowPrompt, setWorkflowPrompt] = useState<{
+    action: LabWorkflowPrompt;
+    id: string | number;
+    version: string;
+    operation: LabReportOperationContext;
   } | null>(null);
   const printAttemptRef = useRef(0);
   // LABR-FE-002 (audit 3886): preview attempt epoch — a late preview
@@ -200,14 +216,20 @@ export default function LabReportWorkbench({
   const operationContextRef = useRef<LabReportOperationContext>(EMPTY_OPERATION_CONTEXT);
   operationContextRef.current = getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT;
 
-  // STRAT#2: единый канал нотификаций.
-  const labToast = useLabToast(notify as (type: string, message: string) => void);
   // PR6: серверно разрешённое действие «Добавить бланк». Единственный
   // источник разрешения — backend факт templateResolution.allowed_templates
   // (resolve_template_options); React не изобретает список и не прячет
   // шаблоны сам. При несохранённых изменениях действие заблокировано,
   // чтобы переключение на новый бланк не потеряло черновик.
   const [addBlankTemplateId, setAddBlankTemplateId] = useState<string>('');
+  const [assignedServices, setAssignedServices] = useState<number[]>([]);
+  const serviceAssignments = (selectedAppointment?.service_details as Array<{
+    visit_service_id?: number;
+    name?: string;
+    code?: string;
+  }> | undefined)?.flatMap((item) => typeof item.visit_service_id === 'number'
+    ? [{ id: item.visit_service_id, label: item.name || item.code || String(item.visit_service_id) }]
+    : []) ?? [];
   const allowedTemplates = ((templateResolution?.allowed_templates ?? []) as Array<Record<string, unknown>>);
   const addBlankTemplateIdValue = addBlankTemplateId || String(allowedTemplates[0]?.id ?? '');
 
@@ -220,6 +242,8 @@ export default function LabReportWorkbench({
     setDraftValues,
     signerSnapshot,
     setSignerSnapshot,
+    studyDate,
+    setStudyDate,
     collapsedSections,
     setCollapsedSections,
     saving,
@@ -232,20 +256,20 @@ export default function LabReportWorkbench({
     setHistorySeverityFilter,
     escapeHatchActive,
     setEscapeHatchActive,
-    lastAutoSave,
-    setLastAutoSave,
-    autoSaving,
-    setAutoSaving,
+    lastSavedAt,
+    setLastSavedAt,
+    saveFailure,
+    setSaveFailure,
+    reconcileReportDraft,
+    initialValues,
     initialValuesRef,
     autoSaveTimerRef,
     handleSaveDraftRef,
     isDirty,
     isInstanceHydrated,
-    publishedTemplates,
     serviceContextItems,
     resolvedTemplates,
     serviceContextPresent,
-    templateOptions,
     effectiveTemplateOptions,
     resolutionHasBlockingGap,
     singleAllowedTemplate,
@@ -265,11 +289,14 @@ export default function LabReportWorkbench({
     templateResolution: templateResolution as never,
     activeInstance: activeInstance as never,
   });
+  const requiresAssignment = serviceAssignments.length > 0 && !escapeHatchActive;
+  useLayoutEffect(() => {
+    setAssignedServices([]);
+  }, [selectedAppointment?.patient_id, selectedAppointment?.visit_id, selectedAppointment?.order_id]);
   const canEditVisibleInstance = canEditActiveInstance
     && isInstanceHydrated
     && !instanceTransitionPending
-    && !saving
-    && !autoSaving;
+    && (!saving || busyAction === 'save');
 
   // PR 3351 pending-контракт (review round 7, P1; уточнение round 8, P1):
   // ДВА уровня pending-защиты, и CREATE блокирует ОБА.
@@ -291,8 +318,8 @@ export default function LabReportWorkbench({
   // historyGuardEngaged в LabDirtyGuardContext) — collapse sentinel-а
   // приземляется на twin с ДО-create URL без расхождения, а отложенная
   // запись выполняется на уже свёрнутую запись после settle.
-  const reportBlocksContextTransition = saving || autoSaving;
-  const reportBlocksDocumentLeave = saving || autoSaving;
+  const reportBlocksContextTransition = saving;
+  const reportBlocksDocumentLeave = saving;
   useLayoutEffect(() => {
     onOperationPendingChange?.({
       blocksContextTransition: reportBlocksContextTransition,
@@ -319,6 +346,13 @@ export default function LabReportWorkbench({
       partialDraftCommitRef.current = null;
     }
   }, [activeInstance?.id, activeInstance?.updated_at]);
+
+  useLayoutEffect(() => {
+    conflictAttemptRef.current += 1;
+    setConflictReport(null);
+    setLoadingConflict(false);
+    setWorkflowPrompt(null);
+  }, [activeInstance?.id, activeInstance?.patient_id]);
 
   useEffect(() => {
     if (printFeedbackTimerRef.current) {
@@ -349,43 +383,31 @@ export default function LabReportWorkbench({
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        if (!saving && handleSaveDraftRef.current) {
+        if (!saving && saveFailure !== 'conflict' && handleSaveDraftRef.current) {
           // PR3: attemptSaveDraft бросает исключение при неудаче — показываем
           // ошибку через общий обработчик (включая конфликтный 409-toast).
           void Promise.resolve(handleSaveDraftRef.current()).catch((saveError: unknown) => {
-            notifySaveError(saveError);
+            notifySaveErrorRef.current(saveError);
           });
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [canSaveDraft, instanceTransitionPending, saving]);
+  }, [canSaveDraft, handleSaveDraftRef, instanceTransitionPending, saving, saveFailure]);
 
-  // PR-58: autosave — 30-second debounce when dirty + canSaveDraft
-  // L-L-6 fix: добавлен autoSaving state — отображается в индикаторе
-  // во время сохранения (а не только после успешного завершения).
+  // Leave failed or ambiguous writes visible until the operator retries or
+  // resolves a version conflict. Typing still works while a write is in flight.
   useEffect(() => {
-    if (!isDirty || !canSaveDraft || saving || instanceTransitionPending || pauseAutoSave) return;
+    if (!isDirty || !canSaveDraft || saving || saveFailure || instanceTransitionPending || pauseAutoSave) return;
     const scheduledOperation = captureOperationContext();
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(async () => {
-      if (handleSaveDraftRef.current && !saving) {
-        if (!isOperationCurrent(scheduledOperation)) return;
-        try {
-          setAutoSaving(true);
-          const accepted = await handleSaveDraftRef.current();
-          if (accepted) {
-            setLastAutoSave(new Date());
-          }
-        } catch (e) {
-          // Autosave failure is non-fatal — manual save is still available
-          if (!(e instanceof StaleLabReportContextError)) {
-            logger.warn('Lab autosave failed:', e);
-          }
-        } finally {
-          setAutoSaving(false);
-        }
+      if (!isOperationCurrent(scheduledOperation)) return;
+      try {
+        await handleSaveDraftRef.current?.('auto');
+      } catch {
+        // attemptSaveDraft records a persistent failure for the active report.
       }
     }, 30000); // 30 seconds
     return () => {
@@ -394,8 +416,13 @@ export default function LabReportWorkbench({
   }, [
     isDirty,
     canSaveDraft,
+    autoSaveTimerRef,
+    handleSaveDraftRef,
     saving,
+    saveFailure,
     draftValues,
+    signerSnapshot,
+    studyDate,
     instanceTransitionPending,
     pauseAutoSave,
     captureOperationContext,
@@ -403,7 +430,7 @@ export default function LabReportWorkbench({
   ]);
 
   const handleCreateInstance = useCallback(async (templateIdOverride: string | number | null = null, options: Record<string, unknown> = {}) => {
-    if (instanceTransitionPending) return;
+    if (instanceTransitionPending || (requiresAssignment && assignedServices.length === 0)) return;
     const operation = captureOperationContext();
     const expectedInstanceId = (activeInstance?.id as string | number | null | undefined) ?? null;
     const templateId = templateIdOverride || selectedTemplateId;
@@ -423,6 +450,8 @@ export default function LabReportWorkbench({
         appointment_id: (selectedAppointment.appointment_id as string | number) || null,
         visit_id: (templateResolution?.visit_id as string | number) || (selectedAppointment.visit_id as string | number) || null,
         template_id: Number(templateId),
+        ...(selectedAppointment.order_id != null ? { order_id: selectedAppointment.order_id } : {}),
+        ...(requiresAssignment ? { visit_service_ids: [...assignedServices].sort((left, right) => left - right) } : {}),
         // WF-11 fix: при escape hatch не передаём service_codes —
         // бланк создаётся без привязки к услугам визита.
         service_codes: escapeHatchActive ? [] : ((templateResolution?.service_codes as string[]) || (selectedAppointment.service_codes as string[]) || []),
@@ -476,6 +505,7 @@ export default function LabReportWorkbench({
         }));
         return;
       }
+      setAssignedServices([]);
       const transitionedOperation = captureOperationContext();
       await onRefreshHistory?.(selectedAppointment.patient_id as string | number);
       if (!isOperationCurrent(transitionedOperation)) return;
@@ -493,19 +523,25 @@ export default function LabReportWorkbench({
     }
   }, [
     activeInstance,
+    assignedServices,
     captureOperationContext,
     isOperationCurrent,
     instanceTransitionPending,
+    labReportingApi,
     notify,
     onInstanceChange,
     onRefreshHistory,
     onRefreshRecentReports,
     onQueueChanged,
+    requiresAssignment,
     resolutionHasBlockingGap,
     escapeHatchActive,
     selectedAppointment,
     selectedTemplateId,
-    templateResolution
+    setBusyAction,
+    setSaving,
+    t,
+    templateResolution,
   ]);
 
   // STRAT#1: init-instance effect, default-template effect, keyboard-shortcut
@@ -514,10 +550,18 @@ export default function LabReportWorkbench({
   // (их нельзя изолировать в хук без прокидания через args).
 
   function updateField(fieldKey: string, value: unknown) {
+    editSequenceRef.current += 1;
     setDraftValues((prev) => ({ ...prev, [fieldKey]: value }));
   }
 
-  async function persistDraft(operation: LabReportOperationContext): Promise<PersistDraftResult> {
+  function isCurrentReport(id: string | number, operation: LabReportOperationContext) {
+    return String(visibleReportRef.current?.id ?? '') === String(id) && isOperationCurrent(operation);
+  }
+
+  async function persistDraft(
+    operation: LabReportOperationContext,
+    submitted: ReportDraftSnapshot,
+  ): Promise<PersistDraftResult> {
     if (!activeInstance) {
       return { instance: null, accepted: false };
     }
@@ -525,9 +569,7 @@ export default function LabReportWorkbench({
     // WF-06 fix: передаём updated_at для optimistic locking.
     // Если backend обнаружит, что бланк был изменён другим пользователем
     // после этого timestamp — вернёт 409, persistDraft выбросит exception.
-    const activeUpdatedAt = activeInstance.updated_at
-      ? activeInstance.updated_at as string
-      : null;
+    const activeUpdatedAt = initialValuesRef.current.updatedAt;
     const cachedPartial = partialDraftCommitRef.current;
     const reusablePartial = cachedPartial
       && String(cachedPartial.instanceId) === String(expectedInstanceId)
@@ -542,16 +584,22 @@ export default function LabReportWorkbench({
     const payload: Array<Record<string, unknown>> = [];
     (activeInstance.sections as Array<Record<string, unknown>>).forEach((section: Record<string, unknown>) => {
       ((section.fields as Array<Record<string, unknown>>) || []).forEach((field: Record<string, unknown>) => {
-        const currentValue = draftValues[field.field_key as string];
+        const fieldKey = String(field.field_key);
+        const currentValue = submitted.values[fieldKey];
         if (currentValue === undefined) {
           return;
         }
+        const absenceReason = String(submitted.values[`${fieldKey}__absence_reason`] ?? '').trim();
+        const unchanged = !hasDraftDifference(currentValue, initialValuesRef.current.values[fieldKey]);
         payload.push({
           field_key: field.field_key,
-          value_text: currentValue === '' ? null : currentValue,
-          value_numeric: field.value_type === 'numeric' && currentValue !== '' ? currentValue : null,
-          // PR-65 / Medium-15: per-field comment from draftValues
-          comment: draftValues[`${field.field_key as string}__comment`] || null
+          value_text: absenceReason || currentValue === '' ? null : String(currentValue),
+          ...(absenceReason ? { result_kind: 'absent', absence_reason: absenceReason } : {}),
+          ...(!absenceReason && unchanged && field.qualitative_code && currentValue !== ''
+            ? { result_kind: 'coded_qualitative', qualitative_code: field.qualitative_code }
+            : {}),
+          ...(unchanged && field.method_code && !absenceReason ? { method_code: field.method_code } : {}),
+          comment: submitted.values[`${fieldKey}__comment`] || null,
         });
       });
     });
@@ -563,13 +611,17 @@ export default function LabReportWorkbench({
         signer_snapshot: reusablePartial.signerSnapshot,
       }
       : activeInstance;
-    const persistedSignerSnapshot = reusablePartial?.signerSnapshot
-      ?? (activeInstance.signer_snapshot as Record<string, unknown> | undefined)
-      ?? {};
-    if (JSON.stringify(persistedSignerSnapshot) !== JSON.stringify(signerSnapshot || {})) {
-      latestInstance = await labReportingApi.updateInstance(activeInstance.id as string | number, {
-        signer_snapshot: signerSnapshot
-      }, expectedUpdatedAt) as Record<string, unknown>;
+    const persistedSignerSnapshot = reusablePartial?.signerSnapshot ?? initialValuesRef.current.signer;
+    const persistedStudyDate = reusablePartial?.studyDate ?? initialValuesRef.current.studyDate;
+    const instanceChanges: Record<string, unknown> = {};
+    if (JSON.stringify(persistedSignerSnapshot) !== JSON.stringify(submitted.signer)) {
+      instanceChanges.signer_snapshot = submitted.signer;
+    }
+    if (persistedStudyDate !== submitted.studyDate) instanceChanges.study_date = submitted.studyDate || null;
+    if (Object.keys(instanceChanges).length > 0) {
+      latestInstance = await labReportingApi.updateInstance(
+        expectedInstanceId, instanceChanges, expectedUpdatedAt,
+      ) as Record<string, unknown>;
       // PR3: signer-запрос продвинул updated_at — последующий bulk-запрос
       // обязан использовать token из ответа первого запроса, иначе получит
       // 409 от собственного сохранения.
@@ -580,10 +632,11 @@ export default function LabReportWorkbench({
           instanceId: expectedInstanceId,
           baseUpdatedAt: reusablePartial?.baseUpdatedAt ?? activeUpdatedAt,
           updatedAt: signerUpdatedAt,
-          signerSnapshot: { ...(signerSnapshot || {}) },
+          signerSnapshot: { ...submitted.signer },
+          studyDate: submitted.studyDate,
         };
       }
-      if (!isOperationCurrent(operation)) throw new StaleLabReportContextError();
+      if (!isCurrentReport(expectedInstanceId, operation)) throw new StaleLabReportContextError();
     }
     if (payload.length > 0) {
       const response = (await labReportingApi.bulkSaveValues(activeInstance.id as string | number, payload, expectedUpdatedAt)) as Record<string, unknown>;
@@ -598,66 +651,69 @@ export default function LabReportWorkbench({
           instanceId: expectedInstanceId,
           baseUpdatedAt: reusablePartial?.baseUpdatedAt ?? activeUpdatedAt,
           updatedAt: committedUpdatedAt,
-          signerSnapshot: { ...(signerSnapshot || {}) },
+          signerSnapshot: { ...submitted.signer },
+          studyDate: submitted.studyDate,
         };
       }
-      if (!isOperationCurrent(operation)) throw new StaleLabReportContextError();
+      if (!isCurrentReport(expectedInstanceId, operation)) throw new StaleLabReportContextError();
     }
-    const accepted = onInstanceChange?.(latestInstance as Record<string, unknown>, {
-      kind: 'update',
-      expectedInstanceId,
-      operation,
-    }) !== false;
-    if (accepted && isOperationCurrent(operation)) {
-      partialDraftCommitRef.current = null;
+    if (!latestInstance || !isCurrentReport(expectedInstanceId, operation)
+      || String(latestInstance.id) !== String(expectedInstanceId)) {
+      throw new StaleLabReportContextError();
     }
     return {
       instance: latestInstance,
-      accepted: accepted && isOperationCurrent(operation),
+      accepted: true,
     };
   }
 
   // PR3: ядро сохранения — бросает исключение при неудаче, чтобы autosave
   // (и любой другой вызывающий) мог достоверно отличить успех от провала
   // и не выставлял lastAutoSave после неуспешного запроса.
-  async function attemptSaveDraft(): Promise<boolean> {
-    if (!activeInstance || instanceTransitionPending) {
-      if (instanceTransitionPending) return false;
-      throw new Error(t('errors.open_or_create_first'));
-    }
+  async function attemptSaveDraft(mode: 'manual' | 'auto' | 'leave' = 'manual'): Promise<boolean> {
+    if (!activeInstance || !isInstanceHydrated || !canSaveDraft || saving || instanceTransitionPending
+      || saveFailure === 'conflict' || draftSaveInFlightRef.current) return false;
     const operation = captureOperationContext();
-    // WF-07 fix: запоминаем статус до save, чтобы обнаружить auto-transition.
+    const expectedInstanceId = activeInstance.id as string | number;
+    const editSequence = editSequenceRef.current;
+    const submitted = { values: draftValues, signer: signerSnapshot, studyDate };
     const previousStatus = activeInstance.status;
+    draftSaveInFlightRef.current = true;
+    setSaveFailure(null);
     setSaving(true);
     setBusyAction('save');
     try {
-      const { instance: latest, accepted } = await persistDraft(operation);
-      if (!accepted) return false;
-      await onRefreshHistory?.(activeInstance.patient_id as string | number);
-      if (!isOperationCurrent(operation)) return false;
-      // Dirty state: после успешного save сбрасываем dirty flag.
-      initialValuesRef.current = {
-        instanceId: activeInstance.id as string | number,
-        values: { ...draftValues },
-        signer: { ...signerSnapshot },
-      };
-      // PR3: isDirty-мемо кэшируется по draftValues — сброс baseline в ref
-      // сам по себе не перерисует бейдж «несохранённые изменения» и
-      // индикатор «✓ сохранено». Форсируем перерасчёт новой ссылкой.
-      setDraftValues((prev) => ({ ...prev }));
-      const newStatus = latest?.status || previousStatus;
-      if (previousStatus === 'DRAFT' && newStatus === 'IN_PROGRESS') {
-        notify?.('info', t('success.draft_saved_in_progress'));
-      } else {
-        notify?.('success', t('success.draft_saved'));
+      const { instance: latest, accepted } = await persistDraft(operation, submitted);
+      if (!accepted || !latest) return false;
+      if (onInstanceChange?.(latest, { kind: 'update', expectedInstanceId, operation }) === false) return false;
+      reconcileReportDraft(latest as unknown as LabReportInstance, submitted, true);
+      const timestamp = typeof latest.updated_at === 'string' ? Date.parse(latest.updated_at) : NaN;
+      setLastSavedAt(Number.isFinite(timestamp) ? new Date(timestamp) : new Date());
+      setConflictReport(null);
+      // History is an independent read. A delayed refresh cannot keep the
+      // acknowledged write pending or convert it to a failed save.
+      void Promise.resolve().then(() => onRefreshHistory?.(activeInstance.patient_id as string | number)).catch(() => {});
+      if (!isCurrentReport(expectedInstanceId, operation)) return false;
+      if (mode !== 'auto') {
+        if (previousStatus === 'DRAFT' && latest.status === 'IN_PROGRESS') {
+          notify?.('info', t('success.draft_saved_in_progress'));
+        } else {
+          notify?.('success', t('success.draft_saved'));
+        }
       }
-      return true;
+      // A navigation save covers only the submitted snapshot. Do not proceed
+      // if a newer local edit arrived before the guard could leave the report.
+      return mode !== 'leave' || editSequenceRef.current === editSequence;
     } catch (error) {
-      if (!isOperationCurrent(operation)) {
+      if (!isCurrentReport(expectedInstanceId, operation)) {
         throw new StaleLabReportContextError();
+      }
+      if (!(error instanceof StaleLabReportContextError)) {
+        setSaveFailure(isSaveConflict(error) ? 'conflict' : getRequestStatus(error) === 401 ? 'session' : 'error');
       }
       throw error;
     } finally {
+      draftSaveInFlightRef.current = false;
       setSaving(false);
       setBusyAction('');
     }
@@ -668,28 +724,12 @@ export default function LabReportWorkbench({
   // автоматически — актуальная версия открывается только явным кликом.
   function notifySaveError(error: unknown) {
     if (error instanceof StaleLabReportContextError) return;
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('другим пользователем') && activeInstance) {
-      labToast.interactiveError(
-        'Бланк изменён другим пользователем. Нажмите здесь, чтобы обновить актуальную версию; ваш черновик не перезаписан.',
-        {
-          autoClose: 10000,
-          onClick: () => {
-            void (async () => {
-              const operation = captureOperationContext();
-              const fresh = await labReportingApi.getInstance(activeInstance.id as string | number);
-              if (!isOperationCurrent(operation)) return;
-              onInstanceChange?.(fresh as Record<string, unknown>, {
-                kind: 'update',
-                expectedInstanceId: activeInstance.id as string | number,
-                operation,
-              });
-            })();
-          },
-        }
-      );
-      return;
-    }
+    const status = getRequestStatus(error);
+    const message = isSaveConflict(error) ? t('workbench.save_conflict')
+      : status === 401 ? t('workbench.save_session')
+        : status === 422 || error instanceof TypeError || (error instanceof DOMException && error.name === 'TimeoutError')
+          ? t('workbench.save_error')
+          : getErrorMessage(error);
     notify?.('error', message);
   }
   const notifySaveErrorRef = useRef(notifySaveError);
@@ -704,6 +744,45 @@ export default function LabReportWorkbench({
       notifySaveError(error);
       return false;
     }
+  }
+
+  async function loadConflictReport() {
+    const expectedInstanceId = activeInstance?.id as string | number | undefined;
+    if (expectedInstanceId == null || loadingConflict) return;
+    const operation = captureOperationContext();
+    const attempt = ++conflictAttemptRef.current;
+    setLoadingConflict(true);
+    try {
+      const latest = await labReportingApi.getInstance(expectedInstanceId) as LabReportInstance;
+      if (conflictAttemptRef.current !== attempt || !isCurrentReport(expectedInstanceId, operation)) return;
+      if (String(latest?.id) !== String(expectedInstanceId)
+        || String(latest?.patient_id ?? '') !== String(activeInstance?.patient_id ?? '')
+        || typeof latest.updated_at !== 'string'
+        || !Array.isArray(latest.sections)) throw new StaleLabReportContextError();
+      setConflictReport(latest);
+    } catch {
+      if (conflictAttemptRef.current === attempt && isCurrentReport(expectedInstanceId, operation)) {
+        notify?.('error', t('workbench.save_compare_error'));
+      }
+    } finally {
+      if (conflictAttemptRef.current === attempt) setLoadingConflict(false);
+    }
+  }
+
+  function resolveDraftConflict(keepLocal: boolean) {
+    const expectedInstanceId = activeInstance?.id as string | number | undefined;
+    if (!conflictReport || expectedInstanceId == null || String(conflictReport.id) !== String(expectedInstanceId)) return;
+    if (keepLocal && !hasLabReportAction(conflictReport, 'save_draft')) return;
+    const operation = captureOperationContext();
+    const accepted = onInstanceChange?.(conflictReport, {
+      kind: 'update', expectedInstanceId, operation,
+    }) !== false;
+    if (!accepted || !isCurrentReport(expectedInstanceId, operation)) return;
+    reconcileReportDraft(conflictReport, keepLocal ? initialValuesRef.current : undefined);
+    partialDraftCommitRef.current = null;
+    setLastSavedAt(null);
+    setSaveFailure(null);
+    setConflictReport(null);
   }
   // WF-22 fix: обновляем ref для keyboard shortcut.
   // L-L-4 fix: присваивание перенесено в useEffect (было при каждом render,
@@ -736,8 +815,8 @@ export default function LabReportWorkbench({
       isDirty: () => isDirtyRef.current,
       save: async () => {
         try {
-          const accepted = await handleSaveDraftRef.current?.();
-          if (accepted === false) {
+          const accepted = await handleSaveDraftRef.current?.('leave');
+          if (!accepted) {
             throw new StaleLabReportContextError();
           }
         } catch (error) {
@@ -757,21 +836,22 @@ export default function LabReportWorkbench({
         const baseline = initialValuesRef.current;
         setDraftValues({ ...baseline.values });
         setSignerSnapshot({ ...baseline.signer });
+        setStudyDate(baseline.studyDate);
+        setSaveFailure(null);
+        setConflictReport(null);
       },
     });
-  }, []);
+  }, [handleSaveDraftRef, initialValuesRef, setDraftValues, setSaveFailure, setSignerSnapshot, setStudyDate]);
 
   // WF-round5: handleMarkReady убран — Mark Ready был функционально пустой
   // операцией (backend разрешал одинаковые действия для DRAFT/IN_PROGRESS/READY).
 
   async function handleFinalize() {
-    if (!activeInstance || instanceTransitionPending) return;
+    if (!activeInstance || saving || draftSaveInFlightRef.current || instanceTransitionPending || isDirty || saveFailure) return;
     const expectedInstanceId = activeInstance.id as string | number;
+    const version = activeInstance.updated_at as string | undefined;
+    const editSequence = editSequenceRef.current;
     const operation = captureOperationContext();
-    // WF-08 fix: Finalize — необратимое действие. Бланк становится immutable,
-    // единственный путь правки — revise (создание нового instance).
-    // Показываем confirmation dialog с объяснением последствий.
-    // STRAT#9: строки мигрированы на t() из labTranslations.
     const ok = await confirm({
       title: t('confirm.finalize_title'),
       message: t('confirm.finalize_message'),
@@ -780,76 +860,102 @@ export default function LabReportWorkbench({
       cancelLabel: t('confirm.cancel'),
       intent: 'primary',
     });
-    if (!ok) return;
-    if (!isOperationCurrent(operation)) return;
+    if (!ok || !isCurrentReport(expectedInstanceId, operation)
+      || visibleReportRef.current?.updated_at !== version
+      || editSequenceRef.current !== editSequence || draftSaveInFlightRef.current) return;
     setSaving(true);
     setBusyAction('finalize');
     try {
-      const { instance: latest, accepted: draftAccepted } = await persistDraft(operation);
-      if (!draftAccepted || !isOperationCurrent(operation)) return;
-      const finalized = await labReportingApi.finalize(((latest || activeInstance) as Record<string, unknown>).id as string | number) as Record<string, unknown>;
+      const finalized = await labReportingApi.finalize(expectedInstanceId, version) as Record<string, unknown>;
       const accepted = onInstanceChange?.(finalized, {
-        kind: 'update',
-        expectedInstanceId,
-        operation,
+        kind: 'update', expectedInstanceId, operation,
       }) !== false;
-      if (!accepted || !isOperationCurrent(operation)) return;
-      await onRefreshHistory?.(finalized.patient_id as string | number);
-      if (!isOperationCurrent(operation)) return;
-      await onRefreshRecentReports?.();
-      if (!isOperationCurrent(operation)) return;
-      await onQueueChanged?.();
-      if (!isOperationCurrent(operation)) return;
-      notify?.('success', t('success.finalized'));
+      if (!accepted || !isCurrentReport(expectedInstanceId, operation)) return;
+      await Promise.all([
+        onRefreshHistory?.(finalized.patient_id as string | number),
+        onRefreshRecentReports?.(),
+        onQueueChanged?.(),
+      ]);
+      if (isCurrentReport(expectedInstanceId, operation)) notify?.('success', t('success.finalized'));
     } catch (error) {
-      if (!isOperationCurrent(operation)) return;
-      // PR3: конфликт 409 при финализации показывает действие
-      // «Обновить актуальную версию» вместо сырой ошибки.
-      notifySaveError(error);
+      if (isCurrentReport(expectedInstanceId, operation)) {
+        if (isSaveConflict(error)) setSaveFailure('conflict');
+        notifySaveError(error);
+      }
     } finally {
       setSaving(false);
       setBusyAction('');
     }
   }
 
-  async function handleRevise() {
-    if (!activeInstance || instanceTransitionPending) return;
-    const expectedInstanceId = activeInstance.id as string | number;
-    const operation = captureOperationContext();
-    // M-1 fix: Revise creates a new instance (old one preserved as FINALIZED),
-    // but it changes which instance is "active" and creates audit-trail entries.
-    // The comment at L52-55 promised a guard — now delivered.
-    // STRAT#9: строки мигрированы на t() из labTranslations.
-    const ok = await confirm({
-      title: t('confirm.revise_title'),
-      message: t('confirm.revise_message'),
-      description: t('confirm.revise_description'),
-      confirmLabel: t('confirm.revise_confirm'),
-      cancelLabel: t('confirm.cancel'),
-      intent: 'warning',
+  function openWorkflowPrompt(action: LabWorkflowPrompt) {
+    if (!activeInstance || saving || isDirty || saveFailure || instanceTransitionPending) return;
+    if (typeof activeInstance.updated_at !== 'string') return;
+    setWorkflowPrompt({
+      action,
+      id: activeInstance.id as string | number,
+      version: activeInstance.updated_at,
+      operation: captureOperationContext(),
     });
-    if (!ok) return;
-    if (!isOperationCurrent(operation)) return;
+  }
+
+  async function handleWorkflowCommand(
+    action: 'submit_review' | 'review' | LabWorkflowPrompt,
+    details?: LabWorkflowDetails,
+  ) {
+    if (!activeInstance || saving || draftSaveInFlightRef.current || isDirty || saveFailure || instanceTransitionPending) return;
+    const id = activeInstance.id as string | number;
+    const version = typeof activeInstance.updated_at === 'string' ? activeInstance.updated_at : '';
+    const operation = workflowPrompt?.operation ?? captureOperationContext();
+    if (!version || !isCurrentReport(id, operation) || !hasLabReportAction(activeInstance, action)) return;
+    if (workflowPrompt && (String(workflowPrompt.id) !== String(id) || workflowPrompt.version !== version)) {
+      setWorkflowPrompt(null);
+      notify?.('error', t('workbench.save_conflict'));
+      return;
+    }
     setSaving(true);
-    setBusyAction('revise');
+    setBusyAction(action);
     try {
-      const revised = (await labReportingApi.revise(activeInstance.id as string | number)) as Record<string, unknown>;
-      const accepted = onInstanceChange?.(revised, {
-        kind: 'transition',
-        expectedInstanceId,
-        operation,
+      let response: unknown;
+      switch (action) {
+        case 'submit_review':
+          response = await labReportingApi.submitReview(id, version);
+          break;
+        case 'review':
+          response = await labReportingApi.review(id, version);
+          break;
+        case 'return_to_draft':
+          if (!details?.reason) return;
+          response = await labReportingApi.returnToDraft(id, { expected_updated_at: version, reason: details.reason });
+          break;
+        case 'record_qc':
+          if (!details?.status) return;
+          response = await labReportingApi.recordQC(id, { ...details, status: details.status, expected_updated_at: version });
+          break;
+        case 'revise':
+          if (!details?.reason) return;
+          response = await labReportingApi.revise(id, { expected_updated_at: version, reason: details.reason });
+          break;
+      }
+      if (!isCurrentReport(id, operation) || !response) return;
+      const changed = response as Record<string, unknown>;
+      const accepted = onInstanceChange?.(changed, {
+        kind: action === 'revise' ? 'transition' : 'update', expectedInstanceId: id, operation,
       }) !== false;
       if (!accepted) return;
-      const transitionedOperation = captureOperationContext();
-      await onRefreshHistory?.(revised.patient_id as string | number);
-      if (!isOperationCurrent(transitionedOperation)) return;
-      await onRefreshRecentReports?.();
-      if (!isOperationCurrent(transitionedOperation)) return;
-      notify?.('success', t('success.revised'));
+      setWorkflowPrompt(null);
+      await Promise.all([
+        onRefreshHistory?.(changed.patient_id as string | number),
+        onRefreshRecentReports?.(),
+        onQueueChanged?.(),
+      ]);
+      if (action === 'revise') notify?.('success', t('success.revised'));
     } catch (error) {
-      if (!isOperationCurrent(operation)) return;
-      // PR3: конфликт 409 при revise показывает действие
-      // «Обновить актуальную версию» вместо сырой ошибки.
+      if (!isCurrentReport(id, operation)) return;
+      if (isSaveConflict(error)) {
+        setSaveFailure('conflict');
+        setWorkflowPrompt(null);
+      }
       notifySaveError(error);
     } finally {
       setSaving(false);
@@ -1317,6 +1423,27 @@ export default function LabReportWorkbench({
     }
   }
 
+  const assignmentPicker = requiresAssignment && (
+    <fieldset className="lab-visit-assignment">
+      <legend>{t('workbench.visit_service_assignment')}</legend>
+      {serviceAssignments.map((service) => (
+        <label key={service.id}>
+          <input
+            type="checkbox"
+            aria-label={service.label}
+            checked={assignedServices.includes(service.id)}
+            disabled={saving || isDirty || instanceTransitionPending}
+            onChange={(event) => {
+              const checked = event.target.checked;
+              setAssignedServices((current) => checked ? [...current, service.id] : current.filter((id) => id !== service.id));
+            }}
+          />
+          {service.label}
+        </label>
+      ))}
+    </fieldset>
+  );
+
   return (
     <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
       <Card variant="filled" padding="none">
@@ -1395,6 +1522,7 @@ export default function LabReportWorkbench({
                   {t('workbench.single_template_found')} <strong>{String(singleAllowedTemplate.name ?? '')}</strong>. {t('workbench.click_create_to_open')}
                 </Alert>
               )}
+              {assignmentPicker}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--mac-spacing-3)', alignItems: 'end' }}>
                 <label style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                   <span>{serviceContextPresent && !escapeHatchActive ? 'Допустимый отчёт' : 'Шаблон отчёта'}</span>
@@ -1415,7 +1543,8 @@ export default function LabReportWorkbench({
                 <Button
                   variant="primary"
                   onClick={() => handleCreateInstance()}
-                  disabled={saving || instanceTransitionPending || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive) || !selectedTemplateId}
+                  disabled={saving || instanceTransitionPending || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive) || !selectedTemplateId
+                    || (requiresAssignment && assignedServices.length === 0)}
                 >
                   <FolderPlus size={16} aria-hidden="true" />
                   {busyAction === 'create' ? t('workbench.creating_report') : t('workbench.create_report')}
@@ -1430,7 +1559,9 @@ export default function LabReportWorkbench({
                     <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                       {String((activeInstance.patient_snapshot as Record<string, unknown> | undefined)?.full_name ?? '') || `Пациент #${String(activeInstance.patient_id ?? '')}`}
                     </div>
-                    <Badge variant={getLabStatusVariant(activeInstance.status as string)}>{formatLabStatus(activeInstance.status as string)}</Badge>
+                    <Badge variant={getLabStatusVariant(activeInstance.status as string)}>
+                      {t(`workbench.workflow_status_${String(activeInstance.status).toLowerCase()}`, { defaultValue: formatLabStatus(activeInstance.status as string) })}
+                    </Badge>
                     <Badge variant="info">{String((activeInstance.template as Record<string, unknown> | undefined)?.name ?? '')}</Badge>
                   </div>
                   <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
@@ -1470,7 +1601,7 @@ export default function LabReportWorkbench({
                   </div>
                   {/* P-20 fix: визуальный stepper жизненного цикла бланка.
                       Показывает текущую фазу и будущие шаги. */}
-                  <LabStatusStepper status={activeInstance.status as string} />
+                  <LabStatusStepper status={activeInstance.status as string} managed={activeInstance.managed_release === true} />
                 </div>
 
 {/* PR6: «Добавить бланк» — только серверно разрешённые шаблоны
@@ -1493,10 +1624,12 @@ export default function LabReportWorkbench({
                           </option>
                         ))}
                       </select>
+                      {assignmentPicker}
                       <Button
                         variant="outline"
                         size="small"
-                        disabled={saving || isDirty || instanceTransitionPending || busyAction === 'create' || !addBlankTemplateIdValue}
+                        disabled={saving || isDirty || instanceTransitionPending || busyAction === 'create' || !addBlankTemplateIdValue
+                          || (requiresAssignment && assignedServices.length === 0)}
                         title={isDirty ? 'Сначала сохраните несохранённые изменения черновика' : undefined}
                         onClick={() => handleCreateInstance(addBlankTemplateIdValue)}
                       >
@@ -1513,9 +1646,10 @@ export default function LabReportWorkbench({
                   <LabReportActionsBar
                     saving={saving || instanceTransitionPending}
                     busyAction={busyAction ?? undefined}
-                    canSaveDraft={canSaveDraft}
+                    canSaveDraft={canSaveDraft && saveFailure !== 'conflict'}
                     // WF-10 fix: Finalize disabled пока есть missing required fields.
-                    canFinalize={canFinalizeWithValidation}
+                    canFinalize={canFinalizeWithValidation && !isDirty && !saveFailure
+                      && !(activeInstance.release_holds as string[] | undefined)?.length}
                     canRevise={canRevise}
                     canPrint={canPrint}
                     canPreview={canPreview}
@@ -1523,7 +1657,7 @@ export default function LabReportWorkbench({
                     canNotify={String(activeInstance?.status ?? '') === 'FINALIZED' || String(activeInstance?.status ?? '') === 'PRINTED'}
                     onSaveDraft={handleSaveDraft}
                     onFinalize={handleFinalize}
-                    onRevise={handleRevise}
+                    onRevise={() => openWorkflowPrompt('revise')}
                     onPrint={handlePrint}
                     onNotify={handleNotifyPatient}
                     onPreview={handlePreviewPdf}
@@ -1532,41 +1666,10 @@ export default function LabReportWorkbench({
                       Показываем сколько обязательных полей ещё не заполнено,
                       чтобы лаборант понимал, почему Finalize disabled. */}
                   {/* PR-66 / Low-27: replaced plain text spans with Badge components */}
-                  {canFinalize && hasMissingRequired && (
+                  {(canFinalize || hasLabReportAction(activeInstance, 'submit_review')) && hasMissingRequired && (
                     <Badge variant="warning" style={{ marginLeft: 'var(--mac-spacing-2)' }}>
-                      ⚠ Не заполнено: {missingRequiredFields.length}
+                      {t('workbench.required_remaining', { count: missingRequiredFields.length })}
                     </Badge>
-                  )}
-                  {isDirty && canEditActiveInstance && (
-                    <Badge variant="warning" style={{ marginLeft: 'var(--mac-spacing-2)' }}>
-                      ● несохранённые изменения
-                    </Badge>
-                  )}
-                  {/* PR-58: autosave indicator
-                      L-L-6 fix: показываем «сохраняется…» во время autosave.
-                      Раньше индикатор пропадал когда labourant начинал печатать,
-                      потому что !isDirty скрывало его. Теперь индикатор виден
-                      во время активного autosave — feedback не прерывается. */}
-                  {autoSaving && (
-                    <span
-                      style={{
-                        fontSize: 'var(--mac-font-size-xs)',
-                        color: 'var(--mac-text-tertiary, #6b7280)',
-                        marginLeft: 'var(--mac-spacing-2)',
-                      }}
-                      aria-live="polite"
-                    >
-                      ◌ сохраняется…
-                    </span>
-                  )}
-                  {!isDirty && !autoSaving && lastAutoSave && (
-                    <span style={{
-                      fontSize: 'var(--mac-font-size-xs)',
-                      color: 'var(--mac-text-tertiary, #6b7280)',
-                      marginLeft: 'var(--mac-spacing-2)',
-                    }}>
-                      ✓ сохранено {lastAutoSave.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </span>
                   )}
                   {/* P-01 fix: AI-анализ бланка. Перенесён из LabResultsManager
                       с сохранением P-02 fix (блокировка при отсутствии возраста/пола).
@@ -1576,6 +1679,46 @@ export default function LabReportWorkbench({
                   {/* STRAT#25: AI analysis moved to ReportSidebar — rendered after the editor card. */}
                 </div>
               </div>
+
+              <ReportWorkflowPanel
+                report={activeInstance}
+                canSubmit={!hasMissingRequired}
+                disabled={saving || instanceTransitionPending || isDirty || saveFailure != null}
+                onReview={(action) => { void handleWorkflowCommand(action); }}
+                onPrompt={openWorkflowPrompt}
+              />
+
+              {(canSaveDraft || saveFailure != null) && (
+                <ReportSaveStatus
+                  language={language}
+                  saving={saving && busyAction === 'save'}
+                  isDirty={isDirty}
+                  lastSavedAt={lastSavedAt}
+                  failure={saveFailure}
+                  comparing={loadingConflict}
+                  baseline={initialValues}
+                  current={{ values: draftValues, signer: signerSnapshot, studyDate }}
+                  comparison={conflictReport}
+                  onRetry={() => { void handleSaveDraft(); }}
+                  onCompare={() => { void loadConflictReport(); }}
+                  onResolve={resolveDraftConflict}
+                />
+              )}
+
+              {canEditActiveInstance && (
+                <label className="lab-report-study-date">
+                  {t('workbench.study_date')}
+                  <Input
+                    type="date"
+                    value={studyDate}
+                    disabled={!canEditVisibleInstance}
+                    onChange={(event) => {
+                      editSequenceRef.current += 1;
+                      setStudyDate(event.target.value);
+                    }}
+                  />
+                </label>
+              )}
 
               {/* UX-AUDIT-FIX8: signer fields свёрнуты в <details>.
                   Ранее 4 поля (lab_technician_label/name, approver_label/name)
@@ -1613,7 +1756,11 @@ export default function LabReportWorkbench({
                         className="macos-input"
                         aria-label={signerFieldLabels[key] || key}
                         value={String(signerSnapshot?.[key] ?? '')}
-                        onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSignerSnapshot((prev) => ({ ...prev, [key]: event.target.value }))}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          editSequenceRef.current += 1;
+                          setSignerSnapshot((prev) => ({ ...prev, [key]: value }));
+                        }}
                         // WF-09 fix: signer fields должны блокироваться на FINALIZED/PRINTED,
                         // иначе persistDraft вызовет updateInstance → 409 Conflict (silent failure).
                         disabled={!canEditVisibleInstance}
@@ -1652,16 +1799,12 @@ export default function LabReportWorkbench({
               {((activeInstance.critical_findings as Array<Record<string, unknown>> | undefined)?.length ?? 0) > 0 && (
                 <Alert severity="error" role="alert">  {/* PR-59: role=alert for screen readers */}
                   <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
-                    <strong>Критические результаты</strong>
+                    <strong>{t('workbench.critical_findings')}</strong>
+                    {isDirty && <span>{t('workbench.critical_saved_snapshot')}</span>}
                     {(activeInstance.critical_findings as Array<Record<string, unknown>>).map((finding: Record<string, unknown>) => (
                       <div
                         key={`${String(finding.section_key ?? '')}-${String(finding.field_key ?? '')}`}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'minmax(180px, 1.4fr) minmax(110px, 0.7fr) minmax(110px, 0.7fr) minmax(100px, 0.6fr)',
-                          gap: 'var(--mac-spacing-2)',
-                          alignItems: 'center'
-                        }}
+                        className="lab-critical-findings-row"
                       >
                         <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)' }}>
                           <strong>{String(finding.label ?? '')}</strong>
@@ -1677,7 +1820,7 @@ export default function LabReportWorkbench({
                           {String(finding.threshold_display ?? finding.reference_text ?? '—')}
                         </div>
                           <Badge variant={flagVariant(String(finding.resolved_flag ?? ''), (finding.resolved_flag_severity as number | null) ?? null)}>
-                            {formatFlagLabel(finding as Record<string, unknown>)}
+                            {t(getEvaluationLabelKey(finding))}
                           </Badge>
                       </div>
                     ))}
@@ -1689,6 +1832,7 @@ export default function LabReportWorkbench({
               <ReportEditor
                 activeInstance={activeInstance as never}
                 draftValues={draftValues as Record<string, string>}
+                acceptedValues={activeInstance.updated_at === initialValues.updatedAt ? initialValues.values : undefined}
                 collapsedSections={collapsedSections}
                 onToggleSection={(sectionKey: string) => {
                   setCollapsedSections((prev) => {
@@ -1701,7 +1845,6 @@ export default function LabReportWorkbench({
                 onUpdateField={updateField}
                 canEditActiveInstance={canEditVisibleInstance}
                 reportHistory={reportHistory}
-                notify={notify}
               />
             </div>
           )}
@@ -1721,6 +1864,15 @@ export default function LabReportWorkbench({
       />
       {/* WF-08 fix: portal-mounted ConfirmDialog для irreversible actions */}
       {confirmDialog}
+      {workflowPrompt && (
+        <ReportWorkflowDialog
+          key={workflowPrompt.action}
+          action={workflowPrompt.action}
+          saving={saving}
+          onClose={() => setWorkflowPrompt(null)}
+          onSubmit={(details) => { void handleWorkflowCommand(workflowPrompt.action, details); }}
+        />
+      )}
     </div>
   );
 }
