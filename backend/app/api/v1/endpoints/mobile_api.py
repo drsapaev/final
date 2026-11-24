@@ -522,27 +522,6 @@ async def book_mobile_appointment(
                 detail="Некорректный формат даты записи (ожидается YYYY-MM-DD)",
             ) from exc
 
-        # Slot-occupancy guard (Codex round-3 P1): same contract as the web
-        # and Telegram writers — two patients must never receive successful
-        # bookings for the same doctor slot. Skipped when NO time was chosen
-        # (Codex round-4 P1): preferred_time is optional, and the occupancy
-        # query would match appointment_time IS NULL rows — after the first
-        # date-only booking every later date-only request would get a false
-        # 409 although no concrete slot was ever selected.
-        if (
-            request.preferred_time
-            and crud_appointment.appointment.is_time_slot_occupied(
-                db,
-                doctor_id=request.doctor_id,
-                appointment_date=appointment_date,
-                appointment_time=request.preferred_time,
-            )
-        ):
-            raise HTTPException(
-                status_code=409,
-                detail="Это время уже занято у выбранного врача",
-            )
-
         # Persist requested services through the REAL contract (Codex
         # round-3 P2): web/Telegram store service NAMES in the
         # Appointment.services JSON column at creation time — resolve the
@@ -572,6 +551,23 @@ async def book_mobile_appointment(
             ) from exc
         service_names = list(service_selection.names)
         duration_minutes_snapshot = service_selection.duration_minutes_snapshot
+
+        # Check the interval we will persist. Date-only requests never reserve
+        # a concrete slot.
+        if (
+            request.preferred_time
+            and crud_appointment.appointment.is_time_slot_occupied(
+                db,
+                doctor_id=request.doctor_id,
+                appointment_date=appointment_date,
+                appointment_time=request.preferred_time,
+                duration_minutes_snapshot=duration_minutes_snapshot,
+            )
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Это время уже занято у выбранного врача",
+            )
 
         # Создаем запись. NOTE: the handler used to bind the wrong request
         # schema and referenced nonexistent Appointment columns (complaint,

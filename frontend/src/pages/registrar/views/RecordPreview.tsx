@@ -52,6 +52,7 @@ const RecordPreviewDialog = ({ isOpen, row, onClose, onEdit, tI18n }: RecordPrev
           [tI18n('registrarPanel.rp_field_patient'), row.patient_fio || row.patient_name],
           [tI18n('registrarPanel.rp_field_phone'), row.patient_phone || row.phone],
           [tI18n('registrarPanel.rp_field_birth_year'), row.patient_birth_year || row.birth_year],
+          [tI18n('misc.eat_address'), (row as Record<string, unknown>).address],
           [tI18n('registrarPanel.rp_field_gender'), normalizePatientGender(row as unknown as Parameters<typeof normalizePatientGender>[0] as Record<string, unknown>)],
           [tI18n('registrarPanel.rp_field_department'), (row as Record<string, unknown>).queue_name || row.department || row.specialty],
           [tI18n('registrarPanel.rp_field_services'), formatPreviewList(row.services || row.service_details)],

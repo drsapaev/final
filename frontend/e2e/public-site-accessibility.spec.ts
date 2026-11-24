@@ -14,6 +14,8 @@ const LOCALES = [
     lang: 'uz-Latn',
     prefix: '',
     skipLink: 'Asosiy mazmunga o‘tish',
+    bookingTitle: 'Onlayn yozilish',
+    bookingLogin: 'Bemor sifatida kirish',
     navigation: 'Sayt navigatsiyasi',
     languageSwitch: 'RU — Rus tiliga o‘tish',
     doctorName: 'Sintetik sinov profili',
@@ -24,6 +26,8 @@ const LOCALES = [
     lang: 'ru',
     prefix: '/ru',
     skipLink: 'Перейти к основному содержимому',
+    bookingTitle: 'Онлайн-запись',
+    bookingLogin: 'Войти как пациент',
     navigation: 'Навигация сайта',
     languageSwitch: 'O‘Z — Перейти на узбекский',
     doctorName: 'Синтетический тестовый профиль',
@@ -55,7 +59,7 @@ const PAGES = [
 ] as const;
 
 const AXE_WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
-const CATALOG_FILTER_ASSET = '/public-site-catalog-filter.js';
+const CATALOG_FILTER_ASSET = '/public-site-catalog-filter.js?v=2';
 const PRIVATE_SEARCH_PROBE = 'synthetic-private-qa-741e';
 const CATALOG_COPY = {
   'uz-Latn': {
@@ -327,14 +331,30 @@ async function assertCatalogFilter(page: Page, locale: Locale, kind: CatalogKind
   const copy = CATALOG_COPY[locale.lang];
   const search = controls.getByRole('searchbox', { name: copy[kind].search, exact: true });
   const group = controls.getByRole('combobox', { name: copy[kind].group, exact: true });
-  const status = catalog.locator('.public-site__catalog-status');
+  const status = catalog.getByRole('status');
   const reset = controls.getByRole('button', { name: copy.reset, exact: true });
   const paths = CATALOG_DETAILS[kind].map((path) => locale.prefix + path);
 
   await expect(search).toBeVisible();
   await expect(group.locator('option:checked')).toHaveText(copy.all);
   await assertVisibleCatalogLinks(catalog, paths);
-  await expect(status).toHaveText(`${copy.resultPrefix} 4`);
+  const initialStatus = await status.elementHandle();
+  const assertResultStatus = async (count: number) => {
+    const text = `${copy.resultPrefix} ${count}`;
+    await expect(status).toHaveAttribute('role', 'status');
+    await expect(status).toHaveAttribute('aria-atomic', 'true');
+    await expect(status).toHaveText(text);
+    expect(await status.evaluate((element, initial) => ({
+      sameRegion: element === initial,
+      content: Array.from(element.childNodes, (node) => ({
+        isText: node.nodeType === Node.TEXT_NODE,
+        text: node.textContent,
+      })),
+    }), initialStatus)).toEqual({
+      sameRegion: true,
+      content: [{ isText: true, text }],
+    });
+  };
 
   let sentQuery = false;
   let fetchedCatalog = false;
@@ -347,13 +367,15 @@ async function assertCatalogFilter(page: Page, locale: Locale, kind: CatalogKind
   const initialUrl = page.url();
   page.on('request', recordRequest);
   try {
+    await assertResultStatus(4);
+
     await group.selectOption({ label: copy[kind].firstGroup });
     await assertVisibleCatalogLinks(catalog, paths.slice(0, 2));
-    await expect(status).toHaveText(`${copy.resultPrefix} 2`);
+    await assertResultStatus(2);
 
     await search.fill(copy.query);
     await assertVisibleCatalogLinks(catalog, [paths[1]]);
-    await expect(status).toHaveText(`${copy.resultPrefix} 1`);
+    await assertResultStatus(1);
 
     await group.selectOption({ label: copy.all });
     await assertVisibleCatalogLinks(catalog, paths.slice(1, 3));
@@ -367,7 +389,7 @@ async function assertCatalogFilter(page: Page, locale: Locale, kind: CatalogKind
     await search.fill(PRIVATE_SEARCH_PROBE);
     await search.press('Enter');
     await assertVisibleCatalogLinks(catalog, []);
-    await expect(status).toHaveText(`${copy.resultPrefix} 0`);
+    await assertResultStatus(0);
     await expect(catalog.getByText(copy.noResults, { exact: true })).toBeVisible();
     await expect(catalog.locator(`a[href="${locale.prefix}/contacts"]`)).toBeVisible();
     await expect(page).toHaveURL(initialUrl);
@@ -384,13 +406,14 @@ async function assertCatalogFilter(page: Page, locale: Locale, kind: CatalogKind
     await expect(search).toHaveValue('');
     await expect(group.locator('option:checked')).toHaveText(copy.all);
     await assertVisibleCatalogLinks(catalog, paths);
-    await expect(status).toHaveText(`${copy.resultPrefix} 4`);
+    await assertResultStatus(4);
     await expect(catalog.getByText(copy.noResults, { exact: true })).toBeHidden();
     await expect(page).toHaveURL(initialUrl);
     expect(sentQuery, 'the synthetic search term must remain out of requests').toBe(false);
     expect(fetchedCatalog, 'filtering must use the catalog already on the page').toBe(false);
   } finally {
     page.off('request', recordRequest);
+    await initialStatus.dispose();
   }
 }
 
@@ -541,6 +564,112 @@ async function solidContrastRatio(target: Locator, kind: 'text' | 'outline') {
 }
 
 test.describe('public-site accessibility', () => {
+  test('Vite public footer and booking controls stay usable after the notification prompt delay', async ({ page, request }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.clock.install();
+    await page.addInitScript((origin) => {
+      if (location.origin !== origin) return;
+      localStorage.setItem('colorScheme', matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      Object.defineProperty(window, 'Notification', {
+        configurable: true,
+        value: class TestNotification {
+          static permission = 'default';
+          static requestPermission() {
+            throw new Error('Native notification permission is outside this test');
+          }
+        },
+      });
+    }, VITE_ORIGIN);
+    await installSyntheticApi(page, request);
+    await page.route((url) => url.pathname === '/api/v1/public-site/booking-options', (route) =>
+      route.fulfill(jsonResponse({
+        available: true,
+        mode: 'registrar_request',
+        settings_version: 1,
+        booking_horizon_days: 90,
+        services: [{ slug: 'synthetic-service', name: 'SYNTHETIC service' }],
+        doctors: [{ slug: 'synthetic-profile', name: 'SYNTHETIC doctor' }],
+        compatible_pairs: [{ service_slug: 'synthetic-service', doctor_slug: 'synthetic-profile' }],
+      })),
+    );
+    await page.route((url) => url.pathname === '/api/v1/public-site/availability', (route) =>
+      route.fulfill(jsonResponse({
+        date: new URL(route.request().url()).searchParams.get('date'),
+        timezone: 'Asia/Tashkent',
+        settings_version: 1,
+        slots: ['09:00:00'],
+      })),
+    );
+
+    const prompt = page.locator('.notification-prompt');
+    for (const [theme, color] of [['light', 'rgb(0, 81, 213)'], ['dark', 'rgb(90, 200, 250)']] as const) {
+      await page.emulateMedia({ colorScheme: theme, forcedColors: 'none', reducedMotion: 'reduce' });
+      for (const locale of LOCALES) {
+        await test.step(`${locale.lang} ${theme} footer`, async () => {
+          await page.goto(VITE_ORIGIN + locale.prefix + '/services');
+          await expect(page.getByRole('heading', { level: 1, name: SERVICE_TITLES[locale.lang], exact: true })).toBeVisible();
+          await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+          await page.clock.runFor(6_000);
+          await expect(prompt).toHaveCount(0);
+
+          const footer = page.getByRole('contentinfo');
+          for (const path of [locale.prefix + '/contacts', '/login']) {
+            const link = footer.locator(`a[href="${path}"]`);
+            await expect(link).toHaveCSS('color', color);
+            await link.click({ trial: true });
+          }
+        });
+      }
+    }
+
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: width === 320 ? 700 : 844 });
+      for (const locale of LOCALES) {
+        await test.step(`${locale.lang} booking sign-in at ${width}px`, async () => {
+          await page.goto(VITE_ORIGIN + locale.prefix + '/booking');
+          await expect(page.getByRole('heading', { level: 1, name: locale.bookingTitle, exact: true })).toBeVisible();
+          await page.locator('#public-booking-service').selectOption('synthetic-service');
+          await page.locator('#public-booking-doctor').selectOption('synthetic-profile');
+          const date = page.locator('#public-booking-date');
+          const firstBookableDate = await date.getAttribute('min');
+          if (!firstBookableDate) throw new Error('Expected the earliest bookable date');
+          await date.fill(firstBookableDate);
+          await page.getByRole('radio', { name: '09:00', exact: true }).check();
+
+          await page.clock.runFor(6_000);
+          await expect(prompt).toHaveCount(0);
+          const signIn = page.getByRole('button', { name: locale.bookingLogin, exact: true });
+          await signIn.evaluate((button) => button.scrollIntoView({ block: 'end', behavior: 'instant' }));
+          await signIn.click({ trial: true });
+        });
+      }
+    }
+
+    await page.goto(VITE_ORIGIN + '/login');
+    await expect(page).toHaveURL(VITE_ORIGIN + '/login');
+    await expect(page.locator('input[autocomplete="username"]')).toBeVisible();
+    await page.clock.runFor(6_000);
+    await expect(prompt).toBeVisible();
+
+    await page.evaluate(() => { document.documentElement.dataset.notificationPromptTest = 'same-document'; });
+    await navigateInApp(page, '/ru/services');
+    await expect(page.getByRole('heading', { level: 1, name: SERVICE_TITLES.ru, exact: true })).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-notification-prompt-test', 'same-document');
+    await expect(prompt).toHaveCount(0);
+
+    await navigateInApp(page, '/login');
+    await expect(page.locator('input[autocomplete="username"]')).toBeVisible();
+    await page.clock.runFor(6_000);
+    await expect(prompt).toBeVisible();
+
+    await navigateInApp(page, '/ru/booking');
+    await expect(page.locator('#public-booking-service')).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-notification-prompt-test', 'same-document');
+    await page.clock.runFor(6_000);
+    await expect(prompt).toHaveCount(0);
+  });
+
   test('Vite dark public navigation preserves hover and keyboard focus contrast', async ({ page, request }) => {
     test.setTimeout(60_000);
     await page.emulateMedia({ colorScheme: 'light', forcedColors: 'none' });

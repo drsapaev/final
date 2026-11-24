@@ -476,8 +476,13 @@ def create_appointment(
             status_code=400, detail="Это время уже занято у выбранного врача"
         )
 
-    appointment = appointment_crud.create(db=db, obj_in=appointment_in)
-    return appointment
+    return appointment_crud.create(
+        db=db,
+        obj_in=appointment_in,
+        slot_conflict=HTTPException(
+            status_code=400, detail="Это время уже занято у выбранного врача"
+        ),
+    )
 
 
 @router.get(
@@ -749,50 +754,40 @@ def update_appointment(
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
 
-    # Проверяем, не занято ли новое время у врача
     _ensure_appointment_record_access(db, appointment, current_user)
     _ensure_appointment_update_fields_allowed(appointment_in, current_user)
 
-    if (
-        appointment_in.appointment_date
-        or appointment_in.appointment_time
-        or appointment_in.doctor_id
-    ):
-        new_date = appointment_in.appointment_date or appointment.appointment_date
-        new_time = appointment_in.appointment_time or appointment.appointment_time
-        new_doctor_id = appointment_in.doctor_id or appointment.doctor_id
+    changes = appointment_in.model_dump(exclude_unset=True)
+    slot_fields = {"doctor_id", "appointment_date", "appointment_time", "service_ids"}
+    slot_conflict = None
+    if changes.keys() & (slot_fields | {"status"}):
+        # Both staff and mobile updates serialize their read of this
+        # appointment before taking the doctor lock for its destination.
+        appointment = appointment_crud.get_for_slot_change(
+            db, appointment_id=appointment_id
+        )
+        if appointment is None:
+            raise HTTPException(status_code=404, detail="Запись не найдена")
+        _ensure_appointment_record_access(db, appointment, current_user)
 
-        # Atomic slot reservation (Codex P1 round-7, ordering fixed round-8: the
-        # per-doctor FOR UPDATE lock is taken BEFORE eligibility so a concurrent
-        # deactivation must commit first and the eligibility read below sees the
-        # post-commit state) — concurrent same-slot writers (reschedules
-        # included) serialize.
-        lock_doctor_for_slot_reservation(db, new_doctor_id)
-
-        # Lifecycle eligibility (Codex P1-D consistency): validate a doctor
-        # REASSIGNMENT to an eligible doctor. A payload that keeps the current
-        # doctor_id (time-only reschedule of an existing row) is not a new
-        # booking and stays legal even if that doctor was deactivated later.
-        if (
-            appointment_in.doctor_id
-            and appointment_in.doctor_id != appointment.doctor_id
-        ):
-            _ensure_appointment_doctor_eligible(db, appointment_in.doctor_id)
-        if appointment_crud.is_time_slot_occupied(
-            db,
-            doctor_id=new_doctor_id,
-            appointment_date=new_date,
-            appointment_time=new_time,
-            exclude_appointment_id=appointment_id,
-        ):
-            raise HTTPException(
+        new_status = changes.get("status", appointment.status)
+        reopens_slot = (
+            appointment.status.strip().casefold() == "cancelled"
+            and isinstance(new_status, str)
+            and new_status.strip().casefold() != "cancelled"
+        )
+        new_doctor_id = changes.get("doctor_id", appointment.doctor_id)
+        if new_doctor_id is not None and (changes.keys() & slot_fields or reopens_slot):
+            lock_doctor_for_slot_reservation(db, new_doctor_id)
+            if new_doctor_id != appointment.doctor_id:
+                _ensure_appointment_doctor_eligible(db, new_doctor_id)
+            slot_conflict = HTTPException(
                 status_code=400, detail="Это время уже занято у выбранного врача"
             )
 
-    appointment = appointment_crud.update(
-        db=db, db_obj=appointment, obj_in=appointment_in
+    return appointment_crud.update(
+        db=db, db_obj=appointment, obj_in=appointment_in, slot_conflict=slot_conflict
     )
-    return appointment
 
 
 @router.delete("/{appointment_id}", response_model=dict[str, Any])

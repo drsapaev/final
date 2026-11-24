@@ -37,6 +37,7 @@ import { getLocalDateString } from '../../utils/dateUtils';
 import { getServiceDisplayName } from '../../utils/serviceCodeResolver';
 import { getRegistrarCancelTargets, getRegistrarRescheduleVisitIds } from '../../pages/registrar/registrarHelpers';
 import type { Appointment, QueueNumberInfo } from '../../types/domain/clinic';
+import { normalizeIssuedQueueTicket } from '../../pages/registrar/registrarHelpers';
 import {
   type AppointmentRow,
   type AppointmentsTranslationFn,
@@ -588,16 +589,10 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
   const renderQueueNumbers = useCallback((row: Appointment) => {
     // Получаем текущую дату
     const today = getLocalDateString();
-    // The backend uses 0 as an ordinal fallback when there is no allocated ticket.
-    // In the registrar worklist, zero/blank must never masquerade as a ticket.
-    const isTicket = (value: unknown) => value !== null && value !== undefined && String(value).trim() !== '' && String(value).trim() !== '0';
-
-    // Helper для форматирования времени
-
-
-
-
-
+    const isTicket = (value: unknown) => normalizeIssuedQueueTicket(value) !== null;
+    const visibleQueueNumbers = Array.isArray(row.queue_numbers)
+      ? row.queue_numbers.filter((ticket) => !preferCanonicalQueueNumber || isTicket(ticket.number))
+      : [];
     // Если запись на текущий день - показываем номер в очереди
     if (preferCanonicalQueueNumber || row.date === today || row.appointment_date === today) {
       // ✅ ИСПРАВЛЕНО: Используем queue_number (уже выбран для текущей вкладки в RegistrarPanel)
@@ -696,7 +691,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
           {/* UX Audit Registrar #8: показываем дополнительные queue numbers
               если у пациента несколько талонов (multi-service запись).
               Раньше показывался только первый номер — остальные игнорировались. */}
-          {Array.isArray(row.queue_numbers) && row.queue_numbers.length > 1 && (
+          {visibleQueueNumbers.length > 1 && (
             <span
               style={{
                 marginLeft: 'var(--mac-spacing-1)',
@@ -707,9 +702,9 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-semibold)',
               }}
-              title={row.queue_numbers.map((q: QueueNumberInfo) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
+              title={visibleQueueNumbers.map((q: QueueNumberInfo) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
             >
-              +{row.queue_numbers.length - 1}
+              +{visibleQueueNumbers.length - 1}
             </span>
           )}
           </>
@@ -717,8 +712,8 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
       }
 
       // Fallback: Если есть номера очередей, но нет queue_number - показываем первый
-      if (row.queue_numbers && Array.isArray(row.queue_numbers) && row.queue_numbers.length > 0 && (!preferCanonicalQueueNumber || isTicket(row.queue_numbers[0].number))) {
-        const firstQueue = row.queue_numbers[0];
+      if (visibleQueueNumbers.length > 0) {
+        const firstQueue = visibleQueueNumbers[0];
         const queueStatusKey = firstQueue.status || 'unknown';
         const statusConfig = {
           waiting: {
@@ -776,7 +771,7 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
           </span>
 
           {/* UX Audit Registrar #8: multi-badge  fallback . */}
-          {row.queue_numbers.length > 1 && (
+          {visibleQueueNumbers.length > 1 && (
             <span
               style={{
                 marginLeft: 'var(--mac-spacing-1)',
@@ -787,9 +782,9 @@ export const useAppointmentsTableRenderers = ({ t, services, data, preferCanonic
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-semibold)',
               }}
-              title={row.queue_numbers.map((q: QueueNumberInfo) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
+              title={visibleQueueNumbers.map((q: QueueNumberInfo) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
             >
-              +{row.queue_numbers.length - 1}
+              +{visibleQueueNumbers.length - 1}
             </span>
           )}
           </>
@@ -986,7 +981,7 @@ export const buildAppointmentsTableColumns = ({
                   fontWeight: 'var(--mac-font-weight-semibold)',
                   whiteSpace: 'nowrap'
                 }}>
-                Manual
+                {t('terms.registrar')}
               </span>
             }
           </div>
@@ -1029,15 +1024,15 @@ export const buildAppointmentsTableColumns = ({
     )
   });
 
-  // Адрес (только registrar view, скрыт на mobile)
+  // Адрес доступен регистратору в прокручиваемой таблице и на узком экране.
   if (!isDoctorView) {
     columns.push({
       key: 'patient_address',
       sortable: false,
-      title: <div className="eat-th-content hide-on-mobile" style={{ minWidth: '140px' }}>{t('misc.eat_address')}</div>,
+      title: <div className="eat-th-content" style={{ minWidth: '140px' }}>{t('misc.eat_address')}</div>,
       render: (_value: unknown, row: AppointmentRow) => (
         <div
-          className="eat-cell eat-cell--primary hide-on-mobile"
+          className="eat-cell eat-cell--primary"
           style={{ minWidth: '140px', whiteSpace: 'normal', lineHeight: '1.4' }}
           title={String(row.address ?? '')}>
           {row.address ?

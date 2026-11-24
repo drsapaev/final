@@ -104,7 +104,7 @@ also maps `TELEGRAM_BOT_TOKEN` into that service. Use a fresh synthetic
 patient and record the exact tested SHA, native result and teardown.
 Do not reuse the reminder workflow or production credentials.
 
-For PR #4195 only, the reviewed **Mini App native staging acceptance**
+For PR #4195, the reviewed **Mini App native staging acceptance**
 workflow can supplement an exact-SHA Cloud run that is otherwise complete.
 Dispatch from `main` with `acceptance=pr-4195-arq-reminder` and `source-sha`
 set to the full current PR #4195 head after it includes the current `main`.
@@ -115,6 +115,27 @@ and verifies the four workflow, helper and runbook files against trusted
 on `main`, while the run attests the exact PR head. The existing protected
 environment, `miniapp-staging.finalclinic.fyi` hostname, and default
 `pr-4118-sessions` choice apply.
+
+For PR #4251, use `acceptance=pr-4251-arq-reminder` from protected `main`
+and pass the full current PR head as `source-sha`. It must match the open
+same-repository PR head and the remote `codex/laboratory-panel-v2` branch tip.
+The checkout verifies the live `refs/heads/main` against the workflow SHA.
+The PR's REST metadata identifies the base branch by name because its
+recorded `base.sha` can lag the live ref.
+The reviewed app is `7a1d512e87bd052dd1ee06199fec7a82e7d27d0e`, which descends
+from review base `11d4a5edd1979ed167ae4acb6b75e7d72eda9239`. The workflow also
+accepts an exact two-parent merge whose first parent is the reviewed app
+and whose second parent is the verified current `main` that runs the workflow.
+For that merge, the current `main` must descend from the review base and may
+differ from it only in `.github/workflows/staging-miniapp-pr.yml`,
+`.github/workflows/staging-miniapp-native-live.yml` and this runbook.
+The merge must match current `main` at those three paths and match the reviewed
+app everywhere else. Verified current `main` also supplies the trusted ARQ
+helper. An app change requires review of its new SHA before updating the pin.
+Use the same `staging-integrations` environment and staging HTTPS hostname.
+Dispatch only with explicit authorization for the approved private test
+recipient and the single reminder. The result supplements the exact-SHA
+Cloud run with the Telegram evidence described below.
 
 When the run summary says native onboarding is ready, use the approved
 Telegram identity in the staging bot's Mini App. In Appointments submit the
@@ -838,6 +859,24 @@ Masked patient: {'first_name': 'A.', 'last_name': 'K.', 'phone': '•••567',
   browser surface, add it to `MEDICAL_PII_KEYS` in
   `frontend/src/services/sentry.ts`. The two lists are intentionally
   separate (frontend covers auth tokens + payment fields per BS-57).
+
+### Public-site analytics through Nginx
+
+Before enabling collection behind an Nginx config from this repo, run
+`bash scripts/smoke_test_public_site_analytics_proxy.sh` from the release
+checkout. Use an isolated Linux or WSL Docker environment with the
+`nginx:1.27-alpine` image already available.
+
+The probe checks successful forwarding and a controlled upstream failure
+using synthetic requests. The collector's normal, trailing slash, and
+encoded paths stay out of inherited access and error logs. The proxy
+preserves the 502 response. Nearby API routes still produce their ordinary
+access and upstream error entries.
+
+The Nginx error-log exclusion applies after the collector location is
+matched. Validate request parsing errors and external ingress separately.
+The clinic's Windows production API uses Cloudflare Tunnel, so its HTTP
+logging and monitoring settings require their own evidence.
 
 ---
 
