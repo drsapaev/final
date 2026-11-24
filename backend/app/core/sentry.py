@@ -434,7 +434,7 @@ def _safe_contexts(value: Any) -> dict[str, Any]:
     return safe
 
 
-def _safe_extra(value: Any) -> dict[str, Any]:
+def _safe_extra(value: Any, *, alert_type: str | None = None) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     safe: dict[str, Any] = {}
@@ -462,6 +462,17 @@ def _safe_extra(value: Any) -> dict[str, Any]:
         number = _bounded_number(value.get(field), minimum, maximum)
         if number is not None and int(number) == number:
             safe[field] = int(number)
+    if alert_type == "system_resource":
+        # These values describe a whole SLA window, not individual requests.
+        for field, minimum, maximum, integer in (
+            ("latency_p95_ms", 0, 3_600_000, False),
+            ("latency_threshold_ms", 100, 30_000, False),
+            ("window_requests", 1, 1_000_000, True),
+            ("window_seconds", 60, 3_600, True),
+        ):
+            number = _bounded_number(value.get(field), minimum, maximum)
+            if number is not None and (not integer or int(number) == number):
+                safe[field] = int(number) if integer else number
     return safe
 
 
@@ -805,18 +816,18 @@ def sanitize_sentry_payload(event: dict[str, Any]) -> dict[str, Any]:
             safe["trace"] = trace
         else:
             safe.pop("trace")
-    if "extra" in safe:
-        extra = _safe_extra(safe["extra"])
-        if extra:
-            safe["extra"] = extra
-        else:
-            safe.pop("extra")
+    tags = _safe_tags(safe.get("tags"))
     if "tags" in safe:
-        tags = _safe_tags(safe["tags"])
         if tags:
             safe["tags"] = tags
         else:
             safe.pop("tags")
+    if "extra" in safe:
+        extra = _safe_extra(safe["extra"], alert_type=tags.get("alert_type"))
+        if extra:
+            safe["extra"] = extra
+        else:
+            safe.pop("extra")
     if "exception" in safe:
         exception = _safe_exception(safe["exception"])
         if exception:
