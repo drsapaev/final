@@ -1,7 +1,7 @@
 # Monitoring and Observability Dependencies
 
 # Error Tracking (app.core.sentry uses the SDK 2.x privacy and transaction hooks)
-sentry-sdk[fastapi]>=2.71.0,<3
+sentry-sdk[fastapi]>=2.75.0,<3
 
 # Metrics
 prometheus-client>=0.26.0
