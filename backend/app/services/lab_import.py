@@ -92,9 +92,17 @@ def _map_values(
         ):
             raise RowRejected("invalid_value")
         payload = value.model_dump(mode="json")
+        if payload.get("method_code") not in {None, row.method_code}:
+            raise RowRejected("method_mismatch")
         payload["field_key"] = field.field_key
         payload["unit_code"] = unit_code
         payload["method_code"] = row.method_code
+        try:
+            normalized = service._normalize_value_payload(payload, field)
+        except LabReportingDomainError as exc:
+            raise RowRejected("invalid_value") from exc
+        if not normalized["result_payload"]:
+            raise RowRejected("invalid_value")
         mapped.append(payload)
     return mapped
 
@@ -177,12 +185,6 @@ def _process_row(
         for value in instance.values
     )
     if preview:
-        definitions = service._field_map(instance.template_version)
-        try:
-            for value in mapped:
-                service._normalize_value_payload(value, definitions[value["field_key"]])
-        except LabReportingDomainError as exc:
-            raise RowRejected("invalid_value") from exc
         updated_at = instance.updated_at
         if updated_at.tzinfo is None:
             updated_at = updated_at.replace(tzinfo=UTC)
@@ -201,6 +203,7 @@ def _process_row(
             mapped,
             expected_updated_at=token,
             actor_user_id=actor_id,
+            source_specimen_id=specimen.id,
             commit=False,
         )
     except LabReportingDomainError as exc:

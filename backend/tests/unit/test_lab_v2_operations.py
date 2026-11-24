@@ -124,6 +124,7 @@ def test_import_validation_receipt_and_partial_retry(db_session, test_patient):
     )
     assert saved.value_numeric == Decimal("0.01")
     assert (saved.result_payload or {}).get("comparator") == "lt"
+    assert (saved.result_payload or {}).get("source_specimen_id") == specimen.id
 
     repeat = process_import_batch(
         db_session, LabImportBatch(source="manual", rows=[data]), actor_id=actor.id
@@ -134,6 +135,20 @@ def test_import_validation_receipt_and_partial_retry(db_session, test_patient):
         db_session, LabImportBatch(source="manual", rows=[different]), actor_id=actor.id
     )
     assert conflict[0].error_code == "message_conflict"
+    whitespace = {
+        **data,
+        "message_id": str(uuid4()),
+        "expected_updated_at": second.updated_at,
+        "replace_existing": True,
+        "values": [{**data["values"][0], "value_text": "   "}],
+    }
+    rejected = process_import_batch(
+        db_session,
+        LabImportBatch(source="manual", rows=[whitespace]),
+        actor_id=actor.id,
+    )
+    assert rejected[0].error_code == "invalid_value"
+    assert saved.value_numeric == Decimal("0.01")
 
 
 @pytest.mark.unit

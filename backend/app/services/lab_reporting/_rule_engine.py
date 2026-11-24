@@ -450,7 +450,11 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
         for value, normalized in updates:
             value.value_text = normalized["value_text"]
             value.value_numeric = normalized["value_numeric"]
-            value.result_payload = normalized["result_payload"]
+            result = normalized["result_payload"]
+            source_specimen_id = (value.result_payload or {}).get("source_specimen_id")
+            if result and result["kind"] != "absent" and source_specimen_id is not None:
+                result = {**result, "source_specimen_id": source_specimen_id}
+            value.result_payload = result
 
     def _evaluate_saved_result(
         self, instance: LabReportInstance, field_def: LabReportFieldDef, value: LabReportValue,

@@ -55,6 +55,25 @@ def _auth(actor):
     return {"Authorization": f"Bearer {token}"}
 
 
+def _accepted_specimen(db, report, barcode, *, replaces_specimen_id=None):
+    specimen = LabSpecimen(
+        order_id=report.order_id,
+        barcode=barcode,
+        material_code="synthetic-blood",
+        container_code="synthetic-tube",
+        status="accepted",
+        revision=4,
+        replaces_specimen_id=replaces_specimen_id,
+        create_request_id=str(uuid4()),
+        created_at=datetime.now(UTC),
+    )
+    db.add(specimen)
+    db.flush()
+    db.add(LabSpecimenAssignment(specimen_id=specimen.id, report_instance_id=report.id))
+    db.commit()
+    return specimen
+
+
 @pytest.mark.unit
 def test_managed_release_versions_permissions_and_correction_history(
     db_session, test_patient, monkeypatch
@@ -90,8 +109,10 @@ def test_managed_release_versions_permissions_and_correction_history(
             report_id, actor_user_id=reviewer_id, expected_updated_at=initial_version
         )
     assert premature.value.status_code == 409
+    assert service.report_release_holds(report) == ["specimen_required", "qc_missing"]
+    specimen = _accepted_specimen(db_session, report, "SYNTHETIC-RELEASE")
 
-    report, _ = service.bulk_upsert_values(
+    report, updated = service.bulk_upsert_values(
         report_id,
         [
             {"field_key": "hgb", "value_text": "100"},
@@ -100,7 +121,10 @@ def test_managed_release_versions_permissions_and_correction_history(
         expected_updated_at=initial_version,
         actor_user_id=actor_id,
     )
-    assert service.report_release_holds(report) == ["specimen_required", "qc_missing"]
+    assert {value.result_payload["source_specimen_id"] for value in updated} == {
+        specimen.id
+    }
+    assert service.report_release_holds(report) == ["qc_missing"]
     draft_token = report.updated_at.isoformat()
     report = service.record_report_qc(
         report_id,
@@ -112,23 +136,6 @@ def test_managed_release_versions_permissions_and_correction_history(
             series_ref="SYNTHETIC-QC",
         ),
     )
-    specimen = LabSpecimen(
-        order_id=report.order_id,
-        barcode="SYNTHETIC-RELEASE",
-        material_code="synthetic-blood",
-        container_code="synthetic-tube",
-        status="accepted",
-        revision=4,
-        create_request_id=str(uuid4()),
-        created_at=datetime.now(UTC),
-    )
-    db_session.add(specimen)
-    db_session.flush()
-    db_session.add(
-        LabSpecimenAssignment(specimen_id=specimen.id, report_instance_id=report_id)
-    )
-    db_session.commit()
-
     report = service.submit_for_review(
         report_id,
         actor_user_id=actor_id,
@@ -216,6 +223,10 @@ def test_managed_release_versions_permissions_and_correction_history(
     )
     assert revision.supersedes_instance_id == report_id
     assert revision.status == "DRAFT"
+    assert "specimen_result_mismatch" in service.report_release_holds(revision)
+    assert {
+        value.result_payload["source_specimen_id"] for value in revision.values
+    } == {specimen.id}
     assert service.workflow_history(revision.id)[0].reason == "SYNTHETIC correction"
     same_revision = service.revise(
         report_id,
@@ -225,6 +236,67 @@ def test_managed_release_versions_permissions_and_correction_history(
     )
     assert same_revision.id == revision.id
     assert service.get_instance(report_id).status == "FINALIZED"
+
+
+@pytest.mark.unit
+def test_recollection_does_not_silently_rebind_a_measured_value(
+    db_session, test_patient, monkeypatch
+):
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", True)
+    entrant = _staff(db_session, "recollection", [])
+    db_session.commit()
+    service = LabReportingService(db_session)
+    template = next(item for item in service.list_templates() if item.code == "cbc_oak")
+    report = service.create_instance(
+        {"patient_id": test_patient.id, "template_id": template.id},
+        actor_user_id=entrant.id,
+    )
+    original = _accepted_specimen(db_session, report, "SYNTHETIC-FIRST")
+    report, values = service.bulk_upsert_values(
+        report.id,
+        [{"field_key": "hgb", "value_text": "100"}],
+        actor_user_id=entrant.id,
+        expected_updated_at=report.updated_at.isoformat(),
+    )
+    assert values[0].result_payload["source_specimen_id"] == original.id
+    original.status = "rejected"
+    original.revision += 1
+    replacement = _accepted_specimen(
+        db_session,
+        report,
+        "SYNTHETIC-SECOND",
+        replaces_specimen_id=original.id,
+    )
+    report, values = service.bulk_upsert_values(
+        report.id,
+        [{"field_key": "hgb", "value_text": "100", "comment": "SYNTHETIC comment"}],
+        actor_user_id=entrant.id,
+        expected_updated_at=report.updated_at.isoformat(),
+    )
+    assert values[0].result_payload["source_specimen_id"] == original.id
+    assert "specimen_result_mismatch" in service.report_release_holds(report)
+    with pytest.raises(LabReportingDomainError, match="specimen_result_mismatch"):
+        service.submit_for_review(
+            report.id,
+            actor_user_id=entrant.id,
+            expected_updated_at=report.updated_at.isoformat(),
+        )
+
+    # A validated import anchored to the replacement can carry the same number.
+    report, values = service.bulk_upsert_values(
+        report.id,
+        [{"field_key": "hgb", "value_text": "100"}],
+        actor_user_id=entrant.id,
+        expected_updated_at=report.updated_at.isoformat(),
+        source_specimen_id=replacement.id,
+    )
+    assert values[0].result_payload["source_specimen_id"] == replacement.id
+    report = service.submit_for_review(
+        report.id,
+        actor_user_id=entrant.id,
+        expected_updated_at=report.updated_at.isoformat(),
+    )
+    assert report.values[0].result_payload["source_specimen_id"] == replacement.id
 
 
 @pytest.mark.unit

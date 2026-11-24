@@ -195,6 +195,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
         self, instance_id: int, values_payload: list[dict[str, Any]],
         expected_updated_at: str | None = None,
         *, actor_user_id: int | None = None, commit: bool = True,
+        source_specimen_id: int | None = None,
     ) -> tuple[LabReportInstance, list[LabReportValue]]:
         logger.info(
             "[LAB] bulk_upsert_values instance_id=%s items=%s",
@@ -219,6 +220,14 @@ class InstancesMixin(LabReportingServiceMixinBase):
                 raise LabReportingDomainError(400, f"Duplicate value for {field_key}")
             normalized_by_key[field_key] = self._normalize_value_payload(item, field_def)
 
+        specimen_id = source_specimen_id
+        if source_specimen_id is not None or (instance.managed_release and normalized_by_key):
+            eligible_ids = self._accepted_result_specimen_ids(instance)
+            if source_specimen_id is not None and source_specimen_id not in eligible_ids:
+                raise LabReportingDomainError(409, "Result specimen is not an accepted report specimen")
+            if source_specimen_id is None and len(eligible_ids) == 1:
+                specimen_id = next(iter(eligible_ids))
+
         updated_values: list[LabReportValue] = []
         for field_key, normalized in normalized_by_key.items():
             lab_value = existing_by_key.get(field_key)
@@ -227,10 +236,22 @@ class InstancesMixin(LabReportingServiceMixinBase):
                 instance.values.append(lab_value)
                 existing_by_key[field_key] = lab_value
 
+            result = normalized["result_payload"]
+            if result and result["kind"] != "absent":
+                # Saving a comment or resending the same result cannot silently
+                # move a measurement to a recollected specimen.
+                old_result = lab_value.result_payload or {}
+                result_specimen_id = specimen_id
+                if source_specimen_id is None and self._same_measurement(
+                    lab_value, normalized, field_map[field_key],
+                ):
+                    result_specimen_id = old_result.get("source_specimen_id")
+                if result_specimen_id is not None:
+                    result = {**result, "source_specimen_id": result_specimen_id}
             lab_value.value_text = normalized["value_text"]
             lab_value.value_numeric = normalized["value_numeric"]
             lab_value.comment = normalized["comment"]
-            lab_value.result_payload = normalized["result_payload"]
+            lab_value.result_payload = result
             updated_values.append(lab_value)
 
         self._refresh_result_evaluation(instance)
@@ -244,6 +265,37 @@ class InstancesMixin(LabReportingServiceMixinBase):
             return instance, updated_values
         self.repository.commit()
         return self.get_instance(instance.id), updated_values
+
+    def _same_measurement(
+        self, value: LabReportValue, normalized: dict[str, Any], field_def: LabReportFieldDef,
+    ) -> bool:
+        value_text = value.value_text
+        value_numeric = value.value_numeric
+        before = value.result_payload
+        if before is None and (value_text is not None or value_numeric is not None):
+            # Older copied corrections may have a measured value without
+            # structured provenance. A matching resave still proves no source.
+            try:
+                legacy = self._normalize_value_payload(
+                    {"value_text": value_text, "value_numeric": value_numeric}, field_def,
+                )
+            except LabReportingDomainError:
+                return False
+            before = legacy["result_payload"]
+            value_text = legacy["value_text"]
+            value_numeric = legacy["value_numeric"]
+        after = normalized["result_payload"]
+        kind = after["kind"]
+        if before is None or before.get("kind") != kind:
+            return False
+        if kind == "text":
+            return value_text == normalized["value_text"]
+        if kind == "coded_qualitative":
+            return before.get("qualitative_code") == after.get("qualitative_code")
+        return (
+            value_numeric == normalized["value_numeric"]
+            and before.get("comparator") == after.get("comparator")
+        )
 
 
     def mark_ready(self, instance_id: int) -> LabReportInstance:

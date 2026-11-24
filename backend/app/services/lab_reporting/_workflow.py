@@ -8,6 +8,7 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.models.lab import FINAL_INSTANCE_STATUSES, LabOrderTest, LabReportInstance
 from app.models.lab_release import LabReportWorkflowEvent
+from app.models.lab_specimen import LabSpecimen
 from app.models.role_permission import Permission
 from app.models.user import User
 from app.models.visit import VisitService
@@ -237,6 +238,22 @@ class WorkflowMixin(LabReportingServiceMixinBase):
             holds.append("specimen_not_accepted")
         if len({specimen.material_code for specimen in specimens}) > 1:
             holds.append("specimen_context_ambiguous")
+        if instance.values:
+            eligible_ids = self._accepted_result_specimen_ids(
+                instance, specimens=specimens
+            )
+            for value in instance.values:
+                result = value.result_payload or {}
+                has_measurement = value.value_numeric is not None or bool(
+                    value.value_text
+                )
+                if (
+                    has_measurement
+                    and result.get("kind") != "absent"
+                    and result.get("source_specimen_id") not in eligible_ids
+                ):
+                    holds.append("specimen_result_mismatch")
+                    break
 
         qc = self._latest_workflow_event(instance.id, "qc_recorded")
         if qc is None:
@@ -255,6 +272,24 @@ class WorkflowMixin(LabReportingServiceMixinBase):
             "qc_event_id": qc.id if qc else None,
         }
         return holds, evidence
+
+    def _accepted_result_specimen_ids(
+        self,
+        instance: LabReportInstance,
+        *,
+        specimens: list[LabSpecimen] | None = None,
+    ) -> set[int]:
+        repository = SpecimenRepository(self.db)
+        if specimens is None:
+            specimens = repository.list_for_release(instance.id)
+        directly_assigned = {
+            item.id for item in repository.list_for_report(instance.id)
+        }
+        return {
+            item.id
+            for item in specimens
+            if item.id in directly_assigned and item.status == "accepted"
+        }
 
     @staticmethod
     def _has_published_template(instance: LabReportInstance) -> bool:
@@ -317,7 +352,9 @@ class WorkflowMixin(LabReportingServiceMixinBase):
             raise LabReportingDomainError(
                 409, "Review requires a published template version"
             )
-        _, evidence = self._release_prerequisites(instance, lock_specimens=True)
+        holds, evidence = self._release_prerequisites(instance, lock_specimens=True)
+        if "specimen_result_mismatch" in holds:
+            raise LabReportingDomainError(409, "specimen_result_mismatch")
         values, context = self._refresh_result_evaluation(
             instance, validate_existing=True
         )

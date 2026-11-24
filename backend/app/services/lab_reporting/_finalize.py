@@ -259,9 +259,15 @@ class FinalizeMixin(LabReportingServiceMixinBase):
                 continue
             code = value.field_key
 
-            result_value = self._format_result_display(value)
-            evaluation = value.evaluation_snapshot or {}
-            unit = evaluation.get("unit") if "unit" in evaluation else self._resolve_field_unit(field_def)
+            evaluation = value.evaluation_snapshot
+            result_value = (
+                "" if evaluation and evaluation.get("visible") is False
+                else self._format_result_display(value)
+            )
+            unit = (
+                evaluation.get("unit") if evaluation is not None
+                else self._resolve_field_unit(field_def)
+            )
 
             # abnormal = True для любого непустого resolved_flag
             # (high, low, abnormal, critical, warning). None/empty → False.
