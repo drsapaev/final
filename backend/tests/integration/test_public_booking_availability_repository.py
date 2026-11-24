@@ -10,12 +10,13 @@ from app.repositories.public_booking_availability_repository import (
 )
 
 
-def test_repository_reads_only_active_profile_shift_and_minimal_day_occupancy(
+def test_repository_reads_active_profile_shift_and_occupancy_since_previous_day(
     db_session, test_doctor, test_doctor_user, test_patient
 ):
     test_doctor.show_on_website = True
     db_session.flush()
     target_date = date(2026, 10, 26)
+    prior_date = date(2026, 10, 25)
     other_doctor = Doctor(user_id=test_doctor_user.id, specialty="Тест")
     db_session.add(other_doctor)
     db_session.flush()
@@ -56,6 +57,22 @@ def test_repository_reads_only_active_profile_shift_and_minimal_day_occupancy(
             Appointment(
                 patient_id=test_patient.id,
                 doctor_id=test_doctor.id,
+                appointment_date=prior_date,
+                appointment_time="23:55",
+                duration_minutes_snapshot=40,
+                status="scheduled",
+            ),
+            Appointment(
+                patient_id=test_patient.id,
+                doctor_id=test_doctor.id,
+                appointment_date=date(2026, 10, 24),
+                appointment_time="23:55",
+                duration_minutes_snapshot=40,
+                status="scheduled",
+            ),
+            Appointment(
+                patient_id=test_patient.id,
+                doctor_id=test_doctor.id,
                 appointment_date=date(2026, 10, 27),
                 appointment_time="09:30",
                 duration_minutes_snapshot=20,
@@ -85,7 +102,24 @@ def test_repository_reads_only_active_profile_shift_and_minimal_day_occupancy(
     )
 
     assert schedules == [(time(9, 10), time(17), [{"start": "12:00", "end": "13:00"}])]
-    assert appointments == [(target_date, "09:30", 40, "scheduled")]
+    assert appointments == [
+        (prior_date, "23:55", 40, "scheduled"),
+        (target_date, "09:30", 40, "scheduled"),
+    ]
+
+
+def test_repository_does_not_read_before_first_representable_date(
+    db_session, test_doctor
+):
+    repository = PublicBookingAvailabilityRepository(db_session)
+
+    assert (
+        repository.list_appointment_occupancy_for_day(
+            doctor_id=test_doctor.id,
+            target_date=date.min,
+        )
+        == []
+    )
 
 
 def test_repository_hides_shifts_for_ineligible_public_doctor(db_session, test_doctor):

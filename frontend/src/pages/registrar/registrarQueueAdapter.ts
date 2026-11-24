@@ -34,6 +34,7 @@ export const adaptQueueEntry = (
   if (!entryId) return null; // Skip entries without ID
 
   const queueNum = fullEntry.queue_position ?? fullEntry.number ?? 0;
+  const queueCabinet = fullEntry.queue_cabinet ?? entry.queue_cabinet ?? null;
   const queueTag = fullEntry.queue_tag ?? queue.queue_tag ?? queue.specialty ?? null;
   const queueName = fullEntry.queue_name ?? queue.specialist_name ?? queue.specialty ?? null;
   // REG-FE-063 (registrar audit #3803, P1): real queue-entry identity for
@@ -114,6 +115,7 @@ export const adaptQueueEntry = (
 
     // Queue info
     queue_number: queueNum,
+    queue_cabinet: queueCabinet,
     queue_numbers: [{
       // REG-FE-063 (#3803 follow-up): carry the ticket's queue-entry
       // identity and the owning daily queue inside the element, so the
@@ -121,7 +123,9 @@ export const adaptQueueEntry = (
       // belong to different doctors/queues.
       queue_entry_id: queueEntryIdentity,
       daily_queue_id: dailyQueueId,
+      visit_id: fullEntry.visit_id ?? entry.visit_id ?? null,
       number: queueNum,
+      queue_cabinet: queueCabinet,
       queue_tag: queueTag,
       queue_name: queueName,
       specialty: queueTag,

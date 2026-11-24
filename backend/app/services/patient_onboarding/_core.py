@@ -1,5 +1,8 @@
 """Core mixin for PatientOnboardingService. Split from patient_onboarding_service.py."""
+
 from __future__ import annotations
+
+from sqlalchemy import update
 
 from app.services.patient_onboarding._base import *  # noqa: F401, F403
 from app.services.patient_onboarding._base import (  # noqa: F401
@@ -25,13 +28,10 @@ class CoreMixin(PatientOnboardingServiceMixinBase):
         self.db = db
 
     @staticmethod
-
-
     def _request_signature(row: PatientOnboardingRequest) -> str:
         return hashlib.sha256(
             f"req:{int(row.id)}:{int(row.telegram_chat_id)}".encode()
         ).hexdigest()[:16]
-
 
     def _validate_audit_actor(self, actor: User) -> None:
         if getattr(actor, "is_superuser", False):
@@ -41,7 +41,6 @@ class CoreMixin(PatientOnboardingServiceMixinBase):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={"reason": "action_forbidden"},
             )
-
 
     def _record_audit(
         self,
@@ -67,21 +66,33 @@ class CoreMixin(PatientOnboardingServiceMixinBase):
             payload=audit_payload,
         )
 
-
-    def _refresh_expired(self, row: PatientOnboardingRequest) -> PatientOnboardingRequest:
+    def _refresh_expired(
+        self, row: PatientOnboardingRequest
+    ) -> PatientOnboardingRequest:
+        now = _utc_now()
         if (
             row.status in ONBOARDING_ACTIVE_STATUSES
             and row.expires_at is not None
-            and _as_aware_utc(row.expires_at) < _utc_now()
+            and _as_aware_utc(row.expires_at) < now
         ):
-            row.status = "expired"
-            row.reviewed_at = _utc_now()
-            row.updated_at = _utc_now()
-            self._record_audit(action="patient_onboarding_expired", row=row)
-            self.db.commit()
+            # Status readers can observe an active request before a concurrent
+            # registrar commits a decision. Expire only the current active row.
+            changed = self.db.execute(
+                update(PatientOnboardingRequest)
+                .where(
+                    PatientOnboardingRequest.id == row.id,
+                    PatientOnboardingRequest.status.in_(ONBOARDING_ACTIVE_STATUSES),
+                    PatientOnboardingRequest.expires_at < now,
+                )
+                .values(status="expired", reviewed_at=now, updated_at=now)
+                .execution_options(synchronize_session=False)
+            )
             self.db.refresh(row)
+            if changed.rowcount == 1:
+                self._record_audit(action="patient_onboarding_expired", row=row)
+                self.db.commit()
+                self.db.refresh(row)
         return row
-
 
     def _patient_name(self, patient: Patient) -> str:
         return " ".join(
@@ -94,8 +105,9 @@ class CoreMixin(PatientOnboardingServiceMixinBase):
             if part
         ).strip()
 
-
-    def _staff_display_name(self, actor_user_id: int | None) -> tuple[str | None, str | None]:
+    def _staff_display_name(
+        self, actor_user_id: int | None
+    ) -> tuple[str | None, str | None]:
         if not actor_user_id:
             return None, None
         user = self.db.query(User).filter(User.id == int(actor_user_id)).first()
@@ -104,7 +116,6 @@ class CoreMixin(PatientOnboardingServiceMixinBase):
         label = _mask_name(user.full_name or user.username or user.role)
         return label, user.role
 
-
     def _last_visit_for_patient(self, patient_id: int) -> Visit | None:
         return (
             self.db.query(Visit)
@@ -112,7 +123,6 @@ class CoreMixin(PatientOnboardingServiceMixinBase):
             .order_by(Visit.created_at.desc(), Visit.id.desc())
             .first()
         )
-
 
     def _candidate_for_patient(
         self,
@@ -123,7 +133,9 @@ class CoreMixin(PatientOnboardingServiceMixinBase):
     ) -> OnboardingPatientCandidate:
         patient_name = self._patient_name(patient)
         candidate_token = _encode_candidate_id(int(request_row.id), int(patient.id))
-        search_phone = _normalize_phone(search_input.phone or request_row.contact_phone or "")
+        search_phone = _normalize_phone(
+            search_input.phone or request_row.contact_phone or ""
+        )
         patient_phone = _normalize_phone(patient.phone or "")
         last_visit = self._last_visit_for_patient(int(patient.id))
         recent_visit_match = False
@@ -135,17 +147,22 @@ class CoreMixin(PatientOnboardingServiceMixinBase):
             if last_seen_at is not None:
                 last_seen = last_seen_at.isoformat()
                 recent_visit_match = (_utc_now() - last_seen_at).days <= 180
-            safe_visit_date = last_visit.visit_date.isoformat() if last_visit.visit_date else None
+            safe_visit_date = (
+                last_visit.visit_date.isoformat() if last_visit.visit_date else None
+            )
             branch_label = _clean_text(last_visit.department, max_length=64)
-            recent_visit_summary = " | ".join(
-                value
-                for value in (
-                    f"Seen {safe_visit_date}" if safe_visit_date else None,
-                    branch_label,
-                    f"status={last_visit.status}" if last_visit.status else None,
+            recent_visit_summary = (
+                " | ".join(
+                    value
+                    for value in (
+                        f"Seen {safe_visit_date}" if safe_visit_date else None,
+                        branch_label,
+                        f"status={last_visit.status}" if last_visit.status else None,
+                    )
+                    if value
                 )
-                if value
-            ) or None
+                or None
+            )
 
         phone_match = _phone_matches(search_phone, patient_phone)
         dob_match = bool(
@@ -193,13 +210,14 @@ class CoreMixin(PatientOnboardingServiceMixinBase):
             risk_level=risk_level,
         )
 
-
     def search_candidates(
         self,
         request_row: PatientOnboardingRequest,
         search_payload: OnboardingPatientSearchRequest,
     ) -> OnboardingSearchResponse:
-        phone = _normalize_phone(search_payload.phone or request_row.contact_phone or "")
+        phone = _normalize_phone(
+            search_payload.phone or request_row.contact_phone or ""
+        )
         name = search_payload.name or request_row.contact_name
         birth_date = search_payload.birth_date
 
@@ -216,7 +234,9 @@ class CoreMixin(PatientOnboardingServiceMixinBase):
                 .all()
             )
             exact_phone_rows = [
-                patient for patient in phone_rows if _phone_matches(phone, patient.phone)
+                patient
+                for patient in phone_rows
+                if _phone_matches(phone, patient.phone)
             ]
             query = query.filter(Patient.phone.is_not(None))
         name_parts = [
@@ -246,9 +266,7 @@ class CoreMixin(PatientOnboardingServiceMixinBase):
         if exact_phone_rows:
             seen_ids = {int(patient.id) for patient in exact_phone_rows}
             candidate_rows = exact_phone_rows + [
-                patient
-                for patient in candidate_rows
-                if int(patient.id) not in seen_ids
+                patient for patient in candidate_rows if int(patient.id) not in seen_ids
             ]
             candidate_rows = candidate_rows[:MAX_SEARCH_CANDIDATES]
         candidates = [
@@ -274,5 +292,3 @@ class CoreMixin(PatientOnboardingServiceMixinBase):
             ),
             top_risk_level=top.risk_level if top is not None else "low",
         )
-
-

@@ -239,7 +239,7 @@ export async function applyRegistrarEditDelta({
     all_free: Boolean(allFree),
     services: (services || []).map((service) => ({
       service_id: Number(service.service_id),
-      quantity: Number(service.quantity || 1),
+      quantity: service.quantity === 0 ? 0 : Number(service.quantity || 1),
       specialist_id: service.specialist_id === null || service.specialist_id === undefined
         ? null
         : Number(service.specialist_id),

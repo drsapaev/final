@@ -31,6 +31,7 @@ from app.api.v1.endpoints.registrar_integration._queue_ops import (  # noqa: F40
     _process_visit_entry,
     _register_bucket_doctor,
     _resolve_queue_entry_metadata,
+    _resolve_registrar_queue_cabinet,
     _resolve_registrar_row_owner,
     _same_patient_queue_entry_for_visit,
     _serialize_queue_entry,
@@ -696,6 +697,9 @@ def _build_queue_result(
                 # W2-PR2: канонический день строки read-модели — день,
                 # для которого построен лист (target_date запроса).
                 record_date=today,
+            )
+            serialized_entry["queue_cabinet"] = _resolve_registrar_queue_cabinet(
+                db, daily_queue_id
             )
             if can_include_patient_gender:
                 patient = cached_patients.get(patient_id)
