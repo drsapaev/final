@@ -33,6 +33,7 @@ that enforces the remediation rules mechanically.
    owner sign-off recorded in the issue).
 5. **Final closure gate** — `--final-closure` fails while any entry is
    `UNVERIFIED` / `CONFIRMED_OPEN` / `FIX_IN_PROGRESS` / `FIX_PROPOSED_DRAFT`.
+   It also requires every owner checklist entry to be checked.
    It runs only via `workflow_dispatch` so it blocks the *closure*, not the
    ongoing remediation work.
 

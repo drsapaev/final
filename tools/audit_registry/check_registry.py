@@ -162,6 +162,9 @@ def final_closure(entries: list[dict]) -> None:
         fail("final audit closure blocked — open statuses remain: "
              + ", ".join(f"{k}={v}" for k, v in c.items())
              + f"; first 20: {open_entries[:20]}")
+    unchecked = [e["id"] for e in entries if e.get("checked") is not True]
+    if unchecked:
+        fail(f"final audit closure blocked — owner checklist entries remain unchecked: {unchecked[:20]}")
     print("final closure check passed: every finding is FIXED_VERIFIED_ON_MAIN / DUPLICATE / REFUTED / OWNER_ACCEPTED_RISK")
 
 

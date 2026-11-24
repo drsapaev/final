@@ -46,6 +46,17 @@ class RegistryConsistencyTests(unittest.TestCase):
         fetch.return_value = {"merged": True, "merge_commit_sha": "fedcba987" + "0" * 31}
         self.assert_rejected(check_registry.verify_merged_pull_requests, entries, "not merged with recorded SHA")
 
+    def test_final_closure_rejects_unchecked_fixed_entry(self):
+        entries = [{"id": "AUTH-BE-001", "status": "FIXED_VERIFIED_ON_MAIN", "checked": False}]
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), self.assertRaises(SystemExit):
+            check_registry.final_closure(entries)
+        self.assertIn("owner checklist entries remain unchecked", output.getvalue())
+
+        entries[0]["checked"] = True
+        with contextlib.redirect_stdout(io.StringIO()):
+            check_registry.final_closure(entries)
+
 
 if __name__ == "__main__":
     unittest.main()
