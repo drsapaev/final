@@ -1639,6 +1639,7 @@ const ru = {
     derma_panel_patient_history_title: 'История пациента',
     derma_panel_patient_history_select_prompt: 'Найдите пациента и выберите его, чтобы открыть историю.',
     derma_panel_patient_history_loading: 'Загрузка истории пациента...',
+    derma_panel_patient_history_load_more_failed: 'Не удалось загрузить следующую страницу истории — показаны только уже загруженные записи. Попробуйте ещё раз.',
     derma_panel_patient_history_error: 'Не удалось загрузить часть истории пациента.',
     derma_panel_patient_history_appointments: 'Записи',
     derma_panel_patient_history_examinations: 'Осмотры кожи',

@@ -1557,6 +1557,7 @@ const kk = {
     derma_panel_patient_history_title: 'Науқас тарихы',
     derma_panel_patient_history_select_prompt: 'Тарихын көру үшін науқасты іздеп, таңдаңыз.',
     derma_panel_patient_history_loading: 'Науқас тарихы жүктелуде...',
+    derma_panel_patient_history_load_more_failed: 'Тарихтың келесі бетін жүктеу сәтсіз аяқталды — тек жүктелген жазбалар көрсетілген. Қайталап көріңіз.',
     derma_panel_patient_history_error: 'Науқас тарихының бір бөлігі жүктелмеді.',
     derma_panel_patient_history_appointments: 'Қабылдаулар',
     derma_panel_patient_history_examinations: 'Тері тексерулері',
