@@ -11,6 +11,8 @@ from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
 from sqlalchemy.engine import make_url
 from sqlalchemy.schema import CreateSchema, DropSchema
 
@@ -466,3 +468,252 @@ def test_transitive_owner_members_and_explicit_non_super_operator(capability_pg)
             for role in (operator, group, owner):
                 db.exec_driver_sql(f"DROP OWNED BY {quote(role)}")
                 db.exec_driver_sql(f"DROP ROLE IF EXISTS {quote(role)}")
+
+
+def _apply_namespace_revision(
+    connection, schema, revision, *, downgrade=False, gateways=None
+):
+    migration = _module(
+        revision.removesuffix(".py"), ROOT / "backend/alembic/versions" / revision
+    )
+    if gateways is not None:
+        migration._GATEWAY_ROLES = gateways
+    context = MigrationContext.configure(
+        connection, opts={"version_table_schema": schema}
+    )
+    with Operations.context(context):
+        (migration.downgrade if downgrade else migration.upgrade)()
+
+
+@pytest.fixture
+def booking_lock_namespace(capability_pg):
+    engine, schema, private, owner, backend, capability, helper, _ = capability_pg
+    quote = engine.dialect.identifier_preparer.quote_identifier
+    signature = f"{quote(private)}.lock_booking_patient(pg_catalog.int4)"
+    with engine.begin() as db:
+        _apply_namespace_revision(db, schema, "0140_booking_patient_lock.py")
+    return engine, schema, private, owner, backend, capability, helper, signature
+
+
+def test_booking_lock_owner_repair_enables_role_provisioning(booking_lock_namespace):
+    engine, schema, private, owner, backend, capability, helper, signature = (
+        booking_lock_namespace
+    )
+    quote = engine.dialect.identifier_preparer.quote_identifier
+    with engine.begin() as db:
+        db.exec_driver_sql(f"ALTER FUNCTION {signature} OWNER TO {quote(backend)}")
+        with pytest.raises(helper.CapabilityNamespaceError, match="unapproved grantee"):
+            helper.validate_namespace(db, schema, expected_owner=owner)
+
+        revision = "0161_booking_lock_owner.py"
+        _apply_namespace_revision(db, schema, revision)
+        _apply_namespace_revision(db, schema, revision, downgrade=True)
+        _apply_namespace_revision(db, schema, revision)
+        helper.reconcile_namespace_roles(
+            db,
+            schema,
+            expected_owner=owner,
+            backend_roles=(backend,),
+            capability_owner_roles=(capability,),
+        )
+        assert helper.validate_namespace(db, schema, expected_owner=owner) == private
+        assert not db.scalar(
+            sa.text(
+                "SELECT pg_catalog.has_function_privilege(:backend, :signature, 'EXECUTE')"
+            ),
+            {"backend": backend, "signature": signature},
+        )
+
+
+def test_booking_lock_owner_repair_preserves_registered_capability(
+    booking_lock_namespace,
+):
+    engine, schema, private, owner, backend, capability, helper, signature = (
+        booking_lock_namespace
+    )
+    quote = engine.dialect.identifier_preparer.quote_identifier
+    with engine.begin() as db:
+        helper.reconcile_namespace_roles(
+            db,
+            schema,
+            expected_owner=owner,
+            backend_roles=(backend,),
+            capability_owner_roles=(capability,),
+        )
+        db.exec_driver_sql(f"ALTER FUNCTION {signature} SECURITY DEFINER")
+        db.exec_driver_sql(f"ALTER FUNCTION {signature} SET row_security=on")
+        db.exec_driver_sql(f"ALTER FUNCTION {signature} OWNER TO {quote(capability)}")
+        db.exec_driver_sql(f"GRANT EXECUTE ON FUNCTION {signature} TO {quote(backend)}")
+
+        _apply_namespace_revision(db, schema, "0161_booking_lock_owner.py")
+
+        actual = db.execute(
+            sa.text("""
+                SELECT pg_catalog.pg_get_userbyid(proowner), prosecdef,
+                       pg_catalog.has_function_privilege(:backend, oid, 'EXECUTE')
+                FROM pg_catalog.pg_proc WHERE oid = pg_catalog.to_regprocedure(:signature)
+            """),
+            {"backend": backend, "signature": signature},
+        ).one()
+        assert actual == (capability, True, True)
+        assert helper.validate_namespace(db, schema, expected_owner=owner) == private
+
+
+def test_booking_lock_owner_repair_rejects_unexpected_execute_grant(
+    booking_lock_namespace,
+):
+    engine, schema, _, _, backend, capability, _, signature = booking_lock_namespace
+    quote = engine.dialect.identifier_preparer.quote_identifier
+    with engine.begin() as db:
+        db.exec_driver_sql(f"ALTER FUNCTION {signature} OWNER TO {quote(backend)}")
+        db.exec_driver_sql(
+            f"GRANT EXECUTE ON FUNCTION {signature} TO {quote(capability)}"
+        )
+        with pytest.raises(RuntimeError, match="unexpected permissions or settings"):
+            _apply_namespace_revision(db, schema, "0161_booking_lock_owner.py")
+        assert (
+            db.scalar(
+                sa.text("""
+                SELECT pg_catalog.pg_get_userbyid(proowner)
+                FROM pg_catalog.pg_proc WHERE oid = pg_catalog.to_regprocedure(:signature)
+            """),
+                {"signature": signature},
+            )
+            == backend
+        )
+
+
+@pytest.fixture
+def confirmation_sequence_namespace(capability_pg):
+    engine, schema, _, owner, backend, capability, _, _ = capability_pg
+    quote = engine.dialect.identifier_preparer.quote_identifier
+    qualified_schema = quote(schema)
+    sequence = f"{qualified_schema}.visit_confirmation_generation_seq"
+    requests = f"{qualified_schema}.all_free_requests"
+    with engine.begin() as db:
+        db.exec_driver_sql(f"CREATE TABLE {requests} (id integer PRIMARY KEY)")
+        db.exec_driver_sql(f"CREATE SEQUENCE {sequence} AS bigint")
+    return engine, schema, owner, backend, capability, sequence, requests
+
+
+def test_confirmation_sequence_owner_repair_keeps_counter_and_usage(
+    confirmation_sequence_namespace,
+):
+    engine, schema, owner, backend, capability, sequence, _ = (
+        confirmation_sequence_namespace
+    )
+    quote = engine.dialect.identifier_preparer.quote_identifier
+    with engine.begin() as db:
+        db.exec_driver_sql(f"ALTER SEQUENCE {sequence} OWNER TO {quote(backend)}")
+        db.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {sequence} TO {quote(capability)}")
+        db.scalar(
+            sa.text(
+                "SELECT pg_catalog.setval(pg_catalog.to_regclass(:sequence), 731, false)"
+            ),
+            {"sequence": sequence},
+        )
+
+        revision = "0162_confirmation_sequence_owner.py"
+        _apply_namespace_revision(db, schema, revision)
+        _apply_namespace_revision(db, schema, revision, downgrade=True)
+        _apply_namespace_revision(db, schema, revision)
+
+        assert db.exec_driver_sql(
+            f"SELECT last_value, is_called FROM {sequence}"
+        ).one() == (731, False)
+        assert db.execute(
+            sa.text("""
+                SELECT pg_catalog.pg_get_userbyid(relowner),
+                       pg_catalog.has_sequence_privilege(:capability, oid, 'USAGE'),
+                       pg_catalog.has_sequence_privilege(:capability, oid, 'UPDATE'),
+                       pg_catalog.has_sequence_privilege(:backend, oid, 'USAGE')
+                FROM pg_catalog.pg_class WHERE oid = pg_catalog.to_regclass(:sequence)
+            """),
+            {"sequence": sequence, "capability": capability, "backend": backend},
+        ).one() == (owner, True, False, False)
+
+
+def test_confirmation_sequence_owner_repair_preserves_request_owner(
+    confirmation_sequence_namespace,
+):
+    engine, schema, _, _, capability, sequence, requests = (
+        confirmation_sequence_namespace
+    )
+    quote = engine.dialect.identifier_preparer.quote_identifier
+    with engine.begin() as db:
+        db.exec_driver_sql(f"ALTER TABLE {requests} OWNER TO {quote(capability)}")
+        db.exec_driver_sql(f"ALTER SEQUENCE {sequence} OWNER TO {quote(capability)}")
+
+        _apply_namespace_revision(db, schema, "0162_confirmation_sequence_owner.py")
+
+        assert (
+            db.scalar(
+                sa.text("""
+                SELECT pg_catalog.pg_get_userbyid(relowner) FROM pg_catalog.pg_class
+                WHERE oid = pg_catalog.to_regclass(:sequence)
+            """),
+                {"sequence": sequence},
+            )
+            == capability
+        )
+
+
+def test_confirmation_sequence_owner_repair_revokes_gateway_and_public_grants(
+    confirmation_sequence_namespace,
+):
+    engine, schema, _, backend, capability, sequence, _ = (
+        confirmation_sequence_namespace
+    )
+    quote = engine.dialect.identifier_preparer.quote_identifier
+    with engine.begin() as db:
+        db.exec_driver_sql(
+            f"GRANT SELECT, UPDATE, USAGE ON SEQUENCE {sequence} TO {quote(backend)}, PUBLIC"
+        )
+
+        _apply_namespace_revision(
+            db, schema, "0162_confirmation_sequence_owner.py", gateways=(backend,)
+        )
+
+        for role in (backend, capability):
+            assert not db.scalar(
+                sa.text(
+                    "SELECT pg_catalog.has_sequence_privilege(:role, :sequence, 'SELECT,UPDATE,USAGE')"
+                ),
+                {"role": role, "sequence": sequence},
+            )
+
+
+def test_confirmation_sequence_owner_repair_refuses_assumable_grants(
+    confirmation_sequence_namespace,
+):
+    engine, schema, _, backend, capability, sequence, _ = (
+        confirmation_sequence_namespace
+    )
+    quote = engine.dialect.identifier_preparer.quote_identifier
+    with engine.begin() as db:
+        db.exec_driver_sql(f"GRANT USAGE ON SEQUENCE {sequence} TO {quote(capability)}")
+        db.exec_driver_sql(f"GRANT SELECT ON SEQUENCE {sequence} TO {quote(backend)}")
+        opts = (
+            "WITH INHERIT FALSE, SET TRUE"
+            if db.dialect.server_version_info >= (16,)
+            else ""
+        )
+        db.exec_driver_sql(f"GRANT {quote(capability)} TO {quote(backend)} {opts}")
+
+    with (
+        pytest.raises(
+            RuntimeError, match="Remaining confirmation generation sequence grants"
+        ),
+        engine.begin() as db,
+    ):
+        _apply_namespace_revision(
+            db, schema, "0162_confirmation_sequence_owner.py", gateways=(backend,)
+        )
+
+    with engine.connect() as db:
+        assert db.scalar(
+            sa.text(
+                "SELECT pg_catalog.has_sequence_privilege(:role, :sequence, 'SELECT')"
+            ),
+            {"role": backend, "sequence": sequence},
+        )
