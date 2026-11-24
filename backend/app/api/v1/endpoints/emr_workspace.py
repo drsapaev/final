@@ -110,6 +110,7 @@ def put_clinical_entry(
     ensure_emr_visit_access(db, visit_id, current_user)
     service = EMRWorkspaceService(db)
     try:
+        ensure_emr_visit_access(db, visit_id, current_user, for_update=True)
         visit, patient = service.context(visit_id, payload.patient_id)
         if visit.status == "canceled":
             raise WorkspaceError(409, "VISIT_CANCELED")
@@ -118,6 +119,9 @@ def put_clinical_entry(
     except WorkspaceError as error:
         db.rollback()
         raise fail_workspace(error) from error
+    except HTTPException:
+        db.rollback()
+        raise
     audit_workspace(
         db, request, current_user, patient.id, visit_id, "edit", str(entry_id)
     )
@@ -260,6 +264,7 @@ def post_workspace_lab_review(
 ):
     ensure_emr_visit_access(db, visit_id, current_user)
     try:
+        ensure_emr_visit_access(db, visit_id, current_user, for_update=True)
         visit, patient = EMRWorkspaceService(db).context(visit_id, payload.patient_id)
         result = record_lab_review(
             db, visit, instance_id, current_user.id, payload.next_action
@@ -268,6 +273,9 @@ def post_workspace_lab_review(
     except WorkspaceError as error:
         db.rollback()
         raise fail_workspace(error) from error
+    except HTTPException:
+        db.rollback()
+        raise
     audit_workspace(
         db, request, current_user, patient.id, visit_id, "edit", str(instance_id)
     )

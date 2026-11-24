@@ -16,8 +16,10 @@ from app.models.lab import (
     LabReportTemplateVersion,
     LabReportValue,
     LabResult,
+    LabResultReview,
 )
 from app.models.patient import Patient
+from app.models.patient_clinical import PatientClinicalRevision
 from app.models.visit import Visit
 
 
@@ -98,6 +100,44 @@ def test_longitudinal_versions_are_scoped_and_do_not_change_the_visit_emr(
         (1, "none_reported"),
     ]
     assert client.get(root, headers=auth_headers).status_code == 404
+
+
+@pytest.mark.parametrize("change, expected_status, expected_code", [
+    ("status", 409, "VISIT_CANCELED"),
+    ("doctor_id", 403, None),
+    ("patient_id", 409, "PATIENT_CONTEXT_CHANGED"),
+])
+def test_longitudinal_write_refreshes_visit_context_under_lock(
+    client, db_session, cardio_auth_headers, test_visit,
+    change, expected_status, expected_code,
+):
+    alternative = Patient(first_name="SYNTHETIC-LockedContext", last_name="Other")
+    db_session.add(alternative)
+    db_session.flush()
+    changed_value = {"status": "canceled", "doctor_id": None, "patient_id": alternative.id}[change]
+    db_session.refresh(test_visit)
+    visit_id, patient_id = test_visit.id, test_visit.patient_id
+    db_session.execute(
+        Visit.__table__.update().where(Visit.id == visit_id).values({change: changed_value})
+    )
+    assert getattr(test_visit, change) != changed_value
+
+    entry_id = uuid4()
+    response = client.put(
+        f"{emr_path(visit_id)}/workspace/entries/{entry_id}",
+        headers=cardio_auth_headers,
+        json={
+            "patient_id": patient_id,
+            "expected_version": 0,
+            "source": "patient_report",
+            "confirmed": True,
+            "clinical_details": {"kind": "allergy_check", "status": "none_reported"},
+        },
+    )
+    assert response.status_code == expected_status, response.text
+    if expected_code:
+        assert response.json()["detail"]["code"] == expected_code
+    assert db_session.query(PatientClinicalRevision).filter_by(entry_id=entry_id).count() == 0
 
 
 def test_transfer_uses_the_signed_source_and_rx_uses_the_exact_saved_revision(
@@ -274,6 +314,37 @@ def test_lab_review_belongs_to_the_exact_report_version_and_order(
     assert correction["reviews"] == []
     assert previous["id"] == first.id and not previous["is_current_final"]
     assert previous["reviews"] == [reviewed.json()]
+
+
+def test_workspace_lab_review_rechecks_visit_owner_under_lock(
+    client, db_session, cardio_auth_headers, test_visit,
+):
+    template = LabReportTemplate(code="SYNTHETIC-LOCK", name="SYNTHETIC Lab", family="test")
+    db_session.add(template)
+    db_session.flush()
+    version = LabReportTemplateVersion(
+        template_id=template.id, version_no=1, status="PUBLISHED", layout_preset="standard",
+    )
+    db_session.add(version)
+    db_session.flush()
+    report = LabReportInstance(
+        patient_id=test_visit.patient_id, visit_id=test_visit.id,
+        template_id=template.id, template_version_id=version.id,
+        status="FINALIZED", finalized_at=datetime.now(UTC),
+    )
+    db_session.add(report)
+    db_session.flush()
+    visit_id, patient_id, instance_id = test_visit.id, test_visit.patient_id, report.id
+    db_session.refresh(test_visit)
+    db_session.execute(Visit.__table__.update().where(Visit.id == visit_id).values(doctor_id=None))
+    assert test_visit.doctor_id is not None
+
+    response = client.post(
+        f"{emr_path(visit_id)}/workspace/labs/{instance_id}/review",
+        headers=cardio_auth_headers, json={"patient_id": patient_id},
+    )
+    assert response.status_code == 403, response.text
+    assert db_session.query(LabResultReview).filter_by(instance_id=instance_id).count() == 0
 
 
 def test_workspace_rx_reuses_exact_appointment_only_prescription(
