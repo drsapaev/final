@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from app.services.payment_providers.manager import PaymentProviderManager
@@ -39,7 +41,7 @@ def test_payme_checkout_advertises_only_supported_outbound_operations():
 
 
 @pytest.mark.unit
-def test_click_advertises_registrar_invoice_payment_capability():
+def test_click_holds_new_checkout_and_retains_historical_status_capability():
     manager = PaymentProviderManager(
         {
             "click": {
@@ -51,8 +53,12 @@ def test_click_advertises_registrar_invoice_payment_capability():
         }
     )
 
-    features = manager.get_provider_info()["click"]["features"]
+    checkout = manager.create_payment("click", Decimal("10.00"), "UZS", "SYNTHETIC", "SYNTHETIC")
 
+    assert checkout.success is False
+    assert checkout.payment_url is None
+    assert "click" not in manager.get_available_providers()
+    assert "click" not in manager.get_provider_info()
     assert manager.supports_registrar_invoice_payment("CLICK") is True
-    assert features["registrar_invoice_payment"] is True
+    assert manager.get_provider("click") is not None
     assert manager.supports_registrar_invoice_payment("payme") is False

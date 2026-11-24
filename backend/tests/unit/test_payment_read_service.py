@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import Mock
 
+import httpx
 import pytest
 from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
@@ -59,17 +60,22 @@ class TestPaymentReadService:
         db_session.commit()
         db_session.refresh(payment)
 
+        evidence = {
+            "status": 2, "merchant_trans_id": "provider-123", "amount": "15000.00",
+            "click_trans_id": "123456", "synced": True,
+        }
         service = PaymentReadService(
             db_session,
-            _FakePaymentManager(
-                PaymentResult(success=True, status="paid", provider_data={"synced": True})
-            ),
+            _FakePaymentManager(PaymentResult(
+                success=True, payment_id="provider-123", status="completed", provider_data=evidence,
+            )),
         )
         result = service.get_payment_status(payment_id=payment.id)
 
         db_session.refresh(payment)
         assert payment.status == "paid"
-        assert payment.provider_data == {"source": "unit", "synced": True}
+        assert payment.provider_transaction_id == "123456"
+        assert payment.provider_data == {"source": "unit", **evidence}
         assert result["status"] == "paid"
         assert result["payment_id"] == payment.id
         assert result["provider_data"] == payment.provider_data
@@ -99,13 +105,17 @@ class TestPaymentReadService:
         db_session.commit()
         payment_id = payment.id
         service = PaymentReadService(db_session, _FakePaymentManager(PaymentResult(
-            success=True, payment_id=order_id, status="paid",
-            provider_data={"merchant_trans_id": order_id, "amount": "7350.25"},
+            success=True, payment_id=order_id, status="completed",
+            provider_data={
+                "status": 2, "merchant_trans_id": order_id, "amount": "7350.25",
+                "click_trans_id": "123456",
+            },
         )))
 
         def fail_audit(pending_payment, *, previous_status):
             assert previous_status == "pending"
             assert pending_payment.status == "paid" and pending_payment.paid_at is not None
+            assert pending_payment.provider_transaction_id == "123456"
             raise SQLAlchemyError("SYNTHETIC-storage-error")
 
         monkeypatch.setattr(service.repository, "record_provider_transition", fail_audit)
@@ -117,6 +127,7 @@ class TestPaymentReadService:
         assert error.value.detail == "Обновление статуса платежа временно недоступно"
         db_session.refresh(payment)
         assert payment.status == "pending" and payment.paid_at is None
+        assert payment.provider_transaction_id is None
         assert payment.provider_data == {"recorded": True}
         assert _provider_transitions(db_session, payment_id) == []
 
@@ -144,7 +155,10 @@ class TestPaymentReadService:
                 .where(Payment.id == payment_id)
                 .values(status="paid", paid_at=posting_time, provider_data={"source": "SYNTHETIC-settlement"})
             )
-            return PaymentResult(success=True, status="processing", provider_data={"status": 1})
+            return PaymentResult(
+                success=True, payment_id=order_id, status="processing",
+                provider_data={"status": 1, "merchant_trans_id": order_id, "amount": "15000.00"},
+            )
 
         manager = Mock()
         manager.check_payment_status.side_effect = check_payment_status
@@ -157,7 +171,7 @@ class TestPaymentReadService:
         assert payment.provider_data == {"source": "SYNTHETIC-settlement"}
         assert _provider_transitions(db_session, payment_id) == []
 
-    def test_provider_poll_reports_saved_status_for_disallowed_transition(self, db_session, test_visit):
+    def test_provider_poll_reports_saved_status_without_evidence(self, db_session, test_visit):
         payment = Payment(
             visit_id=test_visit.id,
             amount=Decimal("15000.00"),
@@ -180,19 +194,42 @@ class TestPaymentReadService:
         assert _provider_transitions(db_session, payment.id) == []
 
     @pytest.mark.parametrize(
-        ("provider_response", "expected_status"),
+        ("response_body", "expected_status", "known_status"),
         [
-            pytest.param({}, "pending", id="missing-status"),
-            pytest.param({"status": 99}, "pending", id="unknown-status"),
-            pytest.param({"status": "-1"}, "pending", id="string-status"),
-            pytest.param({"status": True}, "pending", id="boolean-status"),
-            pytest.param([], "pending", id="non-object-response"),
-            pytest.param({"status": 1}, "processing", id="reported-processing"),
-            pytest.param({"status": -1}, "failed", id="reported-failure"),
+            pytest.param(b'{}', "pending", False, id="missing-status"),
+            pytest.param(b'{"status":99}', "pending", False, id="unknown-status"),
+            pytest.param(b'{"status":"-1"}', "pending", False, id="string-status"),
+            pytest.param(b'{"status":true}', "pending", False, id="boolean-status"),
+            pytest.param(b'[]', "pending", False, id="non-object-response"),
+            pytest.param(b'{"status":1}', "pending", True, id="missing-evidence"),
+            pytest.param(
+                b'{"status":1,"merchant_trans_id":"synthetic-order","amount":15000.00}',
+                "processing", True, id="reported-processing",
+            ),
+            pytest.param(
+                b'{"status":-1,"merchant_trans_id":"synthetic-order","amount":"15000.00"}',
+                "failed", True, id="reported-failure",
+            ),
+            pytest.param(
+                b'{"status":2,"merchant_trans_id":"synthetic-order","amount":15000.00,"click_trans_id":123456}',
+                "paid", True, id="recorded-completion",
+            ),
+            pytest.param(
+                b'{"status":2,"merchant_trans_id":"synthetic-order","amount":15000.001,"click_trans_id":123456}',
+                "pending", True, id="inexact-amount",
+            ),
+            pytest.param(
+                b'{"status":2,"merchant_trans_id":"another-synthetic-order","amount":"15000.00","click_trans_id":123456}',
+                "pending", True, id="different-order",
+            ),
+            pytest.param(
+                b'{"status":2,"merchant_trans_id":"synthetic-order","amount":"15000.00"}',
+                "pending", True, id="pending-provider-reference",
+            ),
         ],
     )
-    def test_click_status_read_uses_only_known_provider_codes(
-        self, db_session, test_visit, monkeypatch, provider_response, expected_status,
+    def test_click_status_read_requires_bound_amount_and_order(
+        self, db_session, test_visit, monkeypatch, response_body, expected_status, known_status,
     ):
         payment = Payment(
             visit_id=test_visit.id,
@@ -211,8 +248,9 @@ class TestPaymentReadService:
             "secret_key": "synthetic-config",
             "base_url": "https://synthetic-provider.invalid",
         })
-        response = Mock()
-        response.json.return_value = provider_response
+        response = httpx.Response(
+            200, content=response_body, request=httpx.Request("POST", "https://synthetic-provider.invalid"),
+        )
         monkeypatch.setattr("app.services.payment_providers.click.httpx.post", Mock(return_value=response))
 
         observation = provider.check_payment_status(payment.provider_payment_id)
@@ -221,15 +259,14 @@ class TestPaymentReadService:
 
         db_session.refresh(payment)
         assert result["status"] == payment.status == expected_status
-        assert payment.paid_at is None
+        assert (payment.paid_at is not None) is (expected_status == "paid")
+        assert observation.success is known_status
         if expected_status == "pending":
-            assert not observation.success
             assert payment.provider_data is None
         else:
-            assert observation.success
-            assert payment.provider_data == provider_response
-        if expected_status == "processing":
-            assert service.get_payment_status(payment_id=payment.id)["status"] == "processing"
+            assert payment.provider_data == observation.provider_data
+            assert payment.provider_data["amount"] == "15000.00"
+            assert service.get_payment_status(payment_id=payment.id)["status"] == expected_status
         transitions = _provider_transitions(db_session, payment.id)
         if expected_status == "pending":
             assert transitions == []

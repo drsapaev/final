@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     CheckConstraint,
     Computed,
     Date,
@@ -18,6 +19,8 @@ from sqlalchemy import (
     Numeric,
     String,
     UniqueConstraint,
+    false,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,6 +40,15 @@ class Visit(Base):
         UniqueConstraint("id", "patient_id", name="uq_visits_id_patient"),
         UniqueConstraint("id", "patient_id", "encounter_id", name="uq_visits_id_patient_encounter"),
         CheckConstraint("encounter_id IS NULL OR patient_id IS NOT NULL", name="ck_visits_encounter_patient_present"),
+        CheckConstraint(
+            "started_appointment_id IS NULL OR started_appointment_checked",
+            name="ck_visits_started_appointment_checked",
+        ),
+        Index(
+            "uq_visits_started_appointment", "started_appointment_id", unique=True,
+            postgresql_where=text("started_appointment_id IS NOT NULL"),
+            sqlite_where=text("started_appointment_id IS NOT NULL"),
+        ),
         ForeignKeyConstraint(
             ["encounter_id", "patient_id"], ["encounters.id", "encounters.patient_id"],
             name="fk_visits_encounter_patient", deferrable=True, initially="DEFERRED",
@@ -92,6 +104,18 @@ class Visit(Base):
     )  # ✅ SECURITY: SET NULL to preserve visit if doctor deleted
     visit_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     visit_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    # A checked NULL is known absence, including when a captured row was deleted.
+    # Unchecked visits predate this observation or started on another surface.
+    started_appointment_checked: Mapped[bool] = mapped_column(
+        Boolean, server_default=false(), nullable=False,
+    )
+    started_appointment_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "appointments.id", ondelete="SET NULL",
+            name="fk_visits_started_appointment", use_alter=True,
+        ),
+        nullable=True,
+    )
     department: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )  # Department name/key

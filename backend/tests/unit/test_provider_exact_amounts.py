@@ -25,12 +25,16 @@ def providers():
     (Decimal("9999999999.99"), 999999999999),
 ])
 @pytest.mark.parametrize("provider", ["click", "payme"])
-def test_uzs_checkout_uses_exact_tiyin(providers, provider, value, minor):
+def test_uzs_amount_conversion_remains_exact_with_click_checkout_held(providers, provider, value, minor):
     adapter = providers[provider]
     assert adapter.format_amount(value, "UZS") == minor
     result = adapter.create_payment(amount=value, currency="UZS", order_id="synthetic-order", description="synthetic")
-    assert result.success
-    assert result.provider_data["amount_tiyin"] == minor
+    if provider == "click":
+        assert not result.success
+        assert result.payment_url is None
+    else:
+        assert result.success
+        assert result.provider_data["amount_tiyin"] == minor
 
 
 @pytest.mark.parametrize("value", [

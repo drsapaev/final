@@ -263,7 +263,10 @@ def test_doctor_payment_status_uses_current_scope_after_lookup(
         assert not db_session.in_transaction()
         if scope_change is not None:
             db_session.execute(changes[scope_change])
-        return PaymentResult(success=provider_has_update, status="processing")
+        return PaymentResult(
+            success=provider_has_update, status="processing", payment_id=order,
+            provider_data={"status": 1, "merchant_trans_id": order, "amount": "125000.00"},
+        )
 
     monkeypatch.setattr(payments, "get_payment_manager", lambda: SimpleNamespace(
         check_payment_status=check_payment_status,

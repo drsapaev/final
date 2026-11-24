@@ -56,7 +56,7 @@ class TestPaymentInitE2E:
         assert payment.currency == currency
         assert payment.status in ["pending", "processing"]
 
-    def test_click_init_success(self, client, auth_headers, test_visit, db_session):
+    def test_click_init_holds_checkout_without_a_link(self, client, auth_headers, test_visit, db_session):
         _price_visit(db_session, test_visit, 150_000, "UZS")
         response = client.post(
             "/api/v1/payments/init",
@@ -71,10 +71,12 @@ class TestPaymentInitE2E:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["success"] is True
-        assert data["payment_id"] is not None
-        assert data["payment_url"]
-        self._assert_payment_created(db_session, data["payment_id"], "click", "UZS")
+        assert data["success"] is False
+        assert data["payment_url"] is None
+        db_session.expire_all()
+        failed = db_session.query(Payment).filter_by(visit_id=test_visit.id, provider="click").one()
+        assert failed.status == "failed"
+        assert failed.provider_payment_id is None and failed.payment_url is None
 
     def test_payme_init_success(self, client, auth_headers, test_visit, db_session):
         _price_visit(db_session, test_visit, 150_000, "UZS")
@@ -144,7 +146,7 @@ class TestPaymentInitE2E:
                 "visit_id": test_visit.id,
                 "amount": 150000,
                 "currency": "UZS",
-                "provider": "click",
+                "provider": "payme",
                 "description": "authorized test init",
             },
         )
@@ -152,7 +154,7 @@ class TestPaymentInitE2E:
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        self._assert_payment_created(db_session, data["payment_id"], "click", "UZS")
+        self._assert_payment_created(db_session, data["payment_id"], "payme", "UZS")
 
     def test_visit_payments_list_includes_new_payment(
         self, client, auth_headers, test_visit, db_session

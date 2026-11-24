@@ -171,153 +171,37 @@ def _make_click_webhook_data(issued_order: str, amount: int = 10000) -> dict:
     }
 
 
-def _make_mock_manager(callback: dict):
-    """Create a mock payment manager that returns success for the given payment."""
-    mock_manager = MagicMock()
-    mock_provider = MagicMock()
-    mock_provider.validate_webhook_signature.return_value = True
-    mock_manager.get_provider.return_value = mock_provider
-
-    mock_result = MagicMock()
-    mock_result.success = True
-    mock_result.status = "completed"
-    mock_result.payment_id = callback["merchant_trans_id"]
-    mock_result.provider_data = {"test": "data", "amount": str(callback["amount"] // 100)}
-    mock_result.error_message = None
-    mock_manager.process_webhook.return_value = mock_result
-    return mock_manager
-
-
 @pytest.mark.unit
 class TestClickWebhookAuditDurability:
-    """P2-3 Finding C: PaymentWebhook must survive business transaction rollback."""
+    """New legacy observations remain auditable without mutating payment state."""
 
-    def test_click_success_persists_webhook_and_payment(
-        self, production_session, verify_session, clean_db
+    @pytest.mark.parametrize(("payment_status", "amount"), [
+        ("pending", 10000),
+        ("refunded", 10000),
+        ("pending", 999),
+    ])
+    def test_click_hold_persists_the_receipt_across_sessions(
+        self, production_session, verify_session, clean_db, payment_status, amount,
     ):
-        """Click success: PaymentWebhook AND payment status visible from new session.
-
-        Note: This test uses SQLite with production-like sessions. For the
-        real PostgreSQL version, see test_webhook_real_db.py (Finding F).
-        """
         from app.services.provider_webhook_service import ProviderWebhookService
-        from app.repositories.provider_webhook_repository import ProviderWebhookRepository
 
-        payment = _setup_payment(production_session, status="pending")
+        payment = _setup_payment(production_session, status=payment_status)
         payment_id = payment.id
-        webhook_data = _make_click_webhook_data(payment.provider_payment_id)
+        callback = _make_click_webhook_data(payment.provider_payment_id, amount=amount)
         production_session.expunge_all()
+        manager = MagicMock()
+        manager.get_provider.return_value.validate_webhook_signature.return_value = True
 
-        mock_manager = _make_mock_manager(webhook_data)
+        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=manager):
+            result = ProviderWebhookService(production_session).process_click_webhook(callback)
 
-        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=mock_manager):
-            repo = ProviderWebhookRepository(production_session)
-            service = ProviderWebhookService(production_session, repository=repo)
-            result = service.process_click_webhook(webhook_data)
-
-        assert result["error"] == 0
+        assert result == {"error": -1, "error_note": "Payment reconciliation required"}
         production_session.close()
-
-        # Verify from NEW session
-        webhook_records = verify_session.query(PaymentWebhook).filter(
-            PaymentWebhook.provider == "click"
-        ).all()
-        assert len(webhook_records) >= 1, (
-            "PaymentWebhook record NOT found in new session after success. "
-            "Data was not committed."
-        )
-
-        committed_payment = verify_session.query(Payment).filter(
-            Payment.id == payment_id
-        ).first()
-        assert committed_payment is not None
-        assert committed_payment.status == "paid"
-
-    def test_click_error_persists_webhook_after_value_error(
-        self, production_session, verify_session, clean_db
-    ):
-        """Click error (ValueError on terminal→paid): PaymentWebhook MUST persist.
-
-        This is the core Finding C test: when BillingService rejects
-        refunded→paid, the webhook receipt must survive the rollback.
-        """
-        from app.services.provider_webhook_service import ProviderWebhookService
-        from app.repositories.provider_webhook_repository import ProviderWebhookRepository
-
-        # Create a payment in terminal state (refunded)
-        payment = _setup_payment(production_session, status="refunded")
-        payment_id = payment.id
-        webhook_data = _make_click_webhook_data(payment.provider_payment_id)
-        production_session.expunge_all()
-
-        mock_manager = _make_mock_manager(webhook_data)
-
-        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=mock_manager):
-            repo = ProviderWebhookRepository(production_session)
-            service = ProviderWebhookService(production_session, repository=repo)
-            # This should NOT crash — ValueError should be caught
-            result = service.process_click_webhook(webhook_data)
-
-        assert result == {"error": -1, "error_note": "Internal server error"}
-        production_session.close()
-
-        # CRITICAL: PaymentWebhook MUST persist even after ValueError rollback
-        webhook_records = verify_session.query(PaymentWebhook).filter(
-            PaymentWebhook.provider == "click"
-        ).all()
-        assert len(webhook_records) >= 1, (
-            "PaymentWebhook record NOT found after ValueError rollback. "
-            "This is the Finding C audit trail durability bug: the webhook "
-            "receipt was rolled back with the business transaction, leaving "
-            "no audit trail of the rejected webhook."
-        )
-
-        # Payment status must NOT change (terminal preserved)
-        committed_payment = verify_session.query(Payment).filter(
-            Payment.id == payment_id
-        ).first()
-        assert committed_payment.status == "refunded", (
-            f"Terminal payment status was changed to '{committed_payment.status}'. "
-            f"Should remain 'refunded' — business transaction should have rolled back."
-        )
-
-    def test_click_amount_mismatch_persists_webhook(
-        self, production_session, verify_session, clean_db
-    ):
-        """Click amount mismatch: PaymentWebhook MUST persist.
-
-        Even when the webhook is rejected due to amount mismatch,
-        the receipt should be visible from a new session.
-        """
-        from app.services.provider_webhook_service import ProviderWebhookService
-        from app.repositories.provider_webhook_repository import ProviderWebhookRepository
-
-        payment = _setup_payment(production_session, status="pending")
-        payment_id = payment.id
-        webhook_data = _make_click_webhook_data(payment.provider_payment_id, amount=999)
-        production_session.expunge_all()
-
-        mock_manager = _make_mock_manager(webhook_data)
-
-        with patch("app.services.provider_webhook_service.get_payment_manager", return_value=mock_manager):
-            repo = ProviderWebhookRepository(production_session)
-            service = ProviderWebhookService(production_session, repository=repo)
-            result = service.process_click_webhook(webhook_data)
-
-        assert result["error_note"] == "Payment amount mismatch"
-        production_session.close()
-
-        # PaymentWebhook should persist
-        webhook_records = verify_session.query(PaymentWebhook).filter(
-            PaymentWebhook.provider == "click"
-        ).all()
-        assert len(webhook_records) >= 1, (
-            "PaymentWebhook record NOT found after amount mismatch. "
-            "Audit trail should persist even for rejected webhooks."
-        )
-
-        # Payment status should NOT change
-        committed_payment = verify_session.query(Payment).filter(
-            Payment.id == payment_id
-        ).first()
-        assert committed_payment.status == "pending"
+        receipt = verify_session.query(PaymentWebhook).filter_by(
+            provider="click", transaction_id=callback["merchant_trans_id"],
+        ).one()
+        assert receipt.status == "failed" and receipt.error_message == "provider_reconciliation_required"
+        assert receipt.visit_id is None and receipt.processed_at is not None
+        assert receipt.raw_data == callback
+        assert verify_session.get(Payment, payment_id).status == payment_status
+        manager.process_webhook.assert_not_called()

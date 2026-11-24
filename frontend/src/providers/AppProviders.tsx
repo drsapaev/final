@@ -9,10 +9,14 @@ import { NotificationPrompt } from '../components/chat/NotificationPrompt';
 import { NotificationCenterProvider } from '../contexts/NotificationCenterContext';
 import { NotificationWebSocketProvider } from '../contexts/NotificationWebSocketContext';
 import { resolvePublicSiteRoute } from '../routing/publicSiteRouteEntries';
+import { findRouteByPath } from '../routing/routeRegistry';
 
 function RouteNotificationPrompt() {
   const { pathname } = useLocation();
-  return resolvePublicSiteRoute(pathname) ? null : <NotificationPrompt />;
+  if (resolvePublicSiteRoute(pathname) || findRouteByPath(pathname)?.owner === 'public-site.booking') {
+    return null;
+  }
+  return <NotificationPrompt />;
 }
 
 /**

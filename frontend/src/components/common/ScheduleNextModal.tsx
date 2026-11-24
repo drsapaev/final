@@ -1,5 +1,5 @@
 import { api } from '../../api/client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { extractApiMessage, getErrorStatus } from '../../utils/error-utils';
 import logger from '../../utils/logger';
@@ -77,41 +77,42 @@ const ScheduleNextModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const submission = useRef<'idle' | 'in-flight' | 'completed'>('idle');
-  const request = useRef<{ key: string | null; payload: string | null }>({ key: null, payload: null });
+  // Retain uncertain operation keys if the form switches to another patient.
+  const attempts = useRef(new Map<string, { key: string; payload: string | null; pending: boolean }>());
 
   // DERMSCHED-FE-003: server-side patient search + the identity of the
   // currently selected patient (see loadPatients and the select below).
   const [patientSearch, setPatientSearch] = useState('');
   const [selectedPatientOption, setSelectedPatientOption] = useState<{ id: string; label: string } | null>(null);
 
-  // DERMSCHED-FE-004: the success auto-close timer handle is tracked so a
-  // stale session timer (started before a manual close, a fresh open for
-  // the next patient, or an unmount) is cancelled instead of firing into
-  // a dialog generation it does not belong to. The component is mounted
-  // persistently (the parent toggles `isOpen`), so an unmount-only
-  // cleanup would miss the reopened-dialog scenario.
+  // The parent can keep this component mounted across patients and opens.
+  // Associate late save feedback and its timer with the committed dialog.
+  const hostPatientId = String(patient?.patient_id ?? patient?.id ?? '');
+  const sessionRef = useRef<{ completed: boolean } | null>(null);
   const successTimerRef = useRef<number | null>(null);
 
-  // Cancel any pending success timer on every open-state transition.
-  useEffect(() => {
-    return () => {
-      if (successTimerRef.current !== null) {
-        window.clearTimeout(successTimerRef.current);
-        successTimerRef.current = null;
-      }
-    };
-  }, [isOpen]);
+  const invalidateSession = () => {
+    sessionRef.current = null;
+    if (successTimerRef.current !== null) {
+      window.clearTimeout(successTimerRef.current);
+      successTimerRef.current = null;
+    }
+  };
 
-  // And on final unmount.
-  useEffect(() => {
-    return () => {
-      if (successTimerRef.current !== null) {
-        window.clearTimeout(successTimerRef.current);
-        successTimerRef.current = null;
-      }
-    };
-  }, []);
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    sessionRef.current = { completed: false };
+    setLoading(false);
+    setError('');
+    setSuccess('');
+    return invalidateSession;
+  }, [isOpen, hostPatientId, formData.patient_id]);
+
+  const handleClose = () => {
+    if (!onClose) return;
+    invalidateSession();
+    onClose();
+  };
 
   // Загрузка данных при открытии модала
   useEffect(() => {
@@ -133,7 +134,7 @@ const ScheduleNextModal = ({
         // `id` — the backend resolves `Patient.id`, so `patient_id` wins
         // whenever it is present.
         const canonicalPatient = patient as PatientRecord;
-        const canonicalId = String(patient.patient_id ?? patient.id ?? '');
+        const canonicalId = hostPatientId;
         setFormData((prev) => ({ ...prev, patient_id: canonicalId }));
         // DERMSCHED-FE-003: keep the canonical selected-patient identity —
         // the supplied patient may sit outside the loaded first page.
@@ -145,7 +146,7 @@ const ScheduleNextModal = ({
         }
       }
     }
-  }, [isOpen, patient]);
+  }, [isOpen, patient, hostPatientId]);
 
   // Фильтрация услуг по специальности
   useEffect(() => {
@@ -248,9 +249,12 @@ const ScheduleNextModal = ({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (submission.current !== 'idle') return;
-    submission.current = 'in-flight';
-    const previousAttempt = request.current;
+    const session = sessionRef.current;
+    if (!session || session.completed) return;
+    const patientId = formData.patient_id;
+    const previousAttempt = attempts.current.get(patientId);
+    if (previousAttempt?.pending) return;
+    let pendingAttempt: typeof previousAttempt;
     setLoading(true);
     setError('');
     setSuccess('');
@@ -271,16 +275,17 @@ const ScheduleNextModal = ({
       }
 
       const attempt = cartIdempotencyGuard({
-        existingKey: previousAttempt.key,
-        existingPayload: previousAttempt.payload,
+        existingKey: previousAttempt?.key ?? null,
+        existingPayload: previousAttempt?.payload ?? null,
         payload: JSON.stringify(formData),
-        newKey: previousAttempt.key ?? createIdempotencyKey(),
+        newKey: previousAttempt?.key ?? createIdempotencyKey(),
       });
       if (attempt.action === 'block' || !attempt.key) {
         setError(t('misc.aw_cart_retry_payload_changed'));
         return;
       }
-      request.current = { key: attempt.key, payload: attempt.payload };
+      pendingAttempt = { key: attempt.key, payload: attempt.payload, pending: true };
+      attempts.current.set(patientId, pendingAttempt);
 
       // DERMSCHED-FE-001 (audit 3892): submit through the shared
       // authenticated client — absolute `/api/v1/doctor/visits/
@@ -293,10 +298,11 @@ const ScheduleNextModal = ({
         confirmation?: { token?: string; channel?: string };
       };
       if (!result?.visit_id) {
-        setError(t('misc.snm_err_create_visit'));
+        if (sessionRef.current === session) setError(t('misc.snm_err_create_visit'));
         return;
       }
-      submission.current = 'completed';
+      session.completed = true;
+      attempts.current.delete(patientId);
       const normalizedFormData = {
         ...formData,
         patient_id: formData.patient_id ? Number(formData.patient_id) : null,
@@ -321,6 +327,8 @@ const ScheduleNextModal = ({
         }
       }
 
+      // The save succeeded even if its form is gone; only its UI is stale.
+      if (sessionRef.current !== session) return;
       setSuccess(t('misc.snm_visit_scheduled', { token: result?.confirmation?.token ?? '' }));
 
       // Сброс формы через 2 секунды (DERMSCHED-FE-004: хэндл отслеживается
@@ -329,26 +337,27 @@ const ScheduleNextModal = ({
         window.clearTimeout(successTimerRef.current);
       }
       successTimerRef.current = window.setTimeout(() => {
+        if (sessionRef.current !== session) return;
         successTimerRef.current = null;
-        onClose?.();
         resetForm();
+        handleClose();
       }, 2000);
     } catch (err) {
       const status = getErrorStatus(err);
       // A denial of a replay cannot determine the result of the original request.
-      if (previousAttempt.key === null && status !== null && [400, 401, 403, 404, 422].includes(status)) {
-        request.current = { key: null, payload: null };
+      if (!previousAttempt && pendingAttempt && status !== null && [400, 401, 403, 404, 422].includes(status)) {
+        attempts.current.delete(patientId);
       }
-      setError(extractApiMessage(err) ?? t('misc.snm_err_create_visit'));
+      if (sessionRef.current === session) {
+        setError(extractApiMessage(err) ?? t('misc.snm_err_create_visit'));
+      }
     } finally {
-      if (submission.current === 'in-flight') submission.current = 'idle';
-      setLoading(false);
+      if (pendingAttempt) pendingAttempt.pending = false;
+      if (sessionRef.current === session) setLoading(false);
     }
   };
 
   const resetForm = () => {
-    request.current = { key: null, payload: null };
-    submission.current = 'idle';
     setFormData({
       patient_id: '',
       visit_date: '',
@@ -530,15 +539,15 @@ const ScheduleNextModal = ({
       style={overlayStyle}
       role="button"
       tabIndex={0}
-      onClick={onClose}
-      onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, onClose ?? (() => undefined))}>
+      onClick={handleClose}
+      onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, handleClose)}>
       <div style={modalStyle} onClickCapture={(e) => e.stopPropagation()}>
         {/* Заголовок */}
         <div style={headerStyle}>
           <h2 style={titleStyle}>{getModalTitle()}</h2>
           <button
             style={closeButtonStyle}
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close schedule next visit modal"
           >
             <X size={20} />
@@ -753,7 +762,7 @@ const ScheduleNextModal = ({
             <button
               type="button"
               style={secondaryButtonStyle}
-              onClick={onClose}
+              onClick={handleClose}
               disabled={loading}>
               
               {t('misc.snm_btn_cancel')}

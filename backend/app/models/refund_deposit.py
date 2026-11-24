@@ -16,6 +16,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Numeric,
@@ -95,6 +96,9 @@ class RefundRequest(Base):
                 "('pending', 'approved', 'processing', 'completed')"
             ),
         ),
+        Index(
+            "uq_refund_requests_id_payment", "id", "payment_id", unique=True,
+        ).ddl_if(dialect="postgresql"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -397,6 +401,15 @@ class PaymentRefundClaim(Base):
             "payment_id",
             unique=True,
         ),
+        # The single-column foreign key clears the request link on deletion.
+        # Check the pair at commit after that referential action has run.
+        ForeignKeyConstraint(
+            ["refund_request_id", "payment_id"],
+            ["refund_requests.id", "refund_requests.payment_id"],
+            name="fk_payment_refund_claims_request_payment",
+            deferrable=True,
+            initially="DEFERRED",
+        ).ddl_if(dialect="postgresql"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

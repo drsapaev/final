@@ -18,6 +18,12 @@ from app.models.payment import Payment
 from app.models.visit import Visit
 from app.repositories.payment_read_repository import PaymentReadRepository
 from app.services.billing_service import BillingService
+from app.services.payment_providers.base import PaymentResult
+from app.services.payment_providers.base import PaymentStatus as ProviderStatus
+from app.services.payment_providers.click import (
+    click_transaction_reference,
+    matches_click_status_evidence,
+)
 from app.services.payment_state_checks import is_valid_payment_transition
 
 logger = logging.getLogger(__name__)
@@ -187,6 +193,7 @@ class PaymentReadService:
         *,
         new_status: str,
         metadata: dict[str, Any],
+        provider_transaction_id: str | None,
     ) -> dict[str, Any]:
         payment_id = payment.id
         previous_status = payment.status
@@ -194,6 +201,8 @@ class PaymentReadService:
             payment = self.billing_service.update_payment_status(
                 payment_id=payment_id, new_status=new_status, meta=metadata, commit=False,
             )
+            if provider_transaction_id is not None:
+                payment.provider_transaction_id = provider_transaction_id
             self.repository.record_provider_transition(payment, previous_status=previous_status)
             # Keep the response in the authorized snapshot before commit expires the ORM row.
             status_payload = self._payment_status_payload(payment)
@@ -205,6 +214,21 @@ class PaymentReadService:
                 status_code=503, detail="Обновление статуса платежа временно недоступно",
             ) from None
         return status_payload
+
+    @staticmethod
+    def _check_click_payment_evidence(
+        result: PaymentResult, payment: Payment, order_id: str,
+    ) -> tuple[bool, str | None]:
+        if not matches_click_status_evidence(
+            result, order_id=order_id, amount=payment.amount, currency=payment.currency,
+        ):
+            return False, None
+        if result.status != ProviderStatus.COMPLETED:
+            return True, None
+        reference = click_transaction_reference(result.provider_data)
+        if reference is None or payment.provider_transaction_id not in (None, reference):
+            return False, None
+        return True, reference
 
     def get_payment_status(
         self,
@@ -233,7 +257,10 @@ class PaymentReadService:
             if end_read_transaction is not None:
                 end_read_transaction()
             result = self.payment_manager.check_payment_status(provider, order_id)
+            is_click = provider.lower() == "click"
             reported_status = result.status.lower() if isinstance(result.status, str) else ""
+            if is_click and reported_status == ProviderStatus.COMPLETED:
+                reported_status = PaymentStatus.PAID.value
 
             can_transition = (
                 result.success
@@ -253,8 +280,16 @@ class PaymentReadService:
                 and payment.provider_payment_id == order_id
                 and (payment.amount, payment.currency, payment.updated_at) == recorded_payment_terms
             ):
+                reference = None
+                if is_click:
+                    matches, reference = self._check_click_payment_evidence(result, payment, order_id)
+                    if not matches:
+                        return self._payment_status_payload(payment)
                 meta = {**(payment.provider_data or {}), **(result.provider_data or {})}
-                return self._persist_provider_status(payment, new_status=reported_status, metadata=meta)
+                return self._persist_provider_status(
+                    payment, new_status=reported_status, metadata=meta,
+                    provider_transaction_id=reference,
+                )
 
         return self._payment_status_payload(payment)
 

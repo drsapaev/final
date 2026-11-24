@@ -22,6 +22,10 @@ from app.services.money_input import MoneyInputError, parse_money
 from app.services.payment_invariant_service import PaymentInvariantService
 from app.services.payment_invoice_service import PaymentInvoiceService
 from app.services.payment_providers.base import PaymentResult
+from app.services.payment_providers.click import (
+    click_transaction_reference,
+    matches_click_status_evidence,
+)
 from app.services.queue_status import (
     POSITION_VISIBLE_RAW_STATUSES,
     normalize_queue_status,
@@ -29,7 +33,7 @@ from app.services.queue_status import (
 from app.services.visit_lifecycle_service import VisitLifecycleService
 
 _FINAL_INVOICE_STATES = frozenset({"paid", "failed", "cancelled"})
-_CLICK_FINAL_STATUS = {"completed": 2, "failed": -1, "cancelled": -2}
+_CLICK_FINAL_STATUSES = {"completed", "failed", "cancelled"}
 _INVOICE_RECONCILIATION_REQUIRED = "Результат оплаты требует сверки с провайдером"
 
 
@@ -265,45 +269,16 @@ def _invoice_checkout_binding(invoice: PaymentInvoice, links: list[PaymentInvoic
 
 def _click_outcome_reference(invoice: PaymentInvoice, result: PaymentResult) -> str | None:
     """Check evidence returned by the provider, including the invoice amount."""
-    data = getattr(result, "provider_data", None)
-    if not isinstance(data, dict):
-        raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED)
-    raw_status = data.get("status")
-    raw_amount = data.get("amount")
-    error_code = data.get("error_code", 0)
-    if (
-        invoice.provider != "click"
-        or result.payment_id != invoice.provider_payment_id
-        or data.get("merchant_trans_id") != invoice.provider_payment_id
-        or type(raw_status) is not int
-        or raw_status != _CLICK_FINAL_STATUS[result.status]
-        or type(error_code) is not int
-        or error_code != 0
-        or invoice.currency != "UZS"
-        or data.get("currency", "UZS") != invoice.currency
-        or type(raw_amount) not in (Decimal, str, int)
+    if invoice.provider != "click" or not matches_click_status_evidence(
+        result, order_id=invoice.provider_payment_id, amount=invoice.total_amount,
+        currency=invoice.currency,
     ):
-        raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED)
-    try:
-        exact_amount = parse_money(raw_amount)
-    except MoneyInputError as exc:
-        raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED) from exc
-    if exact_amount != invoice.total_amount:
         raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED)
     if result.status != "completed":
         return None
 
-    reference = data.get("click_trans_id")
-    if type(reference) is int:
-        reference = str(reference)
-    if (
-        not isinstance(reference, str)
-        or not 1 <= len(reference) <= 19
-        or not reference.isascii()
-        or not reference.isdecimal()
-        or reference.startswith("0")
-        or invoice.provider_transaction_id not in (None, reference)
-    ):
+    reference = click_transaction_reference(result.provider_data)
+    if reference is None or invoice.provider_transaction_id not in (None, reference):
         raise HTTPException(status_code=409, detail=_INVOICE_RECONCILIATION_REQUIRED)
     return reference
 
@@ -520,7 +495,7 @@ def check_invoice_status(
 
         db.rollback()
         result = payment_manager.check_payment_status(provider_name, provider_payment_id)
-        if not result.success or result.status not in _CLICK_FINAL_STATUS:
+        if not result.success or result.status not in _CLICK_FINAL_STATUSES:
             invoice = db.get(PaymentInvoice, invoice_id, populate_existing=True)
             if invoice is None:
                 raise HTTPException(status_code=404, detail="Invoice не найден")
