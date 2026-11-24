@@ -29,6 +29,16 @@ export interface ClinicalEntry {
   confirmed_at: string | null;
 }
 
+export interface WorkspaceLabValue {
+  instance_id: number;
+  name: string;
+  value: string;
+  unit: string | null;
+  finalized_at: string | null;
+  abnormal: boolean;
+  comparison?: { key: string; field_key?: string; template_name: string; template_version: number; value: string } | null;
+}
+
 export interface HistorySummary {
   id: number;
   visit_id: number;
@@ -42,10 +52,7 @@ export interface HistorySummary {
   recommendations: string;
   vitals: Record<string, unknown>;
   echo: Record<string, unknown>;
-  laboratory: {
-    instance_id: number; name: string; value: string; unit: string | null;
-    finalized_at: string | null; abnormal: boolean;
-  }[];
+  laboratory: WorkspaceLabValue[];
 }
 
 export interface HistoryDocument extends HistorySummary {
@@ -89,6 +96,7 @@ export interface EMRWorkspaceData {
   clinical_entries: ClinicalEntry[];
   history: HistorySummary[];
   has_more_history: boolean;
+  current_laboratory?: WorkspaceLabValue[];
 }
 
 export function emrWorkspacePath(visitId: string | number) {

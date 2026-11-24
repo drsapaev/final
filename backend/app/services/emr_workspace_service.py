@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from datetime import UTC, datetime
+from json import dumps
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -21,6 +22,7 @@ from app.schemas.emr_workspace import (
     TransferredField,
     WorkspaceHistoryDocument,
     WorkspaceHistoryItem,
+    WorkspaceLabComparison,
     WorkspaceLabValue,
     WorkspaceOut,
     WorkspacePatient,
@@ -176,18 +178,38 @@ class EMRWorkspaceService:
             summarize_history(record, source_visit, record.data, record.version)
             for record, source_visit in history[:limit]
         ]
-        items_by_visit = {item.visit_id: item for item in history_items}
-        for visit_id, finalized_at, value in self.repository.history_lab_values(
-            patient.id, list(items_by_visit)
-        ):
-            items_by_visit[visit_id].laboratory.append(
+        current_lab_values: list[WorkspaceLabValue] = []
+        labs_by_visit = {
+            visit.id: current_lab_values,
+            **{item.visit_id: item.laboratory for item in history_items},
+        }
+        for row in self.repository.workspace_lab_values(patient.id, list(labs_by_visit)):
+            numeric = row.value_numeric
+            comparison = None
+            if (
+                row.source_root_instance_id is not None
+                and row.test_code
+                and row.unit
+                and row.unit.strip()
+                and numeric is not None
+                and numeric.is_finite()
+            ):
+                comparison = WorkspaceLabComparison(
+                    key=dumps((row.template_version_id, row.test_code, row.unit)),
+                    field_key=row.test_code,
+                    template_name=row.template_name,
+                    template_version=row.template_version,
+                    value=format(numeric, "f"),
+                )
+            labs_by_visit[row.visit_id].append(
                 WorkspaceLabValue(
-                    instance_id=value.source_instance_id,
-                    name=value.test_name,
-                    value=value.value,
-                    unit=value.unit,
-                    finalized_at=finalized_at,
-                    abnormal=value.abnormal,
+                    instance_id=row.instance_id,
+                    name=row.test_name,
+                    value=row.value,
+                    unit=row.unit,
+                    finalized_at=row.finalized_at,
+                    abnormal=row.abnormal,
+                    comparison=comparison,
                 )
             )
         return WorkspaceOut(
@@ -207,6 +229,7 @@ class EMRWorkspaceService:
             ],
             history=history_items,
             has_more_history=len(history) > limit,
+            current_laboratory=current_lab_values,
         )
 
     def history_document(

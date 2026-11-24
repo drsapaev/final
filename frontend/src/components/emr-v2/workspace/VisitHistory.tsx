@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   getEMRWorkspace, getWorkspaceHistoryDocument,
   type EMRWorkspaceData, type FollowUp, type HistoryDocument, type HistorySummary, type TransferField,
@@ -9,6 +9,7 @@ import { useLabReporting } from '@/hooks/useLabReporting';
 import { Button, Input, Textarea } from '../../ui/macos';
 import { ClinicalSummary } from './ClinicalSummary';
 import { DocumentPreview } from './DocumentPreview';
+import { LabTrendPanel } from './LabTrendPanel';
 
 const copyFields: TransferField[] = ['complaints', 'diagnosis', 'treatment', 'recommendations'];
 const followUpNotes = ['changes', 'actual_treatment', 'prior_plan_follow_through', 'new_results'] as const;
@@ -175,12 +176,43 @@ export function WorkspaceSidePanel({
   const [transferLimit, setTransferLimit] = useState(false);
   const [labDownloadFailed, setLabDownloadFailed] = useState(false);
   const selectionRequest = useRef(0);
+  const labDownloadContext = useRef(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const currentMeasurements = measurements({ vitals: currentVitals ?? {}, echo: currentEcho ?? {} });
-  const history = [...new Map([...(workspace?.history ?? []), ...extra].map(item => [item.id, item])).values()];
+  const history = useMemo(() => {
+    const firstPage = workspace?.history ?? [];
+    const items = new Map(firstPage.map(item => [item.id, item]));
+    for (const item of extra) {
+      if (!items.has(item.id)) items.set(item.id, item);
+    }
+    return [...items.values()];
+  }, [workspace, extra]);
+  const labVisits = useMemo(() => workspace ? [
+    { id: workspace.visit.id, date: workspace.visit.date, values: workspace.current_laboratory ?? [] },
+    ...history.map(item => ({ id: item.visit_id, date: item.visit_date, values: item.laboratory ?? [] })),
+  ] : [], [workspace, history]);
   const historyMeasurements = history.map(item => ({ item, values: measurements(item) }))
     .filter(({ values }) => Object.values(values).some(Boolean));
   const hasCurrentMeasurements = Object.values(currentMeasurements).some(Boolean);
+
+  useEffect(() => () => { labDownloadContext.current += 1; }, []);
+
+  async function openLabReport(instanceId: number) {
+    const context = labDownloadContext.current;
+    setLabDownloadFailed(false);
+    try {
+      const blob = await labReporting.downloadPdf(instanceId);
+      if (context !== labDownloadContext.current) return;
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = `lab-${instanceId}.pdf`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      if (context === labDownloadContext.current) setLabDownloadFailed(true);
+    }
+  }
 
   async function openHistory(item: HistorySummary, selectedVersion = item.version) {
     if (!workspace) return;
@@ -265,20 +297,9 @@ export function WorkspaceSidePanel({
                       {item.laboratory.map((value, index) => <li key={`${value.instance_id}:${index}`}>
                         <span>{value.name} {value.value} {value.unit} {value.abnormal && t('emr_workspace.lab_abnormal')}
                           {value.finalized_at && ` · ${new Date(value.finalized_at).toLocaleDateString(language)}`}</span>
-                        <Button type="button" size="small" variant="ghost" onClick={async () => {
-                          setLabDownloadFailed(false);
-                          try {
-                            const blob = await labReporting.downloadPdf(value.instance_id);
-                            const url = URL.createObjectURL(blob);
-                            const link = window.document.createElement('a');
-                            link.href = url;
-                            link.download = `lab-${value.instance_id}.pdf`;
-                            link.click();
-                            window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-                          } catch {
-                            setLabDownloadFailed(true);
-                          }
-                        }}>{t('emr_workspace.lab_report', { id: value.instance_id })}</Button>
+                        <Button type="button" size="small" variant="ghost" onClick={() => void openLabReport(value.instance_id)}>
+                          {t('emr_workspace.lab_report', { id: value.instance_id })}
+                        </Button>
                       </li>)}
                     </ul>
                   </details>}
@@ -319,7 +340,8 @@ export function WorkspaceSidePanel({
             )}
             <details className="emr-workspace-group">
               <summary>{t('emr_workspace.measurement_history')}</summary>
-              {!hasCurrentMeasurements && historyMeasurements.length === 0 && <p>{t('emr_workspace.no_entries')}</p>}
+              {!hasCurrentMeasurements && historyMeasurements.length === 0 && !labVisits.some(item => item.values.length > 0) &&
+                <p>{t('emr_workspace.no_entries')}</p>}
               <ol className="emr-workspace-list">
                 {hasCurrentMeasurements && <li className="emr-workspace-entry">
                   <strong>{t('emr_workspace.today_vitals')} {workspace.visit.date}</strong>
@@ -334,6 +356,7 @@ export function WorkspaceSidePanel({
                   </li>
                 ))}
               </ol>
+              <LabTrendPanel visits={labVisits} onOpenReport={instanceId => { void openLabReport(instanceId); }} />
             </details>
           </section>
         </>

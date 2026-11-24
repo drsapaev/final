@@ -44674,6 +44674,25 @@ export type components = {
             /** Status */
             status: string;
         };
+        /** WorkspaceLabComparison */
+        WorkspaceLabComparison: {
+            /**
+             * Key
+             * @description Opaque key for an exact template version, field and unit
+             */
+            key: string;
+            /** Field Key */
+            field_key: string;
+            /** Template Name */
+            template_name: string;
+            /** Template Version */
+            template_version: number;
+            /**
+             * Value
+             * @description Persisted numeric value from the source lab report
+             */
+            value: string;
+        };
         /** WorkspaceLabOrder */
         WorkspaceLabOrder: {
             /** Id */
@@ -44719,6 +44738,7 @@ export type components = {
             finalized_at: string | null;
             /** Abnormal */
             abnormal: boolean;
+            comparison?: components["schemas"]["WorkspaceLabComparison"] | null;
         };
         /** WorkspaceLabs */
         WorkspaceLabs: {
@@ -44746,6 +44766,8 @@ export type components = {
             history: components["schemas"]["WorkspaceHistoryItem"][];
             /** Has More History */
             has_more_history: boolean;
+            /** Current Laboratory */
+            current_laboratory?: components["schemas"]["WorkspaceLabValue"][];
         };
         /** WorkspacePatient */
         WorkspacePatient: {

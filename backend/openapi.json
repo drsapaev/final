@@ -131211,6 +131211,41 @@
         ],
         "title": "WorkspaceInvoiceStatus"
       },
+      "WorkspaceLabComparison": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Opaque key for an exact template version, field and unit"
+          },
+          "field_key": {
+            "type": "string",
+            "title": "Field Key"
+          },
+          "template_name": {
+            "type": "string",
+            "title": "Template Name"
+          },
+          "template_version": {
+            "type": "integer",
+            "title": "Template Version"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value",
+            "description": "Persisted numeric value from the source lab report"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "field_key",
+          "template_name",
+          "template_version",
+          "value"
+        ],
+        "title": "WorkspaceLabComparison"
+      },
       "WorkspaceLabOrder": {
         "properties": {
           "id": {
@@ -131344,6 +131379,16 @@
           "abnormal": {
             "type": "boolean",
             "title": "Abnormal"
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceLabComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -131432,6 +131477,13 @@
           "has_more_history": {
             "type": "boolean",
             "title": "Has More History"
+          },
+          "current_laboratory": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceLabValue"
+            },
+            "type": "array",
+            "title": "Current Laboratory"
           }
         },
         "type": "object",

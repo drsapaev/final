@@ -10,6 +10,9 @@ from app.models.lab import (
     FINAL_INSTANCE_STATUSES,
     LabOrder,
     LabReportInstance,
+    LabReportTemplate,
+    LabReportTemplateVersion,
+    LabReportValue,
     LabResult,
 )
 from app.models.patient import Patient
@@ -115,12 +118,24 @@ class EMRWorkspaceRepository:
             .all()
         )
 
-    def history_lab_values(self, patient_id: int, visit_ids: list[int]):
+    def workspace_lab_values(self, patient_id: int, visit_ids: list[int]):
         if not visit_ids:
             return []
         return (
             self.db.query(
-                LabReportInstance.visit_id, LabReportInstance.finalized_at, LabResult
+                LabReportInstance.id.label("instance_id"),
+                LabReportInstance.visit_id,
+                LabReportInstance.finalized_at,
+                LabReportInstance.template_version_id,
+                LabResult.test_name,
+                LabResult.value,
+                LabResult.unit,
+                LabResult.abnormal,
+                LabResult.test_code,
+                LabResult.source_root_instance_id,
+                LabReportValue.value_numeric,
+                LabReportTemplate.name.label("template_name"),
+                LabReportTemplateVersion.version_no.label("template_version"),
             )
             .select_from(LabReportInstance)
             .join(LabResult, LabResult.source_instance_id == LabReportInstance.id)
@@ -129,6 +144,22 @@ class EMRWorkspaceRepository:
                 and_(
                     LabOrder.id == LabResult.order_id,
                     LabOrder.id == LabReportInstance.order_id,
+                ),
+            )
+            .join(
+                LabReportTemplateVersion,
+                and_(
+                    LabReportTemplateVersion.id
+                    == LabReportInstance.template_version_id,
+                    LabReportTemplateVersion.template_id == LabReportInstance.template_id,
+                ),
+            )
+            .join(LabReportTemplate, LabReportTemplate.id == LabReportInstance.template_id)
+            .outerjoin(
+                LabReportValue,
+                and_(
+                    LabReportValue.instance_id == LabReportInstance.id,
+                    LabReportValue.field_key == LabResult.test_code,
                 ),
             )
             .filter(

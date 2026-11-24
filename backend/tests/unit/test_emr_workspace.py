@@ -1,6 +1,7 @@
 """Synthetic contracts for the clinician workspace and its clinical writes."""
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import uuid4
 
 from app.models.emr import Prescription
@@ -9,6 +10,8 @@ from app.models.lab import (
     LabReportInstance,
     LabReportTemplate,
     LabReportTemplateVersion,
+    LabReportValue,
+    LabResult,
 )
 from app.models.patient import Patient
 from app.models.visit import Visit
@@ -249,6 +252,103 @@ def test_lab_review_belongs_to_the_exact_report_version_and_order(
     assert correction["reviews"] == []
     assert previous["id"] == first.id and not previous["is_current_final"]
     assert previous["reviews"] == [reviewed.json()]
+
+
+def test_workspace_lab_trend_uses_scoped_numeric_values_from_the_exact_report(
+    client, db_session, auth_headers, test_visit,
+):
+    earlier = Visit(
+        patient_id=test_visit.patient_id, doctor_id=test_visit.doctor_id,
+        visit_date=test_visit.visit_date,
+    )
+    other_patient = Patient(first_name="SYNTHETIC-Lab", last_name="Other")
+    template = LabReportTemplate(
+        code="SYNTHETIC-TREND", name="SYNTHETIC Trend", family="test"
+    )
+    db_session.add_all([earlier, other_patient, template])
+    db_session.flush()
+    saved = client.post(emr_path(earlier.id), headers=auth_headers, json={
+        "data": {"complaints": "SYNTHETIC", "specialty": "cardiology"},
+        "is_draft": False,
+    })
+    assert saved.status_code == 200, saved.text
+    signed = client.post(f"{emr_path(earlier.id)}/sign", headers=auth_headers, json={
+        "data": saved.json()["data"], "row_version": saved.json()["row_version"],
+    })
+    assert signed.status_code == 200, signed.text
+    version, other_version = [LabReportTemplateVersion(
+        template_id=template.id, version_no=number, status="PUBLISHED",
+        layout_preset="standard",
+    ) for number in (1, 2)]
+    db_session.add_all([version, other_version])
+    db_session.flush()
+
+    def report(visit, version_id, *, patient_id=None, status="FINALIZED", previous=None):
+        patient_id = visit.patient_id if patient_id is None else patient_id
+        if previous is None:
+            order = LabOrder(visit_id=visit.id, patient_id=patient_id, status="done")
+            db_session.add(order)
+            db_session.flush()
+            order_id = order.id
+        else:
+            order_id = previous.order_id
+        row = LabReportInstance(
+            visit_id=visit.id, patient_id=patient_id, order_id=order_id,
+            template_id=template.id, template_version_id=version_id, status=status,
+            finalized_at=datetime.now(UTC) if status == "FINALIZED" else None,
+            supersedes_instance_id=previous.id if previous else None,
+        )
+        db_session.add(row)
+        db_session.flush()
+        return row
+
+    def value(source, key, result, *, unit="synthetic-unit", root=None, projected="1"):
+        db_session.add_all([
+            LabReportValue(instance_id=source.id, field_key=key, value_numeric=result),
+            LabResult(
+                order_id=source.order_id, source_instance_id=source.id,
+                source_root_instance_id=root or source.id, test_code=key,
+                test_name="SYNTHETIC Measure", value=projected, unit=unit,
+            ),
+        ])
+
+    old = report(earlier, version.id)
+    value(old, "same-field", Decimal("0"))
+    value(old, "other-field", Decimal("7.125"))
+    value(old, "qualitative", None, projected="SYNTHETIC text")
+    value(old, "no-unit", Decimal("1"), unit=None)
+    prior_different_definition = report(earlier, other_version.id)
+    value(prior_different_definition, "same-field", Decimal("110"))
+    prior_different_unit = report(earlier, version.id)
+    value(prior_different_unit, "same-field", Decimal("120"), unit="synthetic-other-unit")
+    original = report(test_visit, version.id)
+    corrected = report(test_visit, version.id, previous=original)
+    value(corrected, "same-field", Decimal("2.5"), root=original.id)
+    value(corrected, "cleared", None, root=original.id, projected=None)
+    foreign = report(test_visit, version.id, patient_id=other_patient.id)
+    value(foreign, "same-field", Decimal("210"))
+    draft = report(test_visit, version.id, status="DRAFT")
+    value(draft, "same-field", Decimal("310"))
+    db_session.flush()
+
+    response = client.get(f"{emr_path(test_visit.id)}/workspace", headers=auth_headers)
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert len(payload["current_laboratory"]) == 1
+    current = payload["current_laboratory"][0]
+    assert current["instance_id"] == corrected.id
+    assert Decimal(current["comparison"]["value"]) == Decimal("2.5")
+    assert current["comparison"]["template_version"] == 1
+    previous = payload["history"][0]
+    assert previous["visit_id"] == earlier.id
+    previous_values = previous["laboratory"]
+    assert len(previous_values) == 6
+    comparable = [v for v in previous_values if v["comparison"]]
+    assert len(comparable) == 4
+    zero, = [v for v in comparable if Decimal(v["comparison"]["value"]) == 0]
+    assert zero["comparison"]["key"] == current["comparison"]["key"]
+    assert zero["instance_id"] == old.id
+    assert len({v["comparison"]["key"] for v in comparable}) == len(comparable)
 
 
 def test_editing_a_reviewed_template_requires_review_of_the_new_version(

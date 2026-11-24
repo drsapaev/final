@@ -101,6 +101,14 @@ class WorkspaceVisit(BaseModel):
     status: str
 
 
+class WorkspaceLabComparison(BaseModel):
+    key: str = Field(description="Opaque key for an exact template version, field and unit")
+    field_key: str
+    template_name: str
+    template_version: int
+    value: str = Field(description="Persisted numeric value from the source lab report")
+
+
 class WorkspaceLabValue(BaseModel):
     instance_id: int
     name: str
@@ -108,6 +116,7 @@ class WorkspaceLabValue(BaseModel):
     unit: str | None
     finalized_at: datetime | None
     abnormal: bool
+    comparison: WorkspaceLabComparison | None = None
 
 
 class WorkspaceHistoryItem(BaseModel):
@@ -137,6 +146,7 @@ class WorkspaceOut(BaseModel):
     clinical_entries: list[ClinicalEntryOut]
     history: list[WorkspaceHistoryItem]
     has_more_history: bool
+    current_laboratory: list[WorkspaceLabValue] = Field(default_factory=list)
 
 
 class TransferSelection(BaseModel):
