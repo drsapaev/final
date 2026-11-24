@@ -5,7 +5,7 @@ import { safeJsonParse } from '../utils/safeJsonParse';
 
 // Helper для WS с прокси. Управление — VITE_ENABLE_WS=0/1
 function wsEnabled() {
-  const v = (import.meta?.env?.VITE_ENABLE_WS ?? '0').toString().trim();
+  const v = (import.meta.env.VITE_ENABLE_WS ?? '0').toString().trim();
   return v === '1' || v.toLowerCase() === 'true';
 }
 

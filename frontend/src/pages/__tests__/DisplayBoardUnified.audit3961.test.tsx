@@ -49,7 +49,11 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
     vi.unstubAllGlobals();
   });
 
-  const renderBoard = async (props: Record<string, unknown> = {}, settings: Record<string, unknown> = {}) => {
+  const renderBoard = async (
+    props: Record<string, unknown> = {},
+    settings: Record<string, unknown> = {},
+    initialSnapshot = true,
+  ) => {
     apiMock.api.get.mockResolvedValue({
       data: {
         department: 'Reg',
@@ -80,7 +84,7 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
       expect(apiMock.api.get).toHaveBeenCalled();
     });
     const push = (msg: unknown, reply?: DisplayTestReply) => act(() => { wsMessageHandler!(msg, reply); });
-    push({ type: 'initial_state', data: { queue_entries: [], current_call: null } });
+    if (initialSnapshot) push({ type: 'initial_state', data: { queue_entries: [], current_call: null } });
     return {
       view,
       push,
@@ -153,6 +157,94 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
     expect(screen.getByText(/№\s*5/)).toBeInTheDocument();
     act(() => { vi.advanceTimersByTime(5000); });
     expect(screen.queryByText(/№\s*5/)).not.toBeInTheDocument();
+  });
+
+  it.each(['in_progress', 'in_service', 'waiting'])(
+    'clears the call when its entry changes to %s', async (status) => {
+      const { push } = await renderBoard();
+      push({ type: 'patient_call', data: { queue_id: 1, queue_entry_id: 11, queue_number: 5 } });
+      push({ type: 'queue_update', data: { queue_id: 1, queue_entries: [
+        { id: 11, queue_id: 1, number: 5, status },
+      ] } });
+      expect(screen.queryByText(/№\s*5/)).not.toBeInTheDocument();
+    },
+  );
+
+  it('announces a live call that arrives while the first snapshot is being built', async () => {
+    const speak = vi.fn((utterance: { onstart?: () => void }) => utterance.onstart?.());
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'ru-RU' }], speak, cancel: vi.fn() });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
+    const { push } = await renderBoard({}, {
+      sound_enabled: true, voice_announcements: true, voice_language: 'ru', volume_level: 50,
+    }, false);
+    const snapshotStarted = new Date(Date.now() - 1000).toISOString();
+    const call = {
+      event_id: 'live-during-snapshot', issued_at: new Date().toISOString(),
+      queue_number: 7, queue_id: 1, queue_entry_id: 7, cabinet: '505',
+      expires_at: new Date(Date.now() + 5000).toISOString(),
+    };
+    push({ type: 'patient_call', data: call });
+    expect(speak).not.toHaveBeenCalled();
+    push({ type: 'initial_state', data: {
+      queue_entries: [], current_call: null, last_update: snapshotStarted,
+    } });
+    expect(screen.getByText(/№\s*7/)).toBeInTheDocument();
+    await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+    expect(speak).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringMatching(/7.*505/), volume: 0.5,
+    }));
+  });
+
+  it('announces a live call once the selected audio settings finish loading', async () => {
+    const speak = vi.fn((utterance: { onstart?: () => void }) => utterance.onstart?.());
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: 'ru-RU' }], speak, cancel: vi.fn() });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
+    let finishSettings!: (response: unknown) => void;
+    apiMock.api.get.mockImplementation(() => new Promise((resolve) => { finishSettings = resolve; }));
+    let onMessage!: (message: unknown) => void;
+    wsMock.openDisplayBoardWS.mockImplementation((_id, handler, onConnect) => {
+      onMessage = handler;
+      onConnect();
+      return vi.fn();
+    });
+    render(<DisplayBoardUnified department="Reg" dateStr="2026-05-23" />);
+    await waitFor(() => expect(apiMock.api.get).toHaveBeenCalled());
+    act(() => {
+      onMessage({ type: 'initial_state', data: { queue_entries: [] } });
+      onMessage({ type: 'patient_call', data: {
+        event_id: 'live-before-profile', queue_number: 8, cabinet: '506',
+      } });
+    });
+    expect(screen.getByText(/№\s*8/)).toBeInTheDocument();
+    expect(speak).not.toHaveBeenCalled();
+    await act(async () => finishSettings({ data: {
+      sound_enabled: true, voice_announcements: true, voice_language: 'ru', volume_level: 50,
+    } }));
+    await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+    expect(speak).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringMatching(/8.*506/), volume: 0.5,
+    }));
+  });
+
+  it('updates the current room and preserves an explicitly unknown resource room', async () => {
+    const { push } = await renderBoard();
+    push({ type: 'patient_call', data: { queue_id: 1, queue_entry_id: 11, queue_number: 5, cabinet: '101' } });
+    push({ type: 'queue_update', data: { queue_id: 1, cabinet: '102', queue_entries: [
+      { id: 11, queue_id: 1, number: 5, status: 'called', cabinet: '505' },
+      { id: 12, queue_id: 1, number: 6, status: 'called', cabinet: null },
+    ] } });
+    expect(screen.getAllByText('🚪 505')).toHaveLength(2);
+    expect(screen.queryByText('🚪 102')).not.toBeInTheDocument();
+  });
+
+  it('keeps the known invitation room when a later resource update cannot resolve it', async () => {
+    const { push } = await renderBoard();
+    push({ type: 'patient_call', data: { queue_id: 1, queue_entry_id: 11, queue_number: 5, cabinet: '505' } });
+    push({ type: 'queue_update', data: { queue_id: 1, cabinet: '102', queue_entries: [
+      { id: 11, queue_id: 1, number: 5, status: 'called', cabinet: null },
+    ] } });
+    expect(screen.getByText('🚪 505')).toBeInTheDocument();
+    expect(screen.queryByText('🚪 102')).not.toBeInTheDocument();
   });
 
   it.each([['ru', 'ru-RU'], ['uz', 'uz-UZ']])(

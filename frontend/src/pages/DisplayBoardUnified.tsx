@@ -72,7 +72,7 @@ interface QueueEntryDto {
   doctor_name?: string;
   specialist_name?: string;
   specialty?: string;
-  cabinet?: string;
+  cabinet?: string | null;
 }
 
 // RQ-24.a.2: rows from different queues can share one board (every queue is
@@ -220,8 +220,6 @@ function sameId(a: unknown, b: unknown) {
   return a != null && b != null && String(a) === String(b);
 }
 
-const TERMINAL_STATUSES = new Set(['served', 'completed', 'no_show', 'cancelled']);
-
 /**
  * Объединенное табло очереди с полным функционалом
  * Объединяет функции из DisplayBoard.jsx и QueueBoard.jsx
@@ -339,6 +337,7 @@ export default function DisplayBoardUnified({
   const invalidateBoardStateRequests = useCallback(() => { stateRequestRef.current++; }, []);
   const snapshotReadyRef = useRef(false);
   const currentCallRef = useRef<CurrentCall | null>(null);
+  const pendingLiveAudioRef = useRef<CurrentCall | null>(null);
   const latestCallOrderRef = useRef('');
   const displayTestRef = useRef<DisplayTest | null>(null);
   const audioProfileRef = useRef<BoardAudioProfile | null>(null);
@@ -422,6 +421,7 @@ export default function DisplayBoardUnified({
         volume,
         voiceReady,
       };
+      playPendingLiveCall();
       showAnnouncementsRef.current = state.show_announcements !== false;
       const soundEnabled = presentation.sound_default && volume > 0 && soundOverrideRef.current !== false;
       if (!soundEnabled) stopBoardAudio();
@@ -561,6 +561,10 @@ export default function DisplayBoardUnified({
 
   function showCall(call: CurrentCall | null, deadline?: number) {
     clearCallExpiry();
+    const pending = pendingLiveAudioRef.current;
+    if (!call || (pending && pending.event_id !== call.event_id)) {
+      pendingLiveAudioRef.current = null;
+    }
     currentCallRef.current = call;
     setCurrentCall(call);
     if (call && deadline !== undefined && deadline > Date.now()) {
@@ -574,6 +578,18 @@ export default function DisplayBoardUnified({
   function dismissTest() {
     displayTestRef.current = null;
     setDisplayTest(null);
+  }
+
+  function playPendingLiveCall() {
+    const pending = pendingLiveAudioRef.current;
+    if (!pending || !snapshotReadyRef.current || !audioProfileRef.current) return;
+    if (currentCallRef.current !== pending &&
+        (!pending.event_id || currentCallRef.current?.event_id !== pending.event_id)) {
+      pendingLiveAudioRef.current = null;
+      return;
+    }
+    pendingLiveAudioRef.current = null;
+    void playBoardAudio((voiceLanguage) => callText(pending, voiceLanguage));
   }
 
   const handleWebSocketMessage = (messageRaw: unknown, replyToTest?: DisplayTestReply) => {
@@ -608,6 +624,7 @@ export default function DisplayBoardUnified({
         setHasSnapshot(true);
         snapshotReadyRef.current = true;
         setSnapshotReady(true);
+        playPendingLiveCall();
         setQueueData(data.queue_entries);
         clearAnnounceTimers();
         setAnnouncements(Array.isArray(data.announcements) ? data.announcements : []);
@@ -630,7 +647,8 @@ export default function DisplayBoardUnified({
         stopBoardAudio();
         showCall(data, deadline);
         setCallStateAvailable(true);
-        if (snapshotReadyRef.current) void playBoardAudio((voiceLanguage) => callText(data, voiceLanguage));
+        pendingLiveAudioRef.current = data;
+        playPendingLiveCall();
         break;
       }
 
@@ -711,16 +729,26 @@ export default function DisplayBoardUnified({
               queue_id: entry.queue_id ?? eventQueueId,
               doctor_name: entry.doctor_name ?? queueDoctor,
               specialty: entry.specialty ?? queueSpecialty,
-              cabinet: entry.cabinet ?? queueCabinet,
+              cabinet: entry.cabinet === null ? undefined : entry.cabinet ?? queueCabinet,
             }));
           const call = currentCallRef.current;
-          if (call && rawEntries.some((entry) =>
-            TERMINAL_STATUSES.has(entry.status) &&
+          const matchingEntry = call && rawEntries.find((entry) =>
             sameId(entry.queue_id ?? eventQueueId, call.queue_id) &&
-            sameId(entry.id, call.queue_entry_id)
-          )) {
-            showCall(null);
-            stopBoardAudio();
+            sameId(entry.id, call.queue_entry_id));
+          if (call && matchingEntry) {
+            if (matchingEntry.status !== 'called') {
+              showCall(null);
+              stopBoardAudio();
+            } else {
+              // A null resource-room means the update cannot determine the
+              // station. Keep the room from this exact live invitation.
+              const cabinet = matchingEntry.cabinet === null
+                ? call.cabinet
+                : matchingEntry.cabinet === undefined ? queueCabinet : matchingEntry.cabinet;
+              const updatedCall = { ...call, cabinet };
+              currentCallRef.current = updatedCall;
+              setCurrentCall(updatedCall);
+            }
           }
           setQueueData((prev) => {
             if (eventQueueId === undefined) {

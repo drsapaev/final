@@ -277,6 +277,7 @@ async def call_next_patient(
                     queue_entry=entry,
                     doctor_name=owner_name,
                     cabinet=cabinet,
+                    preserve_cabinet=True,
                 )
         except Exception as exc:  # noqa: BLE001 — non-fatal by design
             logger.warning(

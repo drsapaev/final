@@ -45,6 +45,8 @@ class DisplayCallReference:
     queue_id: int
     queue_entry_id: int
     called_at: str
+    preserve_cabinet: bool = False
+    cabinet: str | None = None
 
     @property
     def order(self) -> tuple[str, str]:
@@ -52,6 +54,16 @@ class DisplayCallReference:
 
     def has_expired(self, now: datetime) -> bool:
         return datetime.fromisoformat(self.expires_at) <= now
+
+    def matches(self, queue_id: int, entry, now: datetime) -> bool:
+        return (
+            self.queue_id == queue_id
+            and self.queue_entry_id == entry.id
+            and entry.status == "called"
+            and entry.called_at is not None
+            and utc_timestamp(entry.called_at) == self.called_at
+            and not self.has_expired(now)
+        )
 
 
 _REMEMBER_CALL = """

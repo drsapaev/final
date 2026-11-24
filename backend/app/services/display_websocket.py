@@ -368,6 +368,8 @@ class DisplayWebSocketManager:
         doctor_name: str,
         cabinet: str = None,
         board_ids: list[str] | None = None,
+        *,
+        preserve_cabinet: bool = False,
     ) -> dict:
         """Собрать payload вызова пациента (синхронно, может обращаться к
         lazy-отношениям queue_entry — вызывать при открытой сессии).
@@ -378,7 +380,9 @@ class DisplayWebSocketManager:
         """
         queue = queue_entry.queue
         if queue is not None:
-            _, cabinet, specialty = display_destination(queue)
+            _, queue_cabinet, specialty = display_destination(queue)
+            if not preserve_cabinet:
+                cabinet = queue_cabinet
         else:
             specialty = "Специалист"
         issued_at = datetime.now(UTC)
@@ -398,6 +402,7 @@ class DisplayWebSocketManager:
             "display_duration": DEFAULT_CALL_DURATION,
             "sound_enabled": True,
             "voice_text": f"Пациент номер {queue_entry.number}, пройдите в {cabinet or 'кабинет врача'}",
+            "_preserve_cabinet": preserve_cabinet,
         }
 
     def _call_details(
@@ -530,6 +535,8 @@ class DisplayWebSocketManager:
                     queue_id=data["queue_id"],
                     queue_entry_id=data["queue_entry_id"],
                     called_at=data["called_at"],
+                    preserve_cabinet=call_message.get("_preserve_cabinet") is True,
+                    cabinet=data.get("cabinet"),
                 )
                 try:
                     if not await self._call_store.remember(board_id, ref):
@@ -541,7 +548,7 @@ class DisplayWebSocketManager:
                 statuses[board_id] = await self.broadcast_to_board(
                     board_id,
                     {
-                        **call_message,
+                        **{key: value for key, value in call_message.items() if key != "_preserve_cabinet"},
                         "data": {**data, "expires_at": expires_at},
                         "display_duration": duration,
                     },
@@ -562,6 +569,8 @@ class DisplayWebSocketManager:
         doctor_name: str,
         cabinet: str = None,
         board_ids: list[str] = None,
+        *,
+        preserve_cabinet: bool = False,
     ) -> dict[str, str]:
         """Трансляция вызова пациента на табло.
 
@@ -581,7 +590,8 @@ class DisplayWebSocketManager:
             if board_ids is None:
                 board_ids = self._resolve_untargeted_board_ids()
             call_message = self.build_patient_call_message(
-                queue_entry, doctor_name, cabinet, board_ids=board_ids
+                queue_entry, doctor_name, cabinet, board_ids=board_ids,
+                preserve_cabinet=preserve_cabinet,
             )
             statuses = await self.broadcast_patient_call_data(
                 call_message, board_ids=board_ids
@@ -649,6 +659,15 @@ class DisplayWebSocketManager:
                             "called_at": (
                                 entry.called_at.isoformat() if entry.called_at else None
                             ),
+                            # A resource queue can serve several nurse stations.
+                            # The board-specific reference supplies the room of
+                            # its current call below.
+                            **(
+                                {"cabinet": None}
+                                if daily_queue.queue_resource_id is not None
+                                and entry.status == "called"
+                                else {}
+                            ),
                         }
                     )
                 except Exception as row_exc:
@@ -697,7 +716,31 @@ class DisplayWebSocketManager:
             }
 
             for board_id in board_ids:
-                await self.broadcast_to_board(board_id, update_message)
+                board_message = update_message
+                try:
+                    ref = await self._call_store.latest(board_id)
+                except Exception as exc:
+                    logger.warning("Display call state read failed: %s", type(exc).__name__)
+                    ref = None
+                if ref is not None and ref.queue_id == daily_queue.id:
+                    current_entry = next(
+                        (entry for entry in queue_entries if ref.matches(daily_queue.id, entry, datetime.now(UTC))),
+                        None,
+                    )
+                    if current_entry is not None:
+                        cabinet = ref.cabinet if ref.preserve_cabinet else display_cabinet
+                        board_message = {
+                            **update_message,
+                            "data": {
+                                **update_message["data"],
+                                "queue_entries": [
+                                    {**entry, "cabinet": cabinet}
+                                    if entry["id"] == current_entry.id else entry
+                                    for entry in queue_data
+                                ],
+                            },
+                        }
+                await self.broadcast_to_board(board_id, board_message)
 
         except Exception as e:
             logger.error(f"Ошибка трансляции обновления очереди: {e}")
@@ -809,18 +852,15 @@ class DisplayWebSocketManager:
 
                     owner_label, cabinet, specialty = display_destination(queue)
                     for entry in entries:
-                        if (
-                            ref is not None
-                            and queue.id == ref.queue_id
-                            and entry.id == ref.queue_entry_id
-                            and entry.status == "called"
-                            and entry.called_at is not None
-                            and utc_timestamp(entry.called_at) == ref.called_at
-                            and not ref.has_expired(datetime.now(UTC))
-                        ):
+                        is_current = ref is not None and ref.matches(queue.id, entry, datetime.now(UTC))
+                        entry_cabinet = cabinet
+                        if queue.queue_resource_id is not None and entry.status == "called":
+                            entry_cabinet = None
+                        if is_current:
+                            entry_cabinet = ref.cabinet if ref.preserve_cabinet else cabinet
                             current_call = {
                                 **self._call_details(
-                                    entry, name_format, owner_label, cabinet, specialty
+                                    entry, name_format, owner_label, entry_cabinet, specialty
                                 ),
                                 "event_id": ref.event_id,
                                 "issued_at": ref.issued_at,
@@ -841,7 +881,7 @@ class DisplayWebSocketManager:
                                 "specialist_id": queue.specialist_id,
                                 "specialist_name": owner_label,
                                 "doctor_name": owner_label,
-                                "cabinet": cabinet,
+                                "cabinet": entry_cabinet,
                                 "specialty": specialty,
                                 "created_at": (
                                     entry.created_at.isoformat()

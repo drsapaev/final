@@ -14,6 +14,7 @@ identity contract: the serving mutations and denials surface in ONE
 from __future__ import annotations
 
 from datetime import timedelta
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -123,6 +124,36 @@ def _headers(db: Session, user: User) -> dict[str, str]:
     from tests.conftest import mint_access_token
 
     return {"Authorization": f"Bearer {mint_access_token(user)}"}
+
+
+def test_call_next_broadcasts_the_nurses_assigned_station(
+    client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    from unittest.mock import AsyncMock
+
+    from app.services import display_websocket
+
+    nurse = _user(db_session, "synthetic_display_nurse", "Nurse")
+    resource = _resource(db_session, "synthetic_display")
+    assignment = _assignment(db_session, nurse, resource)
+    assignment.cabinet_override = "505"
+    queue = _queue(db_session, resource)
+    queue.cabinet_number = "102"
+    patient = _patient(db_session, "SYNTHETIC-Display")
+    entry = _entry(db_session, queue, 51, patient)
+    db_session.commit()
+
+    manager = SimpleNamespace(broadcast_patient_call=AsyncMock())
+    monkeypatch.setattr(display_websocket, "get_display_manager", lambda: manager)
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/call-next", headers=_headers(db_session, nurse)
+    )
+    assert response.status_code == 200, response.text
+    manager.broadcast_patient_call.assert_awaited_once()
+    kwargs = manager.broadcast_patient_call.await_args.kwargs
+    assert kwargs["queue_entry"].id == entry.id
+    assert kwargs["cabinet"] == "505"
+    assert kwargs["preserve_cabinet"] is True
 
 
 # ----------------------------------------------------------------------------

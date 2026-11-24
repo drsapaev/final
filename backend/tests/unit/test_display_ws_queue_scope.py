@@ -333,3 +333,60 @@ async def test_current_call_recovers_only_on_its_target_profile(monkeypatch, res
     if redis_url:
         await store._redis.aclose()
         await reconnect_store._redis.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("station_cabinet", ["505", None])
+async def test_nurse_station_cabinet_survives_live_updates_and_reconnect(monkeypatch, station_cabinet):
+    queue = _synthetic_queue(606)
+    queue.queue_resource_id = 44
+    queue.queue_resource = SimpleNamespace(display_name="SYNTHETIC station", default_cabinet="101")
+    queue.cabinet_number = "102"
+    entry = _synthetic_entry(6601, 5, "called")
+    entry.queue = queue
+    entry.queue_id = queue.id
+    other_entry = _synthetic_entry(6602, 6, "called")
+    other_entry.queue = queue
+    other_entry.queue_id = queue.id
+    session = _FakeSession({
+        DailyQueue: _FakeQuery(result_all=[queue]),
+        OnlineQueueEntry: _FakeQuery(result_all=[entry, other_entry]),
+        DisplayBoard: _FakeQuery(result_first=SimpleNamespace(show_patient_names="none")),
+        Setting: _FakeQuery(result_all=[]),
+    })
+    monkeypatch.setattr("app.services.display_websocket.SessionLocal", lambda: session)
+    redis_url = os.getenv("TEST_DISPLAY_REDIS_URL")
+    store = DisplayCallStore(redis_url)
+    reconnect_store = DisplayCallStore(redis_url) if redis_url else store
+    manager = DisplayWebSocketManager(pubsub=_FakePubSubBridge(), call_store=store)
+    receiver = DisplayWebSocketManager(pubsub=_FakePubSubBridge(), call_store=reconnect_store)
+    board_name = f"synthetic-nurse-{uuid4()}"
+    monkeypatch.setattr(manager, "_call_durations", lambda _: {board_name: 30})
+    websocket = _FakeWebSocket()
+    manager.connections[board_name] = {websocket}
+
+    await manager.broadcast_patient_call(
+        entry, "SYNTHETIC station", station_cabinet,
+        board_ids=[board_name], preserve_cabinet=True,
+    )
+    assert websocket.messages[-1]["data"]["cabinet"] == station_cabinet
+    assert "_preserve_cabinet" not in websocket.messages[-1]
+
+    await manager.broadcast_daily_queue_state(queue, board_ids=[board_name])
+    rows = websocket.messages[-1]["data"]["queue_entries"]
+    assert rows[0]["cabinet"] == station_cabinet
+    assert rows[1]["cabinet"] is None
+
+    await receiver._send_current_state(websocket, board_name)
+    snapshot = websocket.messages[-1]["data"]
+    assert snapshot["current_call"]["cabinet"] == station_cabinet
+    assert snapshot["queue_entries"][0]["cabinet"] == station_cabinet
+    assert snapshot["queue_entries"][1]["cabinet"] is None
+
+    await manager._send_current_state(websocket, "other_board")
+    assert websocket.messages[-1]["data"]["queue_entries"][0]["cabinet"] is None
+    if redis_url:
+        stored = await store._redis.get(store._key(board_name))
+        assert b"SYNTHETIC Patient" not in stored
+        await store._redis.aclose()
+        await reconnect_store._redis.aclose()
