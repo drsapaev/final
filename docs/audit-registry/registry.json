@@ -800,10 +800,14 @@
       "priority": "P2",
       "source": "#3892 follow-up review comments, rounds 6–28",
       "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6693119519",
-      "status": "UNVERIFIED",
-      "fix_pr": null,
-      "merge_sha": null,
-      "root_cause": "EVIDENCE UNRECOVERABLE: source comment 6693119519 has been deleted from GitHub (404 on both issue-comment and PR-review-comment endpoints); the finding text cannot be re-verified against main from the remaining audit trail. Left UNVERIFIED with checked=true-triaged evidence-loss marker; the neighboring plane (useDermatologyPatientHistory races, DERMAHIST-FE-001) still carries unresolved generation issues, so a re-derivation requires a fresh audit round"
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": 4260,
+      "merge_sha": "f0639a5345ec91972d690fa2a7238d68efe9a03d",
+      "root_cause": "Rejected examination or procedure pagination did not surface a visible retry state. PR #4260 reports the failure and clears it on retry or reload.",
+      "test_before": "Pagination failures were only logged and the clinician saw no failed-page state; owner recorded fail-first regression 4/5 failing.",
+      "test_after": "On main e2b5405a, useDermatologyPatientHistory.loadMoreError.test.tsx passed; merged PR #4260 CI run 45340494398 succeeded.",
+      "reviewer": "Source and regression review on main e2b5405a",
+      "date": "2026-11-24"
     },
     {
       "checked": true,
@@ -877,9 +881,14 @@
       "priority": "P2",
       "source": "#3892 follow-up review comments, rounds 6–28",
       "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6693119519",
-      "status": "UNVERIFIED",
-      "fix_pr": null,
-      "merge_sha": null
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": 4270,
+      "merge_sha": "58a20bbbe80b08fc6e8ac0d08cd9d8c218a1a88b",
+      "test_before": "Search returned the backend's first 100 rows without pagination; owner recorded the search pagination regression failing 3/4 cases.",
+      "test_after": "On main e2b5405a, DermaPatientsTab.searchPagination.test.tsx passed; merged PR #4270 CI run 45401320403 succeeded.",
+      "root_cause": "The patient search did not request subsequent result pages. PR #4270 adds pagination and a visible error on failed page loads.",
+      "reviewer": "Source and regression review on main e2b5405a",
+      "date": "2026-11-24"
     },
     {
       "checked": true,
@@ -1035,9 +1044,14 @@
       "priority": "P2",
       "source": "#3892 follow-up review comments, rounds 6–28",
       "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6690449597",
-      "status": "UNVERIFIED",
-      "fix_pr": null,
-      "merge_sha": null
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": 4258,
+      "merge_sha": "0d9c5a4a9b0fb60dc76de0f4e946fdd3e9685886",
+      "test_before": "Queue-only statuses fell outside the appointment pipeline and rendered active visits as 0%; owner recorded 3/5 fail-first cases.",
+      "test_after": "On main e2b5405a, VisitTimeline.queueStage.test.tsx passed; merged PR #4258 CI run 45336673927 succeeded.",
+      "root_cause": "Queue statuses were treated as appointment statuses. PR #4258 projects the queue state machine onto the displayed visit stages.",
+      "reviewer": "Source and regression review on main e2b5405a",
+      "date": "2026-11-24"
     },
     {
       "checked": true,
