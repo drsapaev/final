@@ -20,8 +20,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.core.audit import extract_model_changes, log_critical_change
+from app.core.audit import log_critical_change
 from app.models.clinic import Doctor
+from app.models.emr_v2 import EMRRecord
 from app.models.user import User
 from app.models.visit import Visit
 from app.schemas.emr_v2 import (
@@ -36,6 +37,7 @@ from app.schemas.emr_v2 import (
     EMRSaveRequest,
     EMRSignRequest,
 )
+from app.services.audit_service import log_audit_event
 from app.services.emr_contract import extract_icd10_code, get_emr_text_field
 from app.services.emr_doctor_history_service import (
     EMRDoctorHistoryDomainError,
@@ -46,8 +48,10 @@ from app.services.emr_v2_service import (
     EMRNotFoundException,
     EMRSignedError,
     emr_v2_service,
+    get_emr_audit_change_metadata,
 )
 from app.services.emr_workspace_service import WorkspaceError, prepare_workspace_document
+from app.services.reason_codes import ReasonCode
 from app.services.section_templates_service import DoctorSectionTemplatesService
 
 logger = logging.getLogger(__name__)
@@ -270,8 +274,6 @@ async def get_emr(
     )
 
     # M5.1: Also log to unified AuditLog
-    from app.services.audit_service import log_audit_event
-    from app.services.reason_codes import ReasonCode
     log_audit_event(
         db=db,
         event_type="DOCTOR_OPEN_EMR",
@@ -289,9 +291,33 @@ async def get_emr(
     return emr
 
 
+def _log_revision_read(
+    db: Session,
+    request: Request,
+    current_user: User,
+    emr: EMRRecord,
+    *,
+    metadata: dict[str, int],
+) -> None:
+    log_audit_event(
+        db=db,
+        event_type="DOCTOR_OPEN_EMR",
+        actor_user_id=current_user.id,
+        actor_role=current_user.role,
+        subject_patient_id=emr.patient_id,
+        resource_type="emr",
+        resource_id=str(emr.id),
+        action="view",
+        reason_code=ReasonCode.visit(emr.visit_id).to_dict(),
+        request=request,
+        extra_data=metadata,
+    )
+
+
 @router.get("/{visit_id}/history", response_model=EMRHistoryOut)
 async def get_emr_history(
     visit_id: int,
+    request: Request,
     limit: int = Query(50, ge=1, le=200, description="Maximum revisions to return"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
@@ -308,8 +334,11 @@ async def get_emr_history(
         raise HTTPException(status_code=404, detail="EMR not found")
 
     revisions = emr_v2_service.get_history(db, emr.id, limit=limit)
-
-    return {
+    metadata = {"current_version": emr.version, "revision_count": len(revisions)}
+    if revisions:
+        metadata["newest_version"] = revisions[0].version
+        metadata["oldest_version"] = revisions[-1].version
+    history = {
         "emr_id": emr.id,
         "current_version": emr.version,
         "revisions": [
@@ -324,12 +353,15 @@ async def get_emr_history(
             for r in revisions
         ],
     }
+    _log_revision_read(db, request, current_user, emr, metadata=metadata)
+    return history
 
 
 @router.get("/{visit_id}/version/{version}", response_model=EMRRevisionOut)
 async def get_emr_version(
     visit_id: int,
     version: int,
+    request: Request,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
@@ -348,12 +380,21 @@ async def get_emr_version(
     if not revision:
         raise HTTPException(status_code=404, detail=f"Version {version} not found")
 
-    return revision
+    snapshot = EMRRevisionOut.model_validate(revision)
+    _log_revision_read(
+        db,
+        request,
+        current_user,
+        emr,
+        metadata={"revision_id": snapshot.id, "version": snapshot.version},
+    )
+    return snapshot
 
 
 @router.get("/{visit_id}/diff", response_model=EMRDiffOut)
 async def compare_versions(
     visit_id: int,
+    request: Request,
     v1: int = Query(..., ge=1, description="First version number"),
     v2: int = Query(..., ge=1, description="Second version number"),
     db: Session = Depends(deps.get_db),
@@ -366,18 +407,29 @@ async def compare_versions(
     """
     ensure_emr_visit_access(db, visit_id, current_user)
 
-    try:
-        diff = emr_v2_service.get_diff(db, visit_id, v1, v2)
-        return diff
-    except EMRNotFoundException:
+    emr = emr_v2_service.get_by_visit(db, visit_id)
+    if not emr:
         raise HTTPException(status_code=404, detail="EMR not found")
+
+    try:
+        diff = emr_v2_service.get_diff(db, emr, v1, v2)
     except ValueError:
         raise HTTPException(status_code=400, detail="Internal server error")
+
+    _log_revision_read(
+        db,
+        request,
+        current_user,
+        emr,
+        metadata={"version_from": v1, "version_to": v2, "change_count": len(diff["changes"])},
+    )
+    return diff
 
 
 @router.get("/patient/{patient_id}", response_model=list[EMRRecordSummary])
 async def get_patient_emrs(
     patient_id: int,
+    request: Request,
     limit: int = Query(100, ge=1, le=500, description="Maximum EMRs to return"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
@@ -388,7 +440,23 @@ async def get_patient_emrs(
     Returns list of EMR summaries in descending order by creation date.
     """
     emrs = emr_v2_service.get_by_patient(db, patient_id, limit=limit)
-    return filter_patient_emrs_for_access(db, emrs, current_user)
+    summaries = [
+        EMRRecordSummary.model_validate(emr)
+        for emr in filter_patient_emrs_for_access(db, emrs, current_user)
+    ]
+    if summaries:
+        log_audit_event(
+            db=db,
+            event_type="DOCTOR_OPEN_EMR",
+            actor_user_id=current_user.id,
+            actor_role=current_user.role,
+            subject_patient_id=patient_id,
+            resource_type="emr",
+            action="view",
+            request=request,
+            extra_data={"record_count": len(summaries)},
+        )
+    return summaries
 
 
 # =============================================================================
@@ -423,9 +491,14 @@ async def save_emr(
 
     try:
         existing_emr = emr_v2_service.get_by_visit(db, visit_id)
-        old_data = None
+        previous_document = existing_emr.data if existing_emr is not None else {}
+        old_metadata = None
         if existing_emr is not None:
-            old_data, _ = extract_model_changes(existing_emr, None)
+            old_metadata = {
+                "version": existing_emr.version,
+                "row_version": existing_emr.row_version,
+                "status": existing_emr.status,
+            }
 
         emr = emr_v2_service.save(
             db,
@@ -436,15 +509,19 @@ async def save_emr(
             client_session_id=payload.client_session_id,
             is_draft=payload.is_draft,
         )
-        _, new_data = extract_model_changes(None, emr)
         log_critical_change(
             db=db,
             user_id=current_user.id,
             action="CREATE" if existing_emr is None else "UPDATE",
             table_name="emr",
             row_id=emr.id,
-            old_data=old_data,
-            new_data=new_data,
+            old_data=old_metadata,
+            new_data={
+                "version": emr.version,
+                "row_version": emr.row_version,
+                "status": emr.status,
+                **get_emr_audit_change_metadata(previous_document, emr.data),
+            },
             request=request,
             description=f"Сохранен EMR ID={emr.id} для визита {visit_id}",
         )
