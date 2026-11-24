@@ -69,16 +69,20 @@ def board_state(
             .first()
         )
 
+    options = {
+        "show_patient_names": selected_board.show_patient_names if selected_board else "initials",
+        "queue_display_count": selected_board.queue_display_count if selected_board else 5,
+        "show_announcements": selected_board.show_announcements if selected_board else True,
+        "voice_announcements": selected_board.voice_announcements if selected_board else False,
+        "sound_enabled": selected_board.sound_enabled if selected_board else True,
+        "voice_language": selected_board.voice_language if selected_board else "ru",
+        "volume_level": selected_board.volume_level if selected_board else 70,
+    }
     if department is None:
         # Multi-department board: honest suppression of the legacy
         # counters (they would be inferred from arbitrary URL text).
         return {
             "department": None,
-            "show_patient_names": (
-                selected_board.show_patient_names
-                if selected_board
-                else "initials"
-            ),
             "date_str": date,
             "is_open": False,
             "start_number": 1,
@@ -87,34 +91,12 @@ def board_state(
             "serving": 0,
             "done": 0,
             "stats_available": False,
-            "queue_display_count": (
-                selected_board.queue_display_count
-                if selected_board
-                else 5
-            ),
-            "show_announcements": (
-                selected_board.show_announcements
-                if selected_board
-                else True
-            ),
-            "voice_announcements": (
-                selected_board.voice_announcements
-                if selected_board
-                else False
-            ),
-            "sound_enabled": (
-                selected_board.sound_enabled if selected_board else True
-            ),
+            **options,
         }
 
     s = load_stats(db, department=department, date_str=date)
     return {
         "department": s.department,
-        "show_patient_names": (
-            selected_board.show_patient_names
-            if selected_board
-            else "initials"
-        ),
         "date_str": s.date_str,
         "is_open": s.is_open,
         "start_number": s.start_number,
@@ -123,16 +105,5 @@ def board_state(
         "serving": s.serving,
         "done": s.done,
         "stats_available": True,
-        "queue_display_count": (
-            selected_board.queue_display_count if selected_board else 5
-        ),
-        "show_announcements": (
-            selected_board.show_announcements if selected_board else True
-        ),
-        "voice_announcements": (
-            selected_board.voice_announcements if selected_board else False
-        ),
-        "sound_enabled": (
-            selected_board.sound_enabled if selected_board else True
-        ),
+        **options,
     }

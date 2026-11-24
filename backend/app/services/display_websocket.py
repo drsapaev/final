@@ -8,8 +8,10 @@ import json
 import logging
 import os
 import time
-from datetime import UTC, datetime
+from contextlib import suppress
+from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -17,6 +19,15 @@ from app.api.v1.endpoints.ws_token import accept_echoing_subprotocol
 from app.db.session import SessionLocal
 from app.models.display_config import DisplayBoard
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.schemas.misc_endpoints import DisplayTestAck, DisplayTestResponse
+from app.services.display_board_state import (
+    DEFAULT_CALL_DURATION,
+    MAX_CALL_DURATION,
+    DisplayCallReference,
+    DisplayCallStore,
+    display_destination,
+    utc_timestamp,
+)
 from app.services.ws_redis_pubsub import RedisPubSubBridge
 
 logger = logging.getLogger(__name__)
@@ -30,12 +41,18 @@ logger = logging.getLogger(__name__)
 # invalidation still clears entries immediately; resolver failures are never
 # cached and resolve fail-closed to 'none' (DISPLAYPRIVACY-BE-002).
 NAME_FORMAT_CACHE_TTL_SECONDS = 30.0
+DISPLAY_TEST_TIMEOUT_SECONDS = 5
 
 
 class DisplayWebSocketManager:
     """Менеджер WebSocket соединений для табло"""
 
-    def __init__(self, pubsub: RedisPubSubBridge | None = None):
+    def __init__(
+        self,
+        pubsub: RedisPubSubBridge | None = None,
+        *,
+        call_store: DisplayCallStore | None = None,
+    ):
         # Активные соединения по board_id
         self.connections: dict[str, set[WebSocket]] = {}
         # Последнее состояние каждого табло
@@ -44,6 +61,14 @@ class DisplayWebSocketManager:
             channel_prefix="display_ws",
             redis_url=(os.getenv("WS_REDIS_URL") or os.getenv("REDIS_URL")),
         )
+        self._call_store = call_store or DisplayCallStore(
+            getattr(self._pubsub, "redis_url", None)
+        )
+        self._device_ids: dict[WebSocket, int] = {}
+        self._sent_display_tests: dict[WebSocket, dict[str, datetime]] = {}
+        self._test_waiters: dict[
+            str, tuple[str, int, asyncio.Future[DisplayTestResponse]]
+        ] = {}
         # RQ-24.a.1: формат имени пациента борда (DisplayBoard.
         # show_patient_names: full/initials/none), кэш на board_id —
         # без чтения конфига на каждое сообщение.
@@ -63,7 +88,9 @@ class DisplayWebSocketManager:
         # вместо добавления, что ломало connect() (CI RED HEAD).
         self._redis_handlers: dict[str, Any] = {}
 
-    async def connect(self, websocket: WebSocket, board_id: str, user=None) -> None:
+    async def connect(
+        self, websocket: WebSocket, board_id: str, user=None, *, device_id: int | None = None
+    ) -> None:
         """Подключение нового WebSocket с опциональной аутентификацией"""
         try:
             await accept_echoing_subprotocol(websocket)
@@ -72,6 +99,8 @@ class DisplayWebSocketManager:
                 self.connections[board_id] = set()
 
             self.connections[board_id].add(websocket)
+            if device_id is not None:
+                self._device_ids[websocket] = device_id
 
             # Сохраняем информацию о пользователе для этого соединения
             if user:
@@ -82,6 +111,8 @@ class DisplayWebSocketManager:
                 logger.info(
                     f"Аутентифицированный WebSocket подключен к табло {board_id} (пользователь: {user.username})"
                 )
+            elif device_id is not None:
+                logger.info("Display device connected to board=%s", board_id)
             else:
                 logger.info(f"Анонимный WebSocket подключен к табло {board_id}")
 
@@ -103,6 +134,8 @@ class DisplayWebSocketManager:
     async def disconnect(self, websocket: WebSocket, board_id: str) -> None:
         """Отключение WebSocket"""
         try:
+            self._device_ids.pop(websocket, None)
+            self._sent_display_tests.pop(websocket, None)
             if board_id in self.connections:
                 self.connections[board_id].discard(websocket)
 
@@ -194,19 +227,41 @@ class DisplayWebSocketManager:
         if board_id not in self.connections:
             return 0
 
-        # Обновляем состояние табло
-        self.board_states[board_id] = {
-            **self.board_states.get(board_id, {}),
-            **message,
-            "last_update": datetime.now(UTC).isoformat(),
-        }
+        sockets = self.connections[board_id].copy()
+        outgoing = message
+        is_test = message.get("type") == "display_test"
+        if is_test:
+            # Only the authenticated device identity is considered, including
+            # on workers receiving the event through Redis.
+            sockets = {
+                ws for ws in sockets if self._device_ids.get(ws) == message["device_id"]
+            }
+            test_data = message["data"]
+            expires_at = datetime.fromisoformat(test_data["expires_at"])
+            now = datetime.now(UTC)
+            if expires_at <= now:
+                return 0
+            outgoing = {"type": "display_test", "data": test_data}
+        else:
+            self.board_states[board_id] = {
+                **self.board_states.get(board_id, {}),
+                **message,
+                "last_update": datetime.now(UTC).isoformat(),
+            }
 
         # Отправляем всем подключенным
         disconnected = set()
         sent = 0
-        for websocket in self.connections[board_id].copy():
+        serialized = json.dumps(outgoing, ensure_ascii=False)
+        for websocket in sockets:
+            if is_test:
+                pending = self._sent_display_tests.get(websocket, {})
+                self._sent_display_tests[websocket] = {
+                    **{key: deadline for key, deadline in pending.items() if deadline > now},
+                    test_data["test_id"]: expires_at,
+                }
             try:
-                await websocket.send_text(json.dumps(message, ensure_ascii=False))
+                await websocket.send_text(serialized)
                 sent += 1
             except WebSocketDisconnect:
                 disconnected.add(websocket)
@@ -216,11 +271,96 @@ class DisplayWebSocketManager:
 
         # Удаляем отключенные соединения
         for ws in disconnected:
-            self.connections[board_id].discard(ws)
+            await self.disconnect(ws, board_id)
 
         if disconnected:
             logger.info(f"Удалено {len(disconnected)} отключенных соединений")
         return sent
+
+    def _complete_display_test(
+        self, board_id: str, device_id: int, ack: DisplayTestAck
+    ) -> bool:
+        pending = self._test_waiters.get(str(ack.test_id))
+        if pending is None:
+            return False
+        expected_board, expected_device, result = pending
+        if (board_id, device_id) != (expected_board, expected_device) or result.done():
+            return False
+        result.set_result(
+            DisplayTestResponse(
+                test_id=ack.test_id, status=ack.status, audio_status=ack.audio_status
+            )
+        )
+        return True
+
+    async def acknowledge_display_test(
+        self, websocket: WebSocket, board_id: str, device_id: int, ack: DisplayTestAck
+    ) -> None:
+        if self._device_ids.get(websocket) != device_id:
+            return
+        pending = self._sent_display_tests.get(websocket, {})
+        deadline = pending.pop(str(ack.test_id), None)
+        if deadline is None or deadline <= datetime.now(UTC):
+            return
+        if self._complete_display_test(board_id, device_id, ack):
+            return
+        try:
+            await self._pubsub.publish(
+                f"test_ack:{ack.test_id}",
+                {"board_id": board_id, "device_id": device_id, "ack": ack.model_dump(mode="json")},
+            )
+        except Exception as exc:
+            logger.warning("Display test acknowledgment relay failed: %s", type(exc).__name__)
+
+    async def test_device(
+        self, board_id: str, device_id: int, test_type: str
+    ) -> DisplayTestResponse:
+        test_id = uuid4()
+        expires_at = datetime.now(UTC) + timedelta(seconds=DISPLAY_TEST_TIMEOUT_SECONDS)
+        confirmation = asyncio.get_running_loop().create_future()
+        self._test_waiters[str(test_id)] = (board_id, device_id, confirmation)
+        channel = f"test_ack:{test_id}"
+        relay_enabled = self._pubsub.enabled
+        subscribed = False
+
+        async def receive_ack(payload: dict[str, Any]) -> None:
+            self._complete_display_test(
+                payload["board_id"], payload["device_id"], DisplayTestAck.model_validate(payload["ack"])
+            )
+
+        try:
+            async with asyncio.timeout(DISPLAY_TEST_TIMEOUT_SECONDS):
+                if relay_enabled:
+                    subscribed = await self._pubsub.subscribe(channel, receive_ack)
+                message = {
+                    "type": "display_test",
+                    "device_id": device_id,
+                    "data": {
+                        "test_id": str(test_id),
+                        "test_type": test_type,
+                        "expires_at": utc_timestamp(expires_at),
+                        **({"queue_number": "T007", "cabinet": "101"} if test_type == "call" else {}),
+                    },
+                }
+                sent = await self._broadcast_to_board_local(board_id, message)
+                if not sent:
+                    if not relay_enabled:
+                        return DisplayTestResponse(test_id=test_id, status="unconfirmed")
+                    if not subscribed or not await self._pubsub.publish(
+                        self._board_channel(board_id), message
+                    ):
+                        return DisplayTestResponse(test_id=test_id, status="dispatch_failed")
+                return await confirmation
+        except TimeoutError:
+            return DisplayTestResponse(test_id=test_id, status="unconfirmed")
+        except Exception as exc:
+            logger.warning("Display test dispatch failed: %s", type(exc).__name__)
+            return DisplayTestResponse(test_id=test_id, status="dispatch_failed")
+        finally:
+            self._test_waiters.pop(str(test_id), None)
+            if subscribed:
+                with suppress(Exception):
+                    await self._pubsub.unsubscribe(channel, receive_ack)
 
     def build_patient_call_message(
         self,
@@ -236,35 +376,67 @@ class DisplayWebSocketManager:
         GraphQL-мутация могла собрать сообщение в worker-треде (сессия
         открыта там), а на event loop осталась только network-отправка.
         """
-        # RQ-24.a.1: формат имён по show_patient_names целевых табло
+        queue = queue_entry.queue
+        if queue is not None:
+            _, cabinet, specialty = display_destination(queue)
+        else:
+            specialty = "Специалист"
+        issued_at = datetime.now(UTC)
+        if board_ids is None:
+            board_ids = self._resolve_untargeted_board_ids()
         name_format = self._resolve_name_format(board_ids)
         return {
             "type": "patient_call",
             "data": {
-                "id": queue_entry.id,
-                "queue_entry_id": queue_entry.id,
-                "queue_number": queue_entry.number,
-                "patient_name": self._format_patient_name(
-                    queue_entry.patient_name, name_format
+                **self._call_details(
+                    queue_entry, name_format, doctor_name, cabinet, specialty
                 ),
-                "doctor_name": doctor_name,
-                "cabinet": cabinet or "Каб. не указан",
-                "specialty": (
-                    queue_entry.queue.specialist.specialty
-                    if queue_entry.queue.specialist
-                    else "Врач"
-                ),
-                "called_at": (
-                    queue_entry.called_at.isoformat()
-                    if queue_entry.called_at
-                    else datetime.now(UTC).isoformat()
-                ),
-                "urgency": "normal",  # normal, urgent, emergency
+                "event_id": str(uuid4()),
+                "issued_at": utc_timestamp(issued_at),
+                "called_at": utc_timestamp(queue_entry.called_at or issued_at),
             },
-            "display_duration": 30,  # Секунды показа
+            "display_duration": DEFAULT_CALL_DURATION,
             "sound_enabled": True,
             "voice_text": f"Пациент номер {queue_entry.number}, пройдите в {cabinet or 'кабинет врача'}",
         }
+
+    def _call_details(
+        self,
+        entry: OnlineQueueEntry,
+        name_format: str,
+        owner: str,
+        cabinet: str | None,
+        specialty: str,
+    ) -> dict[str, Any]:
+        return {
+            "id": entry.id,
+            "queue_entry_id": entry.id,
+            "queue_id": entry.queue_id,
+            "queue_number": entry.number,
+            "patient_name": self._format_patient_name(entry.patient_name, name_format),
+            "doctor_name": owner,
+            "cabinet": cabinet,
+            "specialty": specialty,
+            "urgency": "normal",
+        }
+
+    @staticmethod
+    def _call_durations(board_ids: list[str]) -> dict[str, int]:
+        try:
+            with SessionLocal() as db:
+                settings = (
+                    db.query(DisplayBoard.name, DisplayBoard.call_display_duration)
+                    .filter(DisplayBoard.name.in_(board_ids))
+                    .all()
+                )
+                return {
+                    name: duration
+                    for name, duration in settings
+                    if isinstance(duration, int) and 5 <= duration <= MAX_CALL_DURATION
+                }
+        except Exception as exc:
+            logger.warning("Display duration lookup failed: %s", type(exc).__name__)
+            return {}
 
     def _resolve_untargeted_board_ids(self) -> list[str]:
         """DISPLAYRELAY-BE-001 (audit PR #3961): ``board_ids=None`` означает
@@ -309,6 +481,11 @@ class DisplayWebSocketManager:
                 merged.append(name)
         return merged
 
+    def _queue_update_board_ids(self) -> list[str]:
+        # The department stream shares this manager. Keep its local
+        # rooms and reach registered TV profiles on other workers.
+        return list(dict.fromkeys([*self.connections, *self._resolve_untargeted_board_ids()]))
+
     async def broadcast_patient_call_data(
         self,
         call_message: dict,
@@ -330,10 +507,44 @@ class DisplayWebSocketManager:
             if board_ids is None:
                 board_ids = self._resolve_untargeted_board_ids()
 
-            # Отправляем на указанные табло
+            if not board_ids:
+                return statuses
+
+            data = call_message["data"]
+            # Older in-process producers can finish a rollout with their
+            # existing payload. Only complete invitations are recoverable.
+            if "issued_at" not in data:
+                for board_id in board_ids:
+                    statuses[board_id] = await self.broadcast_to_board(board_id, call_message)
+                return statuses
+
+            durations = self._call_durations(board_ids)
+            issued_at = datetime.fromisoformat(data["issued_at"])
             for board_id in board_ids:
+                duration = durations.get(board_id, DEFAULT_CALL_DURATION)
+                expires_at = utc_timestamp(issued_at + timedelta(seconds=duration))
+                ref = DisplayCallReference(
+                    event_id=data["event_id"],
+                    issued_at=data["issued_at"],
+                    expires_at=expires_at,
+                    queue_id=data["queue_id"],
+                    queue_entry_id=data["queue_entry_id"],
+                    called_at=data["called_at"],
+                )
+                try:
+                    if not await self._call_store.remember(board_id, ref):
+                        continue
+                except Exception as exc:
+                    # The committed clinical transition can still be
+                    # displayed live if the state store is unavailable.
+                    logger.warning("Display call state write failed: %s", type(exc).__name__)
                 statuses[board_id] = await self.broadcast_to_board(
-                    board_id, call_message
+                    board_id,
+                    {
+                        **call_message,
+                        "data": {**data, "expires_at": expires_at},
+                        "display_duration": duration,
+                    },
                 )
 
             logger.info(
@@ -393,6 +604,8 @@ class DisplayWebSocketManager:
         """Трансляция обновления очереди"""
         db = None
         try:
+            if board_ids is None:
+                board_ids = self._queue_update_board_ids()
             db = SessionLocal()
 
             # Получаем текущую очередь
@@ -447,34 +660,7 @@ class DisplayWebSocketManager:
                         f"{row_exc}"
                     )
 
-            # Codex P2 (round-14): resource/bridged очередь — владелец и
-            # кабинет с оси ресурса (реестр), как в call-обёртках
-            # (round-11/12/13): реконнект/стейт-апдейт не должен
-            # перезаписывать корректное presentation-имя табло на «Врач»
-            # без кабинета. Врач-очереди байт-идентичны.
-            if daily_queue.queue_resource_id is not None:
-                resource = daily_queue.queue_resource
-                display_owner = (
-                    resource.display_name if resource is not None else "Ресурс очереди"
-                )
-                display_cabinet = daily_queue.cabinet_number or (
-                    resource.default_cabinet if resource is not None else None
-                )
-                specialty_label = daily_queue.queue_tag or "Специалист"
-            else:
-                display_owner = (
-                    daily_queue.specialist.user.full_name
-                    if daily_queue.specialist and daily_queue.specialist.user
-                    else "Врач"
-                )
-                display_cabinet = (
-                    daily_queue.specialist.cabinet if daily_queue.specialist else None
-                )
-                specialty_label = (
-                    daily_queue.specialist.specialty
-                    if daily_queue.specialist
-                    else "Специалист"
-                )
+            display_owner, display_cabinet, specialty_label = display_destination(daily_queue)
 
             update_message = {
                 "type": "queue_update",
@@ -510,10 +696,6 @@ class DisplayWebSocketManager:
                 },
             }
 
-            # Отправляем на табло
-            if not board_ids:
-                board_ids = list(self.connections.keys())
-
             for board_id in board_ids:
                 await self.broadcast_to_board(board_id, update_message)
 
@@ -544,12 +726,14 @@ class DisplayWebSocketManager:
         """
         statuses: dict[str, str] = {}
         try:
+            now = datetime.now(UTC)
             announcement_message = {
                 "type": "announcement",
                 "data": {
                     "text": announcement_text,
                     "announcement_type": announcement_type,  # info, warning, emergency
-                    "created_at": datetime.now(UTC).isoformat(),
+                    "created_at": utc_timestamp(now),
+                    "expires_at": utc_timestamp(now + timedelta(seconds=duration)),
                 },
                 "display_duration": duration,
                 "sound_enabled": announcement_type in ["warning", "emergency"],
@@ -578,6 +762,15 @@ class DisplayWebSocketManager:
     async def _send_current_state(self, websocket: WebSocket, board_id: str) -> None:
         """Отправка текущего состояния табло новому подключению"""
         try:
+            snapshot_started_at = utc_timestamp(datetime.now(UTC))
+            call_state_available = True
+            try:
+                ref = await self._call_store.latest(board_id)
+            except Exception as exc:
+                logger.warning("Display call state read failed: %s", type(exc).__name__)
+                ref = None
+                call_state_available = False
+
             # Получаем актуальные данные из базы
             db = SessionLocal()
             try:
@@ -598,6 +791,8 @@ class DisplayWebSocketManager:
                 )
 
                 queue_entries = []
+                current_call = None
+                name_format = self._resolve_name_format([board_id], use_cache=False)
                 for queue in queues:
                     # Codex P2 (round-14): resource-ось — владелец из
                     # реестра (display_name), не «Врач #None» при NULL
@@ -612,21 +807,26 @@ class DisplayWebSocketManager:
                         .all()
                     )
 
-                    if queue.queue_resource_id is not None:
-                        resource = queue.queue_resource
-                        owner_label = (
-                            resource.display_name
-                            if resource is not None
-                            else "Ресурс очереди"
-                        )
-                    elif queue.specialist and queue.specialist.user:
-                        owner_label = queue.specialist.user.full_name
-                    else:
-                        owner_label = f"Врач #{queue.specialist_id}"
-
-                    # RQ-24.a.1: формат имён по настройке этого табло
-                    name_format = self._resolve_name_format([board_id])
+                    owner_label, cabinet, specialty = display_destination(queue)
                     for entry in entries:
+                        if (
+                            ref is not None
+                            and queue.id == ref.queue_id
+                            and entry.id == ref.queue_entry_id
+                            and entry.status == "called"
+                            and entry.called_at is not None
+                            and utc_timestamp(entry.called_at) == ref.called_at
+                            and not ref.has_expired(datetime.now(UTC))
+                        ):
+                            current_call = {
+                                **self._call_details(
+                                    entry, name_format, owner_label, cabinet, specialty
+                                ),
+                                "event_id": ref.event_id,
+                                "issued_at": ref.issued_at,
+                                "called_at": ref.called_at,
+                                "expires_at": ref.expires_at,
+                            }
                         queue_entries.append(
                             {
                                 "id": entry.id,
@@ -640,6 +840,9 @@ class DisplayWebSocketManager:
                                 "status": entry.status,
                                 "specialist_id": queue.specialist_id,
                                 "specialist_name": owner_label,
+                                "doctor_name": owner_label,
+                                "cabinet": cabinet,
+                                "specialty": specialty,
                                 "created_at": (
                                     entry.created_at.isoformat()
                                     if entry.created_at
@@ -657,13 +860,12 @@ class DisplayWebSocketManager:
                     "type": "initial_state",
                     "data": {
                         "queue_entries": queue_entries,
-                        "current_call": self.board_states.get(board_id, {}).get(
-                            "current_call"
-                        ),
+                        "current_call": current_call,
+                        "call_state_available": call_state_available,
                         "announcements": self.board_states.get(board_id, {}).get(
                             "announcements", []
                         ),
-                        "last_update": datetime.now(UTC).isoformat(),
+                        "last_update": snapshot_started_at,
                         "board_id": board_id,
                         "total_entries": len(queue_entries),
                         "waiting_entries": len(
@@ -672,13 +874,13 @@ class DisplayWebSocketManager:
                     },
                 }
 
-                await websocket.send_text(json.dumps(current_state, ensure_ascii=False))
-                logger.info(
-                    f"Отправлено актуальное состояние для табло {board_id}: {len(queue_entries)} записей"
-                )
-
             finally:
                 db.close()
+
+            await websocket.send_text(json.dumps(current_state, ensure_ascii=False))
+            logger.info(
+                "Sent display state board=%s entries=%s", board_id, len(queue_entries)
+            )
 
         except Exception as e:
             logger.error(f"Ошибка отправки текущего состояния: {e}")
@@ -699,7 +901,9 @@ class DisplayWebSocketManager:
             except Exception:
                 pass
 
-    def _resolve_name_format(self, board_ids: list[str] | None) -> str:
+    def _resolve_name_format(
+        self, board_ids: list[str] | None, *, use_cache: bool = True
+    ) -> str:
         """Строгий формат имён среди целевых табло (PHI: none ⊂ initials ⊂ full).
 
         DISPLAYPRIVACY-BE-002 (audit PR #3961): fail-closed masking. Любая
@@ -728,7 +932,7 @@ class DisplayWebSocketManager:
                 for b in ids:
                     entry = cache.get(b)
                     cached = None
-                    if entry is not None:
+                    if use_cache and entry is not None:
                         # Legacy shape: callers/tests that write plain strings
                         # directly into the cache are treated as freshly
                         # cached entries — the TTL contract applies from that
@@ -947,16 +1151,16 @@ class DisplayWebSocketManager:
     async def broadcast_queue_update(self, queue_entry, event_type: str) -> None:
         """Трансляция обновления очереди"""
         try:
+            queue = queue_entry.queue
+            if queue is None:
+                return
             if event_type != "queue.created":
-                if queue_entry.queue:
-                    await self.broadcast_daily_queue_state(
-                        queue_entry.queue,
-                        event_type=event_type,
-                    )
-                    return
+                await self.broadcast_daily_queue_state(queue, event_type=event_type)
+                return
 
-            # RQ-24.a.1: формат имён по show_patient_names целевых табло
-            name_format = self._resolve_name_format(None)
+            board_ids = self._queue_update_board_ids()
+            name_format = self._resolve_name_format(board_ids)
+            owner, cabinet, specialty = display_destination(queue)
             message = {
                 "type": "queue_update",
                 "event_type": event_type,
@@ -978,15 +1182,18 @@ class DisplayWebSocketManager:
                         if queue_entry.called_at
                         else None
                     ),
-                    "specialist_id": queue_entry.queue.specialist_id,
-                    "department": f"specialist_{queue_entry.queue.specialist_id}",
-                    "queue_id": queue_entry.queue.id,
+                    "specialist_id": queue.specialist_id,
+                    "department": f"specialist_{queue.specialist_id}",
+                    "queue_id": queue.id,
+                    "doctor_name": owner,
+                    "cabinet": cabinet,
+                    "specialty": specialty,
                 },
                 "timestamp": datetime.now(UTC).isoformat(),
             }
 
             # Отправляем на все табло
-            for board_id in self.connections.keys():
+            for board_id in board_ids:
                 await self.broadcast_to_board(board_id, message)
 
             logger.info(

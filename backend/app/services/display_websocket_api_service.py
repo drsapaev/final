@@ -15,6 +15,7 @@ from app.crud.clinic import get_queue_settings
 from app.repositories.display_websocket_api_repository import (
     DisplayWebSocketApiRepository,
 )
+from app.services.display_board_state import display_destination
 from app.services.display_websocket import get_display_manager
 
 
@@ -183,25 +184,7 @@ class DisplayWebSocketApiService:
                 ),
             )
 
-        # QD-2C (Codex round-10 P1): resource/bridged очередь
-        # (queue_resource_id) — назначение вызова из оси ресурса:
-        # имя из реестра, кабинет из строки очереди (persisted
-        # default_cabinet / админ-override) с фолбэком на реестр;
-        # иначе вызванному пациенту не сообщается кабинет.
-        daily_cabinet = getattr(queue, "cabinet_number", None)
-        if getattr(queue, "queue_resource_id", None) is not None:
-            resource = getattr(queue, "queue_resource", None)
-            doctor_name = resource.display_name if resource is not None else "Врач"
-            cabinet = daily_cabinet or (
-                resource.default_cabinet if resource is not None else None
-            )
-        else:
-            doctor = queue.specialist
-            doctor_name = doctor.user.full_name if doctor and doctor.user else "Врач"
-            # DailyQueue is the saved clinic-day service location. Its
-            # explicit assignment takes precedence over the owner's default,
-            # matching the resource-owned call path and preserving D2.
-            cabinet = daily_cabinet or (doctor.cabinet if doctor else None)
+        doctor_name, cabinet, _ = display_destination(queue)
 
         manager = self._manager_provider()
 

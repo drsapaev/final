@@ -11,7 +11,8 @@ enforces size caps and rejects dangerous deserialization keys.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -56,18 +57,41 @@ class DisplayBannerRequest(ValidatedDictBase):
 class DisplayTestRequest(BaseModel):
     """Request body for POST /display/boards/{board_id}/test."""
 
-    test_type: str = Field("call", max_length=50, description="Test type: call, announcement, etc.")
-    board_ids: list[int] | None = Field(None, max_length=50, description="Specific board IDs to test")
+    device_id: int = Field(gt=0, strict=True)
+    test_type: Literal["call", "announcement"] = "call"
 
-    model_config = {"extra": "allow"}
+    model_config = {"extra": "forbid"}
 
-    @model_validator(mode="before")
-    @classmethod
-    def _validate_input(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            raise ValueError("test data must be a JSON object")
-        _validate_dict_recursive(data)
-        return data
+
+DisplayTestAudioStatus = Literal["started", "blocked", "disabled", "unavailable"]
+
+
+class DisplayTestAck(BaseModel):
+    test_id: UUID
+    status: Literal["displayed", "busy"]
+    audio_status: DisplayTestAudioStatus | None = None
+
+
+class DisplayTestResponse(BaseModel):
+    test_id: UUID
+    status: Literal["displayed", "busy", "unconfirmed", "dispatch_failed"]
+    audio_status: DisplayTestAudioStatus | None = None
+
+
+class DisplayProfileStats(BaseModel):
+    calls: int | None
+    announcements: int
+    uptime: float | None
+
+
+class DisplayStatsResponse(BaseModel):
+    total_boards: int
+    active_boards: int
+    total_calls_today: int | None
+    total_announcements: int
+    total_banners: int
+    uptime_percentage: float | None
+    by_board: dict[str, DisplayProfileStats]
 
 
 # =============================================================================
@@ -207,7 +231,10 @@ class UserPreferencesRequest(ValidatedDictBase):
 __all__ = [
     "ValidatedDictBase",
     "DisplayBannerRequest",
+    "DisplayStatsResponse",
     "DisplayTestRequest",
+    "DisplayTestResponse",
+    "DisplayTestAck",
     "CallPatientRequest",
     "AnnouncementRequest",
     "CompleteVisitRequest",

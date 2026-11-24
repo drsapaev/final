@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useMemo, type FormEvent } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo, type FormEvent } from 'react';
 import type { CSSProperties } from 'react';
-import { useParams } from 'react-router-dom';
 import {
   Volume2,
   VolumeX,
@@ -18,7 +17,7 @@ import {
   EyeOff } from
 'lucide-react';
 import { api } from '../api/client';
-import { openDisplayBoardWS } from '../api/ws';
+import { openDisplayBoardWS, type DisplayTestAudioStatus, type DisplayTestReply } from '../api/ws';
 import {
   exchangeDisplayDeviceSession,
   exchangeDisplayDeviceCredential,
@@ -34,9 +33,11 @@ import { useTranslation } from '../i18n/useTranslation';
 import { safeJsonParse } from '../utils/safeJsonParse';
 import { tokenManager } from '../utils/tokenManager';
 
-const DEFAULT_BOARD_STATS = { last_ticket: 0, waiting: 0, serving: 0, done: 0 };
-
-type BoardStats = typeof DEFAULT_BOARD_STATS;
+interface BoardStats {
+  waiting: number;
+  serving: number;
+  done: number;
+}
 
 interface BoardState {
   brand: string;
@@ -93,10 +94,33 @@ export const resolveBoardEntryKey = (entry: QueueEntryDto, index: number): strin
 };
 
 interface CurrentCall {
+  queue_id?: string | number;
+  queue_entry_id?: string | number;
+  event_id?: string;
+  issued_at?: string;
+  expires_at?: string;
   queue_number?: number | string;
   patient_name?: string;
   doctor_name?: string;
-  cabinet?: string;
+  cabinet?: string | null;
+}
+
+type VoiceLanguage = 'ru' | 'uz' | 'en';
+const voiceLocale = (language: VoiceLanguage) => language === 'uz' ? 'uz-Latn' : language;
+
+interface BoardAudioProfile {
+  enabled: boolean;
+  voiceEnabled: boolean;
+  voiceLanguage: VoiceLanguage;
+  volume: number;
+  voiceReady?: Promise<void>;
+}
+
+interface DisplayTest {
+  id: string;
+  call: CurrentCall | null;
+  expiresAt: number;
+  reply: DisplayTestReply;
 }
 
 interface Announcement {
@@ -119,7 +143,6 @@ interface BoardSettingsState {
   theme: string;
   showPatientNames: string;
   soundEnabled: boolean;
-  voiceEnabled: boolean;
   displayCount: number;
   // DISPLAYOPTIONS-FE-001 (audit PR #3961): show_announcements табло
   // управляет показом блока объявлений на живом экране.
@@ -130,9 +153,8 @@ interface BoardSettingsState {
   language: string;
 }
 
-interface WSMessageData {
+interface WSMessageData extends CurrentCall {
   number?: number | string;
-  cabinet?: string;
   queue_entries?: QueueEntryDto[];
   current_call?: CurrentCall | null;
   announcements?: Announcement[];
@@ -147,6 +169,8 @@ interface WSMessage {
   data: WSMessageData;
   event_type?: string;
   voice_text?: string;
+  sound_enabled?: boolean;
+  display_duration?: number;
 }
 
 interface DisplayBoardUnifiedProps {
@@ -162,12 +186,41 @@ interface DisplayBoardUnifiedProps {
   boardId?: string;
 }
 
-const extractBoardStats = (source: Record<string, unknown> | null | undefined): BoardStats => ({
-  last_ticket: Number(source?.last_ticket || 0),
-  waiting: Number(source?.waiting || 0),
-  serving: Number(source?.serving || 0),
-  done: Number(source?.done || 0)
+const extractBoardStats = (source: Record<string, unknown>): BoardStats => ({
+  waiting: Number(source.waiting || 0),
+  serving: Number(source.serving || 0),
+  done: Number(source.done || 0)
 });
+
+const boardPresentation = (state: Record<string, unknown>): BoardState => ({
+  brand: String(state.brand ?? state.title ?? 'Clinic'),
+  logo: String(state.logo ?? state.logo_url ?? ''),
+  is_paused: Boolean(state.is_paused || state.paused),
+  is_closed: Boolean(state.is_closed || state.closed),
+  announcement: String(state.announcement ?? state.ticker ?? ''),
+  announcement_ru: String(state.announcement_ru ?? ''),
+  announcement_uz: String(state.announcement_uz ?? ''),
+  announcement_en: String(state.announcement_en ?? ''),
+  primary_color: String(state.primary_color ?? ''),
+  bg_color: String(state.bg_color ?? ''),
+  text_color: String(state.text_color ?? ''),
+  contrast_default: Boolean(state.contrast_default),
+  kiosk_default: Boolean(state.kiosk_default),
+  sound_default: state.sound_enabled !== undefined
+    ? state.sound_enabled === true
+    : state.sound_default !== false,
+});
+
+function eventDeadline(value: unknown, fallbackSeconds?: number) {
+  if (typeof value === 'string') return Date.parse(value);
+  return fallbackSeconds ? Date.now() + fallbackSeconds * 1000 : Number.NaN;
+}
+
+function sameId(a: unknown, b: unknown) {
+  return a != null && b != null && String(a) === String(b);
+}
+
+const TERMINAL_STATUSES = new Set(['served', 'completed', 'no_show', 'cancelled']);
 
 /**
  * Объединенное табло очереди с полным функционалом
@@ -199,7 +252,7 @@ export default function DisplayBoardUnified({
   boardId = 'main_board'
 }: DisplayBoardUnifiedProps) {void
   useTheme();
-  const { t: rawT } = useTranslation();
+  const { t: rawT, i18n } = useTranslation();
   const t = rawT;
 
   // Параметры из URL или пропсов
@@ -226,13 +279,16 @@ export default function DisplayBoardUnified({
   // QR-FE-009: была ли WS-сессия хотя бы раз успешной. Отличает
   // «борд ещё подключается» (баннер не нужен) от устойчивой потери
   // соединения после успешной сессии (строки могут устареть).
-  const [wsEverConnected, setWsEverConnected] = useState(false);
+  const [hasSnapshot, setHasSnapshot] = useState(false);
+  const [snapshotReady, setSnapshotReady] = useState(false);
+  const [callStateAvailable, setCallStateAvailable] = useState(true);
   const [queueData, setQueueData] = useState<QueueEntryDto[]>([]);
   const [currentCall, setCurrentCall] = useState<CurrentCall | null>(null);
+  const [displayTest, setDisplayTest] = useState<DisplayTest | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
   // Состояние статистики (старое)
-  const [stats, setStats] = useState<BoardStats>(DEFAULT_BOARD_STATS);
+  const [stats, setStats] = useState<BoardStats | null>(null);
   const [err, setErr] = useState('');
   const [nowStr, setNowStr] = useState(timeNow());
 
@@ -265,7 +321,6 @@ export default function DisplayBoardUnified({
     theme: 'light',
     showPatientNames: 'initials',
     soundEnabled: soundInitial === undefined ? true : soundInitial,
-    voiceEnabled: false,
     displayCount: 5,
     showAnnouncements: true,
     contrastMode: contrast,
@@ -280,7 +335,18 @@ export default function DisplayBoardUnified({
   const loadBoardStateRef = useRef<() => void>(() => {});
   const loadWindowsRef = useRef<() => void>(() => {});
   const connectWebSocketRef = useRef<() => void>(() => {});
-  const lastTicketRef = useRef(0);
+  const stateRequestRef = useRef(0);
+  const invalidateBoardStateRequests = useCallback(() => { stateRequestRef.current++; }, []);
+  const snapshotReadyRef = useRef(false);
+  const currentCallRef = useRef<CurrentCall | null>(null);
+  const latestCallOrderRef = useRef('');
+  const displayTestRef = useRef<DisplayTest | null>(null);
+  const audioProfileRef = useRef<BoardAudioProfile | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioSequenceRef = useRef(0);
+  const activeToneRef = useRef<OscillatorNode | null>(null);
+  const activeSpeechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const showAnnouncementsRef = useRef(true);
   const [online, setOnline] = useState(true);
 
   // DISPLAYAUDIO-FE-001 (audit PR #3961): сессионное ручное решение звука.
@@ -326,96 +392,74 @@ export default function DisplayBoardUnified({
   // DISPLAYDEPT-FE-001: department уходит в params только когда валиден —
   // литеральный "undefined" не отправляется; DISPLAYCONFIG-FE-001:
   // снапшот настроек запрашивается для ТЕКУЩЕГО табло (board=...).
-  async function loadBoardState() {setErr('');try {const st = (await api.get('/board/state', { params: { date: qs.d, ...(qs.department ? { department: qs.department } : {}), board: currentBoardId } })).data as Record<string, unknown> | undefined;if (st && typeof st === 'object') {
-        setStats(extractBoardStats(st));
-        setBoard({
-          brand: String(st.brand ?? st.title ?? 'Clinic'),
-          logo: String(st.logo ?? st.logo_url ?? ''),
-          is_paused: !!(st.is_paused || st.paused),
-          is_closed: !!(st.is_closed || st.closed),
-          announcement: String(st.announcement ?? st.ticker ?? ''),
-          announcement_ru: String(st.announcement_ru ?? ''),
-          announcement_uz: String(st.announcement_uz ?? ''),
-          announcement_en: String(st.announcement_en ?? ''),
-          primary_color: String(st.primary_color ?? ''),
-          bg_color: String(st.bg_color ?? ''),
-          text_color: String(st.text_color ?? ''),
-          contrast_default: !!st.contrast_default,
-          kiosk_default: !!st.kiosk_default,
-          sound_default: st.sound_default !== false
-        });
-        // DISPLAYAUDIO-FE-001: бэкенд-дефолт применяется, пока оператор
-        // не сделал ручной выбор в этой сессии (иначе мьют переживает опрос).
-        if (
-          soundInitial === undefined &&
-          soundOverrideRef.current === null &&
-          typeof st.sound_default !== 'undefined'
-        ) {
-          setBoardSettings((prev) => ({ ...prev, soundEnabled: st.sound_default !== false }));
-        }
-        // RQ-24.a.1: sync the board privacy setting (full/initials/none)
-        // DISPLAYCONFIG-FE-001: значение ТЕКУЩЕГО табло (/board/state?board=),
-        // а не main_board.
-        if (typeof st.show_patient_names === 'string') {
-          const fmt = st.show_patient_names;
-          if (fmt === 'none' || fmt === 'initials' || fmt === 'full') {
-            setBoardSettings((prev) => ({ ...prev, showPatientNames: fmt }));
-          }
-        }
-        // DISPLAYOPTIONS-FE-001: сохранённые админом настройки показа
-        // применяются живым экраном (непубличные поля не затрагиваются).
-        if (typeof st.queue_display_count === 'number' && st.queue_display_count >= 1) {
-          const count = Math.min(Math.floor(st.queue_display_count), 20);
-          setBoardSettings((prev) => ({ ...prev, displayCount: count }));
-        }
-        if (typeof st.voice_announcements === 'boolean') {
-          const voiceAnnouncements = st.voice_announcements as boolean;
-          setBoardSettings((prev) => ({ ...prev, voiceEnabled: voiceAnnouncements }));
-        }
-        if (typeof st.show_announcements === 'boolean') {
-          const showAnnouncements = st.show_announcements as boolean;
-          setBoardSettings((prev) => ({ ...prev, showAnnouncements }));
-        }
-        try {localStorage.setItem('board.state', JSON.stringify(st));} catch {
+  async function loadBoardState() {
+    const requestId = ++stateRequestRef.current;
+    const cacheKey = 'board.state:' + JSON.stringify([currentBoardId, qs.department, qs.d]);
+    try {
+      const { data } = await api.get('/board/state', {
+        params: { date: qs.d, ...(qs.department ? { department: qs.department } : {}), board: currentBoardId },
+      });
+      if (requestId !== stateRequestRef.current) return;
+      const state = data as Record<string, unknown> | null;
+      if (!state || typeof state !== 'object') throw new Error('Missing display state');
 
-
-
-
-
-
-
-          // Игнорируем ошибки localStorage
-        }}} catch (e: unknown) {setErr((e as { message?: string })?.message || t('misc.dbu_err_load')); // fallback из кэша
-      try {const raw = localStorage.getItem('board.state');if (raw) {const cached = safeJsonParse(raw) as Record<string, unknown>;if (cached && typeof cached === 'object') {
-            setStats(extractBoardStats(cached));
-            setBoard({
-              brand: String(cached.brand ?? cached.title ?? 'Clinic'),
-              logo: String(cached.logo ?? cached.logo_url ?? ''),
-              is_paused: !!(cached.is_paused || cached.paused),
-              is_closed: !!(cached.is_closed || cached.closed),
-              announcement: String(cached.announcement ?? cached.ticker ?? ''),
-              announcement_ru: String(cached.announcement_ru ?? ''),
-              announcement_uz: String(cached.announcement_uz ?? ''),
-              announcement_en: String(cached.announcement_en ?? ''),
-              primary_color: String(cached.primary_color ?? ''),
-              bg_color: String(cached.bg_color ?? ''),
-              text_color: String(cached.text_color ?? ''),
-              contrast_default: !!cached.contrast_default,
-              kiosk_default: !!cached.kiosk_default,
-              sound_default: cached.sound_default !== false
-            });
-          }
+      const presentation = boardPresentation(state);
+      const voiceLanguage = state.voice_language === 'uz' || state.voice_language === 'en'
+        ? state.voice_language
+        : 'ru';
+      const volume = typeof state.volume_level === 'number' && Number.isFinite(state.volume_level)
+        ? Math.max(0, Math.min(100, state.volume_level)) / 100
+        : 0.7;
+      const previousAudio = audioProfileRef.current;
+      let voiceReady = previousAudio?.voiceLanguage === voiceLanguage ? previousAudio.voiceReady : undefined;
+      if (state.voice_announcements === true && !voiceReady) {
+        voiceReady = i18n.loadLanguages(voiceLocale(voiceLanguage)).then(() => {}, () => {});
+      }
+      audioProfileRef.current = {
+        enabled: presentation.sound_default,
+        voiceEnabled: state.voice_announcements === true,
+        voiceLanguage,
+        volume,
+        voiceReady,
+      };
+      showAnnouncementsRef.current = state.show_announcements !== false;
+      const soundEnabled = presentation.sound_default && volume > 0 && soundOverrideRef.current !== false;
+      if (!soundEnabled) stopBoardAudio();
+      const nameFormat = state.show_patient_names;
+      setBoardSettings((prev) => ({
+        ...prev,
+        soundEnabled,
+        showPatientNames: nameFormat === 'none' || nameFormat === 'initials' || nameFormat === 'full'
+          ? nameFormat : prev.showPatientNames,
+        displayCount: typeof state.queue_display_count === 'number' && state.queue_display_count >= 1
+          ? Math.min(Math.floor(state.queue_display_count), 20) : prev.displayCount,
+        showAnnouncements: showAnnouncementsRef.current,
+      }));
+      setBoard(presentation);
+      setStats(state.stats_available === true ? extractBoardStats(state) : null);
+      setErr('');
+      try {
+        // eslint-disable-next-line no-restricted-properties -- Non-auth display preferences only.
+        localStorage.setItem(cacheKey, JSON.stringify(presentation));
+      } catch {
+        // The live profile is available even when browser storage is disabled.
+      }
+    } catch {
+      if (requestId !== stateRequestRef.current) return;
+      setStats(null);
+      setErr(t('misc.dbu_err_load'));
+      try {
+        const raw = localStorage.getItem(cacheKey);
+        if (raw) {
+          const cached = safeJsonParse(raw);
+          if (cached && typeof cached === 'object') setBoard(boardPresentation(cached as Record<string, unknown>));
         }
       } catch {
+        // The last live presentation remains on screen.
+      }
+    }
+  }
 
-
-
-
-
-
-
-        // Игнорируем ошибки localStorage
-      }}} // Загрузка окон/кабинетов (старое)
   async function loadWindows() {
     // Legacy windows endpoint no longer exists in the current backend contract.
     // Keep the section empty instead of hammering a dead route every refresh tick.
@@ -429,6 +473,12 @@ export default function DisplayBoardUnified({
   // WebSocket подключение (новое)
   const connectWebSocket = () => {
     try {
+      snapshotReadyRef.current = false;
+      setSnapshotReady(false);
+      setConnected(false);
+      showCall(null);
+      dismissTest();
+      stopBoardAudio();
       // Закрываем предыдущее соединение если есть
       if (wsRef.current) {
         wsRef.current();
@@ -463,8 +513,15 @@ export default function DisplayBoardUnified({
       const closeWS = openDisplayBoardWS(
         currentBoardId,
         handleWebSocketMessage,
-        () => { setConnected(true); setWsEverConnected(true); },
-        () => setConnected(false),
+        () => setConnected(true),
+        () => {
+          setConnected(false);
+          snapshotReadyRef.current = false;
+          setSnapshotReady(false);
+          showCall(null);
+          dismissTest();
+          stopBoardAudio();
+        },
         tokenProvider,
       );
 
@@ -502,63 +559,110 @@ export default function DisplayBoardUnified({
     }
   };
 
-  // Обработка WebSocket сообщений (новое)
-  const handleWebSocketMessage = (messageRaw: unknown) => {
+  function showCall(call: CurrentCall | null, deadline?: number) {
+    clearCallExpiry();
+    currentCallRef.current = call;
+    setCurrentCall(call);
+    if (call && deadline !== undefined && deadline > Date.now()) {
+      callExpiryRef.current = setTimeout(() => {
+        showCall(null);
+        stopBoardAudio();
+      }, deadline - Date.now());
+    }
+  }
+
+  function dismissTest() {
+    displayTestRef.current = null;
+    setDisplayTest(null);
+  }
+
+  const handleWebSocketMessage = (messageRaw: unknown, replyToTest?: DisplayTestReply) => {
+    if (!messageRaw || typeof messageRaw !== 'object') return;
     const message = messageRaw as WSMessage;
-    logger.log('Получено WebSocket сообщение:', message);
+    const data = message.data ?? {};
 
     switch (message.type) {
       case 'initial_state': {
-        const data = message.data || {};
-        // DISPLAYERROR-FE-001 (audit PR #3961): сбой снапшота бэкенда
-        // приходит как initial_state с data.error и пустыми строками —
-        // это НЕ «живая пустая очередь». Показываем видимый баннер,
-        // последние корректные строки сохраняем (не затираем), повтор
-        // — кнопка Retry / авто-реконнект WS.
-        if (typeof data.error === 'string' && data.error.trim()) {
-          setSnapshotError(data.error);
+        const snapshotError = typeof data.error === 'string' ? data.error.trim() : '';
+        if (snapshotError || !Array.isArray(data.queue_entries)) {
+          snapshotReadyRef.current = false;
+          setSnapshotReady(false);
+          setSnapshotError(snapshotError || t('misc.dbu_err_load'));
+          dismissTest();
+          stopBoardAudio();
           break;
         }
+        const call = data.current_call;
+        const deadline = call ? eventDeadline(call.expires_at, 30) : Number.NaN;
+        const displayed = currentCallRef.current;
+        // A live invitation may arrive while the server is making the snapshot.
+        if (!displayed?.issued_at || typeof data.last_update !== 'string' || displayed.issued_at <= data.last_update) {
+          showCall(call && deadline > Date.now() ? call : null, deadline);
+        }
+        if (call?.issued_at && call.event_id) {
+          const order = call.issued_at + '|' + call.event_id;
+          if (order > latestCallOrderRef.current) latestCallOrderRef.current = order;
+        }
+        setCallStateAvailable(data.call_state_available !== false);
         setSnapshotError('');
-        setQueueData(Array.isArray(data.queue_entries) ? data.queue_entries : []);
-        setCurrentCall(data.current_call ?? null);
-        setAnnouncements(
-          (Array.isArray(data.announcements) ? data.announcements : []).map(
-            (item: Announcement) => ({
-              ...item,
-              expires_at: undefined,
-            })
-          )
-        );
+        setHasSnapshot(true);
+        snapshotReadyRef.current = true;
+        setSnapshotReady(true);
+        setQueueData(data.queue_entries);
+        clearAnnounceTimers();
+        setAnnouncements(Array.isArray(data.announcements) ? data.announcements : []);
         break;
       }
 
       case 'patient_call': {
-        // DISPLAYCALL-FE-001 (audit PR #3961): подсветка последнего вызова
-        // истекает по display_duration из payload (бэкенд-контракт, 30с
-        // по умолчанию) — больше не «навсегда» до следующего вызова.
-        setCurrentCall(message.data);
-        clearCallExpiry();
-        const durationSeconds = Number(message.data?.display_duration ?? 30);
-        if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
-          callExpiryRef.current = setTimeout(() => {
-            setCurrentCall(null);
-            callExpiryRef.current = null;
-          }, durationSeconds * 1000);
+        if (typeof data.queue_number !== 'number' && typeof data.queue_number !== 'string') break;
+        const deadline = eventDeadline(data.expires_at, Number(message.display_duration ?? data.display_duration ?? 30));
+        if (!(deadline > Date.now())) break;
+        if (data.issued_at && data.event_id) {
+          const order = data.issued_at + '|' + data.event_id;
+          if (order <= latestCallOrderRef.current) break;
+          latestCallOrderRef.current = order;
         }
-        if (boardSettings.soundEnabled) {
-          playCallSound(message);
+        if (displayTestRef.current) {
+          displayTestRef.current.reply({ test_id: displayTestRef.current.id, status: 'busy' });
+          dismissTest();
+        }
+        stopBoardAudio();
+        showCall(data, deadline);
+        setCallStateAvailable(true);
+        if (snapshotReadyRef.current) void playBoardAudio((voiceLanguage) => callText(data, voiceLanguage));
+        break;
+      }
+
+      case 'call_completed': {
+        const call = currentCallRef.current;
+        if (call && sameId(call.queue_id, data.queue_id) && sameId(call.queue_entry_id, data.queue_entry_id ?? data.id)) {
+          showCall(null);
+          stopBoardAudio();
         }
         break;
       }
 
-      case 'call_completed':
-        clearCallExpiry();
-        setCurrentCall(null);
+      case 'display_test': {
+        const id = data.test_id;
+        const deadline = eventDeadline(data.expires_at);
+        if (!replyToTest || typeof id !== 'string' || !(deadline > Date.now()) || !snapshotReadyRef.current) break;
+        if (currentCallRef.current || displayTestRef.current) {
+          replyToTest({ test_id: id, status: 'busy' });
+          break;
+        }
+        const test = {
+          id,
+          call: data.test_type === 'call' ? data : null,
+          expiresAt: deadline,
+          reply: replyToTest,
+        };
+        displayTestRef.current = test;
+        setDisplayTest(test);
         break;
+      }
 
       case 'queue_update': {
-        const data = message.data || {};
         // Обновляем очередь при добавлении/изменении записей
         if (message.event_type === 'queue.created') {
           // Добавляем новую запись в очередь
@@ -575,9 +679,12 @@ export default function DisplayBoardUnified({
             called_at: typeof data.called_at === 'string' ? data.called_at : undefined,
             created_at: typeof data.created_at === 'string' ? data.created_at : undefined,
             source: typeof data.source === 'string' ? data.source : undefined,
+            doctor_name: data.doctor_name,
+            specialty: typeof data.specialty === 'string' ? data.specialty : undefined,
+            cabinet: data.cabinet ?? undefined,
           };
-          setQueueData((prev) => [...prev, newEntry]);
-          logger.log(`➕ Новая запись в очереди: №${data.number ?? ''}`);
+          setQueueData((prev) => prev.some((entry) => sameId(entry.id, newEntry.id))
+            ? prev : [...prev, newEntry]);
         } else {
           // Обновляем очередь; RQ-24.a.2: владелец/кабинет приходят
           // на уровне сообщения очереди — прикрепляем к строкам, чтобы
@@ -606,27 +713,14 @@ export default function DisplayBoardUnified({
               specialty: entry.specialty ?? queueSpecialty,
               cabinet: entry.cabinet ?? queueCabinet,
             }));
-          // DISPLAYCALL-FE-001 (audit PR #3961): реальный жизненный цикл
-          // вызова приходит как queue_update — если вызванная строка ушла
-          // в терминальный статус (served/completed/no_show/cancelled),
-          // подсветка последнего вызова гаснет, а не висит до следующего.
-          // Проверка по СЫРОМУ payload (терминальные строки отфильтрованы
-          // из read-model) и функциональный setCurrentCall: WS-хэндлер
-          // держит замыкание на момент подключения, prev-состояние в
-          // updater — единственный честный источник.
-          const terminalStatuses = ['served', 'completed', 'no_show', 'cancelled'];
-          const terminalNumbers = new Set(
-            rawEntries
-              .filter((entry) => terminalStatuses.includes(String(entry.status)))
-              .map((entry) => String(entry.number))
-          );
-          if (terminalNumbers.size > 0) {
-            clearCallExpiry();
-            setCurrentCall((prev) =>
-              prev && terminalNumbers.has(String(prev.queue_number ?? ''))
-                ? null
-                : prev
-            );
+          const call = currentCallRef.current;
+          if (call && rawEntries.some((entry) =>
+            TERMINAL_STATUSES.has(entry.status) &&
+            sameId(entry.queue_id ?? eventQueueId, call.queue_id) &&
+            sameId(entry.id, call.queue_entry_id)
+          )) {
+            showCall(null);
+            stopBoardAudio();
           }
           setQueueData((prev) => {
             if (eventQueueId === undefined) {
@@ -635,7 +729,7 @@ export default function DisplayBoardUnified({
               // номеру/метке специализации не восстанавливаем.
               return scopedEntries;
             }
-            const kept = prev.filter((entry) => entry.queue_id !== eventQueueId);
+            const kept = prev.filter((entry) => !sameId(entry.queue_id, eventQueueId));
             // Стабильный порядок ТВ-раскладки: группировка по очереди,
             // внутри — по номеру (стабильный sort сохраняет порядок остальных).
             const merged = [...kept, ...scopedEntries];
@@ -652,33 +746,33 @@ export default function DisplayBoardUnified({
       }
 
       case 'announcement': {
-        // DISPLAYANNOUNCE-FE-001 (audit PR #3961): display_duration из
-        // payload — каждое объявление живёт запрошенное окно и исчезает
-        // без зависимости от новых событий (раньше оставалось навсегда).
-        const durationSeconds = Number(message.data?.display_duration ?? 0);
-        const announcementKey =
-          typeof message.data?.created_at === 'string'
-            ? message.data.created_at
-            : `announce-${Date.now()}-${Math.random()}`;
+        const duration = Number(message.display_duration ?? data.display_duration ?? 0);
+        const deadline = eventDeadline(data.expires_at, duration);
+        if (Number.isFinite(deadline) && deadline <= Date.now()) break;
+        const announcementKey = data.created_at ?? Date.now().toString();
         const newAnnouncement: Announcement = {
           created_at: announcementKey,
-          announcement_type: typeof message.data?.announcement_type === 'string' ? message.data.announcement_type : undefined,
-          text: typeof message.data?.text === 'string' ? message.data.text : undefined,
-          expires_at:
-            Number.isFinite(durationSeconds) && durationSeconds > 0
-              ? Date.now() + durationSeconds * 1000
-              : undefined,
+          announcement_type: data.announcement_type,
+          text: typeof data.text === 'string' ? data.text : undefined,
+          expires_at: Number.isFinite(deadline) ? deadline : undefined,
         };
-        setAnnouncements((prev) => [newAnnouncement, ...prev.slice(0, 4)]);
-        if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+        const previous = announceTimersRef.current.get(announcementKey);
+        if (previous !== undefined) clearTimeout(previous);
+        setAnnouncements((items) => [
+          newAnnouncement, ...items.filter((item) => item.created_at !== announcementKey).slice(0, 4),
+        ]);
+        if (Number.isFinite(deadline)) {
           const timer = setTimeout(() => {
-            setAnnouncements((prev) => prev.filter((a) => a !== newAnnouncement));
+            setAnnouncements((items) => items.filter((item) => item !== newAnnouncement));
             announceTimersRef.current.delete(announcementKey);
-          }, durationSeconds * 1000);
+          }, deadline - Date.now());
           announceTimersRef.current.set(announcementKey, timer);
         }
-        if (boardSettings.soundEnabled) {
-          playAnnouncementSound(message);
+        if (snapshotReadyRef.current && showAnnouncementsRef.current && !currentCallRef.current &&
+            !displayTestRef.current && message.sound_enabled !== false) {
+          stopBoardAudio();
+          const voice = message.voice_text;
+          void playBoardAudio(voice ? () => voice : undefined);
         }
         break;
       }
@@ -692,102 +786,177 @@ export default function DisplayBoardUnified({
     }
   };
 
-  // Звуковые эффекты (новое)
-  const playCallSound = (message: WSMessage) => {
-    if (!boardSettings.soundEnabled) return;
-
-    try {
-      // Создаем звуковой сигнал с помощью Web Audio API
-      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      // Настройки звука вызова (приятный двойной сигнал)
-      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-      oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
-      oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
-
-      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.05);
-      gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.15);
-      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.2);
-      gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.4);
-
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.4);
-
-      logger.log(`🔊 Звуковой сигнал для пациента №${message.data?.number ?? ''}`);
-
-      // Голосовое объявление
-      if (boardSettings.voiceEnabled) {
-        // QUEUE-AUDIT-28 P0-9: PHI removed — patient name no longer spoken aloud.
-        // Раньше speechSynthesis произносил "Lastname F." в публичном зале ожидания.
-        const text = t('misc.dbu_voice_patient_call', { number: message.data?.number ?? '', cabinet: message.data?.cabinet || t('misc.dbu_voice_default_cabinet') });
-        playVoiceAnnouncement(text);
+  function stopBoardAudio() {
+    audioSequenceRef.current++;
+    const tone = activeToneRef.current;
+    if (tone) {
+      activeToneRef.current = null;
+      try {
+        tone.stop();
+      } catch {
+        // The oscillator may already have stopped.
       }
-    } catch (error) {
-      logger.error('Ошибка воспроизведения звука:', error);
     }
-  };
-
-  const playAnnouncementSound = (message: WSMessage) => {
-    if (!boardSettings.soundEnabled) return;
-
-    try {
-      let soundFile = '/sounds/announcement.mp3';
-
-      if (message.data?.announcement_type === 'warning') {
-        soundFile = '/sounds/warning-beep.mp3';
-      } else if (message.data?.announcement_type === 'emergency') {
-        soundFile = '/sounds/emergency-beep.mp3';
-      }
-
-      const audio = new Audio(soundFile);
-      audio.volume = 0.8;
-      audio.play().catch((playError) => logger.error('Ошибка воспроизведения звука объявления:', playError));
-
-      // Голосовое объявление
-      if (boardSettings.voiceEnabled && message.voice_text) {
-        playVoiceAnnouncement(message.voice_text);
-      }
-    } catch (error) {
-      logger.error('Ошибка воспроизведения звука объявления:', error);
+    if (activeSpeechRef.current) {
+      activeSpeechRef.current = null;
+      window.speechSynthesis?.cancel();
     }
-  };
+  }
 
-  const playVoiceAnnouncement = (text: string) => {
-    if (!boardSettings.voiceEnabled || !('speechSynthesis' in window)) return;
+  function callText(call: CurrentCall, voiceLanguage: VoiceLanguage) {
+    return t(call.cabinet ? 'misc.dbu_voice_patient_call' : 'misc.dbu_voice_call_no_cabinet', {
+      lng: voiceLocale(voiceLanguage), number: call.queue_number, cabinet: call.cabinet,
+    });
+  }
+
+  async function playBoardAudio(text?: (language: VoiceLanguage) => string): Promise<DisplayTestAudioStatus> {
+    const profile = audioProfileRef.current;
+    if (!profile) return 'unavailable';
+    if (!profile.enabled || soundOverrideRef.current === false || profile.volume === 0) return 'disabled';
+    const sequence = audioSequenceRef.current;
+    let signal: DisplayTestAudioStatus = 'unavailable';
 
     try {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'ru-RU';
+      const AudioContextClass = window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextClass) {
+        const context = audioContextRef.current ?? new AudioContextClass();
+        audioContextRef.current = context;
+        if (context.state !== 'running') {
+          signal = 'blocked';
+        } else {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          const start = context.currentTime;
+          oscillator.connect(gain);
+          gain.connect(context.destination);
+          oscillator.frequency.setValueAtTime(800, start);
+          oscillator.frequency.setValueAtTime(1000, start + 0.11);
+          gain.gain.setValueAtTime(0, start);
+          gain.gain.linearRampToValueAtTime(profile.volume * 0.3, start + 0.03);
+          gain.gain.linearRampToValueAtTime(0, start + 0.22);
+          activeToneRef.current = oscillator;
+          oscillator.onended = () => {
+            oscillator.disconnect();
+            gain.disconnect();
+            if (activeToneRef.current === oscillator) activeToneRef.current = null;
+          };
+          oscillator.start(start);
+          oscillator.stop(start + 0.23);
+          signal = 'started';
+        }
+      }
+    } catch {
+      signal = 'unavailable';
+    }
+
+    if (!text || !profile.voiceEnabled) return signal;
+    const synth = window.speechSynthesis;
+    if (!synth || !window.SpeechSynthesisUtterance) return 'unavailable';
+    const voice = synth.getVoices().find((candidate) => candidate.lang.split(/[-_]/)[0].toLowerCase() === profile.voiceLanguage);
+    if (!voice) return 'unavailable';
+    const locale = voiceLocale(profile.voiceLanguage);
+    if (!i18n.hasResourceBundle(locale, 'translation')) {
+      await profile.voiceReady;
+      if (!i18n.hasResourceBundle(locale, 'translation')) return 'unavailable';
+    }
+    if (signal === 'started') await new Promise((resolve) => setTimeout(resolve, 250));
+    if (sequence !== audioSequenceRef.current) return 'unavailable';
+
+    return new Promise((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(text(profile.voiceLanguage));
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
       utterance.rate = 0.9;
-      utterance.pitch = 1.0;
-      utterance.volume = 0.8;
-
-      speechSynthesis.speak(utterance);
-    } catch (error) {
-      logger.error('Ошибка голосового объявления:', error);
-    }
-  };
+      utterance.volume = profile.volume;
+      activeSpeechRef.current = utterance;
+      const finish = (result: DisplayTestAudioStatus) => {
+        clearTimeout(timeout);
+        resolve(result);
+      };
+      const timeout = setTimeout(() => {
+        if (activeSpeechRef.current === utterance) {
+          activeSpeechRef.current = null;
+          synth.cancel();
+        }
+        finish('unavailable');
+      }, 1000);
+      utterance.onstart = () => finish('started');
+      utterance.onend = () => {
+        if (activeSpeechRef.current === utterance) activeSpeechRef.current = null;
+        finish('started');
+      };
+      utterance.onerror = (event) => {
+        if (activeSpeechRef.current === utterance) activeSpeechRef.current = null;
+        finish(event.error === 'not-allowed' ? 'blocked' : 'unavailable');
+      };
+      try {
+        synth.speak(utterance);
+      } catch {
+        if (activeSpeechRef.current === utterance) activeSpeechRef.current = null;
+        finish('unavailable');
+      }
+    });
+  }
 
   loadBoardStateRef.current = loadBoardState;
   loadWindowsRef.current = loadWindows;
   connectWebSocketRef.current = connectWebSocket;
 
-  // Звук при смене номера (старое)
+  const liveData = online && connected && snapshotReady;
+  const liveCall = liveData ? currentCall : null;
+  const playTestAudioRef = useRef<(test: DisplayTest) => Promise<DisplayTestAudioStatus>>(async () => 'unavailable');
+  playTestAudioRef.current = (test) => {
+    stopBoardAudio();
+    const call = test.call;
+    return playBoardAudio(call
+      ? (language) => callText(call, language)
+      : (language) => t('misc.dbu_test_announcement', { lng: voiceLocale(language) }));
+  };
+
   useEffect(() => {
-    const prev = Number(lastTicketRef.current || 0);
-    const cur = Number(stats.last_ticket || 0);
-    if (cur && cur !== prev && boardSettings.soundEnabled) playBeep();
-    lastTicketRef.current = cur;
-  }, [stats.last_ticket, boardSettings.soundEnabled]);
+    if (!displayTest || !liveData) return;
+    let audioDeadline: ReturnType<typeof setTimeout> | undefined;
+    const frame = requestAnimationFrame(() => {
+      if (document.hidden || displayTest.expiresAt <= Date.now()) return;
+      const timeout = new Promise<DisplayTestAudioStatus>((resolve) => {
+        audioDeadline = setTimeout(() => resolve('unavailable'), 1500);
+      });
+      const audio = playTestAudioRef.current(displayTest).catch((): DisplayTestAudioStatus => 'unavailable');
+      void Promise.race([audio, timeout]).then((audioStatus) => {
+        clearTimeout(audioDeadline);
+        if (document.hidden) return;
+        if (displayTestRef.current === displayTest && displayTest.expiresAt > Date.now()) {
+          displayTest.reply({
+            test_id: displayTest.id, status: 'displayed', audio_status: audioStatus,
+          });
+        }
+      });
+    });
+    const expiration = setTimeout(() => {
+      if (displayTestRef.current === displayTest) {
+        displayTestRef.current = null;
+        setDisplayTest(null);
+        stopBoardAudio();
+      }
+    }, Math.max(0, displayTest.expiresAt - Date.now()));
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(expiration);
+      clearTimeout(audioDeadline);
+    };
+  }, [displayTest, liveData]);
 
   // Инициализация
   useEffect(() => {
+    setHasSnapshot(false);
+    setQueueData([]);
+    setStats(null);
+    setAnnouncements([]);
+    setSnapshotError('');
+    latestCallOrderRef.current = '';
+    audioProfileRef.current = null;
+    window.speechSynthesis?.getVoices();
     const params = new URLSearchParams(window.location.search);
     const forgetDeviceRequested = params.get('forget-device') === '1';
     const hasStaffToken = Boolean(tokenManager.getAccessToken());
@@ -848,11 +1017,16 @@ export default function DisplayBoardUnified({
     const tw = setInterval(() => loadWindowsRef.current(), windowsIntervalMs);
 
     return () => {
+      invalidateBoardStateRequests();
       if (tb) clearInterval(tb);
       if (tw) clearInterval(tw);
       clearInterval(clock);
       clearCallExpiry();
       clearAnnounceTimers();
+      stopBoardAudio();
+      const context = audioContextRef.current;
+      audioContextRef.current = null;
+      if (context) void context.close().catch(() => {});
       if (wsRef.current) {
         const closeWS = wsRef.current;
         wsRef.current = null;
@@ -864,12 +1038,20 @@ export default function DisplayBoardUnified({
         }
       }
     };
-  }, [isBoardView, qs.department, qs.d, refreshMs, currentBoardId]);
+  }, [isBoardView, qs.department, qs.d, refreshMs, currentBoardId, invalidateBoardStateRequests]);
 
   // Online/offline (старое)
   useEffect(() => {
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
+    const on = () => {
+      setOnline(true);
+      connectWebSocketRef.current();
+    };
+    const off = () => {
+      setOnline(false);
+      snapshotReadyRef.current = false;
+      setSnapshotReady(false);
+      stopBoardAudio();
+    };
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
     setOnline(navigator.onLine);
@@ -892,10 +1074,18 @@ export default function DisplayBoardUnified({
   // DISPLAYAUDIO-FE-001: ручное решение живёт в ref — опрос /board/state
   // больше не перезатирает мьют оператора бэкенд-дефолтом.
   const toggleSound = () => {
-    setBoardSettings((prev) => {
-      soundOverrideRef.current = !prev.soundEnabled;
-      return { ...prev, soundEnabled: !prev.soundEnabled };
-    });
+    const profile = audioProfileRef.current;
+    if (!profile?.enabled || profile.volume === 0) return;
+    const context = audioContextRef.current;
+    if (context?.state === 'suspended' && boardSettings.soundEnabled) {
+      void context.resume().catch(() => {});
+      return;
+    }
+    const enabled = !boardSettings.soundEnabled;
+    soundOverrideRef.current = enabled;
+    if (enabled && context) void context.resume().catch(() => {});
+    if (!enabled) stopBoardAudio();
+    setBoardSettings((prev) => ({ ...prev, soundEnabled: enabled }));
   };
 
   // Переключение контрастного режима (старое)
@@ -932,17 +1122,6 @@ export default function DisplayBoardUnified({
 
 
 
-
-  // Воспроизведение звука (старое)
-  function playBeep() {
-    try {
-      const audio = new Audio('/sounds/beep.mp3');
-      audio.volume = 0.5;
-      audio.play().catch((playError) => logger.error('Ошибка воспроизведения сигнала:', playError));
-    } catch (error) {
-      logger.error('Ошибка воспроизведения звука:', error);
-    }
-  }
 
   // Получение цвета статуса (новое) — цвета теперь декларированы в displayboard.css
   // через [data-status="..."] селекторы на .displayboard-queue-card. Эта обертка
@@ -1088,9 +1267,10 @@ export default function DisplayBoardUnified({
         <div className="displayboard-flex-center-20">
           {/* Статус соединения */}
           <div className="displayboard-flex-center-8">
-            {connected ? <Wifi size={20} color="var(--mac-success)" /> : <WifiOff size={20} color="#dc3545" />}
+            {liveData ? <Wifi size={20} color="var(--mac-success)" /> : <WifiOff size={20} color="var(--mac-error)" />}
             <span className="displayboard-conn-status">
-              {connected ? t('misc.dbu_conn_connected') : t('misc.dbu_conn_disconnected')}
+              {liveData ? t('misc.dbu_conn_connected') :
+                connected ? t('misc.dbu_awaiting_data') : t('misc.dbu_conn_disconnected')}
             </span>
           </div>
 
@@ -1155,7 +1335,7 @@ export default function DisplayBoardUnified({
           WS initial_state при реконнекте. Пока WS лежит после успешной
           сессии — показываем заметный баннер вместо молчаливой выдачи
           возможно устаревших строк как живых. */}
-      {!connected && wsEverConnected &&
+      {!liveData && hasSnapshot &&
       <div className="displayboard-banner displayboard-banner--warning" data-testid="dbu-stale-banner">
           {t('misc.dbu_stale_ws_banner')}
         </div>
@@ -1190,23 +1370,23 @@ export default function DisplayBoardUnified({
       }
 
       {/* Текущий вызов */}
-      <div className={`displayboard-current-call${currentCall ? ' displayboard-current-call--active' : ''}`}>
-        {currentCall ?
+      <div className={`displayboard-current-call${liveCall ? ' displayboard-current-call--active' : ''}`}>
+        {liveCall ?
         <div>
             <div className="displayboard-call-number">
-              № {currentCall.queue_number}
+              № {liveCall.queue_number}
             </div>
             {/* RQ-24.a.1: тот же PHI-гейт, что и у строк очереди */}
             {boardSettings.showPatientNames !== 'none' &&
             <div className="displayboard-call-patient">
-              {currentCall.patient_name}
+              {liveCall.patient_name}
             </div>}
             <div className="displayboard-call-doctor">
-              👨‍⚕️ {currentCall.doctor_name}
+              👨‍⚕️ {liveCall.doctor_name}
             </div>
-            {currentCall.cabinet &&
+            {liveCall.cabinet &&
           <div className="displayboard-call-cabinet">
-                🚪 {currentCall.cabinet}
+                🚪 {liveCall.cabinet}
               </div>
           }
           </div> :
@@ -1214,18 +1394,25 @@ export default function DisplayBoardUnified({
         <div>
             <Monitor size={64} className="displayboard-no-call-icon" />
             <div className="displayboard-no-call-title">
-              {tBoard('now_serving', boardSettings.language)}
-            </div>
-            <div className="displayboard-no-call-ticket">
-              {stats.last_ticket || 0}
+              {!liveData ? t('misc.dbu_awaiting_data') : callStateAvailable
+                ? t('misc.dbu_no_active_call') : t('misc.dbu_call_unavailable')}
             </div>
           </div>
         }
       </div>
 
+      {liveData && displayTest && !liveCall &&
+        <div className="displayboard-banner displayboard-banner--info" role="status" data-testid="display-board-test">
+          <strong>{t('misc.dbu_test_label')}</strong>{' '}
+          {displayTest.call
+            ? t('misc.dbu_test_call', { number: displayTest.call.queue_number, cabinet: displayTest.call.cabinet })
+            : t('misc.dbu_test_announcement')}
+        </div>
+      }
+
       {/* Объявления: DISPLAYOPTIONS-FE-001 — show_announcements табло
           управляет показом; DISPLAYANNOUNCE-FE-001 — истёкшие уходят. */}
-      {boardSettings.showAnnouncements && announcements.length > 0 &&
+      {liveData && boardSettings.showAnnouncements && announcements.length > 0 &&
       <div className="displayboard-announcements-wrap">
           {announcements.map((announcement) =>
         <div
@@ -1314,50 +1501,23 @@ export default function DisplayBoardUnified({
         </div>
       }
 
-      {/* Статистика */}
-      <div className="displayboard-stats-grid">
-        <div className="displayboard-stat-card">
-          <div className="displayboard-stat-value-lg">
-            {queueData.length}
+      {/* Статистика по выбранному отделению */}
+      {liveData && stats &&
+        <div className="displayboard-stats-grid">
+          <div className="displayboard-stat-card">
+            <div className="displayboard-stat-value-md">{stats.waiting}</div>
+            <div className="displayboard-stat-label">{t('misc.dbu_stat_waiting')}</div>
           </div>
-          <div className="displayboard-stat-label">{t('misc.dbu_stat_total')}</div>
-        </div>
-
-        <div className="displayboard-stat-card">
-          <div className="displayboard-stat-value-lg">
-            {queueData.filter((e) => e.status === 'waiting').length}
+          <div className="displayboard-stat-card">
+            <div className="displayboard-stat-value-md">{stats.serving}</div>
+            <div className="displayboard-stat-label">{t('misc.dbu_stat_serving')}</div>
           </div>
-          <div className="displayboard-stat-label">{t('misc.dbu_stat_waiting')}</div>
-        </div>
-
-        <div className="displayboard-stat-card">
-          <div className="displayboard-stat-value-md">
-            {formatRegistrarTime(new Date().toISOString())}
+          <div className="displayboard-stat-card">
+            <div className="displayboard-stat-value-md">{stats.done}</div>
+            <div className="displayboard-stat-label">{t('misc.dbu_stat_done')}</div>
           </div>
-          <div className="displayboard-stat-label">{t('misc.dbu_stat_current_time')}</div>
         </div>
-
-        <div className="displayboard-stat-card">
-          <div className="displayboard-stat-value-md">
-            {stats.waiting}
-          </div>
-          <div className="displayboard-stat-label">{t('misc.dbu_stat_waiting_legacy')}</div>
-        </div>
-
-        <div className="displayboard-stat-card">
-          <div className="displayboard-stat-value-md">
-            {stats.serving}
-          </div>
-          <div className="displayboard-stat-label">{t('misc.dbu_stat_serving')}</div>
-        </div>
-
-        <div className="displayboard-stat-card">
-          <div className="displayboard-stat-value-md">
-            {stats.done}
-          </div>
-          <div className="displayboard-stat-label">{t('misc.dbu_stat_done')}</div>
-        </div>
-      </div>
+      }
 
       {/* Объявление внизу */}
       {(getAnnouncement(board, boardSettings.language) || announcement) &&

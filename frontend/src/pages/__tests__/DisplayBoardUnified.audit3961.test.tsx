@@ -2,6 +2,7 @@ import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DisplayTestReply } from '../../api/ws';
 
 const wsMock = vi.hoisted(() => ({
   openDisplayBoardWS: vi.fn(),
@@ -45,20 +46,22 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
-  const renderBoard = async (props: Record<string, unknown> = {}) => {
+  const renderBoard = async (props: Record<string, unknown> = {}, settings: Record<string, unknown> = {}) => {
     apiMock.api.get.mockResolvedValue({
       data: {
         department: 'Reg',
         date_str: '2026-05-23',
         is_open: true,
         last_ticket: 0,
+        ...settings,
       },
     });
-    let wsMessageHandler: ((data: unknown) => void) | null = null;
+    let wsMessageHandler: ((data: unknown, reply?: DisplayTestReply) => void) | null = null;
     wsMock.openDisplayBoardWS.mockImplementation(
-      (_boardId: string, onMessage: (data: unknown) => void, onConnect?: () => void) => {
+      (_boardId: string, onMessage: (data: unknown, reply?: DisplayTestReply) => void, onConnect?: () => void) => {
         wsMessageHandler = onMessage;
         onConnect?.();
         return vi.fn();
@@ -76,9 +79,11 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
     await waitFor(() => {
       expect(apiMock.api.get).toHaveBeenCalled();
     });
+    const push = (msg: unknown, reply?: DisplayTestReply) => act(() => { wsMessageHandler!(msg, reply); });
+    push({ type: 'initial_state', data: { queue_entries: [], current_call: null } });
     return {
       view,
-      push: (msg: unknown) => act(() => { wsMessageHandler!(msg); }),
+      push,
     };
   };
 
@@ -89,7 +94,8 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
 
     push({
       type: 'patient_call',
-      data: { queue_number: 11, patient_name: 'Synthetic Patient 11', display_duration: 5 },
+      display_duration: 5,
+      data: { queue_number: 11, queue_id: 1, queue_entry_id: 11 },
     });
     const callNumber = () => screen.getByText(/№\s*11/);
     expect(callNumber()).toBeInTheDocument();
@@ -107,7 +113,15 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
 
     push({
       type: 'patient_call',
-      data: { queue_number: 11, patient_name: 'Synthetic Patient 11', display_duration: 300 },
+      display_duration: 300,
+      data: { queue_number: 11, queue_id: 1, queue_entry_id: 11 },
+    });
+    expect(screen.getByText(/№\s*11/)).toBeInTheDocument();
+
+    push({
+      type: 'queue_update',
+      event_type: 'queue.completed',
+      data: { queue_id: 2, queue_entries: [{ id: 22, queue_id: 2, number: 11, status: 'served' }] },
     });
     expect(screen.getByText(/№\s*11/)).toBeInTheDocument();
 
@@ -126,6 +140,85 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
     expect(screen.queryByText(/№\s*11/)).not.toBeInTheDocument();
   });
 
+  it('keeps the expiration timer when a different queue completes the same ticket number', async () => {
+    const { push } = await renderBoard();
+    push({
+      type: 'patient_call',
+      data: { queue_id: 1, queue_entry_id: 11, queue_number: 5, expires_at: new Date(Date.now() + 5000).toISOString() },
+    });
+    push({
+      type: 'queue_update',
+      data: { queue_id: 2, queue_entries: [{ id: 22, queue_id: 2, number: 5, status: 'completed' }] },
+    });
+    expect(screen.getByText(/№\s*5/)).toBeInTheDocument();
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(screen.queryByText(/№\s*5/)).not.toBeInTheDocument();
+  });
+
+  it.each([['ru', 'ru-RU'], ['uz', 'uz-UZ']])(
+    'restores silently and voices a live call in %s with the profile volume',
+    async (voiceLanguage, voiceLocale) => {
+      const speak = vi.fn((utterance: { onstart?: () => void }) => utterance.onstart?.());
+      vi.stubGlobal('speechSynthesis', { getVoices: () => [{ lang: voiceLocale }], speak, cancel: vi.fn() });
+      vi.stubGlobal('SpeechSynthesisUtterance', class {
+        constructor(public text: string) {}
+      });
+      const { push } = await renderBoard({}, {
+        sound_enabled: true, voice_announcements: true, voice_language: voiceLanguage, volume_level: 25,
+      });
+      const deadline = new Date(Date.now() + 5000).toISOString();
+      push({
+        type: 'initial_state',
+        data: { queue_entries: [], current_call: {
+          queue_number: 7, cabinet: '701', expires_at: deadline,
+        } },
+      });
+      expect(screen.getByText(/№\s*7/)).toBeInTheDocument();
+      expect(speak).not.toHaveBeenCalled();
+      act(() => { vi.advanceTimersByTime(5000); });
+      expect(screen.queryByText(/№\s*7/)).not.toBeInTheDocument();
+
+      const invitation = {
+        type: 'patient_call',
+        data: {
+          queue_number: 11, cabinet: '801', event_id: 'event-11', issued_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 6000).toISOString(),
+        },
+      };
+      push(invitation);
+      push(invitation);
+      expect(screen.getByText(/№\s*11/)).toBeInTheDocument();
+      await waitFor(() => expect(speak).toHaveBeenCalledTimes(1), { timeout: 5000 });
+      expect(speak).toHaveBeenCalledWith(expect.objectContaining({
+        text: expect.stringMatching(voiceLanguage === 'uz' ? /11-raqamli talon.*801/ : /Талон номер 11.*801/),
+        lang: voiceLocale,
+        volume: 0.25,
+      }));
+    },
+  );
+
+  it('acknowledges a visibly rendered test and yields to an active clinical call', async () => {
+    const { push } = await renderBoard({}, { sound_enabled: false });
+    const reply = vi.fn();
+    const makeTest = (id: string) => ({
+      type: 'display_test',
+      data: {
+        test_id: id, test_type: 'call', queue_number: 'T007', cabinet: '101',
+        expires_at: new Date(Date.now() + 5000).toISOString(),
+      },
+    });
+    push(makeTest('test-one'), reply);
+    expect(screen.getByTestId('display-board-test')).toHaveTextContent('T007');
+    await act(async () => { await vi.advanceTimersByTimeAsync(40); });
+    expect(reply).toHaveBeenCalledWith({ test_id: 'test-one', status: 'displayed', audio_status: 'disabled' });
+
+    push({ type: 'patient_call', data: { queue_number: 9, cabinet: '702' } });
+    expect(screen.queryByTestId('display-board-test')).not.toBeInTheDocument();
+    push(makeTest('test-two'), reply);
+    expect(reply).toHaveBeenCalledWith({ test_id: 'test-two', status: 'busy' });
+    expect(screen.getByText(/№\s*9/)).toBeInTheDocument();
+  });
+
   // DISPLAYANNOUNCE-FE-001: each announcement lives its requested
   // display_duration window, independently of newer events.
   it('removes an announcement when its display_duration passes', async () => {
@@ -133,7 +226,8 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
 
     push({
       type: 'announcement',
-      data: { text: 'Synthetic warning', announcement_type: 'warning', created_at: 'a1', display_duration: 5 },
+      display_duration: 5,
+      data: { text: 'Synthetic warning', announcement_type: 'warning', created_at: 'a1' },
     });
     push({
       type: 'announcement',

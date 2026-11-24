@@ -48,6 +48,8 @@ def test_board_state_is_stats_only_contract(client, db_session):
         "show_announcements": True,
         "voice_announcements": False,
         "sound_enabled": True,
+        "voice_language": "ru",
+        "volume_level": 70,
     }
     assert "queue_entries" not in payload
     assert "current_call" not in payload

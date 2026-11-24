@@ -67,7 +67,7 @@ def test_board_param_returns_that_boards_settings(client, db_session):
     """?board=waiting_room_1 returns THAT board's privacy + presentation
     settings, not main_board's."""
     day = datetime.now(UTC).date().isoformat()
-    _make_board(db_session, "waiting_room_1")
+    _make_board(db_session, "waiting_room_1", voice_language="uz", volume_level=25)
     _make_board(db_session, "main_board", show_patient_names="none")
     db_session.commit()
 
@@ -83,6 +83,8 @@ def test_board_param_returns_that_boards_settings(client, db_session):
     assert payload["show_announcements"] is False
     assert payload["voice_announcements"] is True
     assert payload["sound_enabled"] is True
+    assert payload["voice_language"] == "uz"
+    assert payload["volume_level"] == 25
     assert payload["stats_available"] is True
 
 

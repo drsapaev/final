@@ -100,8 +100,8 @@ def handshake_env(monkeypatch):
             self.connected: list[dict] = []
             self.disconnected: list[str] = []
 
-        async def connect(self, websocket, board_id, user=None):
-            self.connected.append({"board_id": board_id, "user": user})
+        async def connect(self, websocket, board_id, user=None, *, device_id=None):
+            self.connected.append({"board_id": board_id, "user": user, "device_id": device_id})
 
         async def disconnect(self, websocket, board_id):
             self.disconnected.append(board_id)
@@ -543,6 +543,7 @@ def test_device_board_socket_closes_after_device_revocation(handshake_env, monke
 
     assert len(handshake_env.manager.connected) == 1
     assert handshake_env.manager.connected[0]["user"] is None
+    assert handshake_env.manager.connected[0]["device_id"] == device_id
     assert handshake_env.manager.disconnected == [board_name]
     assert ws.closes and ws.closes[-1][0] == 1008
     assert "expired or revoked" in (ws.closes[-1][1] or "")

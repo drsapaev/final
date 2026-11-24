@@ -16,6 +16,7 @@ import { api } from '@/api/client';
 
 const syntheticBoard = {
   id: 'main_board',
+  name: 'main_board',
   display_name: 'Синтетическое табло',
   location: 'Synthetic Hall',
   theme: 'light',
@@ -35,13 +36,22 @@ vi.mock('@/api/client', () => {
   const apiMock = {
     get: vi.fn((url: string) => {
       if (url === '/admin/display/boards') {
-        return Promise.resolve({ status: 200, data: [syntheticBoard] });
+        return Promise.resolve({ status: 200, data: [
+          syntheticBoard,
+          { ...syntheticBoard, id: 2, name: 'synthetic-room', display_name: 'Синтетический кабинет' },
+        ] });
       }
       if (url === '/admin/display/themes') {
         return Promise.resolve({ status: 200, data: [] });
       }
       if (url === '/admin/display/stats') {
-        return Promise.resolve({ status: 200, data: {} });
+        return Promise.resolve({ status: 200, data: { total_boards: 2, total_calls_today: null, uptime_percentage: null } });
+      }
+      if (url === '/admin/display/boards/2/devices') {
+        return Promise.resolve({ status: 200, data: [
+          { id: 51, device_name: 'Синтетический монитор', status: 'active' },
+          { id: 52, device_name: 'Отозванный монитор', status: 'revoked' },
+        ] });
       }
       return Promise.resolve({ status: 200, data: [] });
     }),
@@ -111,5 +121,28 @@ describe('DisplayBoardSettings privacy contract (QR-FE-013)', () => {
     // boolean false for every choice and the backend rejects booleans (422).
     expect(body.show_patient_names).toBe(value);
     expect(body.show_patient_names).not.toBe(false);
+  });
+
+  it('tests only the chosen device and reports the actual acknowledgment', async () => {
+    await renderScreen();
+    expect(screen.getAllByText('Данные пока не собираются')).toHaveLength(2);
+    await userEvent.click(screen.getByRole('button', { name: 'Профиль табло' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Синтетический кабинет' }));
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/admin/display/boards/2/devices'));
+    await userEvent.click(screen.getByRole('button', { name: 'Монитор для теста' }));
+    expect(screen.queryByRole('option', { name: 'Отозванный монитор' })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('option', { name: 'Синтетический монитор' }));
+
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { status: 'unconfirmed' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Тест вызова' }));
+    expect(api.post).toHaveBeenCalledWith('/admin/display/boards/2/test', {
+      device_id: 51, test_type: 'call',
+    });
+    expect(await screen.findByText('Подтверждение не получено')).toBeInTheDocument();
+
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { status: 'displayed', audio_status: 'blocked' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Тест вызова' }));
+    expect(await screen.findByText('Показ подтверждён')).toBeInTheDocument();
+    expect(screen.getByText('Браузер заблокировал звук')).toBeInTheDocument();
   });
 });

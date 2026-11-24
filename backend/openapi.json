@@ -36023,7 +36023,7 @@
           "admin"
         ],
         "summary": "Test Display Board",
-        "description": "Тестировать табло",
+        "description": "Проверить выбранное зарегистрированное устройство.",
         "operationId": "test_display_board_api_v1_admin_display_boards__board_id__test_post",
         "security": [
           {
@@ -36057,9 +36057,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Test Display Board Api V1 Admin Display Boards  Board Id  Test Post"
+                  "$ref": "#/components/schemas/DisplayTestResponse"
                 }
               }
             }
@@ -36108,9 +36106,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Display Stats Api V1 Admin Display Stats Get"
+                  "$ref": "#/components/schemas/DisplayStatsResponse"
                 }
               }
             }
@@ -88142,36 +88138,169 @@
         "type": "object",
         "title": "DisplayBoardUpdate"
       },
-      "DisplayTestRequest": {
+      "DisplayProfileStats": {
         "properties": {
-          "test_type": {
-            "type": "string",
-            "maxLength": 50,
-            "title": "Test Type",
-            "description": "Test type: call, announcement, etc.",
-            "default": "call"
-          },
-          "board_ids": {
+          "calls": {
             "anyOf": [
               {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array",
-                "maxItems": 50
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Board Ids",
-            "description": "Specific board IDs to test"
+            "title": "Calls"
+          },
+          "announcements": {
+            "type": "integer",
+            "title": "Announcements"
+          },
+          "uptime": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uptime"
           }
         },
-        "additionalProperties": true,
         "type": "object",
+        "required": [
+          "calls",
+          "announcements",
+          "uptime"
+        ],
+        "title": "DisplayProfileStats"
+      },
+      "DisplayStatsResponse": {
+        "properties": {
+          "total_boards": {
+            "type": "integer",
+            "title": "Total Boards"
+          },
+          "active_boards": {
+            "type": "integer",
+            "title": "Active Boards"
+          },
+          "total_calls_today": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Calls Today"
+          },
+          "total_announcements": {
+            "type": "integer",
+            "title": "Total Announcements"
+          },
+          "total_banners": {
+            "type": "integer",
+            "title": "Total Banners"
+          },
+          "uptime_percentage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uptime Percentage"
+          },
+          "by_board": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DisplayProfileStats"
+            },
+            "type": "object",
+            "title": "By Board"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_boards",
+          "active_boards",
+          "total_calls_today",
+          "total_announcements",
+          "total_banners",
+          "uptime_percentage",
+          "by_board"
+        ],
+        "title": "DisplayStatsResponse"
+      },
+      "DisplayTestRequest": {
+        "properties": {
+          "device_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Device Id"
+          },
+          "test_type": {
+            "type": "string",
+            "enum": [
+              "call",
+              "announcement"
+            ],
+            "title": "Test Type",
+            "default": "call"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device_id"
+        ],
         "title": "DisplayTestRequest",
         "description": "Request body for POST /display/boards/{board_id}/test."
+      },
+      "DisplayTestResponse": {
+        "properties": {
+          "test_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Test Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "displayed",
+              "busy",
+              "unconfirmed",
+              "dispatch_failed"
+            ],
+            "title": "Status"
+          },
+          "audio_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "started",
+                  "blocked",
+                  "disabled",
+                  "unavailable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "test_id",
+          "status"
+        ],
+        "title": "DisplayTestResponse"
       },
       "DoctorContext": {
         "properties": {

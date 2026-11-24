@@ -11425,7 +11425,7 @@ export type paths = {
         put?: never;
         /**
          * Test Display Board
-         * @description Тестировать табло
+         * @description Проверить выбранное зарегистрированное устройство.
          */
         post: operations["test_display_board_api_v1_admin_display_boards__board_id__test_post"];
         delete?: never;
@@ -28691,24 +28691,62 @@ export type components = {
             /** Active */
             active?: boolean | null;
         };
+        /** DisplayProfileStats */
+        DisplayProfileStats: {
+            /** Calls */
+            calls: number | null;
+            /** Announcements */
+            announcements: number;
+            /** Uptime */
+            uptime: number | null;
+        };
+        /** DisplayStatsResponse */
+        DisplayStatsResponse: {
+            /** Total Boards */
+            total_boards: number;
+            /** Active Boards */
+            active_boards: number;
+            /** Total Calls Today */
+            total_calls_today: number | null;
+            /** Total Announcements */
+            total_announcements: number;
+            /** Total Banners */
+            total_banners: number;
+            /** Uptime Percentage */
+            uptime_percentage: number | null;
+            /** By Board */
+            by_board: {
+                [key: string]: components["schemas"]["DisplayProfileStats"];
+            };
+        };
         /**
          * DisplayTestRequest
          * @description Request body for POST /display/boards/{board_id}/test.
          */
         DisplayTestRequest: {
+            /** Device Id */
+            device_id: number;
             /**
              * Test Type
-             * @description Test type: call, announcement, etc.
              * @default call
+             * @enum {string}
              */
-            test_type: string;
+            test_type: "call" | "announcement";
+        };
+        /** DisplayTestResponse */
+        DisplayTestResponse: {
             /**
-             * Board Ids
-             * @description Specific board IDs to test
+             * Test Id
+             * Format: uuid
              */
-            board_ids?: number[] | null;
-        } & {
-            [key: string]: unknown;
+            test_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "displayed" | "busy" | "unconfirmed" | "dispatch_failed";
+            /** Audio Status */
+            audio_status?: ("started" | "blocked" | "disabled" | "unavailable") | null;
         };
         /**
          * DoctorContext
@@ -67182,9 +67220,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DisplayTestResponse"];
                 };
             };
             /** @description Validation Error */
@@ -67215,9 +67251,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DisplayStatsResponse"];
                 };
             };
             /** @description Validation Error */
