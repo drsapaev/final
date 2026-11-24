@@ -305,6 +305,7 @@ const uzCyrl = {
     threshold_label: 'Порог',
     flag_unsaved: 'қоралама',
     flag_unsaved_title: 'Байрақча охирги сақланган қийматга тегишли',
+    instrument_flags: 'Анализатор огоҳлантиришлари · {codes}',
     save_saving: "Сақланмоқда…",
     save_changed: "Сақланмаган ўзгаришлар",
     save_saved: "{{time}} да сақланди",

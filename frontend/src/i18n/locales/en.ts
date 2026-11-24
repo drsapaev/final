@@ -292,6 +292,7 @@ const en = {
     threshold_label: 'Порог',
     flag_unsaved: 'draft',
     flag_unsaved_title: 'The flag refers to the last saved value',
+    instrument_flags: 'Analyzer warnings · {codes}',
     save_saving: "Saving…",
     save_changed: "Unsaved changes",
     save_saved: "Saved at {{time}}",

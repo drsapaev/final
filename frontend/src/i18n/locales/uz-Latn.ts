@@ -300,6 +300,7 @@ const uzLatn = {
     threshold_label: 'Chegara',
     flag_unsaved: 'qoralama',
     flag_unsaved_title: 'Bayroqcha oxirgi saqlangan qiymatga tegishli',
+    instrument_flags: 'Analizator ogohlantirishlari · {codes}',
     save_saving: "Saqlanmoqda…",
     save_changed: "Saqlanmagan o‘zgarishlar",
     save_saved: "{{time}} da saqlandi",

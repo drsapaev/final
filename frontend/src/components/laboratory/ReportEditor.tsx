@@ -56,6 +56,7 @@ interface LabReportField {
   method_code?: string | null;
   evaluation_status?: string | null;
   interpretation?: string | null;
+  instrument_flags?: string[];
   absence_reason?: string | null;
   evaluation_snapshot?: { method?: string | null; method_code?: string | null };
 }
@@ -289,6 +290,8 @@ export default function ReportEditor({
                 const canRecordAbsence = field.evaluation_status != null;
                 const isValueDirty = currentValue !== (acceptedValues?.[field.field_key] ?? extractFieldValue(field))
                   || absenceReason !== (field.absence_reason ?? '');
+                const instrumentFlags = field.instrument_flags ?? [];
+                const showInstrumentFlags = !isValueDirty && instrumentFlags.length > 0;
                 const threshold = formatThreshold(field.resolved_flag_meta);
                 const previous = previousFields.get(field.field_key);
                 const previousValue = previous?.value_display || (previous ? extractFieldValue(previous) : '');
@@ -302,6 +305,7 @@ export default function ReportEditor({
                 const descriptionIds = [
                   field.required && `${inputId}-required`,
                   `${inputId}-reference`,
+                  showInstrumentFlags && `${inputId}-instrument-flags`,
                   numericFormatInvalid && `${inputId}-error`,
                 ].filter(Boolean).join(' ');
                 const inputProps = {
@@ -363,6 +367,11 @@ export default function ReportEditor({
                         <Badge style={assessmentBadgeStyle} variant={flagVariant(field.interpretation || field.resolved_flag || '', field.resolved_flag_severity ?? null)}>
                           {t(getEvaluationLabelKey(field))}
                         </Badge>
+                      )}
+                      {showInstrumentFlags && (
+                        <p id={`${inputId}-instrument-flags`} className="lab-result-instrument-flags">
+                          {t('workbench.instrument_flags', { codes: instrumentFlags.join(', ') })}
+                        </p>
                       )}
                     </div>
                     <div className="lab-result-previous">

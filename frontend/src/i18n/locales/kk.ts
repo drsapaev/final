@@ -292,6 +292,7 @@ const kk = {
     threshold_label: 'Порог',
     flag_unsaved: 'жоба',
     flag_unsaved_title: 'Белгі соңғы сақталған мәнге қатысты',
+    instrument_flags: 'Анализатор ескертулері · {codes}',
     save_saving: "Сақталуда…",
     save_changed: "Сақталмаған өзгерістер",
     save_saved: "{{time}} кезінде сақталды",

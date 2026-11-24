@@ -86,9 +86,14 @@
 .lab-result-unit,
 .lab-result-reference,
 .lab-result-previous,
+.lab-result-instrument-flags,
 .lab-result-details {
   color: var(--mac-text-secondary, CanvasText);
   font-size: var(--mac-font-size-xs, 0.75rem);
+}
+
+.lab-result-instrument-flags {
+  margin: var(--mac-spacing-1, 0.25rem) 0 0;
 }
 
 .lab-result-error {

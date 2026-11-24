@@ -345,6 +345,7 @@ const ru = {
     threshold_label: 'Порог',
     flag_unsaved: 'черновик',
     flag_unsaved_title: 'Флаг относится к последнему сохранённому значению',
+    instrument_flags: 'Предупреждения анализатора · {codes}',
     save_saving: "Сохраняется…",
     save_changed: "Несохранённые изменения",
     save_saved: "Сохранено в {{time}}",
