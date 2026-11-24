@@ -636,8 +636,23 @@ export default function LabPanel() {
     try {
       let worklist: LabWorklistPage | null = null;
       if (worklistAvailableRef.current) {
+        const query = worklistQueryRef.current;
+        const loadedDepth = appointmentsRef.current.length;
         try {
-          worklist = await labReportingApi.listWorklist(worklistQueryRef.current, { signal: controller.signal });
+          const firstPage = await labReportingApi.listWorklist(query, { signal: controller.signal });
+          const entries = new Map(firstPage.entries.map((entry) => [entry.id, entry]));
+          let remaining = loadedDepth - firstPage.entries.length;
+          let cursor = firstPage.next_cursor;
+          // Refresh the loaded window before replacing its visible rows. A
+          // query change clears the window and still needs only the first page.
+          while (cursor != null && remaining > 0) {
+            if (queueGenerationRef.current !== generation) return;
+            const page = await labReportingApi.listWorklist(query, { cursor, signal: controller.signal });
+            page.entries.forEach((entry) => entries.set(entry.id, entry));
+            remaining -= page.entries.length;
+            cursor = page.next_cursor;
+          }
+          worklist = { ...firstPage, entries: [...entries.values()], next_cursor: cursor };
         } catch (error) {
           if (queueGenerationRef.current !== generation) return;
           const status = (error as { status?: number } | null)?.status;

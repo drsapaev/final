@@ -25,6 +25,9 @@ import { ThemeProvider } from '../../contexts/ThemeContext';
 import { LabDirtyGuardProvider } from '../../components/laboratory/LabDirtyGuardContext';
 
 const listQueueTodayMock = vi.hoisted(() => vi.fn());
+const listWorklistMock = vi.hoisted(() => vi.fn(async (_query: unknown, _options?: { cursor?: string }): Promise<unknown> => {
+  throw Object.assign(new Error('Worklist unavailable'), { status: 404 });
+}));
 const forceRefreshTokenMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../api/client', async (importOriginal) => {
@@ -38,6 +41,7 @@ vi.mock('../../api/client', async (importOriginal) => {
 vi.mock('../../api/labReporting', () => ({
   labReportingApi: {
     listQueueToday: listQueueTodayMock,
+    listWorklist: listWorklistMock,
     listTemplates: vi.fn(async () => ({ entries: [{ id: 5, name: 'Rule Demo' }], total: 1 })),
     resolveTemplateOptions: vi.fn(async () => ({
       visit_id: 601,
@@ -136,6 +140,53 @@ const settle = async () => {
 };
 
 const skeletonVisible = () => document.querySelector('.lqw-skeleton') !== null;
+
+it('refreshes the loaded worklist depth with fresh cursors before replacing queue rows', async () => {
+  const firstPage = rows('FIRST', 1001, 50);
+  const secondPage = rows('SECOND', 1051, 50);
+  const refreshedSecondPage = rows('REFRESHED-SECOND', 1051, 50);
+  const page = (entries: typeof firstPage, nextCursor: string) => ({
+    entries,
+    total: 125,
+    counts: { actionable: 125, today: 125, overdue: 0, awaiting_specimen: 0, in_review: 0, ready: 0 },
+    date: '2026-11-24',
+    timezone: 'Asia/Tashkent',
+    next_cursor: nextCursor,
+  });
+  let finishRefreshPage: () => void = () => { throw new Error('Refresh did not request the loaded depth'); };
+  listWorklistMock
+    .mockResolvedValueOnce(page(firstPage, 'initial-second-page'))
+    .mockResolvedValueOnce(page(secondPage, 'initial-third-page'))
+    .mockResolvedValueOnce(page(firstPage, 'refresh-second-page'))
+    .mockImplementationOnce(() => new Promise((resolve) => {
+      finishRefreshPage = () => resolve(page(refreshedSecondPage, 'refresh-third-page'));
+    }));
+
+  render(
+    <MemoryRouter initialEntries={['/lab?tab=queue']}>
+      <ThemeProvider>
+        <LabDirtyGuardProvider>
+          <LabPanel />
+        </LabDirtyGuardProvider>
+      </ThemeProvider>
+    </MemoryRouter>,
+  );
+  await settle();
+  fireEvent.click(screen.getByTestId('vql-load-more'));
+  await settle();
+  expect(screen.getByTestId('vql-row-1051')).toHaveTextContent('SECOND-ROW-1');
+
+  fireEvent.click(screen.getByRole('button', { name: /Yangilash|Обновить|Refresh/i }));
+  await settle();
+
+  expect(screen.getByTestId('vql-row-1051')).toHaveTextContent('SECOND-ROW-1');
+  finishRefreshPage();
+  await settle();
+  expect(screen.getByTestId('vql-row-1051')).toHaveTextContent('REFRESHED-SECOND-ROW-1');
+  expect(listWorklistMock.mock.calls.slice(-4).map(([, options]) => options?.cursor)).toEqual([
+    undefined, 'initial-second-page', undefined, 'refresh-second-page',
+  ]);
+});
 
 describe('LABQ-FE-001 — a load-more page is owned by the queue generation it was launched in', () => {
   beforeEach(() => {
