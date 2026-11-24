@@ -154,6 +154,94 @@ def test_explicit_json_path_keeps_its_full_extension() -> None:
     assert paths == ["frontend/tsconfig.json"]
 
 
+def test_explicit_css_root_preserves_exact_reviewed_scope() -> None:
+    stylesheet = "frontend/src/pages/Setup.css"
+    component = "frontend/src/pages/Setup.tsx"
+    paths = [component, stylesheet]
+    payload = run_gate(
+        f"Update {stylesheet} with {component}. Reference frontend/tsconfig.json.",
+        "--handoff",
+        "--known-root-cause",
+        stylesheet,
+        "--scope",
+        component,
+        "--scope",
+        stylesheet,
+    )
+
+    assert payload["known_root_cause"] == stylesheet
+    assert payload["result"] == "gate_ok"
+    assert payload["override_used"] is False
+    assert payload["gate_misroute"] is False
+    assert payload["first_touch_files"] == paths
+    assert f"Edit only: {', '.join(paths)}\n" in payload["execution_prompt"]
+
+
+def test_css_root_without_relative_path_still_requires_override() -> None:
+    stylesheet = "frontend/src/pages/Setup.css"
+    component = "frontend/src/pages/Setup.tsx"
+    for task in (
+        f"Update {component}",
+        f"Update {component}. Reference /{stylesheet}.",
+        f'Update {component}. Reference "C:/old {stylesheet}".',
+        f"Update {component}. Reference '/tmp/old {stylesheet}'.",
+    ):
+        payload = run_gate(
+            task,
+            "--known-root-cause",
+            stylesheet,
+            "--scope",
+            component,
+            "--scope",
+            stylesheet,
+        )
+
+        assert payload["result"] == "narrow_override", task
+        assert payload["override_used"] is True
+        assert payload["gate_misroute"] is True
+        assert payload["first_touch_files"] == [component, stylesheet]
+
+
+def test_explicit_css_path_keeps_extension_and_checks_path_safety(tmp_path: Path) -> None:
+    gate = load_gate_module()
+    stylesheet = "styles/theme.module.css"
+    (tmp_path / "styles").mkdir()
+    (tmp_path / stylesheet).touch()
+
+    for path in (r"styles\theme.module.css", f"./{stylesheet}"):
+        assert gate.explicit_paths(f"Inspect {path}.", tmp_path, set()) == [stylesheet]
+    for path in (
+        f"../{stylesheet}",
+        f"{stylesheet}.map",
+        "styles/missing.css",
+        f"/{stylesheet}",
+        r"\styles\theme.module.css",
+        r"C:\styles\theme.module.css",
+        f"C:{stylesheet}",
+        r"\\server\share\styles\theme.module.css",
+    ):
+        assert gate.explicit_paths(f"Inspect {path}", tmp_path, set()) == [], path
+
+
+def test_quoted_absolute_path_does_not_supply_a_relative_css_suffix(tmp_path: Path) -> None:
+    gate = load_gate_module()
+    stylesheet = "styles/theme.module.css"
+    (tmp_path / "styles").mkdir()
+    (tmp_path / stylesheet).touch()
+
+    examples = (
+        f'"C:/old {stylesheet}"',
+        r"'\\server\old styles\theme.module.css'",
+        f'`/tmp/архив old {stylesheet}`',
+        f'"C:old {stylesheet}"',
+    )
+    for path in examples:
+        assert gate.explicit_paths(f"Inspect {path}.", tmp_path, set()) == [], path
+        assert gate.explicit_paths(
+            f"Inspect {path} and '{stylesheet}'.", tmp_path, set()
+        ) == [stylesheet], path
+
+
 def test_missing_explicit_path_is_not_assumed_to_be_a_new_file() -> None:
     completed = subprocess.run(
         [
@@ -264,7 +352,7 @@ def test_exact_reviewed_scope_is_preserved_and_requires_known_root() -> None:
             "--scope",
             "ai/langgraph/scripts/agent_gate.py",
             "--scope",
-            "../outside.py",
+            "../outside.css",
         ],
         check=False,
         capture_output=True,
