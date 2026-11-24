@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import MetaData, Table, and_, func, or_, select
+from sqlalchemy import MetaData, Table, and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.lab import (
@@ -143,10 +143,23 @@ def patient_lab_results_statement(patient_id: int, *, include_observation: bool 
     observation = (
         (value.c.result_payload, value.c.value_numeric) if include_observation else ()
     )
+    # The legacy projection stores at most 128 characters. Released text
+    # is available in full through its exact source value. Numeric displays
+    # use the projection's already formatted value and qualifier.
+    displayed_value = case(
+        (
+            and_(value.c.value_numeric.is_(None), value.c.value_text.is_not(None)),
+            value.c.value_text,
+        ),
+        else_=r.c.value,
+    ).label("value")
+    projected_columns = (
+        displayed_value if column.key == "value" else column for column in r.c
+    )
 
     return (
         select(
-            r,
+            *projected_columns,
             source.c.finalized_at.label("released_at"),
             source.c.supersedes_instance_id,
             value.c.evaluation_snapshot,

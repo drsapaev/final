@@ -22,9 +22,11 @@ This file asserts 200 (not 500) for each endpoint.
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from uuid import uuid4
 
 from app.core.security import get_password_hash
+from app.crud.lab import patient_lab_results_statement
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.lab import (
@@ -226,8 +228,10 @@ def test_mobile_lab_result_uses_exact_release_snapshot_and_preserves_legacy(
         other_order, status="FINALIZED", finalized_at=original_date
     )
 
+    long_text = ("SYNTHETIC Ниҳоявий кузатув. " * 8).strip()
     values = [
         ("qualified", "<1", "not_evaluated", None),
+        ("full_text", long_text, "not_evaluated", None),
         ("without_rules", "3.2", "not_applicable", None),
         ("cleared", None, "missing", None),
         ("normal", "7", "evaluated", "normal"),
@@ -251,7 +255,8 @@ def test_mobile_lab_result_uses_exact_release_snapshot_and_preserves_legacy(
                 LabReportValue(
                     instance_id=revised.id,
                     field_key=field,
-                    value_text=raw_value,
+                    value_text="1.0000" if field == "qualified" else raw_value,
+                    value_numeric=Decimal(1) if field == "qualified" else None,
                     resolved_reference_text="1–10" if raw_value else None,
                     evaluation_snapshot={
                         "status": evaluation_status,
@@ -263,7 +268,7 @@ def test_mobile_lab_result_uses_exact_release_snapshot_and_preserves_legacy(
                     order_id=order.id,
                     test_code=field,
                     test_name=field,
-                    value=raw_value,
+                    value=raw_value[:128] if raw_value is not None else None,
                     unit="U/L",
                     ref_range="old range",
                     abnormal=(field == "high"),
@@ -313,6 +318,14 @@ def test_mobile_lab_result_uses_exact_release_snapshot_and_preserves_legacy(
         ]
     )
     db_session.commit()
+
+    emr_observations = db_session.execute(
+        patient_lab_results_statement(patient.id, include_observation=True)
+    ).mappings()
+    emr_values = {row["test_name"]: row for row in emr_observations}
+    assert emr_values["full_text"]["value"] == long_text
+    assert emr_values["full_text"]["source_instance_id"] == revised.id
+    assert emr_values["qualified"]["value"] == "<1"
 
     response = client.get("/api/v1/mobile/lab/results", headers=_login(client, user))
     assert response.status_code == 200, response.text
