@@ -31,8 +31,24 @@ class FinalizeMixin(LabReportingServiceMixinBase):
                 return instance
             evidence = self._assert_reviewed_release(instance, actor, expected_updated_at)
         else:
+            if (
+                instance.status == "FINALIZED"
+                and actor is not None
+                and expected_updated_at is not None
+            ):
+                try:
+                    expected_version = self._workflow_expected_version(expected_updated_at)
+                except (LabReportingDomainError, OverflowError):
+                    # Released legacy reports retain their immutability error.
+                    pass
+                if expected_version is not None and self._workflow_request_replayed(
+                    instance, kind="finalized", actor=actor, expected_version=expected_version,
+                ):
+                    return instance
             self._assert_instance_editable(instance)
             self._assert_not_concurrently_modified(instance, expected_updated_at)
+            if actor is not None and expected_updated_at is not None:
+                expected_version = self._normalized_version(instance.updated_at)
             if not self._has_published_template(instance):
                 raise LabReportingDomainError(409, "Release requires a published template version")
             values, context = self._refresh_result_evaluation(instance, validate_existing=True)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta, timezone
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -19,6 +20,7 @@ from app.models.lab import (
     LabReportValue,
     LabResult,
 )
+from app.models.lab_release import LabReportWorkflowEvent
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
@@ -462,6 +464,155 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     )
     assert print_twice_response.status_code == 200
     assert print_twice_response.json()["status"] == "PRINTED"
+
+
+@pytest.fixture
+def legacy_release_draft(client, auth_headers, test_patient, test_visit, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", False)
+    report = _create_lab_report_instance(
+        client, auth_headers=auth_headers, patient_id=test_patient.id,
+        visit_id=test_visit.id,
+    )
+    assert report["managed_release"] is False
+    route = f"/api/v1/lab/report-instances/{report['id']}"
+    saved = client.post(
+        f"{route}/bulk-values",
+        headers=auth_headers,
+        params={"expected_updated_at": report["updated_at"]},
+        json=[
+            {"field_key": "wbc", "value_text": "5.2"},
+            {"field_key": "hgb", "value_text": "140"},
+        ],
+    )
+    assert saved.status_code == 200, saved.text
+    return route, report["updated_at"], saved.json()["instance"]
+
+
+@pytest.fixture
+def legacy_release_side_effects(monkeypatch):
+    from app.services.lab_notification_service import LabNotificationService
+    from app.services.lab_reporting_service import LabReportingService
+
+    notification = Mock()
+    projection = Mock(wraps=LabReportingService._sync_legacy_lab_results)
+
+    def sync_projection(service, report, fields):
+        return projection(service, report, fields)
+
+    monkeypatch.setattr(
+        LabReportingService, "_emit_lab_results_ready_notification", notification,
+    )
+    monkeypatch.setattr(LabReportingService, "_sync_legacy_lab_results", sync_projection)
+    monkeypatch.setattr(LabNotificationService, "check_critical_values", AsyncMock())
+    return notification, projection
+
+
+@pytest.mark.integration
+def test_versioned_legacy_finalize_replays_only_the_same_actor_and_release_version(
+    client, auth_headers, admin_user, db_session, legacy_release_draft,
+    legacy_release_side_effects,
+):
+    route, stale_version, draft = legacy_release_draft
+    notification, projection = legacy_release_side_effects
+    finalize_url = f"{route}/finalize"
+    command = {"expected_updated_at": draft["updated_at"]}
+    malformed = {"expected_updated_at": "SYNTHETIC-INVALID-TIMESTAMP"}
+    stale = {"expected_updated_at": stale_version}
+
+    def finalize_request(body=None, headers=auth_headers):
+        return client.post(finalize_url, headers=headers, json=body)
+
+    malformed_draft = finalize_request(malformed)
+    assert malformed_draft.status_code == 400, malformed_draft.text
+    assert malformed_draft.json()["detail"] == (
+        "Некорректная версия бланка. "
+        "Обновите страницу, чтобы получить актуальные данные."
+    )
+    stale_draft = finalize_request(stale)
+    assert stale_draft.status_code == 409, stale_draft.text
+    assert stale_draft.json()["detail"] == (
+        "Бланк был изменён другим пользователем. "
+        "Обновите страницу, чтобы получить актуальные данные."
+    )
+    notification.assert_not_called()
+    projection.assert_not_called()
+
+    first = finalize_request(command)
+    assert first.status_code == 200, first.text
+    released = first.json()
+    assert released["status"] == "FINALIZED"
+    replay = finalize_request(command)
+    assert replay.status_code == 200, replay.text
+    assert replay.json() == released
+
+    events = db_session.query(LabReportWorkflowEvent).filter_by(
+        instance_id=draft["id"], kind="finalized",
+    )
+    event = events.one()
+    assert event.actor_user_id == admin_user.id
+    # SQLite stores naive UTC, while the HTTP command may carry a UTC suffix.
+    submitted = datetime.fromisoformat(command["expected_updated_at"]).replace(tzinfo=UTC)
+    assert event.expected_version.replace(tzinfo=UTC) == submitted
+    assert event.report_version.replace(tzinfo=UTC) == datetime.fromisoformat(
+        released["updated_at"],
+    ).replace(tzinfo=UTC)
+
+    other_actor = _create_lab_user(db_session, label="legacy_release_replay")
+    other_headers = {"Authorization": f"Bearer {_mint_access_token(other_actor)}"}
+    assert finalize_request(command, other_headers).status_code == 409
+    assert finalize_request().status_code == 409
+    malformed_replay = finalize_request(malformed)
+    assert malformed_replay.status_code == 409, malformed_replay.text
+    assert malformed_replay.json()["detail"] == "Finalized reports are immutable; use revise"
+    assert finalize_request(stale).status_code == 409
+    assert finalize_request({"expected_updated_at": released["updated_at"]}).status_code == 409
+
+    printed = client.post(f"{route}/mark-printed", headers=auth_headers)
+    assert printed.status_code == 200, printed.text
+    assert printed.json()["status"] == "PRINTED"
+    assert finalize_request(command).status_code == 409
+
+    notification.assert_called_once()
+    projection.assert_called_once()
+    assert events.count() == 1
+    rows = db_session.query(LabResult).filter_by(
+        source_root_instance_id=draft["id"],
+    ).order_by(LabResult.test_code).all()
+    assert [(row.test_code, row.value, row.source_instance_id) for row in rows] == [
+        ("hgb", "140", draft["id"]),
+        ("wbc", "5.2", draft["id"]),
+    ]
+
+
+@pytest.mark.integration
+def test_unversioned_legacy_finalize_is_compatible_but_cannot_replay(
+    client, auth_headers, db_session, legacy_release_draft, legacy_release_side_effects,
+):
+    route, _, draft = legacy_release_draft
+    notification, projection = legacy_release_side_effects
+    finalize_url = f"{route}/finalize"
+
+    first = client.post(finalize_url, headers=auth_headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["status"] == "FINALIZED"
+
+    event = db_session.query(LabReportWorkflowEvent).filter_by(
+        instance_id=draft["id"], kind="finalized",
+    ).one()
+    assert event.expected_version is None
+    assert client.post(finalize_url, headers=auth_headers).status_code == 409
+    versioned_replay = client.post(
+        finalize_url, headers=auth_headers,
+        json={"expected_updated_at": draft["updated_at"]},
+    )
+    assert versioned_replay.status_code == 409, versioned_replay.text
+    notification.assert_called_once()
+    projection.assert_called_once()
+    assert db_session.query(LabReportWorkflowEvent).filter_by(
+        instance_id=draft["id"], kind="finalized",
+    ).count() == 1
 
 
 # PR 3351 (review round 9, P1): report CREATE идемпотентен по операции.
