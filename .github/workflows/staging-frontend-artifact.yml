@@ -80,8 +80,16 @@ jobs:
           containers=()
           trap 'if ((${#containers[@]})); then docker rm "${containers[@]}" >/dev/null; fi' EXIT
 
+          verify_offline_pages() {
+            docker run --rm --network none --user nginx --entrypoint /bin/cat "$1" \
+              /usr/share/nginx/html/offline.html /usr/share/nginx/html/offline-uz.html >/dev/null
+          }
+
+          # A restricted source checkout can carry owner-only modes into the image.
+          chmod 0600 frontend/public/offline.html frontend/public/offline-uz.html
           "${runtime[@]}" config --quiet
           "${runtime[@]}" build frontend
+          verify_offline_pages "${ci_identity}-frontend"
           container_id="$(docker create "${ci_identity}-frontend")"
           containers+=("$container_id")
           docker cp "$container_id:/usr/share/nginx/html/." .scratch/frontend-artifact/
@@ -97,8 +105,10 @@ jobs:
             sha256sum --check --status SHA256SUMS
           )
 
+          chmod 0600 .scratch/frontend-artifact/offline.html .scratch/frontend-artifact/offline-uz.html
           "${artifact_runtime[@]}" config --quiet
           "${artifact_runtime[@]}" build frontend
+          verify_offline_pages "${ci_identity}-frontend"
           container_id="$(docker create "${ci_identity}-frontend")"
           containers+=("$container_id")
           docker cp "$container_id:/usr/share/nginx/html/." .scratch/frontend-artifact-import/
