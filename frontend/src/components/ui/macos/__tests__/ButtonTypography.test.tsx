@@ -19,10 +19,14 @@ describe('macOS primitives regressions', () => {
     expect(button).not.toHaveTextContent('mac-spin');
   });
 
-  it('spinner has aria-hidden', () => {
-    const { container } = renderWithTheme(<Button loading>Save</Button>);
-    const svg = container.querySelector('svg.mac-button-spinner');
-    expect(svg).toHaveAttribute('aria-hidden', 'true');
+  it('exposes the busy button and hides its decorative spinner', () => {
+    renderWithTheme(<Button loading>Save</Button>);
+
+    const button = screen.getByRole('button', { name: 'Save', busy: true });
+    const spinner = button.querySelector('svg');
+    expect(button).toBeDisabled();
+    expect(spinner).toHaveAttribute('aria-hidden', 'true');
+    expect(spinner).toHaveAttribute('focusable', 'false');
   });
 
   it('renders Typography with the requested semantic component', () => {
