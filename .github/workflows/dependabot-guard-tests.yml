@@ -12,12 +12,18 @@ on:
       - ".github/workflows/dependabot-automerge.yml"
       - ".github/workflows/dependabot-guard-tests.yml"
       - "scripts/check_dependabot_automerge_workflow.py"
+      - ".github/workflows/codex-pr-app.yml"
+      - "scripts/merge_queue_coordinator.py"
+      - "scripts/test_merge_queue_coordinator.py"
   push:
     branches: [main]
     paths:
       - ".github/workflows/dependabot-automerge.yml"
       - ".github/workflows/dependabot-guard-tests.yml"
       - "scripts/check_dependabot_automerge_workflow.py"
+      - ".github/workflows/codex-pr-app.yml"
+      - "scripts/merge_queue_coordinator.py"
+      - "scripts/test_merge_queue_coordinator.py"
 
 permissions:
   contents: read
@@ -35,3 +41,56 @@ jobs:
         run: python -m pip install --quiet pyyaml
       - name: Run workflow guard tests
         run: python scripts/check_dependabot_automerge_workflow.py
+      - name: Run protected coordinator tests
+        run: python scripts/test_merge_queue_coordinator.py
+
+  queue-canary:
+    # Same platform slot semantics, distinct test-only group and no write token.
+    strategy:
+      fail-fast: false
+      matrix:
+        request: [1, 2, 3]
+    concurrency:
+      group: final-merge-queue-canary-${{ github.run_id }}-${{ github.run_attempt }}
+      queue: max
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    permissions: {}
+    steps:
+      - name: Record occupied interval
+        env:
+          REQUEST: ${{ matrix.request }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          started="$(date -u +%s%N)"
+          sleep 15
+          printf '%s %s\n' "$started" "$(date -u +%s%N)" > "queue-canary-${REQUEST}.txt"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: queue-canary-${{ github.run_attempt }}-${{ matrix.request }}
+          path: queue-canary-${{ matrix.request }}.txt
+          retention-days: 1
+
+  verify-queue-canary:
+    needs: queue-canary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: queue-canary-${{ github.run_attempt }}-*
+          merge-multiple: true
+      - name: Confirm no requests were lost and slots did not overlap
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          names = [Path(f"queue-canary-{i}.txt") for i in (1, 2, 3)]
+          spans = sorted(tuple(map(int, name.read_text().split())) for name in names)
+          assert all(start < end for start, end in spans), spans
+          assert all(prev[1] <= nxt[0] for prev, nxt in zip(spans, spans[1:])), spans
+          print("All three requests completed, with no overlapping slots.")
+          PY
