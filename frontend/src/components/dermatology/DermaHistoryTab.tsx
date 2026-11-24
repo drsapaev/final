@@ -20,6 +20,11 @@ interface DermaHistoryTabProps {
   hasMoreProcedures?: boolean;
   loadingMoreExaminations?: boolean;
   loadingMoreProcedures?: boolean;
+  /** DERMAHIST-FE-002: a rejected load-more request is surfaced with a
+   * visible alert next to the still-enabled retry button instead of a
+   * silent re-enable. */
+  loadMoreExaminationsError?: boolean;
+  loadMoreProceduresError?: boolean;
   onLoadMoreExaminations?: () => void;
   onLoadMoreProcedures?: () => void;
 }
@@ -71,6 +76,8 @@ export function DermaHistoryTab({
   hasMoreProcedures = false,
   loadingMoreExaminations = false,
   loadingMoreProcedures = false,
+  loadMoreExaminationsError = false,
+  loadMoreProceduresError = false,
   onLoadMoreExaminations,
   onLoadMoreProcedures,
 }: DermaHistoryTabProps) {
@@ -148,6 +155,11 @@ export function DermaHistoryTab({
                     </article>
                   ))}
                 </div>
+                {loadMoreExaminationsError && (
+                  <p role="alert" className="derma-p-14-secondary derma-text-danger">
+                    {t('derma.derma_panel_patient_history_load_more_failed')}
+                  </p>
+                )}
                 {hasMoreExaminations && (
                   <button
                     type="button"
@@ -198,6 +210,11 @@ export function DermaHistoryTab({
                     </article>
                   ))}
                 </div>
+                {loadMoreProceduresError && (
+                  <p role="alert" className="derma-p-14-secondary derma-text-danger">
+                    {t('derma.derma_panel_patient_history_load_more_failed')}
+                  </p>
+                )}
                 {hasMoreProcedures && (
                   <button
                     type="button"
