@@ -283,6 +283,7 @@ export default function ReportEditor({
                 const absenceKey = `${field.field_key}__absence_reason`;
                 const currentComment = draftValues[commentKey] ?? '';
                 const absenceReason = draftValues[absenceKey] ?? '';
+                const hasDetails = Boolean(currentComment || absenceReason);
                 const choiceOptions = field.choice_options || [];
                 const hasNumericInput = field.value_type === 'numeric';
                 const numericFormatInvalid = hasNumericInput && currentValue.trim() !== ''
@@ -305,6 +306,7 @@ export default function ReportEditor({
                 const descriptionIds = [
                   field.required && `${inputId}-required`,
                   `${inputId}-reference`,
+                  `${inputId}-assessment`,
                   showInstrumentFlags && `${inputId}-instrument-flags`,
                   numericFormatInvalid && `${inputId}-error`,
                 ].filter(Boolean).join(' ');
@@ -360,11 +362,11 @@ export default function ReportEditor({
                     </div>
                     <div className="lab-result-assessment">
                       {isValueDirty ? (
-                        <Badge variant="outline" style={assessmentBadgeStyle} title={t('workbench.flag_unsaved_title')}>
+                        <Badge id={`${inputId}-assessment`} variant="outline" style={assessmentBadgeStyle} title={t('workbench.flag_unsaved_title')}>
                           {t('workbench.flag_unsaved')}
                         </Badge>
                       ) : (
-                        <Badge style={assessmentBadgeStyle} variant={flagVariant(field.interpretation || field.resolved_flag || '', field.resolved_flag_severity ?? null)}>
+                        <Badge id={`${inputId}-assessment`} style={assessmentBadgeStyle} variant={flagVariant(field.interpretation || field.resolved_flag || '', field.resolved_flag_severity ?? null)}>
                           {t(getEvaluationLabelKey(field))}
                         </Badge>
                       )}
@@ -381,9 +383,18 @@ export default function ReportEditor({
                         </span>
                       ) : previousValue ? t('workbench.previous_not_comparable') : '—'}
                     </div>
-                    {(canEditActiveInstance || currentComment || absenceReason) && (
+                    {(canEditActiveInstance || hasDetails) && (
                       <details className="lab-result-details">
-                        <summary>{t('workbench.comment_label')}{currentComment || absenceReason ? ' •' : ''}</summary>
+                        <summary
+                          aria-label={`${t('workbench.comment_label')}: ${field.label}`}
+                          aria-describedby={hasDetails ? `${inputId}-details-state` : undefined}
+                        >
+                          {t('workbench.comment_label')}
+                          {hasDetails && <>
+                            <span aria-hidden="true"> •</span>
+                            <span id={`${inputId}-details-state`} className="sr-only">{t('workbench.result_details_available')}</span>
+                          </>}
+                        </summary>
                         <label>
                           {t('workbench.comment_label')}
                           <Input

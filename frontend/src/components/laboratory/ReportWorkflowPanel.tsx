@@ -19,7 +19,7 @@ export default function ReportWorkflowPanel({
   canSubmit: boolean;
   disabled: boolean;
   onReview: (action: 'submit_review' | 'review') => void;
-  onPrompt: (action: LabWorkflowPrompt) => void;
+  onPrompt: (action: LabWorkflowPrompt, trigger: HTMLButtonElement) => void;
 }) {
   const { t, language } = useTranslation();
   if (!report.managed_release) return null;
@@ -80,10 +80,10 @@ export default function ReportWorkflowPanel({
           <Button disabled={disabled || holds.length > 0} onClick={() => onReview('review')}>{t('workbench.workflow_review')}</Button>
         )}
         {canReturnToDraft && (
-          <Button variant="outline" disabled={disabled} onClick={() => onPrompt('return_to_draft')}>{t('workbench.workflow_return_to_draft')}</Button>
+          <Button variant="outline" disabled={disabled} onClick={(event) => onPrompt('return_to_draft', event.currentTarget)}>{t('workbench.workflow_return_to_draft')}</Button>
         )}
         {canRecordQc && (
-          <Button variant="outline" disabled={disabled} onClick={() => onPrompt('record_qc')}>{t('workbench.workflow_record_qc')}</Button>
+          <Button variant="outline" disabled={disabled} onClick={(event) => onPrompt('record_qc', event.currentTarget)}>{t('workbench.workflow_record_qc')}</Button>
         )}
       </div>
       {events.length > 0 && <details>

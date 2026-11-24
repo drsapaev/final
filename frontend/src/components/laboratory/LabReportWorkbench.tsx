@@ -120,8 +120,7 @@ function getRequestStatus(error: unknown) {
 }
 
 function isSaveConflict(error: unknown) {
-  return getRequestStatus(error) === 409
-    || (error instanceof Error && error.message.includes('другим пользователем'));
+  return getRequestStatus(error) === 409;
 }
 
 const EMPTY_OPERATION_CONTEXT: LabReportOperationContext = {
@@ -226,6 +225,8 @@ export default function LabReportWorkbench({
     version: string;
     operation: LabReportOperationContext;
   } | null>(null);
+  const workflowTrigger = useRef<HTMLButtonElement>(null);
+  const editorTitle = useRef<HTMLHeadingElement>(null);
   const printAttemptRef = useRef(0);
   // LABR-FE-002 (audit 3886): preview attempt epoch — a late preview
   // response must never open/report into a context that replaced it.
@@ -408,6 +409,17 @@ export default function LabReportWorkbench({
     setLoadingConflict(false);
     setWorkflowPrompt(null);
   }, [activeInstance?.id, activeInstance?.patient_id]);
+
+  useEffect(() => {
+    if (workflowPrompt || saving || !workflowTrigger.current) return;
+    const trigger = workflowTrigger.current;
+    workflowTrigger.current = null;
+    // The trigger can be disabled when the dialog unmounts, or removed by a workflow transition.
+    const { activeElement, body } = trigger.ownerDocument;
+    if (activeElement !== body && activeElement !== trigger) return;
+    if (trigger.isConnected && !trigger.disabled) trigger.focus();
+    else editorTitle.current?.focus();
+  }, [workflowPrompt, saving]);
 
   useEffect(() => {
     if (printFeedbackTimerRef.current) {
@@ -958,9 +970,10 @@ export default function LabReportWorkbench({
     }
   }
 
-  function openWorkflowPrompt(action: LabWorkflowPrompt) {
+  function openWorkflowPrompt(action: LabWorkflowPrompt, trigger: HTMLButtonElement) {
     if (!activeInstance || saving || isDirty || saveFailure || instanceTransitionPending) return;
     if (typeof activeInstance.updated_at !== 'string') return;
+    workflowTrigger.current = trigger;
     setWorkflowPrompt({
       action,
       id: activeInstance.id as string | number,
@@ -1537,7 +1550,7 @@ export default function LabReportWorkbench({
     <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
       <Card variant="filled" padding="none" style={{ overflow: 'clip' }}>
         <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
-          <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+          <CardTitle ref={editorTitle} tabIndex={-1} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <FileText size={20} aria-hidden="true" />
             {t('workbench.title')}
           </CardTitle>
@@ -1646,7 +1659,8 @@ export default function LabReportWorkbench({
                 <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                   <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
-                      {String((activeInstance.patient_snapshot as Record<string, unknown> | undefined)?.full_name ?? '') || `Пациент #${String(activeInstance.patient_id ?? '')}`}
+                      {String((activeInstance.patient_snapshot as Record<string, unknown> | undefined)?.full_name ?? '')
+                        || `${t('queue.history_patient_number')} #${String(activeInstance.patient_id ?? '')}`}
                     </div>
                     <Badge variant={getLabStatusVariant(activeInstance.status as string)}>
                       {formatLabStatus(String(activeInstance.status ?? ''), t)}
@@ -1654,7 +1668,8 @@ export default function LabReportWorkbench({
                     <Badge variant="info">{String((activeInstance.template as Record<string, unknown> | undefined)?.name ?? '')}</Badge>
                   </div>
                   <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
-                    Визит: {String(activeInstance.visit_id ?? '') || 'без визита'} | Отчёт #{String(activeInstance.id ?? '')}
+                    {t('queue.history_visit')}: {String(activeInstance.visit_id ?? '') || t('queue.history_no_visit')}
+                    {' | '}{t('queue.history_report_number')} #{String(activeInstance.id ?? '')}
                     {/* WF-04 fix: показываем supersedes relationship для audit trail.
                         Если этот отчёт — ревизия другого, лаборант видит связь.
                         Backend поле: supersedes_instance_id (см. lab_reporting_service.py:785). */}
@@ -1684,7 +1699,7 @@ export default function LabReportWorkbench({
                           padding: 0,
                         }}
                       >
-                        ← исправленная версия отчёта #{String(activeInstance.supersedes_instance_id ?? '')}
+                        <span aria-hidden="true">← </span>{t('workbench.new_revision')} #{String(activeInstance.supersedes_instance_id ?? '')}
                       </button>
                     )}
                   </div>
@@ -1915,7 +1930,7 @@ export default function LabReportWorkbench({
                   canNotify={canNotifyPatient}
                   onSaveDraft={handleSaveDraft}
                   onFinalize={handleFinalize}
-                  onRevise={() => openWorkflowPrompt('revise')}
+                  onRevise={(event) => openWorkflowPrompt('revise', event.currentTarget)}
                   onPrint={handlePrint}
                   onNotify={handleNotifyPatient}
                   onPreview={handlePreviewPdf}
@@ -1928,7 +1943,7 @@ export default function LabReportWorkbench({
                     чтобы лаборант понимал, почему Finalize disabled. */}
                 {/* PR-66 / Low-27: replaced plain text spans with Badge components */}
                 {(canFinalize || hasLabReportAction(activeInstance, 'submit_review')) && hasMissingRequired && (
-                  <Badge variant="warning" style={{ marginLeft: 'var(--mac-spacing-2)' }}>
+                  <Badge role="status" variant="warning" style={{ marginLeft: 'var(--mac-spacing-2)' }}>
                     {t('workbench.required_remaining', { count: missingRequiredFields.length })}
                   </Badge>
                 )}

@@ -46,9 +46,10 @@ describe('managed report hold guidance', () => {
     expect(screen.getByText('Контроль качества неприемлем')).toBeVisible();
     expect(screen.getByText('Разберите причину отклонения, затем запишите актуальный итог через «Записать контроль качества».')).toBeVisible();
     expect(screen.getByText('Итог контроля качества · Неприемлемо')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Записать контроль качества' }));
+    const recordQc = screen.getByRole('button', { name: 'Записать контроль качества' });
+    fireEvent.click(recordQc);
     fireEvent.click(screen.getByRole('button', { name: 'Передать на проверку' }));
-    expect(onPrompt).toHaveBeenCalledWith('record_qc');
+    expect(onPrompt).toHaveBeenCalledWith('record_qc', recordQc);
     expect(onReview).toHaveBeenCalledWith('submit_review');
   });
 
@@ -76,8 +77,9 @@ describe('managed report hold guidance', () => {
 
     expect(screen.getAllByText(/Выберите «Вернуть в черновик»/)).toHaveLength(1);
     expect(screen.queryByText(/Попросите сотрудника с правом записи контроля качества/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Вернуть в черновик' }));
-    expect(onPrompt).toHaveBeenCalledWith('return_to_draft');
+    const returnToDraft = screen.getByRole('button', { name: 'Вернуть в черновик' });
+    fireEvent.click(returnToDraft);
+    expect(onPrompt).toHaveBeenCalledWith('return_to_draft', returnToDraft);
     expect(screen.queryByRole('button', { name: 'Подтвердить проверку' })).not.toBeInTheDocument();
   });
 

@@ -42,6 +42,7 @@ vi.mock('../../../api/labReporting', () => ({
     bulkSaveValues: vi.fn(),
     // L-1 fix: markReady removed — endpoint was dead code (WF-round5).
     finalize: vi.fn(),
+    recordQC: vi.fn(),
     revise: vi.fn(),
     downloadPdf: vi.fn(),
     markPrinted: vi.fn(),
@@ -450,6 +451,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     updateInstance: ReturnType<typeof vi.fn>;
     bulkSaveValues: ReturnType<typeof vi.fn>;
     finalize: ReturnType<typeof vi.fn>;
+    recordQC: ReturnType<typeof vi.fn>;
     downloadPdf: ReturnType<typeof vi.fn>;
     markPrinted: ReturnType<typeof vi.fn>;
   };
@@ -1451,7 +1453,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       // Все autosave-попытки в этом тесте неудачны: base после неудачи всё
       // равно ставит lastAutoSave, исправленный код — нет.
       mockedApi.bulkSaveValues.mockRejectedValue(
-        new Error('Бланк был изменён другим пользователем')
+        Object.assign(new Error('SYNTHETIC report version conflict'), { status: 409 })
       );
 
       const utils = renderWithActiveInstance();
@@ -1603,6 +1605,52 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(onOpenInstance).toHaveBeenCalledWith(76);
     expect(mockedApi.getInstance).not.toHaveBeenCalled();
     expect(onInstanceChange).not.toHaveBeenCalled();
+  });
+
+  it('returns focus to the workflow trigger once the successful command refresh settles', async () => {
+    const activeInstance = { ...reopenedDraftInstance, managed_release: true, available_actions: ['record_qc'] };
+    let completeRefresh!: () => void;
+    const refresh = new Promise<void>((resolve) => { completeRefresh = resolve; });
+    const onRefreshHistory = vi.fn(() => refresh);
+    mockedApi.recordQC.mockResolvedValueOnce(activeInstance);
+    renderWithActiveInstance({ activeInstance, onRefreshHistory });
+    const trigger = screen.getByRole('button', { name: 'Записать контроль качества' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = within(screen.getByRole('dialog', { name: 'Записать контроль качества' }));
+    fireEvent.change(dialog.getByRole('combobox'), { target: { value: 'not_applicable' } });
+    const reason = dialog.getByRole('textbox', { name: 'Причина' });
+    reason.focus();
+    fireEvent.change(reason, { target: { value: 'SYNTHETIC reason' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Записать контроль качества' }));
+    await waitFor(() => expect(onRefreshHistory).toHaveBeenCalledWith(444));
+    expect(trigger).toBeDisabled();
+
+    await act(async () => completeRefresh());
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(trigger).toBeEnabled();
+  });
+
+  it.each([
+    ['ru', 'Пациент #444', 'Визит: без визита | Отчёт #77', 'исправленная версия отчёта #76'],
+    ['uz-Cyrl', 'Бемор #444', 'Ташриф: ташрифсиз | Ҳисобот #77', 'ҳисоботнинг тузатилган версияси #76'],
+    ['uz-Latn', 'Bemor #444', 'Tashrif: tashrifsiz | Hisobot #77', 'hisobotning tuzatilgan versiyasi #76'],
+  ])('uses %s for the open report identity and source version', async (language, patient, identity, correction) => {
+    await i18n.changeLanguage(language);
+    try {
+      const onOpenInstance = vi.fn();
+      renderWithActiveInstance({
+        activeInstance: { ...reopenedDraftInstance, supersedes_instance_id: 76 },
+        onOpenInstance,
+      });
+
+      expect(screen.getByText(patient)).toBeVisible();
+      expect(screen.getByText(identity)).toBeVisible();
+      fireEvent.click(screen.getByRole('button', { name: correction }));
+      expect(onOpenInstance).toHaveBeenCalledWith(76);
+    } finally {
+      await act(async () => { await i18n.changeLanguage('ru'); });
+    }
   });
 
   it('notifies and rethrows when the registered report save fails', async () => {

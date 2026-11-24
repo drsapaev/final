@@ -1,5 +1,6 @@
 
 import { Button } from '../ui/macos';
+import type { MouseEventHandler } from 'react';
 import { useTranslation } from '../../i18n/useTranslation';
 import { Download, Eye, GitBranch, Lock, Printer, Send } from 'lucide-react';
 
@@ -15,7 +16,7 @@ interface LabReportActionsBarProps {
   canPreview?: boolean;
   onSaveDraft: () => void;
   onFinalize: () => void;
-  onRevise: () => void;
+  onRevise: MouseEventHandler<HTMLButtonElement>;
   onPrint: () => void;
   onNotify?: () => void;
   onPreview?: () => void;

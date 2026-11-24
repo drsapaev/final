@@ -128,4 +128,23 @@ describe('LABUX-FE-002: choice dropdown exposes its clinical field label', () =>
     expect(blood).not.toBe(urine);
     within(blood as HTMLElement).getByRole('option', { name: 'Норма' });
   });
+
+  it('associates invalid numeric entry with the error, reference and draft assessment', () => {
+    const activeInstance = {
+      ...ACTIVE_INSTANCE,
+      sections: [{ key: 'numeric', title: 'SYNTHETIC chemistry', fields: [{
+        field_key: 'hgb', label: 'SYNTHETIC hgb', value_type: 'numeric',
+        value_text: '120', reference_text: '110–130', required: true,
+      }] }],
+    };
+    render(<ThemeProvider><ReportEditor {...baseProps} activeInstance={activeInstance}
+      draftValues={{ hgb: 'invalid', hgb__comment: 'SYNTHETIC note' }} /></ThemeProvider>);
+
+    const input = screen.getByRole('textbox', { name: 'Результат: SYNTHETIC hgb' });
+    expect(input).toBeInvalid();
+    expect(input).toHaveAccessibleDescription(/обязательное.*110–130.*черновик.*Примеры: 5,2 или <0,01/);
+    const summary = screen.getByText('Комментарий к полю', { selector: 'summary' });
+    expect(summary).toHaveAccessibleName('Комментарий к полю: SYNTHETIC hgb');
+    expect(summary).toHaveAccessibleDescription('Есть комментарий или причина отсутствия результата');
+  });
 });

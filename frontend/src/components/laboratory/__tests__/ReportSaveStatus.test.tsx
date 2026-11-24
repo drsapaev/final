@@ -106,3 +106,24 @@ it.each([
     await i18n.changeLanguage('ru');
   }
 });
+
+it.each([
+  ['ru', 'Сохранено в TIME', 'Последнее сохранение в TIME'],
+  ['uz-Cyrl', 'TIME да сақланди', 'Охирги сақлаш TIME да'],
+  ['uz-Latn', 'TIME da saqlandi', 'Oxirgi saqlash TIME da'],
+])('shows the current and previous save time in %s', async (language, saved, previous) => {
+  await i18n.changeLanguage(language);
+  try {
+    const lastSavedAt = new Date('2026-01-02T13:24:37Z');
+    const time = lastSavedAt.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const { rerender } = renderConflict();
+    rerender({ language, lastSavedAt, failure: null, isDirty: false });
+    expect(screen.getByRole('status')).toHaveTextContent(saved.replace('TIME', time));
+
+    rerender({ language, lastSavedAt, failure: null, isDirty: true });
+    expect(screen.getByRole('status')).toHaveTextContent(previous.replace('TIME', time));
+  } finally {
+    cleanup();
+    await i18n.changeLanguage('ru');
+  }
+});
