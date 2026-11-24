@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import select
 
 from app.main import app
-from app.models.lab import LabCatalogReferenceRange, LabResult
+from app.models.lab import LabCatalogReferenceRange, LabCatalogUnit, LabResult
 from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment
 from app.schemas.lab_reporting import LabReportRenderedFieldOut, LabReportValueIn
 from app.services.emr_lab_integration import EMRLabIntegrationService
@@ -336,9 +336,28 @@ def test_specimen_scope_and_released_reference_are_snapshotted(
     test_patient.birth_date = date(2025, 11, 24)
     db_session.commit()
     service = LabReportingService(db_session)
-    template = next(
-        item for item in service.list_templates() if item.code == "glucose_panel"
+    field_definition = {
+        "field_key": "glucose",
+        "label": "SYNTHETIC glucose",
+        "analyte_code": "glucose",
+        "value_type": "numeric",
+        "unit_code": "mmol_per_l",
+        "reference_mode": "catalog",
+        "highlight_rule": {"mode": "rule_based_reference"},
+    }
+    version_data = {
+        "layout_preset": "lab_table_classic_v1",
+        "sections": [{"key": "synthetic", "fields": [field_definition]}],
+    }
+    template = service.create_template(
+        {
+            "code": "synthetic-glucose-frozen-history",
+            "name": "SYNTHETIC frozen history",
+            "family": "synthetic",
+            "initial_version": version_data,
+        }
     )
+    service.publish_template_version(template.versions[0].id)
     specimen_range = LabCatalogReferenceRange(
         analyte_code="glucose",
         material_code="serum",
@@ -402,14 +421,55 @@ def test_specimen_scope_and_released_reference_are_snapshotted(
         == specimen_range.id
     )
     assert first_field["evaluation_snapshot"]["material_code"] == "serum"
+    assert first_field["unit"] == "mmol/L"
+    assert first_field["unit_code"] == "mmol_per_l"
+    assert first_field["method_code"] == "synthetic_method"
 
+    draft = service.create_template_version(template.id)
+    field_definition["unit_code"] = "umol_per_l"
+    service.update_template_version(draft.id, version_data)
+    new_version = service.publish_template_version(draft.id)
+    original_unit = db_session.get(LabCatalogUnit, "mmol_per_l")
+    original_unit.symbol = "SYNTHETIC changed symbol"
     specimen_range.text = "SYNTHETIC-CHANGED-REFERENCE"
     specimen_range.high = Decimal("4")
+    specimen_range.unit_code = "umol_per_l"
+    specimen_range.method_code = "synthetic_replacement_method"
     db_session.commit()
+
     next_service = LabReportingService(db_session)
+    next_report = next_service.create_instance(
+        {
+            "patient_id": test_patient.id,
+            "template_id": template.id,
+            "order_id": finalized.order_id,
+        }
+    )
+    assert next_report.template_version_id == new_version.id
+    db_session.add(
+        LabSpecimenAssignment(specimen_id=specimen.id, report_instance_id=next_report.id)
+    )
+    db_session.commit()
+    next_report, _ = next_service.bulk_upsert_values(
+        next_report.id,
+        [
+            {
+                "field_key": "glucose",
+                "value_text": "6,1",
+                "unit_code": "umol_per_l",
+                "method_code": "synthetic_replacement_method",
+            }
+        ],
+    )
+    changed = next_service.materialize_instance(next_report)[0]["fields"][0]
+    assert changed["unit_code"] == "umol_per_l"
+    assert changed["unit"] == "mkmol/L"
+    assert changed["method_code"] == "synthetic_replacement_method"
+    assert changed["reference_text"] == "SYNTHETIC-CHANGED-REFERENCE"
+    assert changed["interpretation"] == "high"
+
     unchanged = next_service.materialize_instance(
         next_service.get_instance(finalized.id)
     )[0]["fields"][0]
-    assert unchanged["evaluation_snapshot"] == first_field["evaluation_snapshot"]
-    assert unchanged["reference_text"] == first_field["reference_text"]
-    assert unchanged["interpretation"] == "normal"
+    assert original_unit.symbol == "SYNTHETIC changed symbol"
+    assert unchanged == first_field
