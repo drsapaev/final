@@ -234,6 +234,8 @@ class ContextMixin(LabReportingServiceMixinBase):
         patient_id: int,
         visit_id: int | None,
     ) -> None:
+        if order.patient_id is None and order.visit_id is None:
+            raise LabReportingDomainError(409, "Lab order does not belong to a patient or visit")
         if order.patient_id is not None and int(order.patient_id) != int(patient_id):
             raise LabReportingDomainError(
                 409, "Lab order does not belong to selected patient"

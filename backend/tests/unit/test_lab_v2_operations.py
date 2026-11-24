@@ -68,6 +68,18 @@ def test_standalone_does_not_attach_to_old_order(db_session, test_patient, test_
     assert first.visit_id is None and first.order.visit_id is None
     assert second.visit_id is None and second.order.visit_id is None
 
+    orphan = LabOrder(status="ordered")
+    db_session.add(orphan)
+    db_session.commit()
+    with pytest.raises(LabReportingDomainError, match="does not belong to a patient"):
+        service.create_instance(
+            {
+                "patient_id": test_patient.id,
+                "template_id": first.template_id,
+                "order_id": orphan.id,
+            }
+        )
+
 
 @pytest.mark.unit
 def test_import_validation_receipt_and_partial_retry(db_session, test_patient):
