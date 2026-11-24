@@ -818,7 +818,7 @@ jobs:
         npx tsc --noEmit -p e2e/tsconfig.json
         echo "✅ e2e type-check passed"
 
-    - name: 🧪 Registrar time e2e (Chromium)
+    - name: 🧪 Registrar time and complaints theme e2e (Chromium)
       run: |
         cd frontend
         # 2026-11-11: a sustained DNS outage of the runner's Ubuntu apt
@@ -838,7 +838,8 @@ jobs:
           npx playwright install-deps chromium || echo "WARN: extra font packages unavailable; continuing on the runner's preinstalled fonts"
         fi
         # Spec migrated .spec.js -> .spec.ts in PR #2433 (TS migration).
-        npx playwright test e2e/registrar-time.spec.ts --project=chromium
+        test -f e2e/complaints-theme-states.spec.ts
+        npx playwright test e2e/registrar-time.spec.ts e2e/complaints-theme-states.spec.ts --project=chromium
 
     - name: 📸 UX Audit e2e + Visual regression (Chromium)
       env:
