@@ -117,13 +117,18 @@ environment, `miniapp-staging.finalclinic.fyi` hostname, and default
 `pr-4118-sessions` choice apply.
 
 For PR #4251, use `acceptance=pr-4251-arq-reminder` from protected `main`
-with `source-sha=7a1d512e87bd052dd1ee06199fec7a82e7d27d0e`.
-The workflow admits only that reviewed app commit while it remains the
-open same-repository PR head and the remote `codex/laboratory-panel-v2`
-branch tip. The app commit must descend from review base
-`11d4a5edd1979ed167ae4acb6b75e7d72eda9239`. The workflow commit must be the
-current `main`, which also supplies the trusted ARQ helper. An app change
-requires review of its new SHA before updating the pin on protected `main`.
+and pass the full current PR head as `source-sha`. It must match the open
+same-repository PR head and the remote `codex/laboratory-panel-v2` branch tip.
+The reviewed app is `7a1d512e87bd052dd1ee06199fec7a82e7d27d0e`, which descends
+from review base `11d4a5edd1979ed167ae4acb6b75e7d72eda9239`. The workflow also
+accepts an exact two-parent merge whose first parent is the reviewed app
+and whose second parent is the verified current `main` that runs the workflow.
+For that merge, the current `main` must descend from the review base and may
+differ from it only in `.github/workflows/staging-miniapp-pr.yml`,
+`.github/workflows/staging-miniapp-native-live.yml` and this runbook.
+The merge must match current `main` at those three paths and match the reviewed
+app everywhere else. Verified current `main` also supplies the trusted ARQ
+helper. An app change requires review of its new SHA before updating the pin.
 Use the same `staging-integrations` environment and staging HTTPS hostname.
 Dispatch only with explicit authorization for the approved private test
 recipient and the single reminder. The result supplements the exact-SHA
