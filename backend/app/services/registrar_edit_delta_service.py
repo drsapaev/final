@@ -71,6 +71,27 @@ class RegistrarEditDeltaItem:
     queue_entry_id: int | None = None
 
 
+def partial_removal_targets(
+    positions: list[tuple[int, int, int | None]],
+) -> dict[int, set[int]]:
+    """Exact ticket positions authorized for removal, never routing wildcards."""
+    targets: dict[int, set[int]] = {}
+    for service_id, quantity, entry_id in positions:
+        if quantity < 0:
+            raise ValueError("Количество услуги не может быть отрицательным")
+        if quantity != 0:
+            continue
+        if entry_id is None or entry_id <= 0:
+            raise ValueError("Для удаления услуги нужна исходная запись очереди")
+        if sum(
+            other_service == service_id and other_entry in (entry_id, None)
+            for other_service, _, other_entry in positions
+        ) != 1:
+            raise ValueError("Услуга указана в несовместимых изменениях")
+        targets.setdefault(entry_id, set()).add(service_id)
+    return targets
+
+
 @dataclass
 class _EditLockContext:
     transaction: Any
@@ -381,6 +402,9 @@ class RegistrarEditDeltaService:
                 expected_entry_updated_at, patient_id=patient_id
             )
 
+        removal_targets = partial_removal_targets(
+            [(item.service_id, item.quantity, item.queue_entry_id) for item in services]
+        )
         if patient_data:
             self._apply_patient_data(patient, patient_data)
 
@@ -400,7 +424,7 @@ class RegistrarEditDeltaService:
             if not queue_tag:
                 raise ValueError(f"Service {service.id} has no queue tag")
 
-            requested_qty = max(int(item.quantity or 1), 1)
+            requested_qty = int(item.quantity)
             # Codex R8 #3115 (P1): индивидуальная маршрутизация позиции —
             # явная запись позиции имеет приоритет над глобальным набором.
             item_preferred: set[int] = (
@@ -436,6 +460,12 @@ class RegistrarEditDeltaService:
                 if entry
                 else 0
             )
+            if requested_qty == 0:
+                self._assert_partial_service_removal(
+                    entry=entry,
+                    service_ids=removal_targets[item.queue_entry_id],
+                    target_exists=existing_qty > 0,
+                )
             if requested_qty > existing_qty:
                 self._assert_doctor_eligibility_for_addition(
                     service=service,
@@ -776,6 +806,36 @@ class RegistrarEditDeltaService:
                     "Смена врача существующей услуги выполняется переносом записи — "
                     "обратитесь к администратору"
                 )
+
+    def _assert_partial_service_removal(
+        self,
+        *,
+        entry: OnlineQueueEntry | None,
+        service_ids: set[int],
+        target_exists: bool,
+    ) -> None:
+        if entry is None or not target_exists:
+            raise ValueError("Услуга больше не числится в указанной записи очереди")
+        if entry.status != "waiting" or not entry.visit_id:
+            raise ValueError("Удалить услугу можно только из ожидающей записи с визитом")
+        # VisitService is mirrored by visit and service, not by queue entry.
+        # A shared visit cannot be edited safely by this single-ticket command.
+        shared = self.db.query(OnlineQueueEntry.id).filter(
+            OnlineQueueEntry.visit_id == entry.visit_id,
+            OnlineQueueEntry.id != entry.id,
+        ).first()
+        if shared:
+            raise ValueError("У визита несколько талонов — используйте корректировку визита")
+
+        # Require an already retained service, not a speculative later addition.
+        removed_ids = {str(service_id) for service_id in service_ids}
+        if not any(
+            not self._payload_is_cancelled(payload)
+            and (payload.get("service_id") or payload.get("id"))
+            and str(payload.get("service_id") or payload.get("id")) not in removed_ids
+            for payload in self._coerce_services(entry.services)
+        ):
+            raise ValueError("Последнюю услугу убирают отменой записи целиком")
 
     def _assert_decrease_allowed(self, *, entry: OnlineQueueEntry) -> None:
         """W2-PR1: снижение количества допустимо только для ещё не потреблённых
@@ -1280,9 +1340,11 @@ class RegistrarEditDeltaService:
             # не обнаруживает изменение mutable JSON field, update не persist'ится.
             # Silent data loss: пользователь меняет услуги, но БД не обновляется.
             attributes.flag_modified(entry, "services")
-            entry.service_codes = self._merged_service_codes(
-                entry.service_codes, service
-            )
+            codes = self._merged_service_codes(entry.service_codes, service)
+            if requested_qty == 0:
+                removed_code = self._service_code(service)
+                codes = [code for code in codes if code != removed_code]
+            entry.service_codes = codes
             attributes.flag_modified(entry, "service_codes")
             entry.total_amount = int(
                 Decimal(str(entry.total_amount or 0)) + delta_amount

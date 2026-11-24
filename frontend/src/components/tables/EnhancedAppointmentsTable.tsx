@@ -54,6 +54,7 @@ const EnhancedAppointmentsTable = ({
   outerBorder = true,
   showCheckboxes = true,
   preferCanonicalQueueNumber = false,
+  filteredExport,
   view = 'registrar'
 }: EnhancedAppointmentsTableProps): React.JSX.Element | null => {
   const {
@@ -92,6 +93,12 @@ const EnhancedAppointmentsTable = ({
   // Раньше: inline handleExport с formatPhoneNumber (БЕЗ маски) — PHI leak.
   // Теперь: единая функция с maskPhone=true по умолчанию + опции для extra columns.
   const handleExport = useCallback(() => {
+    if (filteredExport) {
+      if (!filteredExport.disabled && !loading && filteredData.length > 0) {
+        filteredExport.onExport(filteredData);
+      }
+      return;
+    }
     const csvContent = generateCSV(filteredData, {
       maskPhone: true, // R-05 fix: всегда маскируем телефон в CSV-экспорте
       includeQueueNumber: preferCanonicalQueueNumber,
@@ -100,7 +107,7 @@ const EnhancedAppointmentsTable = ({
     });
     const filename = `appointments_${getLocalDateString()}.csv`;
     downloadCSV(csvContent, filename);
-  }, [filteredData, isDoctorView, preferCanonicalQueueNumber]);
+  }, [filteredData, filteredExport, isDoctorView, loading, preferCanonicalQueueNumber]);
 
   // Преждевременный возврат перенесён ниже, чтобы не нарушать порядок хуков
   // Инлайновый лоадер без раннего возврата
@@ -177,10 +184,11 @@ const EnhancedAppointmentsTable = ({
           <Button
             variant="outline"
             onClick={handleExport}
+            disabled={filteredExport ? filteredExport.disabled || loading || filteredData.length === 0 : undefined}
             className="eat-export-btn">
 
             <Download size={16} />
-            {t('misc.eat_export')}
+            {filteredExport?.label ?? t('misc.eat_export')}
           </Button>
 
           

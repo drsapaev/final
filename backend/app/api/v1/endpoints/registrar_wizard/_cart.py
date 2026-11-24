@@ -52,7 +52,10 @@ from app.services.profile_contact_security import (
     check_bearer_expiry,
 )
 from app.services.registrar_doctor_eligibility import service_routes_to_resource_queue
-from app.services.registrar_edit_delta_service import require_edit_delta_discount_mode
+from app.services.registrar_edit_delta_service import (
+    partial_removal_targets,
+    require_edit_delta_discount_mode,
+)
 from app.services.registrar_wizard_queue_assignment_service import (
     DuplicateCartResourceQueueVisitsError,
 )
@@ -695,6 +698,12 @@ def _quote_token(items: list[CartQuoteItemResponse], total_amount: Decimal, appr
         "total_amount": str(total_amount),
         "currency": currency,
     }
+    if any(item.quantity == 0 for item in quote_req.items):
+        payload["partial_removals"] = sorted(
+            (item.queue_entry_id, item.service_id)
+            for item in quote_req.items if item.quantity == 0
+        )
+        payload["patient_id"] = quote_req.patient_id
     canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -710,6 +719,8 @@ def _edit_delta_quote_context(
     specialist_id: int | None = None,
     queue_entry_id: int | None = None,
     lock: bool = False,
+    all_free: bool = False,
+    removal_service_ids: set[int] | None = None,
 ) -> tuple[int, Decimal | None]:
     """Codex R6 #3095 (P2): mirror the edit-delta command's billing quantity.
 
@@ -781,6 +792,13 @@ def _edit_delta_quote_context(
         else []
     )
     existing_qty = sum(int(edit_service._payload_quantity(p)) for p in payloads)
+    if removal_service_ids is not None:
+        try:
+            edit_service._assert_partial_service_removal(
+                entry=entry, service_ids=removal_service_ids, target_exists=existing_qty > 0,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     if requested_qty > existing_qty:
         edit_service._assert_doctor_eligibility_for_addition(
             service=service,
@@ -1027,6 +1045,20 @@ def _quote_core(
     # созданную/пополненную первой. Квота накапливает уже подтверждённые
     # дельты внутри одного прохода — иначе токен покрывает больше единиц,
     # чем выставит команда.
+    removal_targets: dict[int, set[int]] = {}
+    if any(item.quantity == 0 for item in quote_req.items):
+        if (
+            quote_req.pricing_mode != "edit_delta"
+            or quote_req.patient_id is None
+            or edit_target_date is None
+        ):
+            raise HTTPException(status_code=400, detail="Нулевое количество допустимо только при удалении услуги из записи")
+        try:
+            removal_targets = partial_removal_targets([
+                (item.service_id, item.quantity, item.queue_entry_id) for item in quote_req.items
+            ])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     _edit_delta_covered: dict[tuple[int, int | None], int] = {}
 
     for item_req in quote_req.items:
@@ -1133,6 +1165,10 @@ def _quote_core(
                     specialist_id=item_req.specialist_id,
                     queue_entry_id=item_req.queue_entry_id,
                     lock=lock_pricing_rows,
+                    all_free=effective_discount_mode == "all_free",
+                    removal_service_ids=(
+                        removal_targets[item_req.queue_entry_id] if item_req.quantity == 0 else None
+                    ),
                 )
             else:
                 billable_qty = _sequential_requested

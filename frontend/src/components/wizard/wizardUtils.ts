@@ -482,14 +482,9 @@ export const getRemovedQueueEntryIds = (
   );
 };
 
-// REG-FE-084 (follow-up audit 2026-11-02): детектор «удалена ОДНА услуга
-// из СОХРАНЯЕМОЙ записи очереди». Read-модель может нести две услуги на
-// одной записи (общий original_queue_id): buildEditDeltaTargetItems
-// итерирует ТОЛЬКО текущие позиции, getRemovedQueueEntryIds видит запись
-// живой — правка молча терялась, а мастер рапортовал успех. Backend
-// edit-контракт не имеет команды удаления отдельной услуги внутри записи
-// (отдельная операция от отмены записи целиком), поэтому единственный
-// честный исход — громкий отказ до сабмита, а не ложный успех.
+// Detect removed services whose original ticket is still represented in the cart.
+// The edit-delta route sends these as explicit zero targets; the legacy QR
+// route still uses its original guard and does not support partial removal.
 export const detectRemovedServicesWithinRetainedEntries = (
   identity: EditOriginalServiceIdentity,
   cartItems: Array<Record<string, unknown>> = []
@@ -797,7 +792,8 @@ export const buildCartQuoteRequest = (
     .map((item) => {
       const quoteItem: { service_id: number; quantity: number; custom_price?: number; specialist_id?: number; queue_entry_id?: number } = {
         service_id: Number(item.service_id),
-        quantity: Math.max(1, Number(item.quantity || 1)),
+        quantity: options.pricingMode === 'edit_delta' && item.quantity === 0
+          ? 0 : Math.max(1, Number(item.quantity || 1)),
       };
       // Codex R1 #3095 (P2): custom_price зеркалится в квоту (cart-режим)
       const customPrice = (item as { custom_price?: unknown }).custom_price;
@@ -2081,6 +2077,20 @@ export const buildEditDeltaTargetItems = (
       queue_entry_id: Number(originalQueueId),
     });
   });
+  for (const removed of detectRemovedServicesWithinRetainedEntries(identity, cartItems)) {
+    const entryId = Number(removed.queueId);
+    if (!Number.isInteger(entryId) || entryId <= 0) {
+      build.unroutable.push({ service_id: removed.serviceId, name: removed.name });
+      continue;
+    }
+    build.hasQuantityChange = true;
+    build.items.push({
+      service_id: removed.serviceId,
+      quantity: 0,
+      specialist_id: null,
+      queue_entry_id: entryId,
+    });
+  }
   return build;
 };
 
