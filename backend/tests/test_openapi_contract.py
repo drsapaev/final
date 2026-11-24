@@ -30,6 +30,29 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
     assert len(schema["paths"]) >= 100
 
 
+def test_openapi_emr_workspace_exposes_lab_assessment_and_observation_date(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    workspace = schema["paths"]["/api/v1/v2/emr/{visit_id}/workspace"]["get"]
+    response = workspace["responses"]["200"]["content"]["application/json"]["schema"]
+    assert response["$ref"] == "#/components/schemas/WorkspaceOut"
+
+    components = schema["components"]["schemas"]
+    value = components["WorkspaceLabValue"]["properties"]
+    assert "evaluation_status" in value
+    assert {option["type"] for option in value["abnormal"]["anyOf"]} == {
+        "boolean",
+        "null",
+    }
+    assert {"$ref": "#/components/schemas/WorkspaceLabComparison"} in value[
+        "comparison"
+    ]["anyOf"]
+    comparison = components["WorkspaceLabComparison"]
+    assert "observed_on" in comparison["required"]
+    assert comparison["properties"]["observed_on"]["format"] == "date"
+
+
 def test_openapi_notification_templates_document_error_and_update_contract(
     client: TestClient,
 ) -> None:
