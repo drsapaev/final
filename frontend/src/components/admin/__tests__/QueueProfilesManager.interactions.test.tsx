@@ -344,7 +344,8 @@ describe('QueueProfilesManager interactions', () => {
     });
 
     expect(await screen.findByText('Для публикации нет доступного владельца очереди.')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Название вкладки очереди на английском')).toHaveFocus();
+    // The refusal can render before the dialog restores keyboard focus.
+    await waitFor(() => expect(within(dialog).getByLabelText('Название вкладки очереди на английском')).toHaveFocus());
     expect(qrCheckbox).toBeChecked();
     expect(apiMock.put).toHaveBeenCalledWith(
       '/queues/profiles/synthetic-unpublished',
@@ -353,8 +354,10 @@ describe('QueueProfilesManager interactions', () => {
     expect(syntheticProfiles.find((profile) => profile.key === 'synthetic-unpublished')?.show_on_qr_page).toBe(false);
 
     await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(editButton).toHaveFocus();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(editButton).toHaveFocus();
+    });
   });
 
   it.each([
