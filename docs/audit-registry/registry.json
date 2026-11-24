@@ -1016,14 +1016,18 @@
       "merge_sha": null
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "DERMATIMELINE-FE-001",
       "priority": "P2",
       "source": "#3892 follow-up review comments, rounds 6–28",
       "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6690449597",
-      "status": "UNVERIFIED",
-      "fix_pr": null,
-      "merge_sha": null
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": "#4245",
+      "merge_sha": "c5f87d92a",
+      "test_before": "UNVERIFIED: claim evidence https://github.com/drsapaev/final/pull/3892#issuecomment-6690449597 (VisitTimeline reporting an in-progress EMR draft as completed)",
+      "test_after": "owner PR #4245 (merge c5f87d92a, 'a true EMR draft is no longer reported as completed'): VisitTimeline draft-state discrimination added (23 draft/completed pattern hits in diff); dedicated suite VisitTimeline.draftState.test.tsx (93 lines) GREEN — 3 suites 12/12 total on merged tree; registry-agent verification 2026-11-24",
+      "reviewer": "registry-agent cycle-31: commit diff read + dedicated owner suites executed green on exact merged tree be42ec561",
+      "date": "2026-11-24"
     },
     {
       "checked": false,
@@ -1095,10 +1099,14 @@
       "priority": "P2",
       "source": "#3892 follow-up review comments, rounds 6–28",
       "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6690288950",
-      "status": "CONFIRMED_OPEN",
-      "fix_pr": null,
-      "merge_sha": null,
-      "root_cause": "CONFIRMED on current main 2026-11-15: loadPatients() issues api.get('/patients') with NO q/skip/limit/selected-patient option and renders only the returned array — the canonical endpoint defaults to limit=100, so permitted patients beyond the first page are silently unselectable even when the parent already holds their valid ID (ScheduleNextModal.tsx:133-149)"
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": "#4248",
+      "merge_sha": "b40a15a4d",
+      "root_cause": "CONFIRMED on current main 2026-11-15: loadPatients() issues api.get('/patients') with NO q/skip/limit/selected-patient option and renders only the returned array — the canonical endpoint defaults to limit=100, so permitted patients beyond the first page are silently unselectable even when the parent already holds their valid ID (ScheduleNextModal.tsx:133-149)",
+      "test_before": "CONFIRMED on current main 2026-11-15: loadPatients() issues api.get('/patients') with NO q/skip/limit/selected-patient option and renders only the returned array — the canonical endpoint defaults to a small first page, so the patient picker cannot reach patients beyond it",
+      "test_after": "owner PR #4248 (merge b40a15a4d, 'patient picker reaches beyond the first default page'): ScheduleNextModal patient search now passes q/skip/limit (+selected-patient handling, 30 pattern hits in diff); dedicated suite ScheduleNextModal.patientSearch.test.tsx (155 lines) GREEN — 3 suites 12/12 total on merged tree; registry-agent verification 2026-11-24",
+      "reviewer": "registry-agent cycle-31: commit diff read + dedicated owner suites executed green on exact merged tree be42ec561",
+      "date": "2026-11-24"
     },
     {
       "checked": true,
@@ -1106,10 +1114,14 @@
       "priority": "P2",
       "source": "#3892 follow-up review comments, rounds 6–28",
       "evidence": "https://github.com/drsapaev/final/pull/3892#issuecomment-6690288950",
-      "status": "CONFIRMED_OPEN",
-      "fix_pr": null,
-      "merge_sha": null,
-      "root_cause": "CONFIRMED on current main 2026-11-15: the post-success dismiss timer is a bare untracked setTimeout(()=>{onClose?.();resetForm();},2000) (ScheduleNextModal.tsx:241) — no clearTimeout on unmount or modal-generation token, so success-on-A then reopen-B within 2s closes B mid-form"
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": "#4243",
+      "merge_sha": "08a4654e1",
+      "root_cause": "CONFIRMED on current main 2026-11-15: the post-success dismiss timer is a bare untracked setTimeout(()=>{onClose?.();resetForm();},2000) (ScheduleNextModal.tsx:241) — no clearTimeout on unmount or modal-generation token, so success-on-A then reopen-B within 2s closes B mid-form",
+      "test_before": "CONFIRMED on current main 2026-11-15: the post-success dismiss timer is a bare untracked setTimeout(()=>{onClose?.();resetForm();},2000) (ScheduleNextModal.tsx:241) — no clearTimeout on unmount or modal reopen, so a stale timer dismisses a freshly reopened dialog",
+      "test_after": "owner PR #4243 (merge 08a4654e1, 'stale success timer can no longer dismiss a reopened schedule-next dialog'): tracked timer with cleanup (clearTimeout/timerRef patterns in diff); dedicated suite ScheduleNextModal.timer.test.tsx (120 lines) GREEN — 3 suites 12/12 total on merged tree; registry-agent verification 2026-11-24",
+      "reviewer": "registry-agent cycle-31: commit diff read + dedicated owner suites executed green on exact merged tree be42ec561",
+      "date": "2026-11-24"
     },
     {
       "checked": false,
