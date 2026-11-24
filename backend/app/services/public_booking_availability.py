@@ -14,9 +14,18 @@ from enum import Enum
 from itertools import pairwise
 from zoneinfo import ZoneInfo
 
+from app.services.appointment_intervals import (
+    MAX_SERVICE_DURATION_MINUTES as MAX_SERVICE_DURATION_MINUTES,
+)
+from app.services.appointment_intervals import (
+    clock_minutes,
+    clock_seconds,
+    intervals_overlap,
+    valid_duration,
+)
+
 PUBLIC_BOOKING_TIMEZONE = ZoneInfo("Asia/Tashkent")
 PUBLIC_BOOKING_START_STEP_MINUTES = 20
-MAX_SERVICE_DURATION_MINUTES = 480
 _DAY_MINUTES = 24 * 60
 
 
@@ -77,19 +86,20 @@ def available_starts_for_day(
 
     The 20-minute grid starts at the beginning of the shift, not at a rounded
     clock boundary. Appointment and break intervals are half-open, so directly
-    adjacent intervals do not overlap. Any non-cancelled appointment with an
-    unknown/invalid start or duration closes the doctor's whole date. Historical
-    durations are never inferred from current service data.
+    adjacent intervals do not overlap. Any non-cancelled appointment on the
+    target date with an unknown/invalid start or duration closes that date.
+    Known intervals from the previous date block time carried past midnight.
+    Historical durations are never inferred from current service data.
     """
     if shift is None or not shift.active:
         return []
-    if not _valid_duration(service_duration_minutes):
+    if not valid_duration(service_duration_minutes):
         return []
     if calendar is None or not calendar.permits_date(target_date):
         return []
 
-    shift_start = _clock_minutes(shift.start)
-    shift_end = _clock_minutes(shift.end)
+    shift_start = clock_minutes(shift.start)
+    shift_end = clock_minutes(shift.end)
     if shift_start is None or shift_end is None or shift_end <= shift_start:
         return []
 
@@ -102,15 +112,23 @@ def available_starts_for_day(
         return []
 
     occupied_intervals: list[tuple[int, int]] = []
+    target_ordinal = target_date.toordinal()
     for appointment in existing_appointments:
-        if appointment.appointment_date != target_date:
-            continue
-        if _is_cancelled(appointment.status):
+        day_offset = appointment.appointment_date.toordinal() - target_ordinal
+        if day_offset not in (-1, 0) or _is_cancelled(appointment.status):
             continue
 
-        start = _clock_minutes(appointment.appointment_time)
         duration = appointment.duration_minutes_snapshot
-        if start is None or not _valid_duration(duration):
+        if day_offset == -1:
+            start_seconds = clock_seconds(appointment.appointment_time)
+            if start_seconds is not None and valid_duration(duration):
+                tail_seconds = start_seconds + 60 * (duration - _DAY_MINUTES)
+                if tail_seconds > 0:
+                    # A minute-grid start at the final partial minute still overlaps.
+                    occupied_intervals.append((0, (tail_seconds + 59) // 60))
+            continue
+        start = clock_minutes(appointment.appointment_time)
+        if start is None or not valid_duration(duration):
             return []
         end = start + duration
         if end > _DAY_MINUTES:
@@ -138,32 +156,6 @@ def available_starts_for_day(
     return starts
 
 
-def _clock_minutes(value: time | str | None) -> int | None:
-    if isinstance(value, str):
-        parsed: time | None = None
-        for format_string in ("%H:%M", "%H:%M:%S"):
-            try:
-                parsed = datetime.strptime(value, format_string).time()
-                break
-            except ValueError:
-                continue
-        value = parsed
-
-    if not isinstance(value, time) or value.tzinfo is not None:
-        return None
-    if value.second != 0 or value.microsecond != 0:
-        return None
-    return value.hour * 60 + value.minute
-
-
-def _valid_duration(value: int | None) -> bool:
-    return (
-        isinstance(value, int)
-        and not isinstance(value, bool)
-        and 1 <= value <= MAX_SERVICE_DURATION_MINUTES
-    )
-
-
 def _is_cancelled(status: str | Enum | None) -> bool:
     value = getattr(status, "value", status)
     return isinstance(value, str) and value.strip().casefold() == "cancelled"
@@ -177,8 +169,8 @@ def _validated_break_intervals(
 ) -> list[tuple[int, int]] | None:
     intervals: list[tuple[int, int]] = []
     for pause in shift.breaks:
-        pause_start = _clock_minutes(pause.start)
-        pause_end = _clock_minutes(pause.end)
+        pause_start = clock_minutes(pause.start)
+        pause_end = clock_minutes(pause.end)
         if (
             pause_start is None
             or pause_end is None
@@ -202,5 +194,6 @@ def _overlaps_any(
     intervals: Iterable[tuple[int, int]],
 ) -> bool:
     return any(
-        start < other_end and end > other_start for other_start, other_end in intervals
+        intervals_overlap(start, end, other_start, other_end)
+        for other_start, other_end in intervals
     )

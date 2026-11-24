@@ -23,14 +23,13 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.core.security import get_password_hash
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
-from app.models.visit import Visit, VisitService
 from app.models.user import User
-from app.models.clinic import Doctor
-from app.core.security import get_password_hash
-from app.services.service_mapping import normalize_service_code
+from app.models.visit import Visit, VisitService
 
 PRICE = Decimal("25000")
 TZ = ZoneInfo("Asia/Tashkent")
@@ -798,3 +797,102 @@ def test_read_model_service_details_include_quantity(
     assert record is not None
     detail = next(d for d in record["service_details"] if d["id"] == service.id)
     assert detail["quantity"] == 5
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+@pytest.mark.parametrize("case", ["unpaid", "paid", "last", "unbound", "stale", "multi_last", "in_service"])
+def test_edit_removes_an_unpaid_service_and_corrects_name_without_changing_ticket(
+    client, db_session, registrar_auth_headers, test_patient, test_doctor, case
+):
+    removed = _create_service(db_session, code="TSQ-REM-01", name="Synthetic removed", queue_tag="laboratory_general")
+    kept = _create_service(db_session, code="TSQ-REM-02", name="Synthetic retained", queue_tag="laboratory_general")
+    day = date.today()
+    visit = _create_visit(
+        db_session, patient=test_patient, doctor_id=test_doctor.id,
+        department="laboratory_general",
+    )
+    queue = _create_queue(
+        db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general", day=day,
+    )
+    entry = _create_entry(
+        db_session, queue=queue, patient=test_patient, service=removed, visit_id=visit.id,
+    )
+    _attach_visit_service(db_session, visit=visit, service=removed, quantity=1)
+    if case != "last":
+        _attach_visit_service(db_session, visit=visit, service=kept, quantity=1)
+        entry.services = [*entry.services, {
+            "service_id": kept.id, "code": kept.service_code, "name": kept.name,
+            "quantity": 1, "unit_price": float(PRICE), "price": float(PRICE),
+        }]
+        entry.service_codes = [removed.service_code, kept.service_code]
+        entry.total_amount = int(PRICE * 2)
+        db_session.commit()
+    if case == "in_service":
+        entry.status = "in_service"
+        db_session.commit()
+    amount = PRICE if case == "last" else PRICE * 2
+    invoice = _create_pending_invoice(db_session, patient=test_patient, visit=visit, amount=amount)
+    if case == "paid":
+        invoice.status = "paid"
+        db_session.commit()
+    patient_id, entry_id, visit_id = test_patient.id, entry.id, visit.id
+    name_before, number_before, time_before = test_patient.first_name, entry.number, entry.queue_time
+    items = [{"service_id": removed.id, "quantity": 0}]
+    if case != "unbound":
+        items[0]["queue_entry_id"] = entry_id
+    if case == "multi_last":
+        items.append({"service_id": kept.id, "quantity": 0, "queue_entry_id": entry_id})
+    if case == "stale":
+        items[0]["service_id"] = _create_service(
+            db_session, code="TSQ-REM-03", name="Synthetic not present", queue_tag="laboratory_general",
+        ).id
+    quote = client.post("/api/v1/registrar/cart/quote", headers=registrar_auth_headers, json={
+        "items": items, "pricing_mode": "edit_delta", "patient_id": patient_id,
+        "target_date": day.isoformat(), "preferred_entry_ids": [entry_id],
+    })
+    if case == "unpaid":
+        assert quote.status_code == 200, quote.text
+        assert Decimal(str(quote.json()["total_amount"])) == -PRICE
+    else:
+        assert quote.status_code == 400, quote.text
+    payload = {
+        "patient_id": patient_id, "target_date": day.isoformat(), "services": items,
+        "existing_queue_entry_ids": [entry_id],
+        "patient_data": {"full_name": "SYNTHETIC Example"},
+    }
+    if case == "unpaid":
+        payload["quote_token"] = quote.json()["quote_token"]
+    response = client.post(
+        "/api/v1/registrar/cart/edit-delta", headers=registrar_auth_headers, json=payload,
+    )
+    assert response.status_code == (200 if case == "unpaid" else 400), response.text
+    db_session.refresh(invoice)
+    db_session.refresh(entry)
+    db_session.refresh(test_patient)
+    db_session.refresh(visit)
+    rows = db_session.query(VisitService).filter_by(visit_id=visit_id).all()
+    assert (entry.number, entry.queue_time, entry.status, entry.visit_id) == (
+        number_before, time_before, "in_service" if case == "in_service" else "waiting", visit_id,
+    )
+    if case == "unpaid":
+        assert test_patient.first_name == "Example"
+        assert Decimal(str(response.json()["total_amount"])) == -PRICE
+        assert [r.service_id for r in rows] == [kept.id]
+        assert [p["service_id"] for p in entry.services] == [kept.id]
+        assert len(entry.service_codes) == 1
+        assert entry.total_amount == PRICE
+        assert Decimal(str(invoice.total_amount)) == PRICE
+        link = db_session.query(PaymentInvoiceVisit).filter_by(visit_id=visit_id).one()
+        assert Decimal(str(link.visit_amount)) == PRICE
+        replay = client.post(
+            "/api/v1/registrar/cart/edit-delta", headers=registrar_auth_headers, json=payload,
+        )
+        assert replay.status_code == 400
+        db_session.refresh(invoice)
+        assert Decimal(str(invoice.total_amount)) == PRICE
+    else:
+        assert test_patient.first_name == name_before
+        assert removed.id in {r.service_id for r in rows}
+        assert entry.total_amount == amount
+        assert Decimal(str(invoice.total_amount)) == amount
