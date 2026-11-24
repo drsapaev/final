@@ -70,13 +70,28 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-async function submitSuccessfully(container: HTMLElement, patientId: string) {
+async function submit(container: HTMLElement, patientId: string) {
   await waitFor(() => expect(mockedGet).toHaveBeenCalledWith('/services'));
   expect((screen.getByLabelText('Schedule next visit patient') as HTMLSelectElement).value).toBe(patientId);
   fireEvent.change(screen.getByLabelText('Schedule next visit date'), { target: { value: '2030-01-01' } });
   fireEvent.change(screen.getByLabelText('Schedule next visit service 1'), { target: { value: '5' } });
   fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+}
+
+async function submitSuccessfully(container: HTMLElement, patientId: string) {
+  await submit(container, patientId);
   await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(1));
+}
+
+function deferredResponse() {
+  let resolve!: (response: ReturnType<typeof jsonResponse>) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<ReturnType<typeof jsonResponse>>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  mockedPost.mockReturnValueOnce(promise);
+  return { resolve, reject };
 }
 
 describe('DERMSCHED-FE-004 — a stale success timer never closes a dialog generation it does not belong to', () => {
@@ -116,5 +131,78 @@ describe('DERMSCHED-FE-004 — a stale success timer never closes a dialog gener
     // No open-state transition, no unmount — the auto-close must fire.
     act(() => { vi.advanceTimersByTime(2200); });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('schedule-next submission belongs to its originating dialog session', () => {
+  it('keeps B saving and open when the earlier save for A succeeds', async () => {
+    const a = deferredResponse();
+    const b = deferredResponse();
+    const onSuccess = vi.fn();
+    const onClose = vi.fn();
+    const view = render(<ScheduleNextModal isOpen patient={{ id: 9 }} onSuccess={onSuccess} onClose={onClose} />);
+    await submit(view.container, '9');
+
+    view.rerender(<ScheduleNextModal isOpen={false} />);
+    view.rerender(<ScheduleNextModal isOpen patient={{ id: 22 }} onSuccess={onSuccess} onClose={onClose} />);
+    await submit(view.container, '22');
+    expect(mockedPost).toHaveBeenCalledTimes(2);
+    const save = view.container.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+
+    await act(async () => { a.resolve(jsonResponse({ visit_id: 55 })); });
+    expect(onSuccess).toHaveBeenCalledExactlyOnceWith({ visit_id: 55 }, expect.objectContaining({ patient_id: 9 }));
+    expect(save.disabled).toBe(true);
+    expect(screen.queryByText('misc.snm_visit_scheduled')).toBeNull();
+    act(() => { vi.advanceTimersByTime(2200); });
+    expect(onClose).not.toHaveBeenCalled();
+    expect((screen.getByLabelText('Schedule next visit patient') as HTMLSelectElement).value).toBe('22');
+
+    await act(async () => { b.resolve(jsonResponse({ visit_id: 56 })); });
+    expect(onSuccess).toHaveBeenLastCalledWith({ visit_id: 56 }, expect.objectContaining({ patient_id: 22 }));
+    expect(onSuccess).toHaveBeenCalledTimes(2);
+    expect(save.disabled).toBe(false);
+    act(() => { vi.advanceTimersByTime(2200); });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show a stale error when the host replaces the patient without closing', async () => {
+    const a = deferredResponse();
+    const onSuccess = vi.fn();
+    const view = render(<ScheduleNextModal isOpen patient={{ id: 99, patient_id: 9 }} onSuccess={onSuccess} />);
+    await submit(view.container, '9');
+
+    view.rerender(<ScheduleNextModal isOpen patient={{ id: 99, patient_id: 22 }} onSuccess={onSuccess} />);
+    await act(async () => { a.reject({ response: { data: { detail: 'synthetic A-only error' } } }); });
+    expect(screen.queryByText('synthetic A-only error')).toBeNull();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect((screen.getByLabelText('Schedule next visit patient') as HTMLSelectElement).value).toBe('22');
+  });
+
+  it('keeps the current session when a new patient object has the same canonical ID', async () => {
+    const request = deferredResponse();
+    const onClose = vi.fn();
+    const view = render(<ScheduleNextModal isOpen patient={{ id: 99, patient_id: 9 }} onClose={onClose} />);
+    await submit(view.container, '9');
+
+    view.rerender(<ScheduleNextModal isOpen patient={{ id: 100, patient_id: '9' }} onClose={onClose} />);
+    await act(async () => { request.resolve(jsonResponse({ visit_id: 55 })); });
+    expect(screen.getByText('misc.snm_visit_scheduled')).toBeTruthy();
+    act(() => { vi.advanceTimersByTime(2200); });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('notifies the host of the saved visit but does not auto-close after unmount', async () => {
+    const request = deferredResponse();
+    const onSuccess = vi.fn();
+    const onClose = vi.fn();
+    const view = render(<ScheduleNextModal isOpen patient={{ id: 9 }} onSuccess={onSuccess} onClose={onClose} />);
+    await submit(view.container, '9');
+    view.unmount();
+
+    await act(async () => { request.resolve(jsonResponse({ visit_id: 55 })); });
+    expect(onSuccess).toHaveBeenCalledExactlyOnceWith({ visit_id: 55 }, expect.objectContaining({ patient_id: 9 }));
+    act(() => { vi.advanceTimersByTime(2200); });
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
