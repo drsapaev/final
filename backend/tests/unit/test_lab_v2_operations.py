@@ -1,8 +1,9 @@
 from asyncio import run
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy import select
@@ -25,6 +26,7 @@ from app.services.lab_critical_communication import (
     record_released_report,
 )
 from app.services.lab_import import process_import_batch
+from app.services.lab_operational_metrics import laboratory_metrics
 from app.services.lab_reporting import LabReportingDomainError, LabReportingService
 from app.services.notifications import notification_sender_service
 
@@ -74,6 +76,25 @@ def accepted_specimen(db_session, report, barcode):
     )
     db_session.commit()
     return specimen
+
+
+@pytest.mark.unit
+def test_turnaround_uses_elapsed_minutes_for_a_released_specimen(db_session, test_patient):
+    _, report = synthetic_report(db_session, test_patient.id)
+    specimen = accepted_specimen(db_session, report, "SYNTHETIC-TURNAROUND")
+    released_at = datetime.now(UTC) - timedelta(minutes=15)
+    specimen.created_at = released_at - timedelta(minutes=65)
+    specimen.received_at = released_at - timedelta(minutes=60)
+    specimen.accepted_at = specimen.received_at + timedelta(minutes=5)
+    assert report.status == "DRAFT"
+    report.status = "FINALIZED"
+    report.finalized_at = released_at
+    db_session.commit()
+
+    metrics = laboratory_metrics(db_session, ZoneInfo("Asia/Tashkent"), days=1)
+
+    assert metrics["turnaround_pairs"] == 1
+    assert metrics["average_turnaround_minutes"] == 60.0
 
 
 @pytest.mark.unit

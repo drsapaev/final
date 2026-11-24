@@ -48,7 +48,14 @@ def laboratory_metrics(db: Session, timezone: ZoneInfo, *, days: int) -> dict:
         count for action, _, count in specimen_event_counts if action == "hold"
     )
 
-    seconds = extract("epoch", LabReportInstance.finalized_at - LabSpecimen.received_at)
+    if db.get_bind().dialect.name == "sqlite":
+        # SQLite stores these timestamps as text and cannot subtract them directly.
+        seconds = 86_400 * (
+            func.julianday(LabReportInstance.finalized_at)
+            - func.julianday(LabSpecimen.received_at)
+        )
+    else:
+        seconds = extract("epoch", LabReportInstance.finalized_at - LabSpecimen.received_at)
     sample_count, mean_seconds = db.execute(
         select(func.count(), func.avg(seconds))
         .select_from(LabSpecimenAssignment)
