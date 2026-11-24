@@ -1,5 +1,6 @@
 """The managed path never publishes a version the reviewer did not inspect."""
 
+from copy import deepcopy
 from datetime import UTC, date, datetime
 from uuid import uuid4
 
@@ -15,6 +16,7 @@ from app.models.user import User
 from app.models.visit import VisitService
 from app.schemas.lab_release import LabReportQCIn
 from app.services.authentication_service import authentication_service
+from app.services.lab_report_pdf_service import lab_report_pdf_service
 from app.services.lab_reporting_service import (
     LabReportingDomainError,
     LabReportingService,
@@ -56,11 +58,13 @@ def _auth(actor):
     return {"Authorization": f"Bearer {token}"}
 
 
-def _accepted_specimen(db, report, barcode, *, replaces_specimen_id=None):
+def _accepted_specimen(
+    db, report, barcode, *, replaces_specimen_id=None, material_code="synthetic-blood",
+):
     specimen = LabSpecimen(
         order_id=report.order_id,
         barcode=barcode,
-        material_code="synthetic-blood",
+        material_code=material_code,
         container_code="synthetic-tube",
         status="accepted",
         revision=4,
@@ -264,7 +268,11 @@ def test_managed_release_versions_permissions_and_correction_history(
     assert {
         value.result_payload["source_specimen_id"] for value in revision.values
     } == {specimen.id}
-    assert service.workflow_history(revision.id)[0].reason == "SYNTHETIC correction"
+    revision_event = service.workflow_history(revision.id)[0]
+    assert revision_event.kind == "revision_created"
+    assert revision_event.reason == "SYNTHETIC correction"
+    assert revision_event.actor_user_id == actor_id
+    assert revision_event.occurred_at is not None
     same_revision = service.revise(
         report_id,
         actor_user_id=actor_id,
@@ -273,6 +281,217 @@ def test_managed_release_versions_permissions_and_correction_history(
     )
     assert same_revision.id == revision.id
     assert service.get_instance(report_id).status == "FINALIZED"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("qc_status", "mixed_material", "expected_hold"),
+    [
+        (None, False, "qc_missing"),
+        ("rejected", False, "qc_rejected"),
+        ("not_applicable", True, "specimen_context_ambiguous"),
+        ("not_applicable", False, None),
+    ],
+)
+def test_managed_review_surfaces_qc_and_material_holds(
+    client, db_session, test_patient, monkeypatch, qc_status, mixed_material, expected_hold,
+):
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", True)
+    monkeypatch.setattr(settings, "LAB_RELEASE_REQUIRE_DISTINCT_REVIEWER", True)
+    entrant = _staff(db_session, "managed-qc-entry", [])
+    reviewer = _staff(
+        db_session, "managed-qc-review",
+        [Permission(name=code, codename=code) for code in ("lab:review", "lab:qc")],
+    )
+    service = LabReportingService(db_session)
+    template = next(item for item in service.list_templates() if item.code == "cbc_oak")
+    report = service.create_instance(
+        {"patient_id": test_patient.id, "template_id": template.id},
+        actor_user_id=entrant.id,
+    )
+    _accepted_specimen(db_session, report, "SYNTHETIC-QC-PRIMARY")
+    report, _ = service.bulk_upsert_values(
+        report.id,
+        [
+            {"field_key": "hgb", "value_text": "135"},
+            {"field_key": "wbc", "value_text": "5.2"},
+        ],
+        expected_updated_at=report.updated_at.isoformat(), actor_user_id=entrant.id,
+    )
+    if mixed_material:
+        _accepted_specimen(
+            db_session, report, "SYNTHETIC-QC-OTHER", material_code="synthetic-serum",
+        )
+    path = f"/api/v1/lab/report-instances/{report.id}"
+    headers = _auth(reviewer)
+    if qc_status:
+        payload = {"expected_updated_at": report.updated_at.isoformat(), "status": qc_status}
+        if qc_status == "not_applicable":
+            undocumented = client.post(f"{path}/qc", headers=headers, json=payload)
+            assert undocumented.status_code == 422, undocumented.text
+        else:
+            payload.update(method="SYNTHETIC-QC", series_ref="SYNTHETIC-LOT")
+        recorded = client.post(
+            f"{path}/qc", headers=headers,
+            json={**payload, "reason": "SYNTHETIC disposition"},
+        )
+        assert recorded.status_code == 200, recorded.text
+        report = service.get_instance(report.id)
+    report = service.submit_for_review(
+        report.id, expected_updated_at=report.updated_at.isoformat(), actor_user_id=entrant.id,
+    )
+    current = client.get(path, headers=headers)
+    assert current.status_code == 200, current.text
+    saved = current.json()
+    assert saved["release_holds"] == ([expected_hold] if expected_hold else [])
+    assert "return_to_draft" in saved["available_actions"]
+    if qc_status:
+        qc, = [event for event in saved["workflow_events"] if event["kind"] == "qc_recorded"]
+        assert qc["reason"] == "SYNTHETIC disposition"
+        assert qc["evidence"]["qc"]["status"] == qc_status
+    command = {"expected_updated_at": saved["updated_at"]}
+    if expected_hold is None:
+        denied = client.post(f"{path}/review", headers=_auth(entrant), json=command)
+        assert denied.status_code == 403, denied.text
+        forged = client.post(
+            f"{path}/review", headers=_auth(entrant),
+            json={**command, "actor_user_id": reviewer.id},
+        )
+        assert forged.status_code == 422, forged.text
+    reviewed = client.post(
+        f"{path}/review", headers=headers, json=command,
+    )
+    if expected_hold:
+        assert reviewed.status_code == 409, reviewed.text
+        assert reviewed.json()["detail"] == expected_hold
+    else:
+        assert reviewed.status_code == 200, reviewed.text
+        assert reviewed.json()["status"] == "REVIEWED"
+        reviewed_event, = [
+            event for event in reviewed.json()["workflow_events"] if event["kind"] == "reviewed"
+        ]
+        assert reviewed_event["actor_user_id"] == reviewer.id
+
+
+@pytest.mark.unit
+def test_managed_submission_accepts_documented_absence_for_required_results(
+    db_session, test_patient, monkeypatch,
+):
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", True)
+    entrant = _staff(db_session, "managed-completeness", [])
+    service = LabReportingService(db_session)
+    template = service.create_template(
+        {
+            "code": "SYNTHETIC-COMPLETENESS",
+            "name": "SYNTHETIC completeness",
+            "family": "synthetic",
+            "initial_version": {
+                "layout_preset": "lab_table_classic_v1",
+                "sections": [{
+                    "key": "results",
+                    "fields": [
+                        {"field_key": "optional", "label": "SYNTHETIC 1", "value_type": "numeric"},
+                        {"field_key": "required", "label": "SYNTHETIC 2", "value_type": "numeric", "required": True},
+                    ],
+                }],
+            },
+        },
+    )
+    service.publish_template_version(template.versions[0].id)
+    report = service.create_instance(
+        {"patient_id": test_patient.id, "template_id": template.id},
+        actor_user_id=entrant.id,
+    )
+    _accepted_specimen(db_session, report, "SYNTHETIC-COMPLETENESS")
+    with pytest.raises(LabReportingDomainError, match="Required results missing") as empty:
+        service.submit_for_review(
+            report.id, expected_updated_at=report.updated_at.isoformat(), actor_user_id=entrant.id,
+        )
+    assert empty.value.status_code == 400
+    report, _ = service.bulk_upsert_values(
+        report.id, [{"field_key": "optional", "value_text": "135"}],
+        expected_updated_at=report.updated_at.isoformat(), actor_user_id=entrant.id,
+    )
+    with pytest.raises(LabReportingDomainError, match="Required results missing: required"):
+        service.submit_for_review(
+            report.id, expected_updated_at=report.updated_at.isoformat(), actor_user_id=entrant.id,
+        )
+    report, _ = service.bulk_upsert_values(
+        report.id,
+        [{
+            "field_key": "required", "result_kind": "absent",
+            "absence_reason": "SYNTHETIC documented absence",
+        }],
+        expected_updated_at=report.updated_at.isoformat(), actor_user_id=entrant.id,
+    )
+    report = service.submit_for_review(
+        report.id, expected_updated_at=report.updated_at.isoformat(), actor_user_id=entrant.id,
+    )
+    assert report.status == "IN_REVIEW"
+    absence = next(value for value in report.values if value.field_key == "required")
+    assert absence.result_payload["absence_reason"] == "SYNTHETIC documented absence"
+
+
+@pytest.mark.unit
+def test_draft_template_can_preview_but_cannot_replace_released_pdf(
+    client, db_session, test_patient, auth_headers, monkeypatch,
+):
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", False)
+    service = LabReportingService(db_session)
+    monkeypatch.setattr(service, "_emit_lab_results_ready_notification", lambda _: None)
+    template = next(item for item in service.list_templates() if item.code == "cbc_oak")
+    create_data = {"patient_id": test_patient.id, "template_id": template.id}
+    released = service.create_instance(create_data)
+    values = [
+        {"field_key": "hgb", "value_text": "135"},
+        {"field_key": "wbc", "value_text": "5.2"},
+    ]
+    service.bulk_upsert_values(released.id, values)
+    released = service.finalize(released.id)
+    released_version = released.template_version_id
+    payloads = []
+    render_report = lab_report_pdf_service.render_report
+
+    def capture_report(context):
+        payloads.append(deepcopy(context))
+        return render_report(context)
+
+    monkeypatch.setattr(lab_report_pdf_service, "render_report", capture_report)
+    released_path = f"/api/v1/lab/report-instances/{released.id}/pdf"
+    before = client.get(released_path, headers=auth_headers)
+    assert before.status_code == 200 and before.content.startswith(b"%PDF")
+    frozen_context = payloads.pop()
+    draft = service.create_template_version(template.id, source_version_id=released_version)
+    draft_report = service.create_instance({**create_data, "template_version_id": draft.id})
+    service.bulk_upsert_values(draft_report.id, values)
+    draft_path = f"/api/v1/lab/report-instances/{draft_report.id}"
+
+    preview = client.get(f"{draft_path}/preview", headers=auth_headers)
+    assert preview.status_code == 200 and preview.content.startswith(b"%PDF")
+    assert payloads.pop()["watermark_text"]
+    with pytest.raises(LabReportingDomainError, match="Release requires a published template"):
+        service.finalize(draft_report.id)
+    assert service.get_instance(draft_report.id).status in {"DRAFT", "IN_PROGRESS"}
+
+    service.update_template_version(
+        draft.id,
+        {
+            "layout_preset": draft.layout_preset,
+            "page_settings": draft.page_settings,
+            "branding_overrides": draft.branding_overrides,
+            "signer_defaults": draft.signer_defaults,
+            "sections": service._sections_to_payload(draft.sections),
+            "footer_notes": "SYNTHETIC updated footer",
+        },
+    )
+    changed_preview = client.get(f"{draft_path}/preview", headers=auth_headers)
+    assert changed_preview.status_code == 200 and changed_preview.content.startswith(b"%PDF")
+    assert payloads.pop()["footer_notes"] == "SYNTHETIC updated footer"
+    service.publish_template_version(draft.id)
+    after = client.get(released_path, headers=auth_headers)
+    assert after.status_code == 200 and after.content.startswith(b"%PDF")
+    assert service.get_instance(released.id).template_version_id == released_version
+    assert payloads.pop() == frozen_context
 
 
 @pytest.mark.unit
