@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .activation import Activation
+from .activation_rate_budget import ActivationRateBudget
 from .ai_chat import AIChatFeedback, AIChatMessage, AIChatSession
 from .ai_config import (
     AIPromptTemplate,
@@ -165,6 +166,7 @@ from .public_booking_request import (
     PublicBookingRequestEvent,
     PublicBookingRequestNotificationOutbox,
 )
+from .public_site_analytics import PublicSiteDailyCount
 from .public_site_media import PublicSiteMedia
 from .push_device import PushDevice  # noqa: F401  # PR-6: registry re-export
 from .queue_direction_public_address import (  # noqa: F401  # RQ-16.c: public-address registry re-export
@@ -229,6 +231,7 @@ from .visit import Visit, VisitService
 
 # Make sure all models are available
 __all__ = [
+    "ActivationRateBudget",
     "User",
     "Patient",
     "PatientAccessAuditLog",  # M4-P0-1: PHI access audit trail
@@ -354,6 +357,7 @@ __all__ = [
     "PublicBookingRequest",
     "PublicBookingRequestEvent",
     "PublicBookingRequestNotificationOutbox",
+    "PublicSiteDailyCount",
     "PublicSiteMedia",
     "Department",
     "DepartmentService",

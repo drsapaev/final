@@ -205,7 +205,7 @@ class ConfirmationSecurityService:
             )
 
         except Exception as e:
-            logger.error(f"Ошибка валидации запроса подтверждения: {e}")
+            logger.error("Confirmation validation failed error_type=%s", type(e).__name__)
             return SecurityCheckResult(
                 allowed=False, reason="Внутренняя ошибка системы безопасности"
             )
@@ -332,7 +332,7 @@ class ConfirmationSecurityService:
                         )
 
         except Exception as e:
-            logger.error(f"Ошибка записи попытки подтверждения: {e}")
+            logger.error("Confirmation attempt recording failed error_type=%s", type(e).__name__)
 
     def cleanup_expired_tokens(self) -> int:
         """

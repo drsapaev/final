@@ -126,6 +126,7 @@ def _mint_jwt(*, sub, jti: str | None = "synthetic-jti") -> str:
 
 
 def _stub_user_resolver(monkeypatch: pytest.MonkeyPatch, user) -> None:
+    user.auth_epoch = 0
     monkeypatch.setattr(
         ws_auth_module, "_resolve_websocket_user", lambda payload, db: user
     )
@@ -133,8 +134,12 @@ def _stub_user_resolver(monkeypatch: pytest.MonkeyPatch, user) -> None:
 
 
 def _stub_blacklist(monkeypatch: pytest.MonkeyPatch, fake) -> None:
+    def check(db, jti, user_id=None, *, auth_epoch=0):
+        assert auth_epoch == 0
+        return fake(db, jti, user_id=user_id)
+
     monkeypatch.setattr(
-        TokenBlacklistService, "is_token_blacklisted", staticmethod(fake)
+        TokenBlacklistService, "is_token_blacklisted", staticmethod(check)
     )
 
 
@@ -304,11 +309,11 @@ async def test_testing_bypass_still_allows_dev_harness(
 
 
 # ---------------------------------------------------------------------------
-# QUEUEWSAUTH-BE-002 — username-sub revocation reaches the blacklist
+# QUEUEWSAUTH-BE-002 — numeric-sub revocation reaches the blacklist
 # ---------------------------------------------------------------------------
 
 
-def test_username_sub_revoked_jti_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_numeric_sub_revoked_jti_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("TESTING", raising=False)
     monkeypatch.setenv("ENV", "dev")
     calls: list[tuple[str, int | None]] = []
@@ -322,20 +327,22 @@ def test_username_sub_revoked_jti_rejected(monkeypatch: pytest.MonkeyPatch) -> N
         monkeypatch, SimpleNamespace(id=7, role="Doctor", username="synthetic-staff")
     )
 
-    token = _mint_jwt(sub="synthetic-staff", jti="syn-revoked-jti")
+    token = _mint_jwt(sub="7", jti="syn-revoked-jti")
     assert queue_ws._auth_ok({"authorization": f"Bearer {token}"}, None) is False
-    # Revocation must run for the RESOLVED stable user id — not be skipped
-    # because the subject is a username string.
+    # Revocation must run for the resolved stable user id.
     assert calls == [("syn-revoked-jti", 7)]
 
 
-def test_username_sub_all_user_sentinel_rejected(
+def test_numeric_sub_all_user_sentinel_rejected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("TESTING", raising=False)
     monkeypatch.setenv("ENV", "dev")
 
+    calls: list[tuple[str, int | None]] = []
+
     def fake_blacklist(db, jti, user_id=None):
+        calls.append((jti, user_id))
         # The all_user_tokens sentinel for user 7 is active; the fresh jti
         # itself is NOT individually revoked.
         return user_id == 7
@@ -345,11 +352,12 @@ def test_username_sub_all_user_sentinel_rejected(
         monkeypatch, SimpleNamespace(id=7, role="Doctor", username="synthetic-staff")
     )
 
-    token = _mint_jwt(sub="synthetic-staff", jti="syn-fresh-jti")
+    token = _mint_jwt(sub="7", jti="syn-fresh-jti")
     assert queue_ws._auth_ok({"authorization": f"Bearer {token}"}, None) is False
+    assert calls == [("syn-fresh-jti", 7)]
 
 
-def test_username_sub_without_jti_still_checks_all_user_sentinel(
+def test_numeric_sub_without_jti_still_checks_all_user_sentinel(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("TESTING", raising=False)
@@ -365,12 +373,12 @@ def test_username_sub_without_jti_still_checks_all_user_sentinel(
         monkeypatch, SimpleNamespace(id=7, role="Doctor", username="synthetic-staff")
     )
 
-    token = _mint_jwt(sub="synthetic-staff", jti=None)
+    token = _mint_jwt(sub="7", jti=None)
     assert queue_ws._auth_ok({"authorization": f"Bearer {token}"}, None) is False
     assert blacklist_calls == [("", 7)]
 
 
-def test_username_sub_unrevoked_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_numeric_sub_unrevoked_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("TESTING", raising=False)
     monkeypatch.setenv("ENV", "dev")
 
@@ -379,8 +387,21 @@ def test_username_sub_unrevoked_accepted(monkeypatch: pytest.MonkeyPatch) -> Non
         monkeypatch, SimpleNamespace(id=7, role="Doctor", username="synthetic-staff")
     )
 
-    token = _mint_jwt(sub="synthetic-staff", jti="syn-clean-jti")
+    token = _mint_jwt(sub="7", jti="syn-clean-jti")
     assert queue_ws._auth_ok({"authorization": f"Bearer {token}"}, None) is True
+
+
+def test_username_only_sub_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("TESTING", raising=False)
+    monkeypatch.setenv("ENV", "dev")
+    calls = []
+    _stub_blacklist(monkeypatch, lambda db, jti, user_id=None: calls.append(user_id))
+    _stub_user_resolver(
+        monkeypatch, SimpleNamespace(id=7, role="Doctor", username="synthetic-staff")
+    )
+    token = _mint_jwt(sub="synthetic-staff")
+    assert queue_ws._auth_ok({"authorization": f"Bearer {token}"}, None) is False
+    assert calls == []
 
 
 # ---------------------------------------------------------------------------
@@ -400,7 +421,7 @@ async def test_patient_role_cannot_subscribe_to_queue_room(
         monkeypatch, SimpleNamespace(id=9, role="Patient", username="syn-patient")
     )
     manager = _stub_manager(monkeypatch)
-    token = _mint_jwt(sub="syn-patient", jti="syn-patient-jti")
+    token = _mint_jwt(sub="9", jti="syn-patient-jti")
     ws = _FakeWebSocket(
         headers={"origin": "http://localhost:5173", "authorization": f"Bearer {token}"}
     )
@@ -426,7 +447,7 @@ async def test_staff_role_can_subscribe(monkeypatch: pytest.MonkeyPatch) -> None
         SimpleNamespace(id=11, role="Registrar", username="syn-registrar"),
     )
     manager = _stub_manager(monkeypatch)
-    token = _mint_jwt(sub="syn-registrar", jti="syn-registrar-jti")
+    token = _mint_jwt(sub="11", jti="syn-registrar-jti")
     ws = _FakeWebSocket(
         headers={"origin": "http://localhost:5173", "authorization": f"Bearer {token}"}
     )
@@ -468,7 +489,7 @@ async def test_doctor_joins_only_own_specialist_room(
         monkeypatch, SimpleNamespace(id=7, specialty="cardio", department=None)
     )
     manager = _stub_manager(monkeypatch)
-    token = _mint_jwt(sub="syn-doctor", jti="syn-doctor-jti")
+    token = _mint_jwt(sub="17", jti="syn-doctor-jti")
     ws = _FakeWebSocket(
         headers={"origin": "http://localhost:5173", "authorization": f"Bearer {token}"}
     )
@@ -497,7 +518,7 @@ async def test_doctor_denied_foreign_specialist_room(
         monkeypatch, SimpleNamespace(id=73, specialty="derma", department=None)
     )
     manager = _stub_manager(monkeypatch)
-    token = _mint_jwt(sub="syn-doctor", jti="syn-doctor-jti")
+    token = _mint_jwt(sub="17", jti="syn-doctor-jti")
     ws = _FakeWebSocket(
         headers={"origin": "http://localhost:5173", "authorization": f"Bearer {token}"}
     )
@@ -533,7 +554,7 @@ async def test_doctor_denied_foreign_department_name_room(
         ),
     )
     manager = _stub_manager(monkeypatch)
-    token = _mint_jwt(sub="syn-doctor", jti="syn-doctor-jti")
+    token = _mint_jwt(sub="17", jti="syn-doctor-jti")
     ws = _FakeWebSocket(
         headers={"origin": "http://localhost:5173", "authorization": f"Bearer {token}"}
     )

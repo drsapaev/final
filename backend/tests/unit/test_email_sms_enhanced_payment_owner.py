@@ -24,7 +24,7 @@ async def test_doctor_cannot_send_appointment_reminder_enhanced_for_other_doctor
 
     monkeypatch.setattr(
         email_sms_enhanced.crud_appointment,
-        "get_appointment",
+        "get",
         lambda _db, _appointment_id: appointment,
         raising=False,
     )
@@ -35,7 +35,7 @@ async def test_doctor_cannot_send_appointment_reminder_enhanced_for_other_doctor
     )
     monkeypatch.setattr(
         email_sms_enhanced.crud_patient,
-        "get_patient",
+        "get",
         get_patient,
         raising=False,
     )
@@ -61,7 +61,7 @@ async def test_doctor_cannot_send_appointment_reminder_enhanced_for_other_doctor
 
 
 @pytest.mark.asyncio
-async def test_send_payment_confirmation_enhanced_preserves_no_id_payload(
+async def test_send_payment_confirmation_enhanced_rejects_no_id_payload(
     monkeypatch,
 ):
     patient = SimpleNamespace(
@@ -78,8 +78,8 @@ async def test_send_payment_confirmation_enhanced_preserves_no_id_payload(
 
     monkeypatch.setattr(
         email_sms_enhanced.crud_patient,
-        "get_patient",
-        lambda _db, _patient_id: patient,
+        "get",
+        lambda _db, id: patient,
         raising=False,
     )
     monkeypatch.setattr(
@@ -88,18 +88,19 @@ async def test_send_payment_confirmation_enhanced_preserves_no_id_payload(
         Mock(return_value=service),
     )
 
-    response = await email_sms_enhanced.send_payment_confirmation_enhanced(
-        patient_id=123,
-        payment_data=PaymentData(amount=125000),
-        channels=["email"],
-        template_data=None,
-        background_tasks=BackgroundTasks(),
-        db=object(),
-        current_user=SimpleNamespace(role="Cashier"),
-    )
+    with pytest.raises(HTTPException) as exc_info:
+        await email_sms_enhanced.send_payment_confirmation_enhanced(
+            patient_id=123,
+            payment_data=PaymentData(amount=125000),
+            channels=["email"],
+            template_data=None,
+            background_tasks=BackgroundTasks(),
+            db=object(),
+            current_user=SimpleNamespace(role="Cashier"),
+        )
 
-    assert response["success"] is True
-    service.send_payment_confirmation_enhanced.assert_awaited_once()
+    assert exc_info.value.status_code == 400
+    service.send_payment_confirmation_enhanced.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -136,8 +137,8 @@ async def test_send_payment_confirmation_enhanced_rejects_other_patient_payment(
 
     monkeypatch.setattr(
         email_sms_enhanced.crud_patient,
-        "get_patient",
-        lambda _db, _patient_id: patient,
+        "get",
+        lambda _db, id: patient,
         raising=False,
     )
     monkeypatch.setattr(

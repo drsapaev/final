@@ -77,12 +77,20 @@ describe('DOCFLOW-FE-001/002 — cardiology visit completion honesty (source con
 
 describe('DOCFLOW-FE-001/002 — dermatology visit completion honesty (source contract)', () => {
   const source = readSource('../DermatologistPanelUnified.tsx');
+  // DERMACOMPLETE-FE-001: the completion POST lives in `runCompletionFlow`;
+  // the entry handler routes it through the shared dirty-source registry
+  // scoped to this visit's EMR draft (`emr-visit-<id>`).
+  const completionFlow =
+    source.match(/const runCompletionFlow = async[\s\S]*?\n {2}\};/)?.[0] ?? '';
   const completionHandler =
     source.match(/const handleSaveVisit = async[\s\S]*?\n {2}\};/)?.[0] ?? '';
 
   it('pins the handler block that owns completion', () => {
+    expect(completionFlow).not.toBe('');
+    expect(completionFlow).toContain('queueService.completeVisit');
     expect(completionHandler).not.toBe('');
-    expect(completionHandler).toContain('queueService.completeVisit');
+    expect(completionHandler).toContain('guardTransition(');
+    expect(completionHandler).toContain('runCompletionFlow(completionContext, entryId, callNext)');
   });
 
   it('DOCFLOW-FE-002 (existing positive reference): keeps the post-confirm identity recheck', () => {
@@ -90,19 +98,19 @@ describe('DOCFLOW-FE-001/002 — dermatology visit completion honesty (source co
   });
 
   it('DOCFLOW-FE-001: guards the completion on an explicit success ack before any success/reset/auto-call', () => {
-    expect(completionHandler).toMatch(/const completionAck = await queueService\.completeVisit/);
-    expect(completionHandler).toMatch(/completionAck\?\.success !== true|completionAck\.success !== true/);
+    expect(completionFlow).toMatch(/const completionAck = await queueService\.completeVisit/);
+    expect(completionFlow).toMatch(/completionAck\?\.success !== true|completionAck\.success !== true/);
   });
 
   it('DOCFLOW-FE-001: the ambiguous branch reconciles the queue with the canonical server snapshot', () => {
-    expect(completionHandler).toMatch(/loadDermatologyAppointments\(true\)/);
+    expect(completionFlow).toMatch(/loadDermatologyAppointments\(true\)/);
   });
 
   it('DOCFLOW-FE-004 (positive reference parity): the derma post-POST recheck sits after the ack and before the reset/auto-call', () => {
-    const ackAt = completionHandler.indexOf('await queueService.completeVisit');
-    const recheckMarkerAt = completionHandler.indexOf('Stale completion response ignored for a changed visit context');
-    const resetAt = completionHandler.indexOf('setSelectedPatient(null)');
-    const autoCallAt = completionHandler.indexOf('callNextWaiting');
+    const ackAt = completionFlow.indexOf('await queueService.completeVisit');
+    const recheckMarkerAt = completionFlow.indexOf('Stale completion response ignored for a changed visit context');
+    const resetAt = completionFlow.indexOf('setSelectedPatient(null)');
+    const autoCallAt = completionFlow.indexOf('callNextWaiting');
     expect(ackAt).toBeGreaterThanOrEqual(0);
     expect(recheckMarkerAt).toBeGreaterThan(ackAt);
     expect(resetAt).toBeGreaterThan(recheckMarkerAt);

@@ -182,7 +182,7 @@ class MedicalLabMCPServer(BaseMCPServer):
                 try:
                     provider_type = AIProviderType(provider.lower())
                 except ValueError:
-                    logger.warning(f"Invalid provider: {provider}, using default")
+                    logger.warning("Invalid provider, using default")
 
             # Получаем AI интерпретацию
             ai_interpretation = await self.ai_manager.interpret_lab_results(

@@ -11,6 +11,7 @@ import google.generativeai as genai
 from PIL import Image
 
 from .base_provider import AIRequest, AIResponse, BaseAIProvider
+from .icd_provider_result import parse_icd_provider_suggestions
 
 logger = logging.getLogger(__name__)
 
@@ -180,17 +181,9 @@ class GeminiProvider(BaseAIProvider):
         response = await self.generate(request)
 
         if response.error:
-            return []
+            raise RuntimeError("AI provider unavailable")
 
-        try:
-            content = response.content.strip()
-            if content.startswith("```json"):
-                content = content[7:]
-            if content.endswith("```"):
-                content = content[:-3]
-            return json.loads(content.strip())
-        except Exception:
-            return []
+        return parse_icd_provider_suggestions(response.content)
 
     async def interpret_lab_results(
         self, results: list[dict[str, Any]], patient_info: dict | None = None

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import secrets
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -20,9 +21,11 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
+    inspect,
     text,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, attributes, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.db.base_class import Base
@@ -162,11 +165,21 @@ class TelegramUser(Base):
     """Связка пользователей с Telegram"""
 
     __tablename__ = "telegram_users"
+    __table_args__ = (
+        CheckConstraint("patient_link_epoch >= 0", name="ck_telegram_user_patient_link_epoch"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     patient_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("patients.id", ondelete="SET NULL"), nullable=True
     )  # ✅ SECURITY: SET NULL to preserve Telegram link
+    # A random generation fences patient-facing capabilities across
+    # unlink/relink, block/unblock and consent changes. PostgreSQL's trigger
+    # also covers bulk SQL and writes outside the ORM.
+    patient_link_epoch: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=lambda: secrets.randbits(52) + 1,
+        server_default=text("0")
+    )
     user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )  # ✅ SECURITY: SET NULL to preserve Telegram link
@@ -207,6 +220,32 @@ class TelegramUser(Base):
     # Relationships
     patient: Mapped[Patient | None] = relationship("Patient", foreign_keys=[patient_id])
     user: Mapped[User | None] = relationship("User", foreign_keys=[user_id])
+
+
+@event.listens_for(TelegramUser, "before_update")
+def _advance_patient_link_epoch_for_orm(_mapper, _connection, target: TelegramUser) -> None:
+    """Keep ORM-created SQLite test databases consistent with the PG trigger.
+
+    PostgreSQL remains authoritative for bulk updates and external writers.
+    """
+    state = inspect(target)
+    fields = (
+        "patient_id", "chat_id", "active", "blocked",
+        "notifications_enabled", "appointment_reminders",
+    )
+    if any(state.attrs[field].history.has_changes() for field in fields):
+        target.patient_link_epoch = secrets.randbits(52) + 1
+
+
+@event.listens_for(TelegramUser, "after_insert")
+@event.listens_for(TelegramUser, "after_update")
+def _refresh_patient_link_epoch_after_update(_mapper, connection, target: TelegramUser) -> None:
+    """Read the trigger-assigned value, including after an uncommitted flush."""
+    value = connection.execute(
+        TelegramUser.__table__.select().with_only_columns(TelegramUser.patient_link_epoch)
+        .where(TelegramUser.id == target.id)
+    ).scalar_one()
+    attributes.set_committed_value(target, "patient_link_epoch", value)
 
 
 class TelegramStaffLinkToken(Base):

@@ -179,7 +179,7 @@ class MedicalImagingMCPServer(BaseMCPServer):
                 try:
                     provider_type = AIProviderType(provider.lower())
                 except ValueError:
-                    logger.warning(f"Invalid provider: {provider}, using default")
+                    logger.warning("Invalid provider, using default")
 
             # Выбираем подходящий метод анализа
             result = None

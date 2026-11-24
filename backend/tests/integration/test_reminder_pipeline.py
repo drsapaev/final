@@ -241,7 +241,7 @@ def reminder_spy(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
 
     calls: list[dict] = []
 
-    async def _spy(self, db, visit_id, hours_before=24, channel=None):
+    async def _spy(self, db, visit_id, hours_before=24, channel=None, expected_context=None):
         calls.append(
             {
                 "db": db,
@@ -451,7 +451,7 @@ async def test_worker_send_failure_does_not_stamp_and_raises(
     from app.services.notifications_pkg._reminders import RemindersMixin
     from app.tasks.worker import send_visit_reminder
 
-    async def _failing(self, db, visit_id, hours_before=24, channel=None):
+    async def _failing(self, db, visit_id, hours_before=24, channel=None, expected_context=None):
         return {"success": False, "error": "telegram unavailable"}
 
     monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _failing)
@@ -885,7 +885,7 @@ def test_worker_failure_releases_only_own_claim(
     visit_id = make_visit()
     newer_lease = datetime.now(UTC) + timedelta(minutes=1)
 
-    async def _failing_spy(self, db, vid, hours_before=24, channel=None):
+    async def _failing_spy(self, db, vid, hours_before=24, channel=None, expected_context=None):
         # A concurrent delivery re-claims while OUR dispatch is in flight
         # (reschedule cleared our lease, the newer job took its own).
         db.query(Visit).filter(Visit.id == vid).update(
@@ -1319,7 +1319,7 @@ def test_reschedule_during_dispatch_prevents_stale_record(
 
     visit_id = make_visit()  # generation 0, date today, time "10:00"
 
-    async def _spy(self, db, vid, hours_before=24, channel=None):
+    async def _spy(self, db, vid, hours_before=24, channel=None, expected_context=None):
         # The reschedule lands while the provider call is in flight:
         # stamp cleared, generation bumped, lease PRESERVED (round 8).
         db.query(Visit).filter(Visit.id == vid).update(
@@ -1744,7 +1744,7 @@ async def test_status_change_during_dispatch_not_recorded(
 
     visit_id = make_visit()
 
-    async def _spy(self, db, vid, hours_before=24, channel=None):
+    async def _spy(self, db, vid, hours_before=24, channel=None, expected_context=None):
         # The patient confirms while the provider call is in flight.
         db.query(Visit).filter(Visit.id == vid).update({"status": "confirmed"})
         db.commit()
@@ -1782,7 +1782,7 @@ async def test_delivery_failure_gives_up_after_backoffs(
     from app.services.notifications_pkg._reminders import RemindersMixin
     from app.tasks.worker import send_visit_reminder
 
-    async def _failing(self, db, visit_id, hours_before=24, channel=None):
+    async def _failing(self, db, visit_id, hours_before=24, channel=None, expected_context=None):
         return {"success": False, "error": "telegram unavailable"}
 
     monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _failing)
@@ -3084,3 +3084,82 @@ def test_worker_normalizes_null_channel_to_auto(
         assert fresh.reminder_sent_at is not None
     finally:
         s.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("initial_channel", [None, ""])
+async def test_context_trigger_keeps_worker_reissue_for_blank_channel(
+    pipeline_db, make_visit, monkeypatch, initial_channel
+):
+    """The real worker must dispatch the reissued token, not a cleared one."""
+    import importlib.util
+    from pathlib import Path
+
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    from app.models.visit import Visit
+    from app.services.notifications_pkg._reminders import RemindersMixin
+    from app.tasks.scheduler import build_reminder_schedule_version
+    from app.tasks.worker import send_visit_reminder
+
+    path = Path(__file__).resolve().parents[2] / "alembic/versions/0102_visit_confirmation_context.py"
+    spec = importlib.util.spec_from_file_location("context_worker_migration", path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    with pipeline_db.begin() as conn:
+        # Base.metadata.create_all already includes the new column; apply the
+        # actual revision against its pre-migration schema for this test.
+        conn.exec_driver_sql("ALTER TABLE visits DROP COLUMN confirmation_context_epoch")
+        migration.op = Operations(MigrationContext.configure(conn))
+        migration.upgrade()
+
+    captured = []
+
+    async def inspect_dispatch(self, db, visit_id, hours_before=24, channel=None, expected_context=None):
+        visit = db.query(Visit).filter(Visit.id == visit_id).populate_existing().one()
+        assert visit.confirmation_token and visit.confirmation_expires_at
+        assert visit.confirmation_channel == "auto"
+        assert visit.reminder_claimed_at is not None
+        captured.append(visit.confirmation_token)
+        return {"success": True, "channel": channel}
+
+    monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", inspect_dispatch)
+    session = sessionmaker(bind=pipeline_db)()
+    try:
+        visit_id = make_visit()
+        visit = session.query(Visit).filter(Visit.id == visit_id).one()
+        visit.confirmation_channel = initial_channel
+        session.commit()
+        session.expire_all()
+        visit = session.query(Visit).filter(Visit.id == visit_id).one()
+        assert visit.confirmation_token is None
+        version = build_reminder_schedule_version(visit)
+        await send_visit_reminder({}, visit_id=visit_id, channel="telegram", schedule_version=version)
+        session.expire_all()
+        visit = session.query(Visit).filter(Visit.id == visit_id).one()
+        assert len(captured) == 1 and visit.confirmation_token == captured[0]
+        assert visit.reminder_sent_at is not None and visit.reminder_claimed_at is None
+
+        # A reschedule revokes the first link, advances the generation, and
+        # makes a subsequent worker delivery issue a distinct usable token.
+        visit.visit_date = visit.visit_date + timedelta(days=1)
+        session.commit()
+        session.expire_all()
+        visit = session.query(Visit).filter(Visit.id == visit_id).one()
+        assert visit.confirmation_token is None and visit.reminder_sent_at is None
+        await send_visit_reminder(
+            {}, visit_id=visit_id, channel="telegram",
+            schedule_version=build_reminder_schedule_version(visit),
+        )
+        session.expire_all()
+        visit = session.query(Visit).filter(Visit.id == visit_id).one()
+        assert len(captured) == 2 and captured[1] != captured[0]
+        assert visit.confirmation_token == captured[1]
+        assert visit.reminder_sent_at is not None and visit.reminder_claimed_at is None
+    finally:
+        session.close()
+        with pipeline_db.begin() as conn:
+            migration.op = Operations(MigrationContext.configure(conn))
+            migration.downgrade()
+            conn.exec_driver_sql("ALTER TABLE visits ADD COLUMN confirmation_context_epoch BIGINT NOT NULL DEFAULT 0")

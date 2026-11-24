@@ -25,12 +25,13 @@ const ROOT = path.resolve(__dirname, '../../../..');
 
 const AUDITED_FILES = [
   'src/pages/registrar/useRegistrarRowActions.ts',
+  'src/pages/registrar/useRegistrarWizard.ts',
   'src/pages/registrar/views/WelcomeView.tsx',
   'src/components/wizard/AppointmentWizardV2.tsx',
 ] as const;
 
 /** logger.info/log/warn/debug ending in a bare record-object argument. */
-const ROW_DUMP_RE = /logger\.(?:info|log|warn|debug)\([^)]*,\s*(?:row|appointment|record|appt)\s*\)/;
+const ROW_DUMP_RE = /logger\.(?:info|log|warn|debug)\([^)]*,\s*(?:row|appointment|record|appt|wizardData)\s*\)/;
 /** logger call interpolating patient-identifying values into the string. */
 const PHI_INTERPOLATION_RE = /logger\.(?:info|log|warn|debug)\([^)]*\$\{[^}]*(?:patient\.phone|patient\.fio|patient_fio|patient_name|patient_phone|birth_date)/i;
 /** logger call passing patient-identifying values as object fields. */

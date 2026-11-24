@@ -151,7 +151,7 @@ class TestDOCSCHEDBE001ScheduleNextReplayIdempotency:
     def _spy_invitation(self, monkeypatch) -> list[tuple[int, str]]:
         calls: list[tuple[int, str]] = []
 
-        async def _spy(self, db, visit_id, channel="auto"):
+        async def _spy(self, db, visit_id, channel="auto", expected_context=None):
             calls.append((visit_id, channel))
             return {"success": True, "channel": channel}
 
@@ -820,4 +820,56 @@ class TestDOCSCHEDServiceInputValidation:
         )
         assert math.isclose(
             response.json()["confirmation"]["total_amount"], 0.0
+        )
+
+
+@pytest.mark.integration
+@pytest.mark.confirmation
+def test_schedule_next_issues_usable_token_after_initial_service_rows(
+    client, db_session, cardio_auth_headers, test_doctor, test_service, monkeypatch,
+):
+    """The real HTTP creation path issues its token after service fencing."""
+    import importlib.util
+    from pathlib import Path
+
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    path = Path(__file__).resolve().parents[2] / "alembic/versions/0102_visit_confirmation_context.py"
+    spec = importlib.util.spec_from_file_location("context_schedule_migration", path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    conn = db_session.connection()
+    # The test metadata includes the new column already; apply the actual
+    # migration against the equivalent pre-migration schema.
+    conn.exec_driver_sql("ALTER TABLE visits DROP COLUMN confirmation_context_epoch")
+    migration.op = Operations(MigrationContext.configure(conn))
+    migration.upgrade()
+    seen_tokens = []
+
+    async def record_invitation(self, db, visit_id, channel="auto", expected_context=None):
+        visit = db.query(Visit).filter(Visit.id == visit_id).populate_existing().one()
+        seen_tokens.append(visit.confirmation_token)
+        return {"success": True, "channel": channel}
+
+    monkeypatch.setattr(NotificationService, "send_visit_confirmation_invitation", record_invitation)
+    try:
+        patient = _make_patient(db_session)
+        _prior_context_visit(db_session, patient=patient, doctor=test_doctor)
+        payload = _schedule_payload(patient, test_service, visit_date=_clinic_today(db_session) + timedelta(days=1))
+        response = client.post("/api/v1/doctor/visits/schedule-next", json=payload, headers=cardio_auth_headers)
+        assert response.status_code == 200, response.text
+        body = response.json()
+        db_session.expire_all()
+        visit = db_session.get(Visit, body["visit_id"])
+        assert visit is not None and visit.confirmation_token
+        assert body["confirmation"]["token"] == visit.confirmation_token
+        assert seen_tokens == [visit.confirmation_token]
+        assert db_session.query(VisitService).filter_by(visit_id=visit.id).count() == 1
+    finally:
+        # Restore metadata-created test DB for other test modules.
+        migration.op = Operations(MigrationContext.configure(db_session.connection()))
+        migration.downgrade()
+        db_session.connection().exec_driver_sql(
+            "ALTER TABLE visits ADD COLUMN confirmation_context_epoch BIGINT NOT NULL DEFAULT 0"
         )

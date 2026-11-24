@@ -1,17 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, CSSProperties } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { CheckCircle, XCircle } from 'lucide-react';
 
 import { useTranslation } from '../i18n/useTranslation';
 import { api } from '../api/client';
 import { Button, Input } from '../components/ui/macos';
+import { hasRecoveryPasswordMinimum } from '../utils/passwordLength';
+import {
+  clearPasswordResetCredential,
+  extractPasswordResetCredential,
+  getPasswordResetCredential,
+} from '../utils/passwordResetDeepLink';
 
 /**
  * Публичная страница завершения сброса пароля по ссылке из письма.
  *
  * Email-ссылка (backend password_reset_service) ведёт на
- * /reset-password?token=…; здесь токен валидируется
+ * /reset-password#token=…; старые ссылки с query также поддерживаются.
  * (GET /password-reset/validate-token) и публикуется форма
  * нового пароля (POST /password-reset/confirm {token, new_password}).
  *
@@ -20,17 +26,60 @@ import { Button, Input } from '../components/ui/macos';
  */
 
 type Phase = 'checking' | 'form' | 'invalid' | 'done';
+let activeResetViews = 0;
+let clearResetTimer: ReturnType<typeof setTimeout> | null = null;
 
 const ResetPasswordPage = () => {
   const { t } = useTranslation();
-  const [params] = useSearchParams();
-  const token = params.get('token') ?? '';
+  const location = useLocation();
+  const [token, setToken] = useState(() => getPasswordResetCredential() ?? '');
+  const tokenRef = useRef(token);
+  const linkGeneration = useRef(0);
 
   const [phase, setPhase] = useState<Phase>('checking');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    activeResetViews += 1;
+    if (clearResetTimer !== null) clearTimeout(clearResetTimer);
+    clearResetTimer = null;
+    const updateLink = () => {
+      const nextToken = getPasswordResetCredential() ?? '';
+      if (nextToken !== tokenRef.current) {
+        tokenRef.current = nextToken;
+        linkGeneration.current += 1;
+        setNewPassword('');
+        setConfirmPassword('');
+        setError('');
+        setLoading(false);
+      }
+      setToken(nextToken);
+    };
+    window.addEventListener('passwordResetLinkChanged', updateLink);
+    try {
+      extractPasswordResetCredential();
+      updateLink();
+    } catch {
+      clearPasswordResetCredential();
+      updateLink();
+    }
+    return () => {
+      window.removeEventListener('passwordResetLinkChanged', updateLink);
+      activeResetViews -= 1;
+      // React StrictMode immediately repeats effects; retain its capability for
+      // that remount, then clear the slot after a real departure.
+      clearResetTimer = setTimeout(() => {
+        if (activeResetViews === 0) clearPasswordResetCredential();
+      }, 0);
+    };
+  }, [location.key, location.search, location.hash]);
+
+  // Invalidate in-flight work when this view unmounts, without cancelling it
+  // merely because a router location changes while the same link remains open.
+  useEffect(() => () => { linkGeneration.current += 1; }, []);
 
   useEffect(() => {
     let alive = true;
@@ -40,17 +89,20 @@ const ResetPasswordPage = () => {
         alive = false;
       };
     }
+    setPhase('checking');
+    const requestGeneration = linkGeneration.current;
+    const stillCurrent = () => alive && requestGeneration === linkGeneration.current && tokenRef.current === token;
     (async () => {
       try {
         const resp = (await api.get('/password-reset/validate-token', {
-          params: { token },
+          headers: { 'X-Reset-Token': token },
         })) as unknown as { status: number; data: { valid?: boolean } };
-        if (!alive) return;
+        if (!stillCurrent()) return;
         setPhase(
           resp.status < 300 && resp.data?.valid === true ? 'form' : 'invalid',
         );
       } catch {
-        if (alive) setPhase('invalid');
+        if (stillCurrent()) setPhase('invalid');
       }
     })();
     return () => {
@@ -67,7 +119,7 @@ const ResetPasswordPage = () => {
   } as const;
 
   const submit = async () => {
-    if (newPassword.length < 8) {
+    if (!hasRecoveryPasswordMinimum(newPassword)) {
       setError(t('final.fp_password_too_short'));
       return;
     }
@@ -77,26 +129,28 @@ const ResetPasswordPage = () => {
     }
     setLoading(true);
     setError('');
+    const submittedGeneration = linkGeneration.current;
+    const stillCurrent = () => submittedGeneration === linkGeneration.current && tokenRef.current === token;
     try {
       const resp = (await api.post('/password-reset/confirm', {
         token,
         new_password: newPassword,
       })) as unknown as { status: number; data?: { success?: boolean } };
+      if (!stillCurrent()) return;
       if (resp.status < 300 && resp.data?.success) {
+        clearPasswordResetCredential();
         setPhase('done');
       } else {
         setError(t('final.fp_reset_error'));
       }
     } catch (err) {
-      // Сервер возвращает осмысленные причины (совпадение с текущим паролем,
-      // состояние токена) — показываем их владельцу ссылки вместо общего
-      // «Ошибка сброса пароля». Fallback — generic.
-      const detail = (
-        err as { response?: { data?: { detail?: string } } }
-      )?.response?.data?.detail;
-      setError(detail || t('final.fp_reset_error'));
+      if (!stillCurrent()) return;
+      // Only display a known static server reason. Validation detail may be an
+      // array containing submitted values or an untrusted arbitrary string.
+      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      setError(detail === 'Новый пароль должен отличаться от текущего' ? detail : t('final.fp_reset_error'));
     } finally {
-      setLoading(false);
+      if (stillCurrent()) setLoading(false);
     }
   };
 
@@ -173,7 +227,7 @@ const ResetPasswordPage = () => {
               {error}
             </div>
           )}
-          <Button onClick={submit} disabled={loading || newPassword.length < 8 || newPassword !== confirmPassword}>
+          <Button onClick={submit} disabled={loading || !hasRecoveryPasswordMinimum(newPassword) || newPassword !== confirmPassword}>
             {t('final.fp_reset_password')}
           </Button>
         </div>

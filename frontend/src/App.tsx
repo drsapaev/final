@@ -66,6 +66,7 @@ const PaymentTest = lazy(() => import('./pages/PaymentTest'));
 const MacOSDemoPage = lazy(() => import('./pages/MacOSDemoPage'));
 const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired'));
 const PatientLoginPage = lazy(() => import('./pages/auth/PatientLoginPage'));
+const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage'));
 const PatientActivatePage = lazy(() => import('./pages/auth/PatientActivatePage'));
 const PatientBookingPage = lazy(() => import('./pages/PatientBookingPage'));
 const PatientPickupView = lazy(() => import('./pages/PatientPickupView'));
@@ -110,6 +111,7 @@ const ROUTE_COMPONENTS = {
   LoginFormStyled,
   ChangePasswordRequired,
   PatientLoginPage,
+  VerifyEmailPage,
   PatientActivatePage,
   PatientBookingPage,
   Health,
@@ -503,7 +505,9 @@ export default function App() {
           draggable
           theme="colored"
         />
-        <SpeedInsights {...{ beforeSend: beforeSendSpeedInsights } as Record<string, unknown>} />
+        {import.meta.env.VITE_DISABLE_SPEED_INSIGHTS !== '1' && (
+          <SpeedInsights {...{ beforeSend: beforeSendSpeedInsights } as Record<string, unknown>} />
+        )}
       </AppProviders>
     </ThemeProvider>
   );

@@ -7,17 +7,19 @@ import asyncio
 import logging
 import smtplib
 import ssl
+from collections.abc import Callable
 from datetime import datetime
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from pathlib import Path
 from typing import Any
 
 import httpx
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import FileSystemLoader
+from jinja2.sandbox import SandboxedEnvironment
 
 from app.core.config import settings
-from app.core.pii_masker import mask_pii_text
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,19 @@ def _escape_html(text: str | None) -> str:
     phishing <a> tags)."""
     from html import escape
     return escape(str(text or ""))
+
+
+def _authorized_for_delivery(
+    guard: Callable[[str], bool] | None, channel: str
+) -> bool:
+    """Recheck a resource-bound recipient immediately before each provider call."""
+    if guard is None:
+        return True
+    try:
+        return guard(channel) is True
+    except Exception as exc:
+        logger.error("Notification authorization recheck failed error_type=%s", type(exc).__name__)
+        return False
 
 
 def _protected_frontend_url(path: str) -> str:
@@ -89,8 +104,16 @@ class EmailSMSEnhancedService:
         self.sms_sender = getattr(settings, "SMS_SENDER", "Clinic")
 
         # Шаблоны
-        self.template_env = Environment(
-            loader=FileSystemLoader('templates/email'), autoescape=True
+        templates_dir = Path(__file__).resolve().parents[2] / 'templates'
+        self.template_env = SandboxedEnvironment(
+            loader=FileSystemLoader(str(templates_dir / 'email')), autoescape=True
+        )
+        # Plain-text email and SMS are not HTML: escaping would corrupt text.
+        self.text_template_env = SandboxedEnvironment(  # nosec B701
+            loader=FileSystemLoader(str(templates_dir / 'email')), autoescape=False
+        )
+        self.sms_template_env = SandboxedEnvironment(  # nosec B701
+            loader=FileSystemLoader(str(templates_dir / 'sms')), autoescape=False
         )
 
         # Статистика
@@ -127,10 +150,13 @@ class EmailSMSEnhancedService:
             msg["X-Priority"] = "1" if priority == "high" else "3"
 
             # Генерируем контент
-            if template_name and template_data:
-                html_content, text_content = await self._render_email_template(
-                    template_name, template_data
+            if template_name:
+                rendered = await self._render_email_template(
+                    template_name, template_data or {}
                 )
+                if rendered is None:
+                    return False, "Не удалось подготовить email"
+                html_content, text_content = rendered
             elif not html_content and not text_content:
                 return False, "Не указан контент или шаблон"
 
@@ -161,12 +187,11 @@ class EmailSMSEnhancedService:
 
         except Exception as e:
             self.stats['emails_failed'] += 1
-            # PII: провайдерские исключения (SMTPRecipientsRefused)
-            # содержат адрес получателя — чистим до лога и до возврата
-            # вызывающему (текст доходит до detail HTTP-ответа).
-            masked = mask_pii_text(str(e))
-            logger.error("Ошибка отправки email: %s", masked)
-            return False, masked
+            # SMTP exceptions can contain the complete message, including
+            # one-time links; neither masking addresses nor echoing provider
+            # text is sufficient to protect credentials.
+            logger.error("Email delivery failed error_type=%s", type(e).__name__)
+            return False, "Не удалось отправить email"
 
     def _smtp_send_message(self, msg) -> None:
         """Синхронная SMTP-отправка; вызывается через asyncio.to_thread."""
@@ -196,8 +221,11 @@ class EmailSMSEnhancedService:
                 return False, "SMS API credentials не настроены"
 
             # Генерируем сообщение
-            if template_name and template_data:
-                message = await self._render_sms_template(template_name, template_data)
+            if template_name:
+                rendered = await self._render_sms_template(template_name, template_data or {})
+                if rendered is None:
+                    return False, "Не удалось подготовить SMS"
+                message = rendered
             elif not message:
                 return False, "Не указано сообщение или шаблон"
 
@@ -227,16 +255,14 @@ class EmailSMSEnhancedService:
                 return True, "SMS отправлено успешно"
             else:
                 self.stats['sms_failed'] += 1
-                # PII: ответ SMS-провайдера может цитировать номер.
-                error_msg = mask_pii_text(result.get('error', 'Неизвестная ошибка'))
-                logger.error("Ошибка отправки SMS: %s", error_msg)
-                return False, error_msg
+                # Provider errors may echo the complete clinical message.
+                logger.error("SMS delivery failed")
+                return False, "Не удалось отправить SMS"
 
         except Exception as e:
             self.stats['sms_failed'] += 1
-            masked = mask_pii_text(str(e))
-            logger.error("Ошибка отправки SMS: %s", masked)
-            return False, masked
+            logger.error("SMS delivery failed error_type=%s", type(e).__name__)
+            return False, "Не удалось отправить SMS"
 
     async def send_bulk_email(
         self,
@@ -354,6 +380,7 @@ class EmailSMSEnhancedService:
         appointment_data: dict[str, Any],
         channels: list[str] = None,
         template_data: dict[str, Any] = None,
+        delivery_guard: Callable[[str], bool] | None = None,
     ) -> dict[str, Any]:
         """Расширенное напоминание о записи"""
         if channels is None:
@@ -367,7 +394,9 @@ class EmailSMSEnhancedService:
         }
 
         # Подготавливаем данные для шаблона
-        template_data = template_data or {}
+        # Resource notifications use DB-owned data only. Arbitrary caller
+        # variables must not replace any part of a patient-facing message.
+        template_data = {}
         template_data.update(
             {
                 'patient_name': patient_data.get('full_name', 'Пациент'),
@@ -385,7 +414,11 @@ class EmailSMSEnhancedService:
         )
 
         # Отправляем по каналам
-        for channel in channels:
+        for channel in dict.fromkeys(channels):
+            if channel in {'email', 'sms'} and patient_data.get('email' if channel == 'email' else 'phone'):
+                if not _authorized_for_delivery(delivery_guard, channel):
+                    results['channels'][channel] = {'success': False, 'message': 'Данные изменились'}
+                    continue
             if channel == 'email' and patient_data.get('email'):
                 success, message = await self.send_email_enhanced(
                     to_email=patient_data['email'],
@@ -398,13 +431,17 @@ class EmailSMSEnhancedService:
             elif channel == 'sms' and patient_data.get('phone'):
                 success, message = await self.send_sms_enhanced(
                     phone=patient_data['phone'],
+                    message='',
                     template_name='appointment_reminder_sms',
                     template_data=template_data,
                 )
                 results['channels']['sms'] = {'success': success, 'message': message}
 
+            else:
+                results['channels'][channel] = {'success': False, 'message': 'Канал недоступен'}
+
         # Определяем общий успех
-        results['success'] = all(
+        results['success'] = bool(results['channels']) and all(
             result.get('success', False) for result in results['channels'].values()
         )
 
@@ -416,6 +453,7 @@ class EmailSMSEnhancedService:
         lab_data: dict[str, Any],
         channels: list[str] = None,
         template_data: dict[str, Any] = None,
+        delivery_guard: Callable[[str], bool] | None = None,
     ) -> dict[str, Any]:
         """Расширенная отправка результатов анализов"""
         if channels is None:
@@ -429,7 +467,7 @@ class EmailSMSEnhancedService:
         }
 
         # Подготавливаем данные для шаблона
-        template_data = template_data or {}
+        template_data = {}
         template_data.update(
             {
                 'patient_name': patient_data.get('full_name', 'Пациент'),
@@ -447,7 +485,11 @@ class EmailSMSEnhancedService:
         )
 
         # Отправляем по каналам
-        for channel in channels:
+        for channel in dict.fromkeys(channels):
+            if channel in {'email', 'sms'} and patient_data.get('email' if channel == 'email' else 'phone'):
+                if not _authorized_for_delivery(delivery_guard, channel):
+                    results['channels'][channel] = {'success': False, 'message': 'Данные изменились'}
+                    continue
             if channel == 'email' and patient_data.get('email'):
                 success, message = await self.send_email_enhanced(
                     to_email=patient_data['email'],
@@ -460,13 +502,17 @@ class EmailSMSEnhancedService:
             elif channel == 'sms' and patient_data.get('phone'):
                 success, message = await self.send_sms_enhanced(
                     phone=patient_data['phone'],
+                    message='',
                     template_name='lab_results_ready_sms',
                     template_data=template_data,
                 )
                 results['channels']['sms'] = {'success': success, 'message': message}
 
+            else:
+                results['channels'][channel] = {'success': False, 'message': 'Канал недоступен'}
+
         # Определяем общий успех
-        results['success'] = all(
+        results['success'] = bool(results['channels']) and all(
             result.get('success', False) for result in results['channels'].values()
         )
 
@@ -478,6 +524,7 @@ class EmailSMSEnhancedService:
         payment_data: dict[str, Any],
         channels: list[str] = None,
         template_data: dict[str, Any] = None,
+        delivery_guard: Callable[[str], bool] | None = None,
     ) -> dict[str, Any]:
         """Расширенное подтверждение платежа"""
         if channels is None:
@@ -491,7 +538,7 @@ class EmailSMSEnhancedService:
         }
 
         # Подготавливаем данные для шаблона
-        template_data = template_data or {}
+        template_data = {}
         template_data.update(
             {
                 'patient_name': patient_data.get('full_name', 'Пациент'),
@@ -499,9 +546,9 @@ class EmailSMSEnhancedService:
                 'patient_email': patient_data.get('email', ''),
                 'amount': payment_data.get('amount', 0),
                 'currency': payment_data.get('currency', 'UZS'),
-                'formatted_amount': f"{payment_data.get('amount', 0):,.0f} {payment_data.get('currency', 'UZS')}",
+                'formatted_amount': f"{payment_data.get('amount', 0):,.2f} {payment_data.get('currency', 'UZS')}",
                 'payment_method': payment_data.get('payment_method', 'Карта'),
-                'payment_date': datetime.now().strftime('%d.%m.%Y %H:%M'),
+                'payment_date': payment_data.get('payment_date') or 'Дата не указана',
                 'transaction_id': payment_data.get('transaction_id', ''),
                 'receipt_link': _protected_frontend_url('/patient/payments'),
                 'clinic_name': 'Programma Clinic',
@@ -510,7 +557,11 @@ class EmailSMSEnhancedService:
         )
 
         # Отправляем по каналам
-        for channel in channels:
+        for channel in dict.fromkeys(channels):
+            if channel in {'email', 'sms'} and patient_data.get('email' if channel == 'email' else 'phone'):
+                if not _authorized_for_delivery(delivery_guard, channel):
+                    results['channels'][channel] = {'success': False, 'message': 'Данные изменились'}
+                    continue
             if channel == 'email' and patient_data.get('email'):
                 success, message = await self.send_email_enhanced(
                     to_email=patient_data['email'],
@@ -523,13 +574,17 @@ class EmailSMSEnhancedService:
             elif channel == 'sms' and patient_data.get('phone'):
                 success, message = await self.send_sms_enhanced(
                     phone=patient_data['phone'],
+                    message='',
                     template_name='payment_confirmation_sms',
                     template_data=template_data,
                 )
                 results['channels']['sms'] = {'success': success, 'message': message}
 
+            else:
+                results['channels'][channel] = {'success': False, 'message': 'Канал недоступен'}
+
         # Определяем общий успех
-        results['success'] = all(
+        results['success'] = bool(results['channels']) and all(
             result.get('success', False) for result in results['channels'].values()
         )
 
@@ -537,7 +592,7 @@ class EmailSMSEnhancedService:
 
     async def _render_email_template(
         self, template_name: str, template_data: dict[str, Any]
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str] | None:
         """Рендеринг HTML и текстового шаблона email"""
         try:
             # HTML шаблон
@@ -545,26 +600,24 @@ class EmailSMSEnhancedService:
             html_content = html_template.render(**template_data)
 
             # Текстовый шаблон
-            text_template = self.template_env.get_template(f"{template_name}.txt")
+            text_template = self.text_template_env.get_template(f"{template_name}.txt")
             text_content = text_template.render(**template_data)
 
             return html_content, text_content
         except Exception as e:
-            logger.error(f"Ошибка рендеринга email шаблона {template_name}: {e}")
-            # Возвращаем базовый шаблон
-            return self._get_basic_email_template(template_data)
+            logger.error("Email template rendering failed error_type=%s", type(e).__name__)
+            return None
 
     async def _render_sms_template(
         self, template_name: str, template_data: dict[str, Any]
-    ) -> str:
+    ) -> str | None:
         """Рендеринг SMS шаблона"""
         try:
-            template = self.template_env.get_template(f"sms/{template_name}.txt")
+            template = self.sms_template_env.get_template(f"{template_name}.txt")
             return template.render(**template_data)
         except Exception as e:
-            logger.error(f"Ошибка рендеринга SMS шаблона {template_name}: {e}")
-            # Возвращаем базовый шаблон
-            return self._get_basic_sms_template(template_data)
+            logger.error("SMS template rendering failed error_type=%s", type(e).__name__)
+            return None
 
     def _format_phone(self, phone: str) -> str:
         """Форматирование номера телефона"""

@@ -67,8 +67,8 @@ const PhoneVerificationManager = () => {
     try {
       const response = await api.get('/phone-verification/statistics');
       setStatistics(response.data.statistics);
-    } catch (error) {
-      logger.error('Error loading verification statistics:', error);
+    } catch {
+      logger.error('Error loading verification statistics');
       toast.error(t('admin2.pvm_err_load_stat'));
     } finally {
       setLoading(false);
@@ -83,20 +83,20 @@ const PhoneVerificationManager = () => {
 
     setLoading(true);
     try {
-      const params: Record<string, any> = {
+      const payload: Record<string, string> = {
         phone: adminForm.phone,
         purpose: adminForm.purpose
       };
 
       if (adminForm.provider) {
-        params.provider = adminForm.provider;
+        payload.provider = adminForm.provider;
       }
 
       if (adminForm.message.trim()) {
-        params.message = adminForm.message;
+        payload.message = adminForm.message;
       }
 
-      const response = await api.post('/phone-verification/admin/send-code', null, { params });
+      const response = await api.post('/phone-verification/admin/send-code', payload);
 
       if (response.data.success) {
         toast.success(t('admin2.pvm_code_sent', { phone: adminForm.phone }));
@@ -108,8 +108,8 @@ const PhoneVerificationManager = () => {
         });
         loadStatistics(); // Обновляем статистику
       }
-    } catch (error) {
-      logger.error('Error sending admin verification code:', error);
+    } catch {
+      logger.error('Error sending admin verification code');
       toast.error(t('admin2.pvm_err_send_code'));
     } finally {
       setLoading(false);
@@ -266,9 +266,7 @@ const PhoneVerificationManager = () => {
             onChange={(value: SelectChangeEvent) => setAdminForm((prev) => ({ ...prev, purpose: value.target.value }))}
             options={[
             { value: 'verification', label: t('admin2.pvm_purpose_verification') },
-            { value: 'password_reset', label: t('admin2.pvm_purpose_password_reset') },
-            { value: 'phone_change', label: t('admin2.pvm_purpose_phone_change') },
-            { value: 'registration', label: t('admin2.pvm_purpose_registration') }]
+            { value: 'phone_change', label: t('admin2.pvm_purpose_phone_change') }]
             }
             size="large"
             className="w-full" />
@@ -285,8 +283,7 @@ const PhoneVerificationManager = () => {
             options={[
             { value: '', label: t('admin2.pvm_provider_default') },
             { value: 'eskiz', label: 'Eskiz' },
-            { value: 'playmobile', label: 'PlayMobile' },
-            { value: 'mock', label: t('admin2.pvm_provider_mock') }]
+            { value: 'playmobile', label: 'PlayMobile' }]
             }
             size="large"
             className="w-full" />
