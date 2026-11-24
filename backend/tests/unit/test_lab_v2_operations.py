@@ -544,6 +544,48 @@ def test_critical_admin_route_retries_and_never_replaces_clinical_acknowledgment
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("escalated", [False, True])
+def test_configured_critical_admin_recovers_existing_open_tasks(
+    db_session, test_patient, test_visit, monkeypatch, escalated,
+):
+    admin = synthetic_user(db_session, "Admin")
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", None)
+    monkeypatch.setattr(settings, "TENANT_SCOPE_ENFORCE_WRITES", False)
+    test_visit.doctor_id = None
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+    if escalated:
+        escalate(db_session, task.id, actor_user_id=admin.id)
+    assert task.next_attempt_at is None
+    original_state = task.state
+
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+    assert run(dispatch_pending(db_session)) == 0
+    sender.assert_not_awaited()
+
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    assert run(dispatch_pending(db_session)) == 1
+    assert run(dispatch_pending(db_session)) == 0
+    assert task.state == original_state and task.next_attempt_at is None
+    assert task.inbox_recorded_at is None and task.acknowledged_at is None
+    sender.assert_awaited_once()
+    args = sender.await_args.kwargs
+    assert args["recipient"].id == admin.id
+    assert args["entity_id"] == task.id
+    assert args["entity_type"] == (
+        "lab_critical_escalation" if escalated else "lab_critical_assignment"
+    )
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize(("role", "is_active", "shared_deployment"), [
     ("Doctor", True, False), ("Admin", False, False), ("Admin", True, True),
 ])

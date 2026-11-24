@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -306,14 +306,35 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
     recorded = 0
     for _ in range(limit):
         now = datetime.now(UTC)
+        due = LabCriticalCommunication.next_attempt_at <= now
+        if _configured_operations_admin_id() is not None:
+            # Recover open tasks that waited for a configured route. A null
+            # schedule can also mean the inbox already recorded this state.
+            receipt = case(
+                (LabCriticalCommunication.state == "needs_assignment", "assignment_notified"),
+                else_="escalation_notified",
+            )
+            notified = select(LabCriticalCommunicationEvent.id).where(
+                LabCriticalCommunicationEvent.communication_id == LabCriticalCommunication.id,
+                LabCriticalCommunicationEvent.event_type == receipt,
+            ).exists()
+            due = or_(
+                due,
+                and_(
+                    LabCriticalCommunication.state.in_(("needs_assignment", "escalated")),
+                    LabCriticalCommunication.next_attempt_at.is_(None),
+                    ~notified,
+                ),
+            )
         task = db.scalar(
             select(LabCriticalCommunication)
             .where(
                 LabCriticalCommunication.state.in_(("pending", "needs_assignment", "escalated")),
-                LabCriticalCommunication.next_attempt_at <= now,
+                due,
             )
             .order_by(
-                LabCriticalCommunication.next_attempt_at, LabCriticalCommunication.id
+                LabCriticalCommunication.next_attempt_at.asc().nulls_last(),
+                LabCriticalCommunication.id,
             )
             .limit(1)
             .with_for_update(skip_locked=True)
