@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import i18n from '@/i18n';
+import type { WorkspaceLabReport, WorkspaceLabs } from '@/api/emrWorkspace';
 
 /**
  * EMRLAB-FE-001..004 (audit 3886, round 15) — fail-first.
@@ -22,6 +23,13 @@ import i18n from '@/i18n';
  */
 
 const listInstancesMock = vi.hoisted(() => vi.fn());
+const getWorkspaceLabsMock = vi.hoisted(() => vi.fn());
+const reviewLabVersionMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/api/emrWorkspace', () => ({
+  getWorkspaceLabs: getWorkspaceLabsMock,
+  reviewLabVersion: reviewLabVersionMock,
+}));
 
 vi.mock('../../../../hooks/useLabReporting', () => ({
   useLabReporting: () => ({
@@ -58,8 +66,25 @@ function draft(id: number, name: string): Record<string, unknown> {
   return { id, template_name: name, status: 'IN_PROGRESS', updated_at: new Date().toISOString() };
 }
 
+const noWorkspaceLabs: WorkspaceLabs = { orders: [], unlinked_reports: [], executions: [], invoices: [] };
+
+function workspaceLabs(reports: WorkspaceLabReport[]): WorkspaceLabs {
+  return {
+    ...noWorkspaceLabs,
+    orders: [{ id: 77, status: 'completed', created_at: '2026-07-01T09:00:00Z', reports }],
+  };
+}
+
+function report(id: number, name: string, supersedes: number | null = null): WorkspaceLabReport {
+  return {
+    id, template_name: name, status: 'FINALIZED', finalized_at: '2026-07-01T11:00:00Z',
+    supersedes_instance_id: supersedes, is_current_final: true, reviews: [],
+  };
+}
+
 beforeEach(async () => {
   vi.clearAllMocks();
+  getWorkspaceLabsMock.mockReset().mockResolvedValue(noWorkspaceLabs);
   await act(async () => { await i18n.changeLanguage('ru'); });
 });
 
@@ -233,5 +258,74 @@ describe('EMRLAB-FE-004: read-only does not revoke read access', () => {
     // EMRCOLLAPSE-FE-001 (round 21): expand before querying body content.
     fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
     expect(screen.getByRole('button', { name: /Скачать PDF: Лейкоциты/ })).toBeVisible();
+  });
+});
+
+describe('Lab results refresh within the same encounter', () => {
+  it('retries the failed list and opens the newly finalized correction by exact version', async () => {
+    listInstancesMock.mockRejectedValue(new Error('Synthetic results outage'));
+    render(<ThemeProvider><LabResultsSection patientId={1} visitId={5} reviewerId={19} /></ThemeProvider>);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(i18n.t('emr_workspace.load_error'));
+    listInstancesMock.mockResolvedValue([]);
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('emr_workspace.retry') }));
+    fireEvent.click(screen.getByRole('button', { name: /Результаты анализов/ }));
+    expect(await screen.findByText(i18n.t('empty.no_lab_results'))).toBeVisible();
+
+    const original = report(11, 'SYNTHETIC original');
+    getWorkspaceLabsMock.mockResolvedValue(workspaceLabs([original]));
+    listInstancesMock.mockResolvedValue([finalized(11, original.template_name)]);
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('emr_workspace.lab_refresh') }));
+    expect(await screen.findByText(original.template_name)).toBeVisible();
+    expect(screen.getByRole('button', { name: i18n.t('emr_workspace.lab_review') })).toBeEnabled();
+
+    const correction = report(12, 'SYNTHETIC correction', original.id);
+    getWorkspaceLabsMock.mockResolvedValue(workspaceLabs([{ ...original, is_current_final: false }, correction]));
+    listInstancesMock.mockResolvedValue([
+      finalized(11, original.template_name), { ...finalized(12, correction.template_name), flagged_findings_count: 2 },
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('emr_workspace.lab_refresh') }));
+    expect(screen.queryByRole('button', { name: i18n.t('emr_workspace.lab_review') })).toBeNull();
+
+    expect(await screen.findByText(correction.template_name)).toBeVisible();
+    expect(screen.getByText(i18n.t('emr_workspace.lab_previous_version'))).toBeVisible();
+    expect(screen.getByRole('button', { name: `Скачать PDF: ${correction.template_name}` })).toBeVisible();
+    expect(screen.getByText(/2 отклонений/)).toBeVisible();
+    const latestReview = screen.getByRole('button', { name: i18n.t('emr_workspace.lab_review') });
+    fireEvent.click(latestReview);
+    await waitFor(() => expect(reviewLabVersionMock).toHaveBeenCalledExactlyOnceWith(5, 1, correction.id, ''));
+    expect(getWorkspaceLabsMock).toHaveBeenLastCalledWith(5, 1, expect.any(AbortSignal));
+  });
+
+  it('discards both late refresh responses after changing patients', async () => {
+    listInstancesMock.mockResolvedValue([]);
+    const view = render(<ThemeProvider><LabResultsSection patientId={1} visitId={5} /></ThemeProvider>);
+    const refresh = await screen.findByRole('button', { name: i18n.t('emr_workspace.lab_refresh') });
+    await waitFor(() => expect(refresh).toBeEnabled());
+
+    let resolveOldResults!: (value: Record<string, unknown>[]) => void;
+    let resolveOldWorkspace!: (value: WorkspaceLabs) => void;
+    listInstancesMock.mockImplementationOnce(() => new Promise(resolve => { resolveOldResults = resolve; }));
+    getWorkspaceLabsMock.mockImplementationOnce(() => new Promise(resolve => { resolveOldWorkspace = resolve; }));
+    fireEvent.click(refresh);
+    await waitFor(() => expect(resolveOldResults).toBeTypeOf('function'));
+
+    const current = report(22, 'SYNTHETIC current patient');
+    getWorkspaceLabsMock.mockResolvedValue(workspaceLabs([current]));
+    listInstancesMock.mockResolvedValue([
+      { ...finalized(22, current.template_name), visit_id: 6, patient_id: 2 },
+      { ...finalized(23, 'SYNTHETIC unexpected scope'), visit_id: 5, patient_id: 1 },
+    ]);
+    view.rerender(<ThemeProvider><LabResultsSection patientId={2} visitId={6} /></ThemeProvider>);
+    expect(await screen.findByText(current.template_name)).toBeInTheDocument();
+
+    const previous = report(11, 'SYNTHETIC previous patient');
+    await act(async () => {
+      resolveOldResults([finalized(11, previous.template_name)]);
+      resolveOldWorkspace(workspaceLabs([previous]));
+    });
+    expect(screen.getByText(current.template_name)).toBeInTheDocument();
+    expect(screen.queryByText(previous.template_name)).toBeNull();
+    expect(screen.queryByText('SYNTHETIC unexpected scope')).toBeNull();
   });
 });

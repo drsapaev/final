@@ -139,7 +139,7 @@ interface EMRDataShape {
     icd10_code?: string;
     specialty?: string;
     vitals?: Record<string, unknown>;
-    medications?: { text?: string; list?: unknown[] };
+    medications?: { text?: string; list?: unknown[]; [key: string]: unknown } | unknown[];
     specialty_data?: Record<string, unknown>;
     patient_age?: string | number;
     patient_gender?: string;
@@ -329,6 +329,10 @@ export function EMRContainerV2({
         redo,
         reloadFromServer,
     } = useEMR(visitId, { specialty: canonicalSpecialty }) as EMRHookResult;
+    const storedMedications = data?.medications;
+    const legacyMedicationList = Array.isArray(storedMedications);
+    const medicationSection = legacyMedicationList ? { list: storedMedications } : storedMedications;
+    const medications = Array.isArray(medicationSection?.list) ? medicationSection.list : [];
     const followUp = data?.follow_up && typeof data.follow_up === 'object' ? data.follow_up as FollowUp : {};
     const [isPreparingCompletion, setIsPreparingCompletion] = useState(false);
     const [isSigning, setIsSigning] = useState(false);
@@ -1165,7 +1169,7 @@ export function EMRContainerV2({
                         doctorId={doctorId}
                         specialty={canonicalSpecialty}
                     />
-                    <FieldDictation key={workspaceState.scope} disabled={editingDisabled || accessDenied}
+                    <FieldDictation key={`dictation:${workspaceState.scope}`} disabled={editingDisabled || accessDenied}
                         onInsert={text => handleFieldChange('complaints')(
                             [emrTextValue(data?.complaints).trimEnd(), text].filter(Boolean).join('\n'),
                         )} />
@@ -1218,16 +1222,15 @@ export function EMRContainerV2({
                     />
 
                     <TreatmentSection
-                        value={data?.medications?.text || ''}
+                        value={medicationSection?.text || ''}
                         onChange={(text, source) => handleFieldChange('medications')({
-                            ...(data?.medications || {}),
+                            ...medicationSection,
                             text
                         }, source)}
-                        medications={data?.medications?.list || []}
-                        onMedicationsChange={(list) => handleFieldChange('medications')({
-                            ...(data?.medications || {}),
-                            list
-                        })}
+                        medications={medications}
+                        onMedicationsChange={(list) => handleFieldChange('medications')(
+                            legacyMedicationList ? list : { ...medicationSection, list },
+                        )}
                         disabled={editingDisabled}
                         specialty={data?.specialty || 'general'}
                         icd10Code={data?.icd10_code || ''}
@@ -1242,9 +1245,9 @@ export function EMRContainerV2({
                         visitKey={visitId}
                     />
                     {workspace && (
-                        <PrescriptionAction key={workspaceState.scope} visitId={workspace.visit.id}
+                        <PrescriptionAction key={`prescription:${workspaceState.scope}`} visitId={workspace.visit.id}
                             patientId={workspace.patient.id} rowVersion={rowVersion}
-                            hasMedications={Boolean(data?.medications?.list?.length)}
+                            hasMedications={medications.length > 0}
                             isCurrentSaved={!isDirty && !isSaving && rowVersion > 0 && savedEMRStatus !== 'draft'}
                             readOnly={editingDisabled || accessDenied || Boolean(conflict)} />
                     )}
@@ -1343,7 +1346,7 @@ export function EMRContainerV2({
                         Collapsible (defaultOpen=false when no results, true when
                         results exist). Read-only — doctors view, don't edit. */}
                     <LabResultsSection
-                        key={workspaceState.scope}
+                        key={`labs:${workspaceState.scope}`}
                         patientId={patientId}
                         visitId={visitId}
                         disabled={editingDisabled}

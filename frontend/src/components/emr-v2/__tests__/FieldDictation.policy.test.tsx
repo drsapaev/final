@@ -11,17 +11,25 @@ const policyNames = ['permissionsPolicy', 'featurePolicy'] as const;
 const policyDescriptors = policyNames.map(name => Object.getOwnPropertyDescriptor(document, name));
 const available = vi.fn<() => Promise<string>>();
 const install = vi.fn();
-const construct = vi.fn();
+const construct = vi.fn<(recognition: LocalRecognition) => void>();
 
 class LocalRecognition {
   static available = available;
   static install = install;
+  private useLocalEngine = false;
+
+  onresult: ((event: { results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null = null;
+  onerror: (() => void) | null = null;
+  start = vi.fn();
+  stop = vi.fn();
+  abort = vi.fn();
 
   constructor() {
-    construct();
+    construct(this);
   }
 
-  get processLocally() { return true; }
+  get processLocally() { return this.useLocalEngine; }
+  set processLocally(value: boolean) { this.useLocalEngine = value; }
 }
 
 function setPolicy(name: typeof policyNames[number], policy?: { allowsFeature: (key: string) => boolean }) {
@@ -35,7 +43,7 @@ function expandDictation() {
 beforeEach(() => {
   available.mockReset().mockResolvedValue('available');
   install.mockClear();
-  construct.mockClear();
+  construct.mockReset();
   for (const name of policyNames) setPolicy(name);
   vi.stubGlobal('SpeechRecognition', LocalRecognition);
   vi.stubEnv('VITE_EMR_DICTATION_DISABLED', 'false');
@@ -51,7 +59,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe('FieldDictation microphone policy', () => {
+describe('FieldDictation local recording controls', () => {
   it.each(policyNames)('shows the policy restriction without calling speech APIs via %s', async name => {
     const allowsFeature = vi.fn(() => false);
     setPolicy(name, { allowsFeature });
@@ -102,5 +110,30 @@ describe('FieldDictation microphone policy', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(available).toHaveBeenCalledTimes(1);
     expect(install).not.toHaveBeenCalled();
+  });
+
+  it('keeps the transcript editable and allows a fresh local session after an error without an end event', async () => {
+    const onInsert = vi.fn();
+    render(<FieldDictation disabled={false} onInsert={onInsert} />);
+    expandDictation();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'emr_workspace.dictation_start' }));
+    const first = construct.mock.calls[0][0];
+    expect(first.processLocally).toBe(true);
+    act(() => {
+      first.onresult?.({ results: [{ isFinal: true, 0: { transcript: 'SYNTHETIC note' } }] });
+      first.onerror?.();
+      first.onresult?.({ results: [{ isFinal: true, 0: { transcript: 'SYNTHETIC late result' } }] });
+    });
+
+    expect(first.abort).toHaveBeenCalledOnce();
+    expect(screen.getByRole('alert')).toHaveTextContent('emr_workspace.dictation_error');
+    expect(screen.getByRole('textbox')).toHaveValue('SYNTHETIC note');
+    fireEvent.click(screen.getByRole('button', { name: 'emr_workspace.dictation_insert' }));
+    expect(onInsert).toHaveBeenCalledExactlyOnceWith('SYNTHETIC note');
+
+    fireEvent.click(screen.getByRole('button', { name: 'emr_workspace.dictation_start' }));
+    expect(construct).toHaveBeenCalledTimes(2);
+    expect(construct.mock.calls[1][0].start).toHaveBeenCalledOnce();
   });
 });

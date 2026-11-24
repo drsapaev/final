@@ -124,6 +124,7 @@ const en = {
     saving: 'Saving…',
     load_error: 'Unable to load the information',
     retry: 'Retry',
+    lab_refresh: 'Refresh lab results',
     conflict: 'The information has changed. Refresh the summary and reopen the entry.',
     save_error: 'The entry was not saved. Check the information and retry.',
     patient_history: 'Patient history',

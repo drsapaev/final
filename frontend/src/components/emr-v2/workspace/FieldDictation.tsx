@@ -44,6 +44,14 @@ function localRecognition(): LocalRecognitionConstructor | undefined {
   return candidate?.available && 'processLocally' in candidate.prototype ? candidate : undefined;
 }
 
+function abortRecognition(recognition: LocalRecognition | null) {
+  try {
+    recognition?.abort();
+  } catch {
+    // A failing browser engine must leave the manual editor usable.
+  }
+}
+
 function DictationControls({
   lang, disabled, onInsert,
 }: { lang: string; disabled: boolean; onInsert: (text: string) => void }) {
@@ -75,7 +83,7 @@ function DictationControls({
       current = false;
       const recognition = active.current;
       active.current = null;
-      recognition?.abort();
+      abortRecognition(recognition);
     };
   }, [disabled, lang]);
 
@@ -96,44 +104,49 @@ function DictationControls({
     }
   }
 
+  function failRecording() {
+    const recognition = active.current;
+    active.current = null;
+    setPhase('error');
+    abortRecognition(recognition);
+  }
+
   function start() {
     if (!available || active.current || disabled) return;
     const Constructor = localRecognition();
     if (!Constructor) return;
-    const recognition = new Constructor();
-    recognition.processLocally = true;
-    if (recognition.processLocally !== true) {
-      setAvailable(false);
-      return;
-    }
-    active.current = recognition;
-    recognition.lang = lang;
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    const previous = draft;
-    recognition.onresult = event => {
-      if (active.current !== recognition) return;
-      const spoken = Array.from(event.results)
-        .filter(result => result.isFinal)
-        .map(result => result[0].transcript.trim())
-        .filter(Boolean).join(' ');
-      setDraft([previous, spoken].filter(Boolean).join(' '));
-    };
-    recognition.onend = () => {
-      if (active.current !== recognition) return;
-      active.current = null;
-      setPhase(current => current === 'error' ? 'error' : 'idle');
-    };
-    recognition.onerror = () => {
-      if (active.current !== recognition) return;
-      setPhase('error');
-    };
     try {
+      const recognition = new Constructor();
+      recognition.processLocally = true;
+      if (recognition.processLocally !== true) {
+        setAvailable(false);
+        return;
+      }
+      active.current = recognition;
+      recognition.lang = lang;
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      const previous = draft;
+      recognition.onresult = event => {
+        if (active.current !== recognition) return;
+        const spoken = Array.from(event.results)
+          .filter(result => result.isFinal)
+          .map(result => result[0].transcript.trim())
+          .filter(Boolean).join(' ');
+        setDraft([previous, spoken].filter(Boolean).join(' '));
+      };
+      recognition.onend = () => {
+        if (active.current !== recognition) return;
+        active.current = null;
+        setPhase('idle');
+      };
+      recognition.onerror = () => {
+        if (active.current === recognition) failRecording();
+      };
       setPhase('recording');
       recognition.start();
     } catch {
-      active.current = null;
-      setPhase('error');
+      failRecording();
     }
   }
 
@@ -143,8 +156,7 @@ function DictationControls({
     try {
       active.current.stop();
     } catch {
-      active.current = null;
-      setPhase('error');
+      failRecording();
     }
   }
 

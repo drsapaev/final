@@ -469,8 +469,10 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
   const adultTteSaveBlocked = unsupportedAdultTte && [...draftTouchedRef.current.keys()].some(isAdultTtePath);
   const adultTteInvalidKeys = ADULT_TTE_MEASUREMENT_KEYS.filter(key => {
     const value = adultTte?.measurements?.[key]?.value;
-    return draftTouchedRef.current.has(`adult_tte.measurements.${key}`) &&
-      typeof value === 'string' && value.trim() !== '' && parseAdultTteMeasurement(value) === null;
+    if (!draftTouchedRef.current.has(`adult_tte.measurements.${key}`) ||
+      typeof value !== 'string' || value.trim() === '') return false;
+    const parsed = parseAdultTteMeasurement(value);
+    return parsed === null || (key === 'lvef' && parsed > 100);
   });
   const hasLegacyMeasurements = [
     echoData.leftVentricle, echoData.rightVentricle, echoData.atria, echoData.valves,
@@ -775,7 +777,10 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
               <p>{t('emr_workspace.measurement_recorded', { date: new Date(adultTte.recorded_at).toLocaleString() })}</p>
             )}
             {adultTteInvalidKeys.length > 0 && (
-              <p role="alert" id={`${fieldIdPrefix}-invalid-tte`}>{t('emr_workspace.echo_tte_number_error')}</p>
+              <p role="alert" id={`${fieldIdPrefix}-invalid-tte`}>
+                {t('emr_workspace.echo_tte_number_error')}
+                {adultTteInvalidKeys.includes('lvef') && ` ${t('emr_workspace.echo_tte_lvef')} (0–100%).`}
+              </p>
             )}
           </>}
         </section>

@@ -124,6 +124,7 @@ const uzLatn = {
     saving: "Saqlanmoqda…",
     load_error: "Ma’lumotni yuklab bo‘lmadi",
     retry: "Qayta urinish",
+    lab_refresh: "Tahlil natijalarini yangilash",
     conflict: "Ma’lumot o‘zgargan. Xulosani yangilang va yozuvni qayta oching.",
     save_error: "Yozuv saqlanmadi. Ma’lumotni tekshirib, qayta urining.",
     patient_history: "Bemor tarixi",

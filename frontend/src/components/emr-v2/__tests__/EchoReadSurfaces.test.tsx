@@ -1,12 +1,15 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { EMRWorkspaceData } from '@/api/emrWorkspace';
+import { getWorkspaceHistoryDocument, type EMRWorkspaceData } from '@/api/emrWorkspace';
 import { CardiologySection } from '../sections/specialty/CardiologySection';
 import { DocumentPreview } from '../workspace/DocumentPreview';
 import { WorkspaceSidePanel } from '../workspace/VisitHistory';
 
 vi.mock('@/hooks/useLabReporting', () => ({ useLabReporting: () => ({}) }));
+vi.mock('@/api/emrWorkspace', () => ({
+  getEMRWorkspace: vi.fn(), getWorkspaceHistoryDocument: vi.fn(),
+}));
 vi.mock('@/i18n/useTranslation', () => ({
   useTranslation: () => ({
     language: 'en',
@@ -19,6 +22,7 @@ vi.mock('@/i18n/useTranslation', () => ({
 }));
 vi.mock('../../ui/macos', () => ({
   Button: ({ size: _size, ...props }: Omit<ComponentProps<'button'>, 'size'> & { size?: string }) => <button {...props} />,
+  Input: (props: ComponentProps<'input'>) => <input {...props} />,
   Modal: ({ children, actions }: { children: ReactNode; actions: ReactNode }) => <div>{children}{actions}</div>,
 }));
 
@@ -85,8 +89,52 @@ describe('Adult TTE clinical read surfaces', () => {
       readOnly reload={vi.fn()} followUp={{}} onFollowUpChange={vi.fn()} />);
     fireEvent.click(screen.getByText('emr_workspace.measurement_history'));
 
-    expect(screen.getByText(/echo_tte_reporting · .*61\.25 % · .*biplane_simpson_2d · 2026-11-20/)).toBeVisible();
+    const adult = within(screen.getByRole('region', { name: 'emr_workspace.echo_tte_reporting' }));
+    expect(adult.getByText(/echo_tte_lvef 61\.25 % · .*biplane_simpson_2d/)).toBeVisible();
+    expect(adult.getByText('2026-11-20')).toHaveAttribute('datetime', '2026-11-20');
     expect(screen.getByText(/echo_legacy_measurements · EF 54%, SYNTHETIC legacy method · 2026-09-04/)).toBeVisible();
     expect(screen.queryByText(/61\.25.*54/)).toBeNull();
+  });
+
+  it('keeps adult TTE studies without EF visible in the timeline and exact history version', async () => {
+    const study = (visitId: number, measuredAt: string, value: number) => ({ adult_tte: {
+      version: 2, measurements: { lavi: { value, unit: 'mL/m²' } },
+      measured_at: measuredAt, source_visit_id: visitId,
+    } });
+    const currentEcho = study(99, '2026-11-19', 40);
+    const history = {
+      id: 101, visit_id: 98, version: 3, visit_date: '2026-09-05', signed_at: null,
+      status: 'signed', complaints: '', diagnosis: '', treatment: '', recommendations: '',
+      vitals: {}, echo: study(98, '2026-09-04', 35), laboratory: [],
+    };
+    const workspace: EMRWorkspaceData = {
+      patient: { id: 1, full_name: 'SYNTHETIC patient', birth_date: null, legacy_allergies: null, legacy_conditions: null },
+      visit: { id: 99, date: '2026-11-20', status: 'open' },
+      clinical_entries: [], allergy_state: 'not_checked', has_more_history: false, history: [history],
+    };
+    const previousEcho = study(98, '2026-09-03', 31);
+    vi.mocked(getWorkspaceHistoryDocument)
+      .mockResolvedValueOnce({ ...history, data: { specialty_data: { echo: history.echo } } })
+      .mockResolvedValueOnce({
+        ...history, version: 2, echo: previousEcho, data: { specialty_data: { echo: previousEcho } },
+      });
+    render(<WorkspaceSidePanel status="ready" workspace={workspace} currentEcho={currentEcho}
+      readOnly reload={vi.fn()} followUp={{}} onFollowUpChange={vi.fn()} />);
+    fireEvent.click(screen.getByText('emr_workspace.measurement_history'));
+
+    const observations = screen.getAllByRole('region', { name: 'emr_workspace.echo_tte_reporting' });
+    expect(observations).toHaveLength(2);
+    expect(within(observations[0]!).getByText(/echo_tte_lavi 40 mL\/m²/)).toBeVisible();
+    expect(within(observations[0]!).getByText('2026-11-19')).toBeVisible();
+    expect(within(observations[1]!).getByText(/echo_tte_lavi 35 mL\/m²/)).toBeVisible();
+    expect(within(observations[1]!).getByText('2026-09-04')).toBeVisible();
+
+    fireEvent.click(screen.getAllByRole('button', { name: '2026-09-05' })[0]!);
+    const version = await screen.findByRole('spinbutton', { name: 'emr_workspace.document_version' });
+    fireEvent.change(version, { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'emr_workspace.open_version' }));
+    expect(await screen.findByText(/echo_tte_lavi 31 mL\/m²/)).toBeVisible();
+    expect(screen.getByText('2026-09-03')).toBeVisible();
+    expect(vi.mocked(getWorkspaceHistoryDocument).mock.lastCall).toEqual([99, 1, 98, 2]);
   });
 });

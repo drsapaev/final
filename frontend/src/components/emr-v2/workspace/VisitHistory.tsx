@@ -7,6 +7,7 @@ import { useTranslation } from '@/i18n/useTranslation';
 import { echoAdultTteFacts, echoMeasurementFacts } from '@/utils/echoMeasurements';
 import { useLabReporting } from '@/hooks/useLabReporting';
 import { Button, Input, Textarea } from '../../ui/macos';
+import { AdultTteSummary } from './AdultTteSummary';
 import { ClinicalSummary } from './ClinicalSummary';
 import { DocumentPreview } from './DocumentPreview';
 import { LabTrendPanel } from './LabTrendPanel';
@@ -76,7 +77,7 @@ function measurements({ vitals, echo }: Pick<HistorySummary, 'vitals' | 'echo'>)
   const systolic = measurement(vitals.systolic ?? pressure.systolic);
   const diastolic = measurement(vitals.diastolic ?? pressure.diastolic);
   const legacyEf = echoMeasurementFacts(echo).find(fact => fact.key === 'ef');
-  const adultTteEf = echoAdultTteFacts(echo).find(fact => fact.key === 'lvef');
+  const adultTte = echoAdultTteFacts(echo);
   return {
     pressure: systolic || diastolic ? `${systolic || '—'}/${diastolic || '—'}` : '',
     pulse: measurement(vitals.pulse),
@@ -85,13 +86,13 @@ function measurements({ vitals, echo }: Pick<HistorySummary, 'vitals' | 'echo'>)
     temperature: measurement(vitals.temperature),
     weight: measurement(vitals.weight),
     legacyEf,
-    adultTteEf,
+    adultTte: adultTte.length > 0 ? adultTte : undefined,
   };
 }
 
 function MeasurementValues({ values }: { values: ReturnType<typeof measurements> }) {
   const { t, language } = useTranslation();
-  const { legacyEf, adultTteEf } = values;
+  const { legacyEf, adultTte } = values;
   return <>
     {values.pressure && <span>{t('emr_workspace.pressure_value', { value: values.pressure })}</span>}
     {values.pulse && <span>{t('emr_workspace.pulse_value', { value: values.pulse })}</span>}
@@ -103,11 +104,7 @@ function MeasurementValues({ values }: { values: ReturnType<typeof measurements>
       value: new Intl.NumberFormat(language).format(legacyEf.value),
       method: legacyEf.method || t('emr_workspace.unknown_method'),
     })}{legacyEf.measuredAt && ` · ${legacyEf.measuredAt}`}</span>}
-    {adultTteEf && <span>{t('emr_workspace.echo_tte_reporting')} · {t('emr_workspace.echo_tte_lvef')} {
-      new Intl.NumberFormat(language, { maximumSignificantDigits: 15 }).format(adultTteEf.value)
-    } {adultTteEf.unit} · {adultTteEf.methodCode
-      ? t(`emr_workspace.echo_method_${adultTteEf.methodCode}`) : t('emr_workspace.unknown_method')
-    }{adultTteEf.measuredAt && ` · ${adultTteEf.measuredAt}`}</span>}
+    {adultTte && <AdultTteSummary facts={adultTte} />}
   </>;
 }
 

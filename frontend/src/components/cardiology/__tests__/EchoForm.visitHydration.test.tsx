@@ -374,6 +374,49 @@ describe('Adult transthoracic echocardiography definition', () => {
       source_visit_id: 11,
     });
   });
+
+  it('rejects a new LVEF above 100% and saves the 100% boundary', async () => {
+    const stored = { row_version: 3, data: { specialty_data: { echo: {} } } };
+    apiMocks.get.mockResolvedValue({ data: stored });
+    apiMocks.post.mockResolvedValueOnce({ status: 200 });
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+    const save = await screen.findByRole('button', { name: 'Сохранить' });
+    const ef = screen.getByRole('textbox', { name: 'Фракция выброса ЛЖ (%)' });
+
+    fireEvent.change(ef, { target: { value: '130' } });
+    expect(ef).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent('0–100%');
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(apiMocks.post).not.toHaveBeenCalled();
+
+    fireEvent.change(ef, { target: { value: '100' } });
+    expect(save).toBeEnabled();
+    await act(async () => { fireEvent.click(save); });
+    expect(apiMocks.post).toHaveBeenCalledTimes(1);
+    const [, payload] = apiMocks.post.mock.calls[0];
+    expect(payload.data.specialty_data.echo.adult_tte.measurements.lvef).toEqual({ value: 100, unit: '%' });
+  });
+
+  it('preserves previously stored LVEF when editing a different measurement', async () => {
+    const adultTte = {
+      version: 2, measurements: { lvef: { value: 130, unit: '%' } }, ef_method: 'visual_estimate',
+    };
+    const stored = { row_version: 7, data: { specialty_data: { echo: { adult_tte: adultTte } } } };
+    apiMocks.get.mockResolvedValue({ data: stored });
+    apiMocks.post.mockResolvedValueOnce({ status: 200 });
+    renderWithProviders(<EchoForm visitId={11} patientId={7} />);
+    await screen.findByDisplayValue('130');
+
+    const edv = screen.getByRole('textbox', { name: 'Конечный диастолический объём ЛЖ (mL)' });
+    fireEvent.change(edv, { target: { value: '114' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Сохранить' })); });
+    expect(apiMocks.post).toHaveBeenCalledTimes(1);
+    const [, payload] = apiMocks.post.mock.calls[0];
+    expect(payload.data.specialty_data.echo.adult_tte).toMatchObject({
+      ...adultTte, measurements: { ...adultTte.measurements, lvedv: { value: 114, unit: 'mL' } },
+    });
+  });
 });
 
 describe('ECHO-FE-001: visit switch isolation', () => {

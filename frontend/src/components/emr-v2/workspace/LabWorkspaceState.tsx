@@ -12,12 +12,11 @@ function useLabLabels() {
 }
 
 export function LabWorkspaceState({
-  labs, error, retry,
-}: { labs?: WorkspaceLabs; error: boolean; retry: () => void }) {
+  labs, error,
+}: { labs?: WorkspaceLabs; error: boolean }) {
   const { t, status } = useLabLabels();
   if (error && !labs) return <div role="alert">
     <p>{t('emr_workspace.load_error')}</p>
-    <Button type="button" size="small" variant="outline" onClick={retry}>{t('emr_workspace.retry')}</Button>
   </div>;
   if (!labs) return <p role="status">{t('emr_workspace.loading')}</p>;
   const isPending = (report: WorkspaceLabReport) => !['FINALIZED', 'PRINTED'].includes(report.status);
@@ -37,7 +36,6 @@ export function LabWorkspaceState({
       <h3>{t('emr_workspace.pending_labs')}</h3>
       {error && <div role="alert">
         <p>{t('emr_workspace.load_error')}</p>
-        <Button type="button" size="small" variant="outline" onClick={retry}>{t('emr_workspace.retry')}</Button>
       </div>}
       {pendingOrders.length === 0 && pendingUnlinked.length === 0 && <p>{t('emr_workspace.no_entries')}</p>}
       <ul className="emr-workspace-list">
