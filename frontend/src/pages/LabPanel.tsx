@@ -1843,16 +1843,11 @@ export default function LabPanel() {
           </div>
         </CardHeader>
         {message.text && (
-          <CardContent
-            role={message.type === 'error' ? 'alert' : 'status'}
-            aria-live={message.type === 'error' ? 'assertive' : 'polite'}
-            className="lab-card-secondary"
-          >
-            {/* QW-4 fix: Alert с кнопками «Повторить» (если есть retryAction)
-                и «Закрыть». Раньше Alert только показывал текст — теперь
-                пользователь может восстановиться после ошибки одним кликом. */}
+          <CardContent className="lab-card-secondary">
             <Alert
-              severity={message.type === 'error' ? 'error' : 'info'}
+              type={message.type === 'error' ? 'error' : 'info'}
+              role={message.type === 'error' ? 'alert' : 'status'}
+              description={message.text}
               action={(
                 <div className="lab-flex-center-8">
                   {message.retryAction && (
@@ -1886,9 +1881,7 @@ export default function LabPanel() {
                   </Button>
                 </div>
               )}
-            >
-              {message.text}
-            </Alert>
+            />
           </CardContent>
         )}
       </Card>

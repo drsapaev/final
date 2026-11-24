@@ -515,6 +515,49 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     await installApiMocks(page);
   });
 
+  for (const labels of [
+    {
+      language: 'uz-Cyrl',
+      queueError: 'Лаборатория навбатини юклаб бўлмади. Уланишни текшириб, қайта уриниб кўринг.',
+      retry: 'Қайта юклаш',
+      dismiss: 'Билдиришномани ёпиш',
+      saveDraft: 'Қораламани сақлаш',
+    },
+    {
+      language: 'uz-Latn',
+      queueError: 'Laboratoriya navbatini yuklab bo‘lmadi. Ulanishni tekshirib, qayta urinib ko‘ring.',
+      retry: 'Qayta yuklash',
+      dismiss: 'Bildirishnomani yopish',
+      saveDraft: 'Qoralamani saqlash',
+    },
+  ]) {
+    test(`recovers from a worklist network failure in ${labels.language}`, async ({ page }) => {
+      state.instances.push(makeInstanceRecord(CREATED_INSTANCE_ID, 'IN_PROGRESS'));
+      // eslint-disable-next-line no-restricted-properties -- Seed the language preference in the isolated browser.
+      await page.addInitScript(language => localStorage.setItem('language', language), labels.language);
+      let worklistAvailable = false;
+      await page.route('**/api/v1/lab/worklist/search', route => (
+        worklistAvailable ? route.fallback() : route.abort('internetdisconnected')
+      ));
+
+      await page.goto('/lab');
+      await expect(page.getByText(labels.queueError, { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: labels.dismiss, exact: true })).toBeVisible();
+      worklistAvailable = true;
+      const retry = page.getByRole('button', { name: labels.retry, exact: true });
+      await retry.focus();
+      await expect(retry).toBeFocused();
+      await page.keyboard.press('Enter');
+
+      const order = page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) });
+      await expect(order).toBeVisible();
+      await expect(page.getByText(labels.queueError, { exact: true })).toHaveCount(0);
+      await order.click();
+      await expect(page.getByRole('button', { name: labels.saveDraft, exact: true })).toBeVisible();
+      expect(finalizePostCount).toBe(0);
+    });
+  }
+
   test('finds an older order through worklist search without paging through the list', async ({ page }) => {
     let requestedCursor = false;
     await page.route('**/api/v1/lab/worklist/search', (route) => {
@@ -590,7 +633,7 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     let accepted = false;
     let reportReads = 0;
     await page.route('**/api/v1/lab/worklist/search', (route) => json(route, {
-      entries: [{ ...QUEUE_ENTRY, id: `order:${orderId}`, order_id: orderId, report_instance_id: record.id }],
+      entries: [{ ...QUEUE_ENTRY, id: `order:${orderId}`, queue_number: 777, order_id: orderId, report_instance_id: record.id }],
       total: 1,
       counts: { actionable: 1, today: 0, overdue: 0, awaiting_specimen: 1, in_review: 0, ready: 0 },
       next_cursor: null,
