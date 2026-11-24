@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import MetaData, Table, and_, or_, select
+from datetime import datetime
+
+from sqlalchemy import MetaData, Table, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.lab import FINAL_INSTANCE_STATUSES, LabReportInstance, LabReportValue
@@ -95,19 +97,28 @@ def list_results(db: Session, order_id: int) -> list[dict]:
     return [dict(row) for row in rows]
 
 
-# === ФУНКЦИИ ДЛЯ МОБИЛЬНОГО API ===
-
-
 def get_patient_lab_results(
-    db: Session, patient_id: int, limit: int = 50, offset: int = 0
+    db: Session,
+    patient_id: int,
+    limit: int | None = 50,
+    offset: int = 0,
+    *,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
 ) -> list[dict]:
-    """Read mobile results and the exact released evaluation behind each projection."""
+    """Read patient results and the exact released evaluation behind each projection."""
     r = _results(db)
     o = _orders(db)
     source = LabReportInstance.__table__
     root = source.alias("lab_result_root")
     value = LabReportValue.__table__
     released_statuses = sorted(FINAL_INSTANCE_STATUSES)
+    result_date = func.coalesce(source.c.finalized_at, r.c.created_at)
+    date_filters = []
+    if date_from is not None:
+        date_filters.append(result_date >= date_from)
+    if date_to is not None:
+        date_filters.append(result_date <= date_to)
 
     rows = (
         db.execute(
@@ -154,6 +165,7 @@ def get_patient_lab_results(
                     ),
                     and_(source.c.id.is_not(None), root.c.id.is_not(None)),
                 ),
+                *date_filters,
             )
             .order_by(r.c.id.desc())
             .offset(offset)

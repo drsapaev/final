@@ -11,7 +11,14 @@ from app.core.security import get_password_hash
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.emr import EMR
-from app.models.lab import LabOrder, LabReportInstance, LabResult
+from app.models.lab import (
+    LabOrder,
+    LabReportInstance,
+    LabReportTemplate,
+    LabReportTemplateVersion,
+    LabReportValue,
+    LabResult,
+)
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
@@ -776,6 +783,139 @@ def test_doctor_emr_lab_reads_are_limited_to_own_patients(
         headers=doctor_headers,
     )
     assert other_summary.status_code == 403
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("value", "evaluation_status", "interpretation", "is_abnormal"),
+    [("<1", "not_evaluated", None, None), ("135", "evaluated", "critical", True)],
+)
+def test_emr_lab_uses_current_frozen_assessment_and_release_date(
+    client, db_session, value, evaluation_status, interpretation, is_abnormal
+) -> None:
+    user, doctor = _create_doctor_user(db_session, label="exact_emr_release")
+    patient = _create_patient(db_session)
+    visit = _create_visit(db_session, patient_id=patient.id, doctor_id=doctor.id)
+    legacy = _create_legacy_lab_result(
+        db_session,
+        patient_id=patient.id,
+        visit_id=visit.id,
+        test_code="hemoglobin",
+        value="130",
+    )
+    now = datetime.now(UTC).replace(microsecond=0)
+    original_at = now - timedelta(days=45)
+    released_at = now - timedelta(hours=1)
+    order = LabOrder(patient_id=patient.id, visit_id=visit.id)
+    template = LabReportTemplate(
+        code=f"synthetic-emr-{_suffix()}",
+        name="SYNTHETIC EMR parity",
+        family="synthetic",
+    )
+    version = LabReportTemplateVersion(
+        template=template,
+        version_no=1,
+        layout_preset="default",
+        status="PUBLISHED",
+        published_at=original_at,
+    )
+    db_session.add_all([order, version])
+    db_session.flush()
+    release_context = {
+        "order_id": order.id,
+        "visit_id": visit.id,
+        "patient_id": patient.id,
+        "template_id": template.id,
+        "template_version_id": version.id,
+    }
+    original = LabReportInstance(
+        **release_context, status="FINALIZED", finalized_at=original_at
+    )
+    db_session.add(original)
+    db_session.flush()
+    correction = LabReportInstance(
+        **release_context,
+        status="PRINTED",
+        supersedes_instance_id=original.id,
+        finalized_at=released_at,
+    )
+    db_session.add(correction)
+    db_session.flush()
+    projected = LabResult(
+        order_id=order.id,
+        test_code="hemoglobin",
+        test_name="SYNTHETIC linked hemoglobin",
+        value=value,
+        unit="previous unit",
+        ref_range="previous range",
+        abnormal=False,
+        source_instance_id=correction.id,
+        source_root_instance_id=original.id,
+        created_at=original_at,
+    )
+    db_session.add_all(
+        [
+            projected,
+            LabReportValue(
+                instance_id=original.id,
+                field_key="hemoglobin",
+                evaluation_snapshot={"status": "evaluated", "interpretation": "normal"},
+            ),
+            LabReportValue(
+                instance_id=correction.id,
+                field_key="hemoglobin",
+                resolved_reference_text="SYNTHETIC current range",
+                evaluation_snapshot={
+                    "status": evaluation_status,
+                    "interpretation": interpretation,
+                    "unit": "g/L",
+                },
+            ),
+        ]
+    )
+    db_session.commit()
+
+    headers = _doctor_headers(client, user)
+    response = client.get(
+        f"/api/v1/emr/lab/patients/{patient.id}/lab-results",
+        params={"date_from": (now - timedelta(days=2)).isoformat()},
+        headers=headers,
+    )
+    assert response.is_success, response.text
+    payload = response.json()
+    rows = {row["id"]: row for row in payload["results"]}
+    historical = rows[legacy.id]
+    assert historical["is_abnormal"] is False
+    assert "evaluation_status" not in historical
+    linked = rows[projected.id]
+    assert linked["value"] == value
+    assert linked["unit"] == "g/L"
+    assert linked["ref_range"] == "SYNTHETIC current range"
+    assert linked["source_instance_id"] == correction.id
+    assert linked["source_root_instance_id"] == original.id
+    assert linked["supersedes_instance_id"] == original.id
+    assert datetime.fromisoformat(linked["released_at"]).replace(tzinfo=UTC) == released_at
+    assert linked["evaluation_status"] == evaluation_status
+    assert linked["interpretation"] == interpretation
+    assert linked["abnormal"] is is_abnormal and linked["is_abnormal"] is is_abnormal
+    assert payload["abnormal_count"] == int(is_abnormal is True)
+
+    emr = _create_emr(
+        db_session,
+        appointment_id=_create_appointment(
+            db_session, patient_id=patient.id, doctor_id=doctor.id
+        ).id,
+    )
+    response = client.get(
+        f"/api/v1/emr/lab/emr/{emr.id}/lab-summary",
+        params={"patient_id": patient.id},
+        headers=headers,
+    )
+    assert response.is_success, response.text
+    summary = response.json()["summary"]["summary"]
+    assert summary["total_tests"] == 2
+    assert summary["abnormal_count"] == int(is_abnormal is True)
+    assert summary["recommendations"] == []
 
 
 @pytest.mark.integration

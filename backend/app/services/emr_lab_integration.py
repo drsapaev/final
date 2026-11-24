@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.crud import lab_result
+from app.crud import lab, lab_result
 from app.models.appointment import Appointment
 from app.models.emr import EMR
 from app.models.lab import LabOrder, LabResult
@@ -39,32 +39,69 @@ class EMRLabIntegrationService:
     ) -> list[dict[str, Any]]:
         """Получить лабораторные результаты пациента"""
         try:
-            # Получаем результаты анализов
-            results = lab_result.get_lab_results_by_patient(
-                db, patient_id=patient_id, date_from=date_from, date_to=date_to
+            results = lab.get_patient_lab_results(
+                db, patient_id, limit=None, date_from=date_from, date_to=date_to
             )
 
             # Фильтруем по типам тестов если указано
             if test_types:
-                results = [r for r in results if r.test_code in test_types]
+                results = [r for r in results if r["test_code"] in test_types]
 
             # Форматируем результаты
             formatted_results = []
             for result in results:
                 formatted_result = {
-                    "id": result.id,
-                    "test_name": result.test_name,
-                    "test_code": result.test_code,
-                    "value": result.value,
-                    "unit": result.unit,
-                    "ref_range": result.ref_range,
-                    "abnormal": result.abnormal,
-                    "is_abnormal": await self._check_abnormal_value(
-                        result.test_code, result.value, result.unit
-                    ),
-                    "created_at": result.created_at,
-                    "notes": result.notes,
+                    key: result[key]
+                    for key in (
+                        "id",
+                        "test_name",
+                        "test_code",
+                        "value",
+                        "unit",
+                        "ref_range",
+                        "abnormal",
+                        "created_at",
+                        "notes",
+                    )
                 }
+                source_id = result["source_instance_id"]
+                if source_id is None:
+                    formatted_result["is_abnormal"] = await self._check_abnormal_value(
+                        result["test_code"], result["value"], result["unit"]
+                    )
+                else:
+                    snapshot = result["evaluation_snapshot"]
+                    if not isinstance(snapshot, dict):
+                        snapshot = {}
+                    status = snapshot.get("status") or "unknown"
+                    interpretation = snapshot.get("interpretation")
+                    is_abnormal: bool | None = None
+                    if status == "evaluated" and result["value"]:
+                        if interpretation in (
+                            "low",
+                            "high",
+                            "warning",
+                            "abnormal",
+                            "critical",
+                        ):
+                            is_abnormal = True
+                        elif interpretation == "normal":
+                            is_abnormal = False
+                    formatted_result.update(
+                        abnormal=is_abnormal,
+                        is_abnormal=is_abnormal,
+                        evaluation_status=status,
+                        interpretation=interpretation,
+                        source_instance_id=source_id,
+                        source_root_instance_id=result["source_root_instance_id"],
+                        supersedes_instance_id=result["supersedes_instance_id"],
+                        released_at=result["released_at"],
+                    )
+                    if snapshot:
+                        formatted_result.update(
+                            unit=snapshot.get("unit"),
+                            ref_range=result["resolved_reference_text"],
+                        )
                 formatted_results.append(formatted_result)
 
             return formatted_results
@@ -200,7 +237,9 @@ class EMRLabIntegrationService:
                 "test_types": len(grouped_results),
                 "abnormal_count": len([r for r in results if r["is_abnormal"]]),
                 "latest_date": (
-                    max([r["created_at"] for r in results]) if results else None
+                    max(r.get("released_at") or r["created_at"] for r in results)
+                    if results
+                    else None
                 ),
                 "grouped_results": grouped_results,
                 "recommendations": await self._generate_lab_recommendations(results),
@@ -360,11 +399,14 @@ class EMRLabIntegrationService:
         """Генерировать рекомендации на основе лабораторных данных"""
         recommendations = []
 
-        # Анализируем результаты
-        abnormal_results = [r for r in results if r["is_abnormal"]]
+        # Keep legacy recommendations scoped to independently entered results.
+        abnormal_results = [
+            r for r in results if r["is_abnormal"] and "source_instance_id" not in r
+        ]
 
         if not abnormal_results:
-            recommendations.append("Все лабораторные показатели в пределах нормы")
+            if results and all(r["is_abnormal"] is False for r in results):
+                recommendations.append("Все лабораторные показатели в пределах нормы")
             return recommendations
 
         # Группируем аномальные результаты по типам
