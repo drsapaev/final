@@ -11,7 +11,7 @@
  */
 
 import type { Appointment, QueueNumberInfo } from '../../types/domain/clinic';
-import { hasBackendAction } from '../../pages/registrar/registrarHelpers';
+import { hasBackendAction, normalizeIssuedQueueTicket } from '../../pages/registrar/registrarHelpers';
 
 /** Translation fn shape (same contract as RefundTranslationFn, PR-UI-14-6). */
 export type AppointmentsTranslationFn = (key: string, options?: Record<string, unknown>) => string;
@@ -240,10 +240,12 @@ export const formatPhoneNumber = (phone: string) => {
 // In registrar mode the visible ticket is the backend-selected row.queue_number.
 // Shared-table default sorting must remain unchanged for other consumers.
 const registrarTicketValue = (row: AppointmentRow): number | null => {
-  const candidates = [row.queue_number, row.queue_numbers?.[0]?.number];
+  const tickets = Array.isArray(row.queue_numbers) ? row.queue_numbers : [];
+  const candidates = [row.queue_number, ...tickets.map((ticket) => ticket.number)];
   for (const candidate of candidates) {
-    if (candidate === null || candidate === undefined || String(candidate).trim() === '') continue;
-    const numeric = Number(candidate);
+    const issued = normalizeIssuedQueueTicket(candidate);
+    if (!issued) continue;
+    const numeric = Number(issued.match(/\d+$/u)?.[0]);
     if (Number.isFinite(numeric) && numeric > 0) return numeric;
   }
   return null;

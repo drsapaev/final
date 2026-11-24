@@ -449,7 +449,7 @@ const WelcomeView = React.memo(({
                     size="default"
                     onClick={() => {
                       logger.info('Кнопка "Экспорт CSV" нажата');
-                      const csvContent = generateCSV(appointments);
+                      const csvContent = generateCSV(appointments, { includeQueueNumber: true });
                       const filename = `appointments_${getLocalDateString()}.csv`;
                       downloadCSV(csvContent, filename);
                       notify.success(`Экспортировано ${appointments.length} записей`);

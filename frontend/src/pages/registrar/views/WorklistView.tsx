@@ -10,10 +10,10 @@
  * Pure composition view: all state stays in the panel's hooks; row-action
  * routing is delegated to the panel via onActionClick.
  */
+import { useLayoutEffect, useRef } from 'react';
 import EnhancedAppointmentsTable from '../../../components/tables/EnhancedAppointmentsTable';
 import { Button, Badge } from '../../../components/ui/macos';
 import { AnimatedLoader } from '../../../components/ui';
-import logger from '../../../utils/logger';
 import { formatRegistrarDate } from '../../../utils/dateUtils';
 import type { WorklistPaginationInfo } from '../useRegistrarWorklistData';
 // RQ-21.a: scope fact ('queue-empty' vs 'filtered-empty') resolved by the
@@ -119,9 +119,17 @@ const WorklistView = ({
     narrowed: false,
     loadedPage: paginationInfo.hasMore,
   };
+  const worklistRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    // Do not carry the right-hand columns of a previous department/day into a new worklist.
+    worklistRef.current?.querySelectorAll<HTMLElement>('.eat-table-scroll, .mac-table-scroll-wrapper')
+      .forEach((viewport) => { viewport.scrollLeft = 0; });
+  }, [activeTab, activeDoctorId, showCalendar, historyDate]);
+
   return (
   <div
     id="main-content"
+    ref={worklistRef}
     role="tabpanel"
     // RQ-19: reference the department tab buttons' real ids (shared
     // tabButtonIdFor contract with navigation/Tabs, percent-encoded for
@@ -293,10 +301,7 @@ const WorklistView = ({
       showCheckboxes={false} // UX Audit R-4.7: bulk-action UI удалён (QW-01 fix),
                             // поэтому чекбоксы отключены — они были dead UI
                             // (видны, но ничего не делают). Nielsen #2 + #4.
-      onRowClick={(row: unknown) => {
-        logger.info('Открыть детали записи:', row);
-        // Здесь можно открыть модальное окно с деталями записи
-      }}
+      onRowClick={(row: unknown) => { void onActionClick('view', row as Record<string, unknown>); }}
       onActionClick={onActionClick} />
 
     }

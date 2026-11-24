@@ -1,5 +1,5 @@
 import { api } from '../../api/client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
@@ -76,9 +76,49 @@ const ScheduleNextModal = ({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // DERMSCHED-FE-003: server-side patient search + the identity of the
+  // currently selected patient (see loadPatients and the select below).
+  const [patientSearch, setPatientSearch] = useState('');
+  const [selectedPatientOption, setSelectedPatientOption] = useState<{ id: string; label: string } | null>(null);
+
+  // DERMSCHED-FE-004: the success auto-close timer handle is tracked so a
+  // stale session timer (started before a manual close, a fresh open for
+  // the next patient, or an unmount) is cancelled instead of firing into
+  // a dialog generation it does not belong to. The component is mounted
+  // persistently (the parent toggles `isOpen`), so an unmount-only
+  // cleanup would miss the reopened-dialog scenario.
+  const successTimerRef = useRef<number | null>(null);
+
+  // Cancel any pending success timer on every open-state transition.
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current !== null) {
+        window.clearTimeout(successTimerRef.current);
+        successTimerRef.current = null;
+      }
+    };
+  }, [isOpen]);
+
+  // And on final unmount.
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current !== null) {
+        window.clearTimeout(successTimerRef.current);
+        successTimerRef.current = null;
+      }
+    };
+  }, []);
+
   // Загрузка данных при открытии модала
   useEffect(() => {
     if (isOpen) {
+      // DERMSCHED-FE-003: every fresh dialog generation starts with a
+      // clean search and (when no patient is supplied) no carried-over
+      // selected-patient identity.
+      setPatientSearch('');
+      if (!patient) {
+        setSelectedPatientOption(null);
+      }
       loadPatients();
       loadServices();
 
@@ -88,7 +128,17 @@ const ScheduleNextModal = ({
         // A queue-row-shaped patient carries the visit/queue record id in
         // `id` — the backend resolves `Patient.id`, so `patient_id` wins
         // whenever it is present.
-        setFormData((prev) => ({ ...prev, patient_id: String(patient.patient_id ?? patient.id ?? '') }));
+        const canonicalPatient = patient as PatientRecord;
+        const canonicalId = String(patient.patient_id ?? patient.id ?? '');
+        setFormData((prev) => ({ ...prev, patient_id: canonicalId }));
+        // DERMSCHED-FE-003: keep the canonical selected-patient identity —
+        // the supplied patient may sit outside the loaded first page.
+        if (canonicalId !== '') {
+          setSelectedPatientOption({
+            id: canonicalId,
+            label: `${canonicalPatient.first_name ?? ''} ${canonicalPatient.last_name ?? ''}`.trim() || `#${canonicalId}`,
+          });
+        }
       }
     }
   }, [isOpen, patient]);
@@ -130,14 +180,21 @@ const ScheduleNextModal = ({
     }
   }, [services, specialtyFilter]);
 
-  const loadPatients = async () => {
+  const loadPatients = async (search?: string) => {
     try {
       // DERMSCHED-FE-001 (audit 3892): raw `fetch('patients/')`-style
       // SPA-relative URLs resolve under the panel route (e.g.
       // /doctor/patients/), not the configured API origin, which silently
       // dead-ends the whole schedule-next feature. Use the shared
       // authenticated client with absolute versioned API paths.
-      const response = await api.get('/patients');
+      // DERMSCHED-FE-003: the canonical patient-list API defaults to
+      // limit=100 and supports server-side `q` search — the explicit
+      // surface plus a bounded search page replace the silent
+      // first-page-only picker.
+      const trimmed = (search ?? '').trim();
+      const response = await api.get('/patients', trimmed
+        ? { params: { q: trimmed, limit: 50 } }
+        : { params: { limit: 100 } });
       if (response.status < 400) {
         const data = Array.isArray(response.data) ? response.data : [];
         setPatients(data as PatientRecord[]);
@@ -237,8 +294,13 @@ const ScheduleNextModal = ({
 
       setSuccess(t('misc.snm_visit_scheduled', { token: result?.confirmation?.token ?? '' }));
 
-      // Сброс формы через 2 секунды
-      setTimeout(() => {
+      // Сброс формы через 2 секунды (DERMSCHED-FE-004: хэндл отслеживается
+      // и отменяется при новом открытии / ручном закрытии / unmount)
+      if (successTimerRef.current !== null) {
+        window.clearTimeout(successTimerRef.current);
+      }
+      successTimerRef.current = window.setTimeout(() => {
+        successTimerRef.current = null;
         onClose?.();
         resetForm();
       }, 2000);
@@ -470,18 +532,49 @@ const ScheduleNextModal = ({
               <User size={16} style={{ display: 'inline', marginRight: getSpacing('xs') }} />
               {t('misc.snm_label_patient')}
             </label>
+            {/* DERMSCHED-FE-003: server-side search over the canonical
+            patient-list API (`q`) — the picker is no longer silently
+            limited to the first default page. */}
+            <input
+              type="search"
+              aria-label="Schedule next visit patient search"
+              style={inputStyle}
+              value={patientSearch}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+                const value = String(e.target.value ?? '');
+                setPatientSearch(value);
+                void loadPatients(value);
+              }}
+            />
             <select
               id="schedule-next-patient"
               aria-label="Schedule next visit patient"
               style={selectStyle}
               value={formData.patient_id}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('patient_id', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+                handleInputChange('patient_id', e.target.value);
+                // DERMSCHED-FE-003: identity validation — remember the
+                // chosen patient so the option survives search-list
+                // replacement instead of turning into a false blank.
+                const found = patients.find((p: PatientRecord) => String(p.id) === String(e.target.value));
+                setSelectedPatientOption(found ? {
+                  id: String(found.id),
+                  label: `${found.first_name ?? ''} ${found.last_name ?? ''}`.trim() || `#${found.id}`,
+                } : null);
+              }}
               required>
-              
+
               <option value="">{t('misc.snm_select_patient')}</option>
               {patients.map((p: PatientRecord) =>
               <option key={p.id} value={p.id}>
                   {p.first_name} {p.last_name} - {p.phone}
+                </option>
+              )}
+              {selectedPatientOption &&
+                String(formData.patient_id) === selectedPatientOption.id &&
+                !patients.some((p: PatientRecord) => String(p.id) === selectedPatientOption.id) && (
+                <option key={`selected-patient-${selectedPatientOption.id}`} value={selectedPatientOption.id}>
+                  {selectedPatientOption.label}
                 </option>
               )}
             </select>

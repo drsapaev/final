@@ -8,6 +8,7 @@ import type { Appointment } from '../../../types/domain/clinic';
 import type { AppointmentRow } from '../appointmentsTableContracts';
 import { useAppointmentsTableRenderers } from '../appointmentsTableColumns';
 import { getLocalDateString } from '../../../utils/dateUtils';
+import { generateCSV } from '../../../pages/registrar/registrarCsv';
 
 afterEach(() => cleanup());
 
@@ -226,4 +227,35 @@ describe('REG-FE-057: badge status resolves by queue identity, not by number alo
     const badge = document.querySelector('[data-queue-status]') as HTMLElement;
     expect(badge.getAttribute('data-queue-status')).toBe('waiting');
   });
+});
+
+it('labels CSV row order separately from the backend ticket and excludes unassigned values', () => {
+  const [headers, issued, unallocated] = generateCSV([
+    { queue_number: 17, cabinet: '6' },
+    { queue_number: 0, cabinet: '6' },
+  ], { includeQueueNumber: true }).split('\n');
+  expect(headers).toMatch(/^№ строки,№ талона,/);
+  expect(issued).toMatch(/^"1","17",/);
+  expect(unallocated).toMatch(/^"2","",/);
+});
+
+it('selects issued tickets in an aggregate after an unnumbered visit', () => {
+  renderTicket({ id: 721, queue_number: 0, queue_numbers: [
+    { number: 0, queue_tag: 'procedures' },
+    { number: 7, queue_tag: 'ecg' },
+    { number: 9, queue_tag: 'lab' },
+  ] });
+  expect(screen.getByText('7')).toBeTruthy();
+  expect(screen.getByText('+1')).toBeTruthy();
+  expect(screen.queryByText('0')).toBeNull();
+});
+
+it('exports issued numbers from all departments, even when different queues both have ticket 1', () => {
+  const [header, row] = generateCSV([{ queue_numbers: [
+    { number: 0, queue_tag: 'procedures' },
+    { number: 1, queue_name: 'ЭКГ' },
+    { number: 1, queue_name: 'Лаборатория' },
+  ] }], { includeQueueNumber: true }).split('\n');
+  expect(header).toContain('№ талона');
+  expect(row).toMatch(/^"1","ЭКГ: 1; Лаборатория: 1",/);
 });
