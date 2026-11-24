@@ -202,7 +202,11 @@ export function FieldDictation({ disabled, onInsert }: { disabled: boolean; onIn
   const { t, language } = useTranslation();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
-  if (disabled || import.meta.env.VITE_EMR_DICTATION_DISABLED === 'true') return null;
+  if (
+    disabled
+    || import.meta.env.VITE_EMR_DICTATION_ENABLED !== 'true'
+    || import.meta.env.VITE_EMR_DICTATION_DISABLED === 'true'
+  ) return null;
   const lang = language.startsWith('uz') ? 'uz-UZ' : language.startsWith('ru') ? 'ru-RU' : '';
   return (
     <details className="emr-workspace-visit-section" open={open} onToggle={event => setOpen(event.currentTarget.open)}>

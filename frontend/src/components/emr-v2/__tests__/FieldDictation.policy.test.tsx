@@ -49,6 +49,7 @@ beforeEach(() => {
   construct.mockReset();
   for (const name of policyNames) setPolicy(name);
   vi.stubGlobal('SpeechRecognition', LocalRecognition);
+  vi.stubEnv('VITE_EMR_DICTATION_ENABLED', 'true');
   vi.stubEnv('VITE_EMR_DICTATION_DISABLED', 'false');
 });
 
@@ -63,6 +64,24 @@ afterEach(() => {
 });
 
 describe('FieldDictation local recording controls', () => {
+  it.each([
+    ['opt-in unset', undefined, 'false'],
+    ['opt-in false', 'false', 'false'],
+    ['opt-in nonliteral', '1', 'false'],
+    ['kill switch enabled', 'true', 'true'],
+  ] as const)('hides all controls and skips speech APIs with %s', (_description, optIn, disabled) => {
+    vi.stubEnv('VITE_EMR_DICTATION_ENABLED', optIn);
+    vi.stubEnv('VITE_EMR_DICTATION_DISABLED', disabled);
+    const onInsert = vi.fn();
+    const { container } = render(<FieldDictation disabled={false} onInsert={onInsert} />);
+
+    expect(container).toBeEmptyDOMElement();
+    expect(available).not.toHaveBeenCalled();
+    expect(install).not.toHaveBeenCalled();
+    expect(construct).not.toHaveBeenCalled();
+    expect(onInsert).not.toHaveBeenCalled();
+  });
+
   it.each(policyNames)('shows the policy restriction without calling speech APIs via %s', async name => {
     const allowsFeature = vi.fn(() => false);
     setPolicy(name, { allowsFeature });
