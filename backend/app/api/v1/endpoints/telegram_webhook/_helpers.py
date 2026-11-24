@@ -170,7 +170,6 @@ from app.services.visit_confirmation_service import (  # noqa: F401
     TELEGRAM_TICKET_QR_PREFIX,
     consume_telegram_ticket_start_token,
 )
-from app.utils.validators import normalize_phone_uz  # noqa: F401
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -240,7 +239,8 @@ TELEGRAM_TICKET_QR_EXPIRED_MESSAGE = (
     "Ссылка из чека истекла или уже использована. " "Обратитесь в регистратуру."
 )
 TELEGRAM_TICKET_QR_LINK_FAILED_MESSAGE = (
-    "Не удалось привязать Telegram к чеку. " "Попробуйте открыть QR еще раз."
+    "Не удалось привязать Telegram по QR из чека. "
+    "Попробуйте открыть QR ещё раз или обратитесь в регистратуру."
 )
 TELEGRAM_STAFF_LINKED_MESSAGE = (
     "Telegram привязан к учетной записи сотрудника. "
@@ -284,24 +284,26 @@ STAFF_COMMAND_DOMAIN_ITEM_KEYS = {
     "/summary": ("daily_summary", "revenue_summary"),
 }
 TELEGRAM_SHARE_CONTACT_MESSAGE = (
-    "Чтобы привязать Telegram к карте пациента, нажмите кнопку "
-    '"Поделиться номером". Номер должен совпадать с номером в регистратуре.'
+    "Откройте QR с чека или нажмите «Поделиться номером», чтобы получить ссылку "
+    "на заявку. Привязку по заявке подтверждает регистратура."
+)
+TELEGRAM_SHARE_CONTACT_MESSAGE_UZ = (
+    "Chekdagi QR kodni oching yoki ariza havolasini olish uchun "
+    "«Telefon raqamni ulashish» tugmasini bosing. "
+    "Ariza bo'yicha bog'lashni registratura tasdiqlaydi."
 )
 TELEGRAM_CONTACT_REJECTED_MESSAGE = (
     "Можно отправить только свой номер Telegram. "
     'Нажмите кнопку "Поделиться номером" в меню бота.'
 )
-TELEGRAM_PATIENT_NOT_FOUND_MESSAGE = (
-    "Пациент с этим номером не найден. Проверьте номер в регистратуре "
-    "или отсканируйте QR с чека."
-)
-TELEGRAM_CONTACT_LINKED_MESSAGE = (
-    "Telegram привязан к карте пациента. "
-    "Теперь бот сможет присылать уведомления клиники."
+TELEGRAM_CONTACT_VERIFICATION_REQUIRED_MESSAGE = (
+    "Для привязки Telegram откройте QR с чека или оставьте защищённую заявку "
+    "для проверки регистратурой. Если открыть заявку не получается, "
+    "обратитесь в регистратуру."
 )
 TELEGRAM_NEEDS_LINK_MESSAGE = (
-    "Telegram пока не привязан к пациенту. "
-    "Отсканируйте QR с чека или поделитесь номером телефона через кнопку меню."
+    "Telegram пока не привязан к карте пациента. "
+    "Откройте QR с чека или оставьте заявку для проверки регистратурой."
 )
 TELEGRAM_MAIN_MENU = {
     "keyboard": [
@@ -459,15 +461,13 @@ TELEGRAM_LOCALIZED_TEXTS = {
     "ticket_qr_link_failed": {
         TELEGRAM_LANGUAGE_RU: TELEGRAM_TICKET_QR_LINK_FAILED_MESSAGE,
         TELEGRAM_LANGUAGE_UZ: (
-            "Telegramni chek bilan bog'lab bo'lmadi. " "QR kodni yana ochib ko'ring."
+            "Telegramni chekdagi QR kod orqali bog'lab bo'lmadi. "
+            "QR kodni yana ochib ko'ring yoki registraturaga murojaat qiling."
         ),
     },
     "share_contact": {
         TELEGRAM_LANGUAGE_RU: TELEGRAM_SHARE_CONTACT_MESSAGE,
-        TELEGRAM_LANGUAGE_UZ: (
-            "Telegramni bemor kartasi bilan bog'lash uchun "
-            '"Telefon raqamni ulashish" tugmasini bosing. Raqam registraturadagi raqam bilan mos bo\'lishi kerak.'
-        ),
+        TELEGRAM_LANGUAGE_UZ: TELEGRAM_SHARE_CONTACT_MESSAGE_UZ,
     },
     "contact_rejected": {
         TELEGRAM_LANGUAGE_RU: TELEGRAM_CONTACT_REJECTED_MESSAGE,
@@ -476,25 +476,19 @@ TELEGRAM_LOCALIZED_TEXTS = {
             'Bot menyusidagi "Telefon raqamni ulashish" tugmasini bosing.'
         ),
     },
-    "patient_not_found": {
-        TELEGRAM_LANGUAGE_RU: TELEGRAM_PATIENT_NOT_FOUND_MESSAGE,
+    "contact_verification_required": {
+        TELEGRAM_LANGUAGE_RU: TELEGRAM_CONTACT_VERIFICATION_REQUIRED_MESSAGE,
         TELEGRAM_LANGUAGE_UZ: (
-            "Bu raqam bilan bemor topilmadi. Raqamni registraturada tekshiring "
-            "yoki chekdagi QR kodni skaner qiling."
-        ),
-    },
-    "contact_linked": {
-        TELEGRAM_LANGUAGE_RU: TELEGRAM_CONTACT_LINKED_MESSAGE,
-        TELEGRAM_LANGUAGE_UZ: (
-            "Telegram bemor kartasi bilan bog'landi. "
-            "Endi bot klinika xabarnomalarini yubora oladi."
+            "Telegramni bog'lash uchun chekdagi QR kodni oching yoki registratura "
+            "tekshiruvi uchun himoyalangan ariza qoldiring. "
+            "Arizani ochish imkoni bo'lmasa, registraturaga murojaat qiling."
         ),
     },
     "needs_link": {
         TELEGRAM_LANGUAGE_RU: TELEGRAM_NEEDS_LINK_MESSAGE,
         TELEGRAM_LANGUAGE_UZ: (
-            "Telegram hali bemorga bog'lanmagan. "
-            "Chekdagi QR kodni skaner qiling yoki menyudagi telefon tugmasi orqali raqamingizni ulashing."
+            "Telegram hali bemor kartasiga bog'lanmagan. "
+            "Chekdagi QR kodni oching yoki registratura tekshiruvi uchun ariza qoldiring."
         ),
     },
     "welcome": {
@@ -560,8 +554,7 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "Команды: /start, /menu, /services, /book, /queue, /visits, /payments, /results, "
             "/forms, /documents, /doctors, /cabinet, /profile, /settings, /support, /staff, /help.\n\n"
             'Для записи откройте Mini App из кнопки под сообщением "Записаться на приём". '
-            "Для привязки отсканируйте QR с чека или нажмите "
-            '"Поделиться номером".\n\n'
+            f"{TELEGRAM_SHARE_CONTACT_MESSAGE}\n\n"
             "Для сотрудников: доступ отдельно через персональную ссылку администратора "
             "или /staff после привязки. В Telegram режим сотрудника только для просмотра; "
             "действия выполняются в приложении клиники."
@@ -586,8 +579,7 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "Buyruqlar: /start, /menu, /services, /book, /queue, /visits, /payments, /results, "
             "/forms, /documents, /doctors, /cabinet, /profile, /settings, /support, /staff, /help.\n\n"
             'Yozilish uchun "Qabulga yozilish" xabari ostidagi Mini App tugmasini oching. '
-            "Bog'lash uchun chekdagi QR kodni skaner qiling yoki "
-            '"Telefon raqamni ulashish" tugmasini bosing.\n\n'
+            f"{TELEGRAM_SHARE_CONTACT_MESSAGE_UZ}\n\n"
             "Xodimlar uchun: kirish administrator bergan shaxsiy havola orqali "
             "yoki bog'langandan keyin /staff orqali. Telegramdagi xodim rejimi faqat "
             "ko'rish uchun; amallar klinika ilovasida bajariladi."

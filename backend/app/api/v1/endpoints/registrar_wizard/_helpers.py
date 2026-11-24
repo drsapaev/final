@@ -155,7 +155,7 @@ class EditDeltaPatientData(BaseModel):
 
 class EditDeltaServiceItem(BaseModel):
     service_id: int
-    quantity: int = Field(default=1, ge=1)
+    quantity: int = Field(default=1, ge=0)
     # Codex R11 #3095 (P2): the edit-delta QUOTE must mirror the command's
     # create-path gate — an item that would create a new queue entry needs a
     # resolvable specialist when no active queue exists for the tag/date.
@@ -311,7 +311,7 @@ class RepeatEligibilityPreviewResponse(BaseModel):
 
 class CartQuoteItemRequest(BaseModel):
     service_id: int
-    quantity: int = Field(default=1, ge=1)
+    quantity: int = Field(default=1, ge=0)
     # Codex R1 #3095 (P2): зеркало ServiceItemRequest.custom_price — иначе
     # квота считала каталоговую цену, а /registrar/cart считал инвойс по
     # врачебной переопределённой цене, и подтверждение расходилось со счётом.

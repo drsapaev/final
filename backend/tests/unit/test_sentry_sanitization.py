@@ -780,6 +780,52 @@ class TestRegisteredBeforeSendPayloadRedaction:
         ]
 
 
+class TestSystemResourceAlertDiagnostics:
+    def test_keeps_only_numeric_aggregate_evidence(self, monkeypatch):
+        before_send = _make_before_send(monkeypatch)
+        metrics = {
+            "latency_p95_ms": 1900.25,
+            "latency_threshold_ms": 1200.0,
+            "window_requests": 37,
+            "window_seconds": 300,
+        }
+        scrubbed = before_send(
+            {
+                "message": "SYNTHETIC_PRIVATE_TEXT",
+                "tags": {"alert_type": "system_resource", "severity": "critical"},
+                "extra": {**metrics, "diagnosis": "SYNTHETIC_DIAGNOSIS"},
+            },
+            {},
+        )
+        assert scrubbed["extra"] == metrics
+        assert scrubbed["message"] == "[REDACTED]"
+
+    def test_does_not_allow_metrics_on_other_events(self, monkeypatch):
+        before_send = _make_before_send(monkeypatch)
+        for tags in ({}, {"alert_type": "database_error"}):
+            scrubbed = before_send(
+                {"tags": tags, "extra": {"latency_p95_ms": 2000.0}}, {}
+            )
+            assert "extra" not in scrubbed
+
+    def test_rejects_malformed_and_out_of_range_metrics(self, monkeypatch):
+        before_send = _make_before_send(monkeypatch)
+        scrubbed = before_send(
+            {
+                "tags": {"alert_type": "system_resource"},
+                "extra": {
+                    "latency_p95_ms": float("inf"),
+                    "latency_threshold_ms": "SYNTHETIC_TOKEN",
+                    "window_requests": 37.5,
+                    "window_seconds": 3601,
+                    "body": "SYNTHETIC_BODY",
+                },
+            },
+            {},
+        )
+        assert "extra" not in scrubbed
+
+
 class TestRegisteredBeforeSendTransaction:
     def test_registered_callback_scrubs_transaction_payload(self, monkeypatch):
         import json

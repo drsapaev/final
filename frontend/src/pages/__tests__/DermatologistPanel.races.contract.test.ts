@@ -54,7 +54,7 @@ describe('DERMACOMPLETE-FE-002 — post-POST completion context guard (source co
     expect(completionHandler).toContain('guardTransition(');
     expect(completionHandler).toContain('emr-visit-${completionContext.visitId}');
     expect(completionHandler).toContain("intentPolicy: 'leave'");
-    expect(completionHandler).toContain('runCompletionFlow(completionContext, entryId)');
+    expect(completionHandler).toContain('runCompletionFlow(completionContext, entryId, callNext)');
   });
 
   it('rechecks the completion context AFTER the POST resolves, before any reset or auto-call', () => {

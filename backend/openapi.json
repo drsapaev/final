@@ -11297,7 +11297,7 @@
           "qr-queue"
         ],
         "summary": "Restore Entry To Next",
-        "description": "Восстанавливает пациента no_show как следующего в очереди\nУстанавливает priority=1 для приоритетной обработки",
+        "description": "Возвращает пациента в очередь с действующим приоритетом восстановления\nУстанавливает priority=1 для приоритетной обработки",
         "operationId": "restore_entry_to_next_api_v1_queue_entry__entry_id__restore_next_post",
         "security": [
           {
@@ -83303,7 +83303,7 @@
           },
           "quantity": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 0.0,
             "title": "Quantity",
             "default": 1
           },
@@ -91966,7 +91966,7 @@
           },
           "quantity": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 0.0,
             "title": "Quantity",
             "default": 1
           },
