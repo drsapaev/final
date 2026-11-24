@@ -1033,6 +1033,7 @@ const en = {
     cardio_queue_call: 'Call patient',
     cardio_queue_start_visit: 'Start visit',
     cardio_queue_open_visit: 'Open visit',
+    cardio_queue_resume_visit: 'Resume visit',
     cardio_queue_view_emr: 'View EMR',
     cardio_queue_status_waiting: 'Waiting',
     cardio_queue_status_called: 'Called',

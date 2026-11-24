@@ -29,11 +29,15 @@ from app.crud.visit_appointment_pairing import (
     AmbiguousAppointmentPairingError,
     move_paired_appointment_to_day,
 )
+from app.models.enums import (
+    AppointmentStatus,
+    can_transition_status,
+    normalize_appointment_status,
+)
 from app.schemas.doctor_queue import (
     DoctorQueueStartVisitResponse,
     DoctorQueueTodayResponse,
 )
-from app.models.enums import AppointmentStatus, can_transition_status, normalize_appointment_status
 from app.services.emr_completion_policy import (
     EMR_REQUIRED_DETAIL,
     requires_saved_emr,
@@ -214,12 +218,32 @@ def get_doctor_queue_today(
                 },
             )
 
+        from app.services.doctor_queue_diagnostics import matches_active_doctor_visit
+
+        # Resolve only exact linked visits, once for the whole snapshot.
+        diagnostic_visit_ids = {
+            entry.visit_id for entry in entries
+            if entry.status in {"in_progress", "diagnostics"} and entry.visit_id is not None
+        }
+        diagnostic_visits = {
+            visit.id: visit
+            for visit in db.query(Visit).filter(Visit.id.in_(diagnostic_visit_ids)).all()
+        } if diagnostic_visit_ids else {}
+        daily_queues_by_id = {queue.id: queue for queue in daily_queues}
+
         # Формируем данные для врача
         queue_entries = []
         next_call_entry_id = None
         for entry in entries:
-            available_actions = _doctor_queue_available_actions(entry)
-            action_flags = _doctor_queue_action_flags(entry)
+            exact_diagnostic_visit = matches_active_doctor_visit(
+                entry, daily_queues_by_id[entry.queue_id], diagnostic_visits.get(entry.visit_id),
+            )
+            available_actions = _doctor_queue_available_actions(
+                entry, exact_diagnostic_visit=exact_diagnostic_visit,
+            )
+            action_flags = _doctor_queue_action_flags(
+                entry, exact_diagnostic_visit=exact_diagnostic_visit,
+            )
             if (
                 requires_emr
                 and (entry.visit_id, entry.patient_id) not in saved_emr_pairs
@@ -808,6 +832,32 @@ def start_patient_visit(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Нет прав для работы с этой очередью",
                 )
+
+        if queue_entry.status == "diagnostics":
+            from app.services.doctor_queue_diagnostics import (
+                change_diagnostic_queue_status,
+                lock_active_doctor_visit,
+            )
+
+            visit = lock_active_doctor_visit(db, queue_entry, daily_queue)
+            if visit is None:
+                raise HTTPException(status_code=409, detail="Нет связанного активного приёма для продолжения")
+            _ensure_visit_doctor_access(visit, current_user)
+            patient_id, visit_id = visit.patient_id, visit.id
+            changed_at = change_diagnostic_queue_status(
+                db, queue_entry, visit, from_status="diagnostics", to_status="in_progress",
+            )
+            if changed_at is None:
+                raise HTTPException(status_code=409, detail="Состояние очереди уже изменилось")
+            db.commit()
+            return {
+                "success": True,
+                "message": "Приём продолжен",
+                "entry_id": entry_id,
+                "patient_id": patient_id,
+                "visit_id": visit_id,
+                "status": "in_progress",
+            }
 
         # Обновляем статус
         if "start_visit" not in _doctor_queue_available_actions(queue_entry):

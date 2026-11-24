@@ -1032,6 +1032,7 @@ const uzLatn = {
     cardio_queue_call: "Chaqirish",
     cardio_queue_start_visit: "Qabulni boshlash",
     cardio_queue_open_visit: "Qabulni ochish",
+    cardio_queue_resume_visit: 'Qabulni davom ettirish',
     cardio_queue_view_emr: "EMRni ko'rish",
     cardio_queue_status_waiting: "Kutmoqda",
     cardio_queue_status_called: "Chaqirildi",

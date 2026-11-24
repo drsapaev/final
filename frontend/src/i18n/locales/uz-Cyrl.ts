@@ -1044,6 +1044,7 @@ const uzCyrl = {
     cardio_queue_call: 'Чақириш',
     cardio_queue_start_visit: 'Қабулни бошлаш',
     cardio_queue_open_visit: 'Қабулни очиш',
+    cardio_queue_resume_visit: 'Қабулни давом эттириш',
     cardio_queue_view_emr: 'EMRни кўриш',
     cardio_queue_status_waiting: 'Кутмоқда',
     cardio_queue_status_called: 'Чақирилди',
