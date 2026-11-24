@@ -29,7 +29,10 @@ from app.schemas.emr_workspace import (
     WorkspaceVisit,
 )
 from app.services.emr_contract import get_emr_text_field
-from app.services.emr_lab_result_evidence import frozen_assessment, released_numeric_observation
+from app.services.emr_lab_result_evidence import (
+    frozen_assessment,
+    released_numeric_observation,
+)
 from app.services.emr_v2_service import EMRPatientContextMismatch, emr_v2_service
 
 

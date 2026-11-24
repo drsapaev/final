@@ -896,6 +896,9 @@ def test_doctor_lab_report_reads_are_limited_to_own_visits(
 def test_doctor_family_uses_owned_workspace_lab_transports(
     client, auth_headers, db_session, monkeypatch, role,
 ) -> None:
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", False)
     user, doctor = _create_doctor_user(db_session, label="workspace", role=role)
     own_patient = _create_patient(db_session)
     own_visit = _create_visit(db_session, patient_id=own_patient.id, doctor_id=doctor.id)
@@ -921,12 +924,25 @@ def test_doctor_family_uses_owned_workspace_lab_transports(
         own_patient.id, own_visit.id, "DRAFT",
     )
 
+    report = db_session.get(LabReportInstance, report_id)
+    db_session.add(
+        LabReportInstance(
+            order_id=report.order_id,
+            patient_id=own_patient.id,
+            visit_id=own_visit.id,
+            template_id=report.template_id,
+            template_version_id=report.template_version_id,
+            status="DRAFT",
+            managed_release=True,
+        )
+    )
+    db_session.commit()
+
     listed = client.get("/api/v1/lab/report-instances", headers=headers)
     assert listed.status_code == 200, listed.text
     assert {item["id"] for item in listed.json()} == {report_id}
     assert other_report["id"] != report_id
 
-    report = db_session.get(LabReportInstance, report_id)
     report.status = "FINALIZED"
     report.finalized_at = datetime.now(UTC)
     db_session.commit()
