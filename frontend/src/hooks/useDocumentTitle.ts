@@ -1,6 +1,6 @@
 import { useLayoutEffect } from 'react';
 
-export function useDocumentTitle(title?: string) {
+export function useDocumentTitle(title: string | null) {
   useLayoutEffect(() => {
     if (!title) return undefined;
 
