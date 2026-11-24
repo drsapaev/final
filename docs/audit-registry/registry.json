@@ -3873,54 +3873,74 @@
       "date": "2026-11-16"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYTGBOTCONFIG-BE-001",
       "priority": "P2 conditional/architecture",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "mounted legacy aiogram bot reads startup env token only and is independent of DB-configured canonical patient bot token",
-      "status": "UNVERIFIED",
+      "status": "CONFIRMED_OPEN",
       "fix_pr": null,
-      "merge_sha": null
+      "merge_sha": null,
+      "root_cause": "STILL OPEN: the legacy aiogram bot reads the startup env token only (bot.py L94: self.token = settings.TELEGRAM_BOT_TOKEN) and is independent of the DB-configured canonical patient bot token SSOT (store_patient_bot_token in admin_telegram/_settings.py)",
+      "test_after": "STILL OPEN: the legacy aiogram bot reads the startup env token only (bot.py L94: self.token = settings.TELEGRAM_BOT_TOKEN) and is independent of the DB-configured canonical patient bot token SSOT (store_patient_bot_token in admin_telegram/_settings.py); registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "reviewer": "registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "date": "2026-11-24"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYTGBOTJOIN-BE-001",
       "priority": "P1",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "Telegram patient queue invokes absent QueueBusinessService.join_queue",
-      "status": "UNVERIFIED",
+      "status": "CONFIRMED_OPEN",
       "fix_pr": null,
-      "merge_sha": null
+      "merge_sha": null,
+      "root_cause": "STILL OPEN verbatim: the patient queue callback calls await self.queue_service.join_queue(specialist_id=..., phone=..., telegram_id=..., patient_name=...) (bot.py L477-482) but QueueBusinessService (queue_svc package via the queue_service shim) has NO join_queue method — only join_queue_with_token (queue_svc/_operations.py L2165) — so patient queue join via the bot raises AttributeError at runtime",
+      "test_after": "STILL OPEN verbatim: the patient queue callback calls await self.queue_service.join_queue(specialist_id=..., phone=..., telegram_id=..., patient_name=...) (bot.py L477-482) but QueueBusinessService (queue_svc package via the queue_service shim) has NO join_queue method — only join_queue_with_token (queue_svc/_operations.py L2165) — so patient queue join via the bot raises AttributeError at runtime; registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "reviewer": "registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "date": "2026-11-24"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYTGBOTLINKS-BE-001",
       "priority": "P2",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "bot WebAppInfo has unknown patient URLs and staff-only /appointments alias",
-      "status": "UNVERIFIED",
+      "status": "CONFIRMED_OPEN",
       "fix_pr": null,
-      "merge_sha": null
+      "merge_sha": null,
+      "root_cause": "STILL OPEN: the patient bot's 'Мои записи' handler is a stub ('Загрузка данных...') and its WebApp button opens FRONTEND_URL/appointments (bot.py L505-520) — the staff-alias URL from the claim; other buttons point at /mobile, /appointment, /lab-results",
+      "test_after": "STILL OPEN: the patient bot's 'Мои записи' handler is a stub ('Загрузка данных...') and its WebApp button opens FRONTEND_URL/appointments (bot.py L505-520) — the staff-alias URL from the claim; other buttons point at /mobile, /appointment, /lab-results; registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "reviewer": "registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "date": "2026-11-24"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYTGCHATSCOPE-BE-001",
       "priority": "P1 conditional/privacy",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "clinical send-appointment-reminder and send-lab-notification accept arbitrary caller-supplied Telegram chat IDs without patient-to-chat / source-record ownership validation",
-      "status": "UNVERIFIED",
-      "fix_pr": null,
-      "merge_sha": null
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": "#4076",
+      "merge_sha": "a7e13fcb5",
+      "test_before": "clinical send-appointment-reminder and send-lab-notification accept arbitrary caller-supplied Telegram chat IDs without patient-to-chat / source-record ownership validation",
+      "test_after": "patient TG delivery no longer accepts caller chat IDs: the endpoint resolves the chat via _linked_patient_chat(db, patient_id, event_type) (telegram_notifications.py L77-80) from the patient-bound link store, adds _report_access visit-ownership checks (L102-112), finalized-report gating (409) and role denial (403), and documents the patient-bound delivery error contract (L57-61); preference gating ('disabled by patient preference') present; registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "reviewer": "registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "date": "2026-11-24"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYTGDOCTORKEY-BE-001",
       "priority": "P2",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "typed AppointmentData uses doctor_name but bot reminder reads doctor",
-      "status": "UNVERIFIED",
-      "fix_pr": null,
-      "merge_sha": null
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": "#4076",
+      "merge_sha": "a7e13fcb5",
+      "test_before": "typed AppointmentData uses doctor_name but bot reminder reads doctor",
+      "test_after": "the bot reminder no longer renders doctor fields at all: send_appointment_reminder consumes only id/occurrence_revision/telegram_link_id/patient_link_epoch and sends a generic 'У вас новое уведомление' with a 'Просмотреть' callback (bot.py L548-568) — the mismatched AppointmentData .doctor key read is gone from the delivery path; registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "reviewer": "registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "date": "2026-11-24"
     },
     {
       "checked": false,
@@ -3941,14 +3961,18 @@
       "date": "2026-11-17"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYTGLABKEY-BE-001",
       "priority": "P3 conditional/UX & privacy decision",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "typed LabResultsData uses test_type but bot renderer reads test_name; preserve privacy minimization until policy is approved",
-      "status": "UNVERIFIED",
-      "fix_pr": null,
-      "merge_sha": null
+      "status": "FIXED_VERIFIED_ON_MAIN",
+      "fix_pr": "#4076",
+      "merge_sha": "a7e13fcb5",
+      "test_before": "typed LabResultsData uses test_type but bot renderer reads test_name; preserve privacy minimization until policy is approved",
+      "test_after": "producer and renderer keys now agree on the restructured path: lab_payload passes {'test_name': result.test_name, 'date': ...} (telegram_delivery_authorization.py L188-189; LabResult.test_name is the model attr, models/lab.py L81) and the bot renderer reads results_info.get('test_name') (bot.py L579) — the typed LabResultsData.test_type mismatch is gone; privacy minimization preserved (name+date only); registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "reviewer": "registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "date": "2026-11-24"
     },
     {
       "checked": false,
@@ -3987,14 +4011,18 @@
       "test_after": "owner reconciliation 2026-11-16: fix PR #4084 merged (merge c9b3d7271); registry-agent v42 resync verified merged state via GitHub API (merged=true, merge_commit_sha recorded)"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYTGQUEUEWINDOW-BE-001",
       "priority": "P2 conditional",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "menu uses host-local hardcoded queue time and stale callback lacks queue-policy recheck",
-      "status": "UNVERIFIED",
+      "status": "CONFIRMED_OPEN",
       "fix_pr": null,
-      "merge_sha": null
+      "merge_sha": null,
+      "root_cause": "STILL OPEN: /queue gates on host-local datetime.now() hour 7-8 with a hardcoded RU message (bot.py L224-234); the join callback performs no queue-policy recheck on stale callbacks (and currently cannot succeed at all due to the absent join_queue method)",
+      "test_after": "STILL OPEN: /queue gates on host-local datetime.now() hour 7-8 with a hardcoded RU message (bot.py L224-234); the join callback performs no queue-policy recheck on stale callbacks (and currently cannot succeed at all due to the absent join_queue method); registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "reviewer": "registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "date": "2026-11-24"
     },
     {
       "checked": false,
@@ -4015,14 +4043,18 @@
       "date": "2026-11-17"
     },
     {
-      "checked": false,
+      "checked": true,
       "id": "NOTIFYTGWEBHOOKROT-BE-001",
       "priority": "P2 conditional",
       "source": "Issue #4063 checklist expansion (2026-11-14, notification audit planes merged in)",
       "evidence": "remote Telegram webhook secret rotation can succeed before DB secret persistence fails",
-      "status": "UNVERIFIED",
+      "status": "CONFIRMED_OPEN",
       "fix_pr": null,
-      "merge_sha": null
+      "merge_sha": null,
+      "root_cause": "STILL OPEN verbatim: webhook secret rotation posts the NEW secret to api.telegram.org/setWebhook FIRST (admin_telegram/_settings.py L382-386) and only after remote ok persists it (update_setting + update_telegram_config with webhook_secret=secret_token, L396-413) — a DB failure after remote success leaves the live webhook expecting a secret the DB never recorded",
+      "test_after": "STILL OPEN verbatim: webhook secret rotation posts the NEW secret to api.telegram.org/setWebhook FIRST (admin_telegram/_settings.py L382-386) and only after remote ok persists it (update_setting + update_telegram_config with webhook_secret=secret_token, L396-413) — a DB failure after remote success leaves the live webhook expecting a secret the DB never recorded; registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "reviewer": "registry-agent cycle-32 triage 2026-11-24: direct source read on origin/main be42ec561 (services/telegram/bot.py, api/v1/endpoints/telegram_notifications.py, services/telegram_delivery_authorization.py, api/v1/endpoints/admin_telegram/_settings.py, services/queue_svc/_operations.py, models/lab.py)",
+      "date": "2026-11-24"
     },
     {
       "checked": false,
