@@ -1,66 +1,11 @@
-// i18n-unification: `t` is now passed as a prop from RegistrarPanel (wrapper
-// around tI18n that routes flat keys to registrarPanel.* namespace).
-// No direct import needed.
-/**
- * Registrar Panel — Welcome View.
- *
- * Decomposition step 6b: extracted from RegistrarPanel.jsx (lines 1586-2020).
- *
- * Mirrors the QueueView.jsx extraction pattern (decomp 6a): the inline
- * welcome dashboard — hero header, ModernStatistics, quick-action buttons,
- * calendar widget, history table, and empty-state CTA — is lifted into a
- * dedicated presentational component. All state, setters, handlers, and
- * inline-defined helpers (DataSourceIndicator, generateCSV, downloadCSV)
- * are now passed as explicit props from RegistrarPanel.jsx so the welcome
- * view itself is pure / side-effect free.
- *
- * @param {Object} props
- * @param {Function} props.t - translation function from getRegistrarTranslator
- * @param {string} props.language - UI language code ('ru' | 'uz' | 'en')
- * @param {string} props.theme - 'light' or 'dark' from useTheme
- * @param {string} props.textColor - resolved CSS color string ('var(--mac-text-primary)')
- * @param {Array} props.appointments - all loaded appointment rows (raw)
- * @param {Object} props.departmentStats - aggregated department statistics for ModernStatistics
- * @param {string} props.dataSource - 'loading' | 'api' | 'error' (drives empty state + indicator)
- * @param {boolean} props.appointmentsLoading - whether appointments are currently loading
- * @param {Array} props.filteredAppointments - filtered rows for the active tab + status + search
- * @param {Object} props.services - services map for EnhancedAppointmentsTable
- * @param {string|null} props.activeTab - active department tab key (null = all departments)
- * @param {string} props.historyDate - selected calendar history date (YYYY-MM-DD)
- * @param {boolean} props.showCalendar - whether the calendar widget is open
- * @param {string} props.tempDateInput - temp value being typed into the date Input before blur
- * @param {Function} props.loadAppointments - reload appointments ({ source, force })
- * @param {Function} props.setShowWizard - open/close the appointment wizard
- * @param {Function} props.setWizardEditMode - toggle wizard edit vs create mode
- * @param {Function} props.setWizardInitialData - seed wizard with row data for editing
- * @param {Function} props.setShowPaymentManager - open/close the payment manager modal
- * @param {Function} props.setHistoryDate - commit a new history date
- * @param {Function} props.setShowCalendar - toggle calendar widget visibility
- * @param {Function} props.setTempDateInput - update temp date input value
- * @param {Function} props.setSearchParams - replace URL search params (filters / queue navigation)
- * @param {Function} props.navigate - react-router navigate function
- * @param {Function} props.setPaymentDialog - open/close payment dialog ({ open, row, paid, source })
- * @param {Function} props.setPrintDialog - open/close print dialog ({ open, type, data })
- * @param {Function} props.setContextMenu - open/close row context menu ({ open, row, position })
- * @param {Function} props.openRecordPreview - open a read-only record preview
- * @param {Function} props.openRecordEditor - open the wizard in edit mode for a row
- * @param {Function} props.updateAppointmentStatus - patch a row status (e.g. 'in_cabinet', 'done')
- * @param {Function} props.handleStartVisit - call the patient into the cabinet (start visit)
- * @param {Function} props.generateCSV - serialize appointment rows to a CSV string (parent-defined)
- * @param {Function} props.downloadCSV - trigger a browser CSV download (parent-defined)
- * @param {React.ComponentType<{count: number}>} props.DataSourceIndicator - memoized data-source
- *   badge rendered above the history table (parent-defined, closes over dataSource / paginationInfo)
- */
-import React from 'react';
+import React, { useId } from 'react';
 import { Button, Card, CardHeader, CardContent, Badge, Input } from '@/components/ui/macos';
-import { AnimatedTransition } from '@/components/ui';
-import ModernStatistics from '@/components/statistics/ModernStatistics';
 import EnhancedAppointmentsTable from '@/components/tables/EnhancedAppointmentsTable';
-import { getLocalDateString, getYesterdayDateString, parseRegistrarTimestamp, REGISTRAR_TIME_ZONE } from '@/utils/dateUtils';
+import { getLocalDateString, parseRegistrarTimestamp, REGISTRAR_TIME_ZONE } from '@/utils/dateUtils';
 import logger from '@/utils/logger';
 import notify from '@/services/notify';
 import tokenManager from '@/utils/tokenManager';
-import { ArrowUpDown, Bell, Calendar, CheckCircle2, CreditCard, Eye, FileText, KeyRound, ListFilter, Lock, Plus, RotateCw, Search, Share, User, AlertTriangle } from 'lucide-react';
+import { Bell, Calendar, CreditCard, Plus, RotateCw, Search } from 'lucide-react';
 import type { RegistrarWorklistLoadOutcome } from '../useRegistrarWorklistData';
 
 // === REG-FE-032 (registrar audit ledger): clinic-timezone date labels ===
@@ -105,19 +50,19 @@ export interface WelcomeViewProps {
   t: (key: string, options?: Record<string, unknown>) => string;
   language: string;
   theme: string;
-  textColor?: string;
   // Data — appointment shape is dynamic; component reads arbitrary fields.
   appointments: Record<string, unknown>[];
-  departmentStats: unknown;
   dataSource: string;
   appointmentsLoading: boolean;
   filteredAppointments: Record<string, unknown>[];
   services: Record<string, unknown>;
   // Filters
-  activeTab: string | null;
-  historyDate: string;
+  today: string;
+  selectedDate: string;
+  loadedDate: string | null;
+  stale: boolean;
+  hasUrlFilters: boolean;
   showCalendar: boolean;
-  tempDateInput: string;
   // Action: data load — accepts an options object per caller convention.
   // REG-FE-008: the shared hook resolves a typed outcome so callers can
   // reward only a verified refresh; void stays valid for stub/legacy callers.
@@ -129,9 +74,7 @@ export interface WelcomeViewProps {
   // Action: payment manager
   setShowPaymentManager: (open: boolean) => void;
   // Action: filter changes
-  setHistoryDate: (date: string) => void;
   setShowCalendar: (open: boolean) => void;
-  setTempDateInput: (date: string) => void;
   // Action: URL search params — react-router's SetURLSearchParams signature
   // (accepts URLSearchParams, plain object, or updater function).
   setSearchParams: (
@@ -153,44 +96,36 @@ export interface WelcomeViewProps {
   handleTableAction: (action: string, row: Record<string, unknown>, event?: unknown) => void | Promise<void>;
   handleStartVisit: (row: unknown) => void | Promise<void>;
   // Action: CSV — actual signatures come from registrarCsv.ts; loosened here.
-  generateCSV: (...args: unknown[]) => unknown;
-  downloadCSV: (...args: unknown[]) => void;
+  generateCSV: (rows: Record<string, unknown>[], options?: Record<string, unknown>) => string;
+  downloadCSV: (content: string, filename: string) => void;
   // Memoized data-source badge component
   DataSourceIndicator: WelcomeViewDataSourceIndicator;
   // REG-FE-028: same SSOT scope fact the worklist uses — filters narrowing a
   // non-empty scope to zero rows must read as "no matches", not "empty queue".
   emptyScopeKind?: 'queue-empty' | 'filtered-empty';
-  // REG-FE-027: the morning checklist is a TODAY instrument. The panel tells
-  // the view whether the loaded sample is the current clinic day (mirrors
-  // the hook's dateParam resolution). Absent → assume today (degraded
-  // fallback for out-of-panel consumers/tests).
-  loadedDateIsToday?: boolean;
-  [key: string]: unknown;
 }
 
 const WelcomeView = React.memo(({
   t,
   language,
   theme,
-  textColor,
   appointments,
-  departmentStats,
   dataSource,
   appointmentsLoading,
   filteredAppointments,
   services,
-  activeTab,
-  historyDate,
+  today,
+  selectedDate,
+  loadedDate,
+  stale,
+  hasUrlFilters,
   showCalendar,
-  tempDateInput,
   loadAppointments,
   setShowWizard,
   setWizardEditMode,
   setWizardInitialData,
   setShowPaymentManager,
-  setHistoryDate,
   setShowCalendar,
-  setTempDateInput,
   setSearchParams,
   navigate,
   setPaymentDialog,
@@ -204,583 +139,193 @@ const WelcomeView = React.memo(({
   downloadCSV,
   DataSourceIndicator,
   emptyScopeKind = 'queue-empty',
-  loadedDateIsToday = true,
 }: WelcomeViewProps) => {
-  // Locale resolution shared by every date label in the view.
-  const registrarLocale = language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-US' : 'uz-UZ';
+  const dateInputId = useId();
+  const calendarId = useId();
+  const locale = language === 'uz' ? 'uz-Latn' : language;
+  const sessionExpired = dataSource === 'api' && !tokenManager.hasToken();
+  const dateMatches = loadedDate === selectedDate;
+  const canSummarize = dateMatches && dataSource === 'api' && !stale && !sessionExpired;
+  const loadError = !appointmentsLoading && (dataSource === 'error' || (!dateMatches && stale));
+  const loading = !sessionExpired && !loadError && (!dateMatches || appointmentsLoading || dataSource === 'loading');
+  // Kept data is shown only under its own date, and cannot be exported until refreshed.
+  const showRows = dateMatches && !sessionExpired && filteredAppointments.length > 0;
+  const empty = canSummarize && !loading && !showRows;
 
-  // REG-FE-030 (registrar audit ledger): quick filters mutate ONLY the keys
-  // they own. The old setSearchParams({ status }) call replaced the WHOLE
-  // query and silently dropped date / dept / doctor_id / q scope.
-  const setStatusQuickFilter = (status: string) => {
-    setSearchParams((prev) => {
+  const createAppointment = () => {
+    setWizardEditMode(false);
+    setWizardInitialData(null);
+    setShowWizard(true);
+  };
+
+  const selectDay = (day: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day === selectedDate) return;
+    setSearchParams(prev => {
       const params = new URLSearchParams(prev);
-      params.set('status', status);
+      if (day === today) params.delete('date');
+      else params.set('date', day);
       return params;
     });
   };
-  // «Все записи» clears the narrowing (status + search) but keeps the
-  // date / department / doctor scope — "all records" must not silently
-  // move the day or the department.
+  // Shift a clinic calendar day, not the operator's browser day (DST).
+  const daysBeforeToday = (days: number) => {
+    const calendarDay = new Date(`${today}T12:00:00Z`);
+    calendarDay.setUTCDate(calendarDay.getUTCDate() - days);
+    return getLocalDateString(calendarDay);
+  };
   const clearNarrowingFilters = () => {
-    setSearchParams((prev) => {
+    setSearchParams(prev => {
       const params = new URLSearchParams(prev);
       params.delete('status');
       params.delete('q');
       return params;
     });
   };
+  const refresh = async () => {
+    const result = await loadAppointments({ source: 'manual_refresh_button' });
+    if (result === 'loaded' || result === 'empty') notify.success(t('misc.data_updated'));
+  };
 
-  // === Честная классификация пустых состояний (REG-FE-028/029) ===
-  // Те же контракты, что и в WorklistView: сбой первичной загрузки — видимое
-  // состояние ошибки с повтором; фильтр, сузивший непустой скоуп до нуля —
-  // «Ничего не найдено», а не «Очередь пуста».
-  const isSettledEmpty = !appointmentsLoading && filteredAppointments.length === 0;
-  // REG-FE-029: dataSource='error' без строк раньше не рендерил НИЧЕГО —
-  // пустой регион истории выглядел как «нет записей».
-  const isLoadError = isSettledEmpty && dataSource === 'error';
-  // REG-FE-028: emptyScopeKind — тот же SSOT-факт скоупа, что у worklist.
-  const isFilteredEmpty = isSettledEmpty && dataSource === 'api' && emptyScopeKind === 'filtered-empty';
-  const isEmptyQueue = isSettledEmpty && dataSource === 'api' && !isFilteredEmpty;
-
-  // PR-51: debug-лог только когда пустое состояние реально показано.
-  if (isEmptyQueue && import.meta.env.MODE === 'development') {
-    logger.debug('Empty state shown:', {
-      isNoToken: !tokenManager.getAccessToken(),
-      dataSource,
-      filteredLength: filteredAppointments.length,
-    });
+  // These are counts of loaded queue records for the selected day, not
+  // unique-patient or revenue totals. No comparison with an unqueried day.
+  let waiting = 0;
+  let pendingPayment = 0;
+  let completed = 0;
+  const ownerGroups = new Map<string, { name: string; patients: Set<string>; records: number; unlinked: boolean }>();
+  if (canSummarize) {
+    for (const row of appointments) {
+      const status = row.canonical_status ?? row.status;
+      if (status === 'waiting' || status === 'queued') waiting += 1;
+      if (row.payment_status === 'pending' || status === 'paid_pending') pendingPayment += 1;
+      if (status === 'done' || status === 'completed' || status === 'served') completed += 1;
+      if (selectedDate !== today) continue;
+      const ownerKind = typeof row.queue_owner_kind === 'string' ? row.queue_owner_kind : null;
+      const ownerId = row.queue_owner_id;
+      const key = ownerKind && ownerId != null ? `${ownerKind}:${ownerId}` : 'unowned';
+      let group = ownerGroups.get(key);
+      if (!group) {
+        const queueName = typeof row.queue_name === 'string' ? row.queue_name : '';
+        const name = key === 'unowned' ? t('rp_welcome_unassigned') :
+          queueName || t(ownerKind === 'doctor' ? 'rp_welcome_doctor' : 'rp_welcome_queue', { id: ownerId });
+        group = { name, patients: new Set(), records: 0, unlinked: false };
+        ownerGroups.set(key, group);
+      }
+      group.records += 1;
+      if (row.patient_id == null || row.patient_id === '') group.unlinked = true;
+      else group.patients.add(String(row.patient_id));
+    }
   }
 
   return (
-    <AnimatedTransition type="fade" delay={100}>
-      <Card variant="default" className="registrar-card-surface">
-        <CardHeader className="registrar-card-header">
-          {/* QW-08 fix: reduced AnimatedTransition from 10 to 3 (100/200/300ms). */}
-          {/* Previous delays 400/800/900/1000/1100/1350/1400/1500 blocked first */}
-          {/* user intent until 1.5s after page load. */}
-          <AnimatedTransition type="slide" direction="up" delay={200}>
-            <h1 className="registrar-hero-title">
-              {t('welcome')} в панель регистратора!
-              <User size={20} style={{ color: 'var(--mac-accent-blue)' }} aria-hidden="true" />
-            </h1>
-          </AnimatedTransition>
-          <AnimatedTransition type="fade" delay={300}>
-            <div className="registrar-date-subtitle">
-              {/* REG-FE-032: the hero "today" is the CLINIC's today
-                  (Asia/Tashkent), never the operator's browser zone — a
-                  UTC-negative remote operator used to see yesterday. */}
-              {formatClinicTodayLong(registrarLocale)}
-            </div>
-          </AnimatedTransition>
-        </CardHeader>
+    <Card variant="default" className="registrar-card-surface">
+      <CardHeader className="registrar-card-header">
+        <h1 className="registrar-hero-title">{t('rp_welcome_title')}</h1>
+      </CardHeader>
+      <CardContent>
+        <div className="registrar-welcome-actions">
+          <Button variant="primary" disabled={sessionExpired} onClick={createAppointment}>
+            <Plus size={16} aria-hidden="true" />{t('new_appointment')}
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/clinical/search')}>
+            <Search size={16} aria-hidden="true" />{t('rp_welcome_find_patient')}
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/registrar/queue')}>
+            <Bell size={16} aria-hidden="true" />{t('rp_welcome_open_queue')}
+          </Button>
+        </div>
 
-        <CardContent>
-          {/* UX Audit Registrar #5: Morning checklist — список врачей с
-              информацией о том, открыт ли приём. Раньше регистратору нужно
-              было проверять каждого врача вручную через QueueView. */}
-          {/* REG-FE-027: сводка — инструмент СЕГОДНЯШНЕГО дня; на исторической
-              выборке (календарь/URL-дата) она не показывается. */}
-          {loadedDateIsToday && (() => {
-            // REG-FE-027 (registrar audit ledger): группы по каноническому
-            // владельцу очереди из read-model (queue_owner_kind /
-            // queue_owner_id), НЕ по legacy doctor_id/specialist_id — их на
-            // канонических строках нет, и раньше все записи сливались в одну
-            // карточку «Врач #undefined». Счётчик — отдельные ПАЦИЕНТЫ, когда
-            // каждая строка группы несёт patient_id; без полного
-            // patient-identity подпись честно меняется на «Записей».
-            const ownerGroups = new Map<string, {
-              key: string;
-              name: string;
-              patients: Set<string>;
-              rowCount: number;
-              hasAnonymousRows: boolean;
-            }>();
-            for (const appt of appointments) {
-              const ownerKind = typeof appt.queue_owner_kind === 'string' ? appt.queue_owner_kind : null;
-              const ownerId = appt.queue_owner_id;
-              let key: string;
-              let name: string;
-              if (ownerKind === 'doctor' && ownerId != null) {
-                key = `doctor:${ownerId}`;
-                const queueName = typeof appt.queue_name === 'string' ? appt.queue_name : '';
-                name = queueName || `Врач №${ownerId}`;
-              } else if (ownerKind && ownerId != null) {
-                // Очередь ресурса (кабинет/оборудование) — честное имя очереди.
-                key = `${ownerKind}:${ownerId}`;
-                const queueName = typeof appt.queue_name === 'string' ? appt.queue_name : '';
-                name = queueName || `Очередь №${ownerId}`;
-              } else {
-                // Запись без владельца очереди — не приписываем её врачу.
-                key = 'unowned';
-                name = 'Без привязки к врачу';
-              }
-              let group = ownerGroups.get(key);
-              if (!group) {
-                group = { key, name, patients: new Set(), rowCount: 0, hasAnonymousRows: false };
-                ownerGroups.set(key, group);
-              }
-              group.rowCount += 1;
-              const patientId = appt.patient_id;
-              if (patientId !== undefined && patientId !== null && patientId !== '') {
-                group.patients.add(`patient:${String(patientId)}`);
-              } else {
-                // Без patient_id дедупликация пациентов невозможна — строка
-                // считается отдельным неизвестным пациентом, группа помечается.
-                group.patients.add(`row:${String(appt.id)}`);
-                group.hasAnonymousRows = true;
-              }
-            }
-            const doctorsList = Array.from(ownerGroups.values());
-
-            if (doctorsList.length === 0) return null;
-
-            return (
-              <div style={{
-                marginBottom: 'var(--mac-spacing-6)',
-                padding: 'var(--mac-spacing-4)',
-                borderRadius: 'var(--mac-radius-lg)',
-                border: '1px solid var(--mac-card-border)',
-                background: 'var(--mac-card-bg)',
-              }}>
-                <h2 style={{
-                  margin: '0 0 var(--mac-spacing-3) 0',
-                  fontSize: 'var(--mac-font-size-base)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  color: textColor,
-                }}>
-                  Утренний статус приёма
-                </h2>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                  gap: 'var(--mac-spacing-3)',
-                }}>
-                  {doctorsList.map((doc) => (
-                    <div
-                      key={doc.key}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 'var(--mac-spacing-1)',
-                        padding: '10px 12px',
-                        borderRadius: 'var(--mac-radius-md)',
-                        border: '1px solid var(--mac-card-border)',
-                        background: 'var(--mac-bg-secondary)',
-                      }}
-                    >
-                      <span style={{
-                        fontSize: 'var(--mac-font-size-sm)',
-                        fontWeight: 'var(--mac-font-weight-semibold)',
-                        color: textColor,
-                      }}>
-                        {doc.name}
-                      </span>
-                      <span style={{
-                        fontSize: 'var(--mac-font-size-xs)',
-                        color: 'var(--mac-text-secondary)',
-                      }}>
-                        {/* REG-FE-027: подпись счётчика честная — «Пациентов»
-                            только при полном пациент-identity (дедупликация
-                            корректна); иначе считаем записи. */}
-                        {doc.hasAnonymousRows
-                          ? `Записей: ${doc.rowCount}`
-                          : `Пациентов: ${doc.patients.size}`}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Современная статистика */}
-          <ModernStatistics
-          appointments={appointments as never[]}
-          departmentStats={departmentStats}
-          language={language}
-          selectedDate={(showCalendar && historyDate ? historyDate : getLocalDateString()) as never}
-          onExport={() => {
-            logger.info('Экспорт статистики');
-          }}
-          onRefresh={() => {
-            loadAppointments({ source: 'statistics_refresh' });
-          }} />
-
-
-          {/* Панель управления и фильтров */}
-          {/* QW-08 fix: unwrapped nested AnimatedTransition (was delays 800-1500). */}
-            {/* UX Audit R-4.6: убран мета-заголовок «Панель управления».
-                Две группы кнопок ниже сами по себе понятны, лишний
-                заголовок создавал визуальный шум (Nielsen #8). */}
-            <div style={{ marginBottom: 'var(--mac-spacing-8)' }}>
-              {/* Быстрые действия */}
-                <div className="registrar-grid-auto" style={{ marginBottom: 'var(--mac-spacing-6)' }}>
-                    <Button
-                    variant="primary"
-                    size="default"
-                    onClick={() => {
-                      logger.info('Кнопка "Новая запись" нажата');
-                      setWizardEditMode(false); // ✅ Сброс режима
-                      setWizardInitialData(null); // ✅ Сброс данных
-                      setShowWizard(true);
-                    }}
-                    aria-label="Create new appointment"
-                    className="registrar-flex" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
-
-                      <Plus size={16} style={{ color: 'white' }} aria-hidden="true" />
-                      {t('new_appointment')}
-                    </Button>
-
-                  {/* Кнопка модуля оплаты */}
-                    <Button
-                    variant="secondary"
-                    size="default"
-                    onClick={() => setShowPaymentManager(true)}
-                    aria-label="Open payment module"
-                    className="registrar-flex">
-
-                      <CreditCard size={16} aria-hidden="true" />
-                      Модуль оплаты
-                    </Button>
-
-                    <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => {
-                      logger.info('Кнопка "Экспорт CSV" нажата');
-                      const csvContent = generateCSV(appointments);
-                      const filename = `appointments_${getLocalDateString()}.csv`;
-                      downloadCSV(csvContent, filename);
-                      notify.success(`Экспортировано ${appointments.length} записей`);
-                    }}
-                    className="registrar-flex">
-
-                      <Share size={16} aria-hidden="true" />
-                      {t('export_csv')}
-                    </Button>
-                </div>
-
-              {/* Фильтры и навигация */}
-                <div className="registrar-surface-toolbar">
-                  <h3 className="registrar-subsection-heading">
-                    <ListFilter size={20} style={{ color: 'var(--mac-accent-blue)' }} aria-hidden="true" />
-                    Фильтры и навигация
-                  </h3>
-
-                  {/* UX Audit R-1.1: 6 кнопок → 2 primary + overflow dropdown.
-                      Раньше: 6 кнопок одновременно → Hick's Law violation.
-                      Теперь: «Календарь» (toggle) + «Все записи» (default filter) +
-                      «Ещё» dropdown с остальными 4 действиями. */}
-                  <div className="registrar-grid-auto">
-                    <Button
-                    variant={showCalendar ? 'primary' : 'outline'}
-                    size="default"
-                    onClick={() => {
-                      logger.info('Кнопка "Календарь" нажата');
-                      setShowCalendar(!showCalendar);
-                    }}
-                    className="registrar-flex">
-
-                      <Calendar size={16} className={showCalendar ? 'registrar-text-white' : 'registrar-text-primary'} aria-hidden="true" />
-                      Календарь
-                    </Button>
-
-                    <Button
-                    variant="outline"
-                    size="default"
-                    onClick={clearNarrowingFilters}
-                    className="registrar-flex">
-
-                      <Eye size={16} aria-hidden="true" />
-                      Все записи
-                    </Button>
-
-                    <details className="registrar-overflow-menu">
-                      <summary className="registrar-overflow-trigger" aria-label="Дополнительные фильтры и действия">
-                        <Plus size={16} aria-hidden="true" />
-                        Ещё
-                      </summary>
-                      <div className="registrar-overflow-popover" role="menu">
-                        <button
-                          type="button"
-                          className="registrar-overflow-item"
-                          onClick={() => setStatusQuickFilter('queued')}
-                          role="menuitem">
-                          <CheckCircle2 size={16} aria-hidden="true" />
-                          Активная очередь
-                        </button>
-                        <button
-                          type="button"
-                          className="registrar-overflow-item"
-                          onClick={() => setStatusQuickFilter('paid_pending')}
-                          role="menuitem">
-                          <CreditCard size={16} aria-hidden="true" />
-                          Ожидают оплаты
-                        </button>
-                        <button
-                          type="button"
-                          className="registrar-overflow-item"
-                          onClick={() => navigate('/registrar/queue')}
-                          role="menuitem">
-                          <Bell size={16} aria-hidden="true" />
-                          Онлайн-очередь
-                        </button>
-                        <button
-                          type="button"
-                          className="registrar-overflow-item"
-                          onClick={() => {
-                            // REG-FE-008 (registrar audit ledger): тост успеха —
-                            // только после ПОДТВЕРЖДЁННОГО исхода загрузки; хук
-                            // возвращает типизированный результат: «пустой день»
-                            // — тоже успешное обновление, сбой — нет.
-                            void Promise.resolve(loadAppointments({ source: 'manual_refresh_button' }))
-                              .then((outcome) => {
-                                if (outcome === 'loaded' || outcome === 'empty') {
-                                  notify.success(t('misc.data_updated'));
-                                }
-                              });
-                          }}
-                          role="menuitem">
-                          <RotateCw size={16} aria-hidden="true" />
-                          Обновить данные
-                        </button>
-                      </div>
-                    </details>
-                  </div>
-
-                  {/* Календарный виджет */}
-                  {showCalendar &&
-                <div className="registrar-info-card" style={{ padding: 'var(--mac-spacing-5)', boxShadow: 'var(--mac-shadow-sm)' }}>
-                      <div className="registrar-flex-col">
-                        <label className="registrar-picker-label">
-                          <Search size={16} style={{ color: 'var(--mac-text-secondary)' }} aria-hidden="true" />
-                          Выберите дату для просмотра истории:
-                        </label>
-                        <Input
-                      type="date"
-                      label=""
-                      value={tempDateInput}
-                      onChange={(e) => {
-                        setTempDateInput(e.target.value);
-                        logger.info('Введена дата (debounced):', e.target.value);
-                      }}
-                      onBlur={(e) => {
-                        if (e.target.value && e.target.value !== historyDate) {
-                          logger.info('📅 Date input blur - applying immediately:', e.target.value);
-                          setHistoryDate(e.target.value);
-                        }
-                      }} />
-
-                        <div className="registrar-flex-wrap" style={{ gap: 'var(--mac-spacing-2)' }}>
-                          <button
-                      type="button"
-                      onClick={() => {
-                        const today = getLocalDateString();
-                        setTempDateInput(today);
-                        setHistoryDate(today);
-                      }}
-                      className="registrar-date-btn"
-                      style={{
-                        background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
-                        color: textColor
-                      }}>
-
-                            Сегодня
-                          </button>
-                          <button
-                      type="button"
-                      onClick={() => {
-                        const yesterdayStr = getYesterdayDateString();
-                        setTempDateInput(yesterdayStr);
-                        setHistoryDate(yesterdayStr);
-                      }}
-                      className="registrar-date-btn"
-                      style={{
-                        background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
-                        color: textColor
-                      }}>
-
-                            Вчера
-                          </button>
-                          <button
-                      type="button"
-                      onClick={() => {
-                        const weekAgo = new Date();
-                        weekAgo.setDate(weekAgo.getDate() - 7);
-                        const weekAgoStr = getLocalDateString(weekAgo);
-                        setTempDateInput(weekAgoStr);
-                        setHistoryDate(weekAgoStr);
-                      }}
-                      className="registrar-date-btn"
-                      style={{
-                        background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
-                        color: textColor
-                      }}>
-
-                            Неделю назад
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                }
-                </div>
-            </div>
-
-          {/* История записей */}
-          <div>
-            <div className="registrar-flex-between" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
-              <h3 className="registrar-history-heading">
-                <Eye size={20} style={{ color: 'var(--mac-accent-blue)' }} aria-hidden="true" />
-                История записей
-              </h3>
-              {showCalendar &&
+        <section aria-label={t('rp_welcome_day_tools')} className="registrar-welcome-section">
+          <div className="registrar-welcome-toolbar">
             <Badge variant="secondary" className="registrar-badge-date">
-                  <Search size={16} aria-hidden="true" />
-                  {/* REG-FE-032: historyDate — ташкентский календарный день;
-              форматируем в зоне клиники, а не в зоне браузера. */}
-                  {formatClinicDayLong(historyDate, registrarLocale)}
-                </Badge>
-            }
+              <Calendar size={16} aria-hidden="true" />
+              <time dateTime={selectedDate}>{formatClinicDayLong(selectedDate, locale)}</time>
+            </Badge>
+            <Button variant="outline" aria-expanded={showCalendar} aria-controls={calendarId}
+              onClick={() => setShowCalendar(!showCalendar)}>{t('rp_welcome_choose_day')}</Button>
+            <Button variant="outline" onClick={() => void refresh()} disabled={loading || sessionExpired}>
+              <RotateCw size={16} aria-hidden="true" />{t('rp_welcome_refresh')}
+            </Button>
+            <Button variant="outline" onClick={() => setShowPaymentManager(true)} disabled={sessionExpired}>
+              <CreditCard size={16} aria-hidden="true" />{t('rp_welcome_payments')}
+            </Button>
+          </div>
+          <div id={calendarId} hidden={!showCalendar}>
+            {showCalendar && <form key={selectedDate} className="registrar-welcome-toolbar" onSubmit={event => {
+              event.preventDefault();
+              selectDay(String(new FormData(event.currentTarget).get('day') ?? ''));
+            }}>
+              <label htmlFor={dateInputId}>{t('rp_welcome_date_label')}</label>
+              <Input id={dateInputId} type="date" name="day" required defaultValue={selectedDate} />
+              <Button type="submit" variant="outline">{t('rp_welcome_apply_day')}</Button>
+              <Button type="button" variant="outline" onClick={() => selectDay(today)}>{t('rp_welcome_today')}</Button>
+              <Button type="button" variant="outline" onClick={() => selectDay(daysBeforeToday(1))}>{t('rp_welcome_yesterday')}</Button>
+              <Button type="button" variant="outline" onClick={() => selectDay(daysBeforeToday(7))}>{t('rp_welcome_week_ago')}</Button>
+            </form>}
+          </div>
+          {canSummarize && <div className="registrar-welcome-section">
+            <h2 className="registrar-subsection-heading">{t('rp_welcome_day_counts')}</h2>
+            <dl className="registrar-welcome-actions registrar-welcome-counts">
+              <div><dt>{t('rp_welcome_waiting')}</dt><dd>{waiting}</dd></div>
+              <div><dt>{t('rp_welcome_payment_pending')}</dt><dd>{pendingPayment}</dd></div>
+              <div><dt>{t('status_done')}</dt><dd>{completed}</dd></div>
+            </dl>
+          </div>}
+        </section>
+
+        <section aria-label={t('rp_welcome_records')} className="registrar-welcome-section" aria-busy={loading}>
+          <div className="registrar-welcome-toolbar">
+            <h2 className="registrar-history-heading">{t('rp_welcome_records')}</h2>
+            {hasUrlFilters &&
+              <Button variant="outline" onClick={clearNarrowingFilters}>{t('rp_welcome_clear_filters')}</Button>}
+            {dateMatches && (showRows || stale) && !sessionExpired && <DataSourceIndicator count={appointments.length} />}
+          </div>
+          {loading && !showRows && <p role="status">{t('misc.eat_loading')}</p>}
+          {sessionExpired && (
+            <div className="registrar-empty-state">
+              <p role="status">{t('rp_welcome_session_expired')}</p>
+              <a href="/login">{t('rp_welcome_log_in')}</a>
             </div>
-            <div className="registrar-surface-toolbar">
-              {/* Индикатор источника данных */}
-              {appointments.length > 0 && <DataSourceIndicator count={appointments.length} />}
-
-              {/* REG-FE-029 (registrar audit ledger): первичный сбой загрузки —
-              видимое состояние ошибки с повтором, а не пустой регион истории.
-              Зеркалит контракт WorklistView (те же классы, без inline-стилей). */}
-              {isLoadError &&
+          )}
+          {loadError && !sessionExpired && (
             <div className="registrar-empty-state">
-                  <div className="registrar-empty-icon-lg">
-                    <AlertTriangle size={24} aria-hidden="true" />
-                  </div>
-                  <h3 className="registrar-empty-heading registrar-empty-heading-text">
-                    {t('ds_error_message')}
-                  </h3>
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      // Повтор — тот же контракт загрузки, что и в worklist.
-                      void loadAppointments({ source: 'welcome_retry' });
-                    }}
-                    className="registrar-btn-cta">
-                    {t('ds_retry')}
-                  </Button>
-                </div>
-            }
-
-              {/* REG-FE-028 (registrar audit ledger): фильтры/поиск ничего не
-              нашли — это «Ничего не найдено», а не «Очередь пуста»; CTA
-              «Создать первую запись» здесь не предлагается. */}
-              {isFilteredEmpty &&
+              <p role="alert">{t('ds_error_message')}</p>
+              <Button variant="primary" onClick={() => void loadAppointments({ source: 'welcome_retry' })}>
+                {t('ds_retry')}
+              </Button>
+            </div>
+          )}
+          {empty && (emptyScopeKind === 'filtered-empty' ? (
             <div className="registrar-empty-state">
-                  <div className="registrar-empty-icon-lg">
-                    <Search size={24} aria-hidden="true" />
-                  </div>
-                  <h3 className="registrar-empty-heading registrar-empty-heading-text">
-                    {t('rp_worklist_no_matches')}
-                  </h3>
-                  <p className="registrar-empty-desc-text registrar-empty-desc-fixed">
-                    {t('rp_empty_filter_desc')}
-                  </p>
-                </div>
-            }
-
-              {/* ✅ Сообщение при пустой очереди */}
-              {isEmptyQueue &&
+              <h3>{t('rp_worklist_no_matches')}</h3>
+              <p>{t('rp_empty_filter_desc')}</p>
+            </div>
+          ) : (
             <div className="registrar-empty-state">
-                    {/* QW-04: empty state 1 of 3 (session-expired / empty-queue). */}
-              {/* Full unification deferred — migrate to MacOSEmptyState from */}
-              {/* the macOS design system (components/ui/macos) first. */}
-              <div className="registrar-empty-icon-lg">
-                      {!tokenManager.hasToken() ?
-                <Lock size={24} aria-hidden="true" /> :
-                <FileText size={24} aria-hidden="true" />}
-                    </div>
-                    <h3 className="registrar-empty-heading" style={{ color: textColor }}>
-                      {!tokenManager.hasToken() ? 'Сессия истекла' : 'Очередь пуста'}
-                    </h3>
-                    <p className="registrar-empty-desc-text" style={{ fontSize: 'var(--mac-font-size-lg)', color: textColor }}>
-                      {!tokenManager.hasToken() ?
-                'Нажмите "Войти снова", чтобы обновить данные.' :
-                'На сегодня нет записей в очереди.'}
-                    </p>
-
-                    {/* Кнопки действий */}
-                    {!tokenManager.hasToken() &&
-              <div className="registrar-flex-wrap">
-                        <button
-                  onClick={() => {
-                    // Перенаправляем на страницу входа
-                    window.location.href = '/login';
-                  }}
-                  className="registrar-btn-lg registrar-btn-accent">
-
-                          <KeyRound size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} aria-hidden="true" />Войти снова
-                        </button>
-
-                        <button
-                  onClick={() => {
-                    // Обновляем данные
-                    loadAppointments({ source: 'manual_refresh_button' });
-                  }}
-                  className="registrar-btn-lg registrar-btn-success">
-
-                          <ArrowUpDown size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} aria-hidden="true" />Обновить данные
-                        </button>
-
-                        {/* UX Audit R-2.2: кнопка «Перезапустить приложение» удалена —
-                            это dev-tool, не должен быть в продакшене. */}
-              </div>
-              }
-                    <p style={{
-                fontSize: 'var(--mac-font-size-base)',
-                color: textColor,
-                marginBottom: 'var(--mac-spacing-6)'
-              }}>
-                      {activeTab ?
-                `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}` :
-                'Сегодня пока нет записей'}
-                    </p>
-                    {/* QW-04: empty state 3 of 3 (welcome no-records). */}
-              {/* See empty state 1 above for unification plan. */}
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setWizardEditMode(false); // ✅ Сброс режима
-                  setWizardInitialData(null); // ✅ Сброс данных
-                  setShowWizard(true);
-                }}
-                // PR-51: disable CTA when session expired (no token)
-                disabled={!tokenManager.hasToken()}
-                className="registrar-btn-cta">
-
-                      <Plus size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} aria-hidden="true" />Создать первую запись
-                    </Button>
-                  </div>
-            }
-
-              {/* Таблица отображается только если есть данные */}
-              {(appointmentsLoading || filteredAppointments.length > 0) &&
+              <h3>{t('rp_welcome_empty_day')}</h3>
+              {selectedDate === today &&
+                <Button variant="outline" onClick={createAppointment}>{t('rp_welcome_create_first')}</Button>}
+            </div>
+          ))}
+          {showRows && (
             <EnhancedAppointmentsTable
+              key={selectedDate}
               data={filteredAppointments}
-              rawEntries={appointments} // ⭐ SSOT FIX: Сырые данные для полного Tooltip
+              rawEntries={appointments}
               loading={appointmentsLoading}
               theme={theme}
               language={language}
-              outerBorder={true}
+              outerBorder
               services={services}
               preferCanonicalQueueNumber
-              showCheckboxes={false} // REG-FE-031 (registrar audit ledger): нет
-                            // ни одного bulk-действия над выделением (то же
-                            // удаление dead-UI, что в worklist) — чекбоксы
-                            // выключены, пока реальная bulk-операция не появится.
-              onRowClick={(row) => {
-                // REG-FE-013 (audit ledger 3803): безопасные факты вместо
-                // дампа строки — без ФИО/телефона пациента.
-                logger.info('[Welcome] Row action: open details', { recordId: row.id });
-                // Здесь можно открыть модальное окно с деталями записи
+              showCheckboxes={false}
+              onRowClick={openRecordPreview}
+              filteredExport={{
+                label: t('rp_welcome_csv'),
+                disabled: !canSummarize || loading,
+                onExport: rows => {
+                  const csv = generateCSV(rows, { includeQueueNumber: true });
+                  downloadCSV(csv, `appointments_${selectedDate}.csv`);
+                },
               }}
               onActionClick={(action, row, event) => {
                 switch (action) {
@@ -826,19 +371,28 @@ const WelcomeView = React.memo(({
                   default:
                     break;
                 }
-              }} />
-
-            }
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </AnimatedTransition>
+              }}
+            />
+          )}
+        </section>
+        {ownerGroups.size > 0 && (
+          <details className="registrar-welcome-section">
+            <summary>{t('rp_welcome_owner_counts')}</summary>
+            <dl className="registrar-welcome-actions registrar-welcome-counts">
+              {[...ownerGroups].map(([key, group]) => (
+                <div key={key}>
+                  <dt>{group.name}</dt>
+                  <dd>{t(group.unlinked ? 'rp_welcome_records_count' : 'rp_welcome_patients_count',
+                    { total: group.unlinked ? group.records : group.patients.size })}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+        )}
+      </CardContent>
+    </Card>
   );
 });
 
 WelcomeView.displayName = 'WelcomeView';
-
-// UX Audit: TS interfaces for all props used in WelcomeView.
-
 export default WelcomeView;

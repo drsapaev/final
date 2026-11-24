@@ -12,6 +12,8 @@ from pydantic import BaseModel
 
 from ....api.deps import require_roles
 from ....models.user import User
+from ....schemas.medical_ai_safety import MedicalAIListResponse, MedicalAIResultResponse
+from ....services.ai.medical_safety import with_medical_ai_safety
 from ....services.mcp import get_mcp_manager
 
 logger = logging.getLogger(__name__)
@@ -163,7 +165,7 @@ class MCPComplaintRequest(BaseModel):
     provider: str | None = None
 
 
-@router.post("/complaint/analyze", response_model=dict[str, Any])
+@router.post("/complaint/analyze", response_model=MedicalAIResultResponse)
 async def mcp_analyze_complaint(
     request: MCPComplaintRequest, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
@@ -212,7 +214,7 @@ async def mcp_analyze_complaint(
             },
         )
 
-        return result
+        return with_medical_ai_safety(result)
 
     except HTTPException:
         raise
@@ -220,7 +222,7 @@ async def mcp_analyze_complaint(
         raise_mcp_internal_error("mcp_analyze_complaint", e)
 
 
-@router.post("/complaint/validate", response_model=dict[str, Any])
+@router.post("/complaint/validate", response_model=MedicalAIResultResponse)
 async def mcp_validate_complaint(
     complaint: str, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
@@ -234,7 +236,7 @@ async def mcp_validate_complaint(
             params={"complaint": complaint},
         )
 
-        return result
+        return with_medical_ai_safety(result)
 
     except Exception as e:
         raise_mcp_internal_error("mcp_validate_complaint", e)
@@ -273,7 +275,7 @@ class MCPICD10Request(BaseModel):
     max_suggestions: int = 5
 
 
-@router.post("/icd10/suggest", response_model=dict[str, Any])
+@router.post("/icd10/suggest", response_model=MedicalAIResultResponse)
 async def mcp_suggest_icd10(
     request: MCPICD10Request, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
@@ -307,11 +309,11 @@ async def mcp_suggest_icd10(
         if not request.symptoms or len(request.symptoms) == 0:
             # Если нет симптомов и нет диагноза, возвращаем пустой результат
             if not request.diagnosis or len(request.diagnosis.strip()) < 2:
-                return {
+                return with_medical_ai_safety({
                     "suggestions": [],
                     "message": "Укажите симптомы или диагноз для подбора кодов МКБ-10",
                     "success": False,
-                }
+                })
 
         # Фильтруем пустые симптомы
         symptoms = [s.strip() for s in request.symptoms if s and s.strip()]
@@ -320,20 +322,20 @@ async def mcp_suggest_icd10(
         if len(symptoms) == 0 and (
             not request.diagnosis or len(request.diagnosis.strip()) < 2
         ):
-            return {
+            return with_medical_ai_safety({
                 "suggestions": [],
                 "message": "Укажите симптомы или диагноз для подбора кодов МКБ-10",
                 "success": False,
-            }
+            })
 
         # Проверяем, что есть хотя бы один значимый входной параметр
         diagnosis_text = (request.diagnosis or "").strip()
         if len(symptoms) == 0 and len(diagnosis_text) < 2:
-            return {
+            return with_medical_ai_safety({
                 "suggestions": [],
                 "message": "Недостаточно данных для подбора кодов МКБ-10",
                 "success": False,
-            }
+            })
 
         mcp_manager = await get_mcp_manager()
 
@@ -356,38 +358,38 @@ async def mcp_suggest_icd10(
 
             # Если результат пустой или содержит ошибку, возвращаем корректный ответ
             if not result or result.get("error"):
-                return {
+                return with_medical_ai_safety({
                     "suggestions": [],
                     "message": result.get(
                         "error", "Не удалось получить подсказки МКБ-10"
                     ),
                     "success": False,
-                }
+                })
 
-            return result
+            return with_medical_ai_safety(result)
 
         except Exception as mcp_error:
             # Если ошибка при обращении к MCP, возвращаем корректный ответ вместо 500
             log_mcp_service_unavailable("mcp_suggest_icd10_service", mcp_error)
-            return {
+            return with_medical_ai_safety({
                 "suggestions": [],
                 "message": "Сервис подбора МКБ-10 временно недоступен",
                 "success": False,
-            }
+            })
 
     except HTTPException:
         raise
     except Exception as e:
         log_mcp_service_unavailable("mcp_suggest_icd10", e)
         # Возвращаем корректный ответ вместо 500
-        return {
+        return with_medical_ai_safety({
             "suggestions": [],
             "message": "Сервис подбора МКБ-10 временно недоступен",
             "success": False,
-        }
+        })
 
 
-@router.post("/icd10/validate", response_model=dict[str, Any])
+@router.post("/icd10/validate", response_model=MedicalAIResultResponse)
 async def mcp_validate_icd10(
     code: str,
     symptoms: list[str] | None = None,
@@ -404,7 +406,7 @@ async def mcp_validate_icd10(
             params={"code": code, "symptoms": symptoms, "diagnosis": diagnosis},
         )
 
-        return result
+        return with_medical_ai_safety(result)
 
     except Exception as e:
         raise_mcp_internal_error("mcp_validate_icd10", e)
@@ -446,7 +448,7 @@ class MCPLabRequest(BaseModel):
     include_recommendations: bool = True
 
 
-@router.post("/lab/interpret", response_model=dict[str, Any])
+@router.post("/lab/interpret", response_model=MedicalAIResultResponse)
 async def mcp_interpret_lab_results(
     request: MCPLabRequest, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
@@ -471,7 +473,7 @@ async def mcp_interpret_lab_results(
             },
         )
 
-        return result
+        return with_medical_ai_safety(result)
 
     except HTTPException:
         raise
@@ -479,7 +481,7 @@ async def mcp_interpret_lab_results(
         raise_mcp_internal_error("mcp_interpret_lab_results", e)
 
 
-@router.post("/lab/check-critical", response_model=dict[str, Any])
+@router.post("/lab/check-critical", response_model=MedicalAIResultResponse)
 async def mcp_check_critical_values(
     results: list[dict[str, Any]], current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
 ) -> dict[str, Any]:
@@ -493,7 +495,7 @@ async def mcp_check_critical_values(
             params={"results": results},
         )
 
-        return result
+        return with_medical_ai_safety(result)
 
     except Exception as e:
         raise_mcp_internal_error("mcp_check_critical_values", e)
@@ -524,7 +526,7 @@ async def mcp_get_normal_ranges(
 # === Medical Imaging via MCP ===
 
 
-@router.post("/imaging/analyze", response_model=dict[str, Any])
+@router.post("/imaging/analyze", response_model=MedicalAIResultResponse)
 async def mcp_analyze_image(
     image: UploadFile = File(...),
     image_type: str = Form(...),
@@ -558,7 +560,7 @@ async def mcp_analyze_image(
             },
         )
 
-        return result
+        return with_medical_ai_safety(result)
 
     except HTTPException:
         raise
@@ -566,7 +568,7 @@ async def mcp_analyze_image(
         raise_mcp_internal_error("mcp_analyze_image", e)
 
 
-@router.post("/imaging/skin-lesion", response_model=dict[str, Any])
+@router.post("/imaging/skin-lesion", response_model=MedicalAIResultResponse)
 async def mcp_analyze_skin_lesion(
     image: UploadFile = File(...),
     lesion_info: str | None = Form(None),
@@ -597,7 +599,7 @@ async def mcp_analyze_skin_lesion(
             },
         )
 
-        return result
+        return with_medical_ai_safety(result)
 
     except HTTPException:
         raise
@@ -637,10 +639,10 @@ class MCPBatchRequest(BaseModel):
     parallel: bool = True
 
 
-@router.post("/batch", response_model=list[dict[str, Any]])
+@router.post("/batch", response_model=MedicalAIListResponse)
 async def mcp_batch_process(
     request: MCPBatchRequest, current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dermatologist", "dentist", "Lab", "labtechnician"))
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     """Пакетная обработка запросов через MCP"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -649,7 +651,7 @@ async def mcp_batch_process(
             requests=request.requests, parallel=request.parallel
         )
 
-        return results
+        return with_medical_ai_safety({"data": results})
 
     except HTTPException:
         raise

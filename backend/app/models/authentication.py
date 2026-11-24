@@ -69,7 +69,7 @@ class RefreshToken(Base):
     )  # ✅ SECURITY: CASCADE (tokens die with user)
 
     # Токен и его данные
-    token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    token: Mapped[str] = mapped_column(String(512), unique=True, nullable=False, index=True)
     jti: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, index=True)  # JWT ID
 
     # Метаданные
@@ -107,7 +107,7 @@ class UserSession(Base):
     )  # ✅ SECURITY: CASCADE (tokens die with user)
 
     # Сессия (соответствует реальной схеме БД)
-    refresh_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    refresh_token: Mapped[str | None] = mapped_column(String(512), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
 

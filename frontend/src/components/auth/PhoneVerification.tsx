@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Label } from '../ui/macos';
 import {
   Phone,
@@ -10,8 +10,9 @@ import {
   RefreshCw,
   Send
 } from 'lucide-react';
-import { api } from '../../api/client';
+import { api, getAuthSessionGeneration } from '../../api/client';
 import { toast } from 'react-toastify';
+import { clearAuthToken } from '../../stores/auth';
 
 import logger from '../../utils/logger';
 import { useSafeInput } from '../../hooks/useSafeInput';  // PR-39 / P0-5: sanitizer wired to form
@@ -24,6 +25,7 @@ export type PhoneVerificationPurpose = 'verification' | 'login' | 'reset' | stri
 export interface PhoneVerificationResult {
   phone: string;
   verified_at?: string;
+  sessions_revoked?: boolean;
   [key: string]: unknown;
 }
 
@@ -73,6 +75,12 @@ const PhoneVerification = ({
   const [timeLeft, setTimeLeft] = useState(0);
   const [attemptsLeft, setAttemptsLeft] = useState(3);
   const [verificationStatus, setVerificationStatus] = useState<{ verified?: boolean; message?: string } | null>(null);
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -108,8 +116,8 @@ const PhoneVerification = ({
     if (!currentPhone || !validatePhone(currentPhone)) return;
 
     try {
-      const response = await api.get('/phone-verification/status', {
-        params: { phone: currentPhone, purpose }
+      const response = await api.post('/phone-verification/status', {
+        phone: currentPhone, purpose
       });
 
       setVerificationStatus(response.data);
@@ -119,8 +127,8 @@ const PhoneVerification = ({
         setTimeLeft(response.data.time_left_minutes * 60);
         setAttemptsLeft(response.data.max_attempts - response.data.attempts);
       }
-    } catch (error) {
-      logger.error('Error checking verification status:', error);
+    } catch {
+      logger.error('Error checking verification status');
     }
   }, [currentPhone, purpose]);
 
@@ -136,6 +144,7 @@ const PhoneVerification = ({
       return;
     }
 
+    const initiatingSession = getAuthSessionGeneration();
     setLoading(true);
     try {
       const payload: Record<string, unknown> = {
@@ -149,14 +158,28 @@ const PhoneVerification = ({
 
       const response = await api.post('/phone-verification/send-code', payload);
 
+      if (!mounted.current || getAuthSessionGeneration() !== initiatingSession) return;
       if (response.data.success) {
+        const seconds = response.data.expires_in_seconds;
+        const minutes = response.data.expires_in_minutes;
+        const remaining = typeof seconds === 'number' && Number.isFinite(seconds)
+          ? Math.max(0, Math.floor(seconds))
+          : typeof minutes === 'number' && Number.isFinite(minutes)
+            ? Math.max(0, Math.floor(minutes * 60))
+            : 0;
+        if (remaining === 0) {
+          setCodeSent(false);
+          toast.error(t('misc.pv_kod_istek_zaprosite_novyy_ko'));
+          return;
+        }
         setCodeSent(true);
-        setTimeLeft(response.data.expires_in_minutes * 60);
+        setTimeLeft(remaining);
         setAttemptsLeft(3);
         toast.success(t('misc.pv_kod_verifikatsii_otpravlen_n'));
       }
     } catch (error) {
-      logger.error('Error sending verification code:', error);
+      if (!mounted.current || getAuthSessionGeneration() !== initiatingSession) return;
+      logger.error('Error sending verification code');
       
       const sendErrResponse = (error as HttpApiError)?.response;
       if (sendErrResponse?.status === 429) {
@@ -167,7 +190,7 @@ const PhoneVerification = ({
         toast.error(t('misc.pv_oshibka_otpravki_koda_verifi'));
       }
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   };
 
@@ -177,28 +200,61 @@ const PhoneVerification = ({
       return;
     }
 
+    const initiatingSession = getAuthSessionGeneration();
     setLoading(true);
     try {
-      const response = await api.post('/phone-verification/verify-code', {
-        phone: currentPhone,
-        code: verificationCode,
-        purpose: purpose
-      });
+      const response = purpose === 'phone_change'
+        ? await api.put('/phone-verification/update-phone', {
+            new_phone: currentPhone,
+            verification_code: verificationCode,
+          })
+        : await api.post('/phone-verification/verify-code', {
+            phone: currentPhone,
+            code: verificationCode,
+            purpose: purpose
+          });
+
+      // The request interceptor also rejects stale responses; this second
+      // synchronous check covers a replacement after interceptor resolution.
+      if (getAuthSessionGeneration() !== initiatingSession) return;
 
       if (response.data.success) {
-        toast.success(t('misc.pv_nomer_telefona_uspeshno_podt'));
+        if (purpose === 'phone_change' && typeof response.data.sessions_revoked !== 'boolean') {
+          // A successful response without the revocation result cannot be
+          // safely interpreted across mixed backend versions.
+          clearAuthToken();
+          toast.error(t('misc.pv_phone_change_uncertain_relogin'));
+          return;
+        }
+        if (purpose === 'phone_change' && response.data.sessions_revoked) {
+          clearAuthToken();
+          toast.success(t('misc.pv_phone_changed_relogin'));
+        } else {
+          toast.success(t('misc.pv_nomer_telefona_uspeshno_podt'));
+        }
         if (onVerified) {
           onVerified({
             phone: currentPhone,
-            verified_at: response.data.verified_at
+            verified_at: response.data.verified_at,
+            ...(purpose === 'phone_change' ? { sessions_revoked: response.data.sessions_revoked } : {}),
           });
         }
       }
     } catch (error) {
-      logger.error('Error verifying code:', error);
+      logger.error('Error verifying code');
+
+      if (getAuthSessionGeneration() !== initiatingSession) return;
       
       const errorResponse = (error as HttpApiError & { response?: { data?: { detail?: { attempts_left?: number } } } })?.response;
       const errorData = errorResponse?.data?.detail;
+
+      // The server may have committed and revoked the session before the
+      // response was lost. Require a fresh login before claiming the result.
+      if (purpose === 'phone_change' && (!errorResponse?.status || errorResponse.status >= 500)) {
+        clearAuthToken();
+        toast.error(t('misc.pv_phone_change_uncertain_relogin'));
+        return;
+      }
       
       if (errorResponse?.status === 404) {
         toast.error(t('misc.pv_kod_ne_nayden_ili_istek'));
@@ -222,8 +278,8 @@ const PhoneVerification = ({
 
   const cancelVerification = async () => {
     try {
-      await api.delete('/phone-verification/cancel', {
-        params: { phone: currentPhone, purpose }
+      await api.post('/phone-verification/cancel', {
+        phone: currentPhone, purpose
       });
       
       setCodeSent(false);
@@ -234,8 +290,8 @@ const PhoneVerification = ({
       if (onCancel) {
         onCancel();
       }
-    } catch (error) {
-      logger.error('Error cancelling verification:', error);
+    } catch {
+      logger.error('Error cancelling verification');
     }
   };
 
@@ -246,6 +302,7 @@ const PhoneVerification = ({
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (loading || codeSent) return;
     const formatted = formatPhone(e.target.value);
     setCurrentPhone(formatted);
   };
@@ -277,7 +334,7 @@ const PhoneVerification = ({
                 onChange={handlePhoneChange}
                 placeholder="+998XXXXXXXXX"
                 className="pl-10"
-                disabled={codeSent}
+                disabled={codeSent || loading}
               />
             </div>
             {currentPhone && !validatePhone(currentPhone) && (

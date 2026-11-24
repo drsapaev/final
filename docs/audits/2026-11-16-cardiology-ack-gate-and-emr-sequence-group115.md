@@ -1,0 +1,42 @@
+# Group115 — DOCFLOW final-head CI, EMR completion safety sequence, and merge gate handoff
+
+**Date:** 2026-11-16. **Canonical main examined:** [`835eb01b6a664ef3485a6ce4e1590313ca937b75`](https://github.com/drsapaev/final/commit/835eb01b6a664ef3485a6ce4e1590313ca937b75). **Owner:** [#4063](https://github.com/drsapaev/final/issues/4063); **cumulative audit:** [Draft #4059](https://github.com/drsapaev/final/pull/4059). **Source proposal:** [Draft #4106](https://github.com/drsapaev/final/pull/4106), fresh head [`17fba86e2c9fe3ed5505bae133478327b39c2dbb`](https://github.com/drsapaev/final/commit/17fba86e2c9fe3ed5505bae133478327b39c2dbb), **UNMERGED**. No live patient data, local worktree tests, PowerShell gate execution, production actions, deploy or main writes.
+
+## 1. Previous exact-head Unified CI is completely GREEN
+
+**[GitHub Actions Unified run 43880149784](https://github.com/drsapaev/final/actions/runs/43880149784)** for previous sync head `4d814af8325d665cf5f0442a956818fa85afe81a` **completed success**. Independently fetched jobs: frontend unit, frontend E2E, frontend build, frontend lint and **PR Required Gate** all completed `success`; security, Gitleaks, i18n, Regression Audit, Agent Workflow Guards and PR Review Quality separately `success`. Its parent source/test head `c1532ed35` [Unified 43862149204](https://github.com/drsapaev/final/actions/runs/43862149204) had **4,361/4,361 frontend tests passed, 520/520 files** and **5/5 new deferred-A→B completion tests**, after a genuine earlier RED on an older head. These are **remote GitHub CI results**, not local Vitest or a PowerShell gate.
+
+## 2. Second sync is scoped and preserves latest queue-print fix
+
+Current main [`835eb01b6`](https://github.com/drsapaev/final/commit/835eb01b6a664ef3485a6ce4e1590313ca937b75) advanced exactly **one commit** after previous synced base `eb8fff18d`, merged [#4114](https://github.com/drsapaev/final/pull/4114) for queue-ticket print identity. GitHub compare showed the **only** changed paths were `frontend/src/services/panelPrint.ts` and `frontend/src/services/__tests__/panelPrint.queueIdentity.test.ts`. Neither intersects #4106's two scoped files.
+
+To preserve both histories, made a true two-parent merge commit **only in the existing Draft branch** `codex/docflow-deferred-ack-regression-g111-20261116`, [`17fba86e2c9fe3ed5505bae133478327b39c2dbb`](https://github.com/drsapaev/final/commit/17fba86e2c9fe3ed5505bae133478327b39c2dbb), parents `4d814af8325d665cf5f0442a956818fa85afe81a` (previous Draft head) and `835eb01b6a664ef3485a6ce4e1590313ca937b75` (main). The new tree was constructed from exact GitHub main tree with **unmodified #4106 source and test blobs**; ref advanced with `expected_sha` and `force=false`, no main write.
+
+Post-sync verified with GitHub compare `main...branch` **status ahead, 14 commits ahead, 0 behind**, with **exactly two diff paths**: `frontend/src/pages/CardiologistPanelUnified.tsx` and `frontend/src/pages/__tests__/CardiologistPanel.deferredCompletion.test.tsx`. The history includes multiple old Draft commits but resulting code diff is two files only. No source conflict or silent change to #4114.
+
+[New exact sync-head Unified run 43886315404](https://github.com/drsapaev/final/actions/runs/43886315404) **still in progress** when inspected: frontend build and lint completed `success`; frontend unit and E2E ongoing; PR Review Quality, Regression Audit, Agent Workflow, i18n, Gitleaks, Security completed `success`. **Do not promote previous GREEN to current synced head until the new run is completed.**
+
+## 3. Independent safety review: real cardiology EMR completion is save-gated before queue POST
+
+Group113's direct successful-completion route navigation raised a narrow question: is cardiology's saved-visit path identical to dermatology's former unsafe bypass (fixed by [#4109](https://github.com/drsapaev/final/pull/4109))? **Current source says no; don't invent that bug.**
+
+The actual cardiology view [`VisitTab.tsx`](https://github.com/drsapaev/final/blob/835eb01b6a664ef3485a6ce4e1590313ca937b75/frontend/src/components/cardiology/VisitTab.tsx#L145-L159) renders `EMRContainerV2` with `onComplete={...onComplete}`, which points through panel [`handleCompleteVisitFromEMR`](https://github.com/drsapaev/final/blob/835eb01b6a664ef3485a6ce4e1590313ca937b75/frontend/src/pages/CardiologistPanelUnified.tsx#L1738-L1746) to the `handleSaveVisit` queue completion. Before invoking `onComplete(savedData)`, [`EMRContainerV2.tsx`](https://github.com/drsapaev/final/blob/835eb01b6a664ef3485a6ce4e1590313ca937b75/frontend/src/components/emr-v2/EMRContainerV2.tsx#L816-L845) calls `readSavedEMRForCompletion` with `shouldSave: isDirty || !emr.id || status==='draft'`, `save: ()=>saveEMR({isDraft:false})` and `reload: ()=>loadEMR(true)`; it verifies the scope is still active and the same `visitId` before passing the saved DTO to the panel's `onComplete`. It also blocks under loading/saving, access denial, conflict and signed-but-dirty states. Existing [`EMRContainerV2.completion.contract.test.ts`](https://github.com/drsapaev/final/blob/835eb01b6a664ef3485a6ce4e1590313ca937b75/frontend/src/components/emr-v2/__tests__/EMRContainerV2.completion.contract.test.ts) asserts these source safeguards. That path is **not** analogous to dermatology's pre-#4109 direct queue completion bypass. Actual clinical autosave/save behavior would still require independent end-to-end confirmation before claiming system verification.
+
+The five synthetic #4106 component regressions mock `VisitTab` and call the real panel completion handler: they **prove the deferred ACK handling and URL transitions**, not the `EMRContainerV2` draft-save path. Avoid overstating test coverage. The new confirmed-completion URL update maintains the prior direct transition but now clears completed `patientId/visitId/visit_id` and synchronizes `tab=queue`; a dirty EMR is first handled by the real `EMRContainerV2` save-to-completion boundary. The independent reviewer should still inspect its clinical-lifecycle semantics when approving merge.
+
+## 4. Merge gate remains mandatory even with full GitHub CI success
+
+[Root AGENTS.md](https://github.com/drsapaev/final/blob/835eb01b6a664ef3485a6ce4e1590313ca937b75/AGENTS.md) requires **`gate_known_root_cause`** for confirmed clinical lifecycle source. The mandatory wrapper is [`ai/langgraph/scripts/run_agent_gate.ps1`](https://github.com/drsapaev/final/blob/835eb01b6a664ef3485a6ce4e1590313ca937b75/ai/langgraph/scripts/run_agent_gate.ps1), from working directory `ai/langgraph`, not a bare invocation of `agent_gate.py`. Script is a PowerShell wrapper around repo `scripts/run_python.ps1` and `agent_gate.py`. The execution operator must run it in a **verified clean checkout of the current PR head**, include:
+```powershell
+cd ai/langgraph
+./scripts/run_agent_gate.ps1 --known-root-cause frontend/src/pages/CardiologistPanelUnified.tsx --scope frontend/src/pages/CardiologistPanelUnified.tsx --scope frontend/src/pages/__tests__/CardiologistPanel.deferredCompletion.test.tsx
+```
+Then collect **exact command, head SHA, UTC timestamp, exit code, sanitized handoff**; inspect execution prompt/stop conditions and rerun with any authorized scope update. **This report did not execute any gate.** The historical process evidence conflict for merged #4103/#4105 (substituting bare Python when `pwsh` unavailable) does not authorize #4106 to bypass it.
+
+The source PR remains **Draft / UNMERGED / NO DEPLOY**. `DOCFLOW-FE-004` in owner #4063 must remain **[ ]** until current-head CI, actual gate + independent acceptance and final merged-main verification. Formal GitHub PR reviews were **empty at inspection**; automated PR Lifecycle recommendation is not an independent code-review approval.
+
+## 5. Owner accounting
+
+At inspection, the canonical owner checklist was **536 IDs total: 147 checked / 389 pending** (one newly checked by another actor since Group114); `DOCFLOW-FE-004` still unchecked. No owner checkbox changed here, no source PR merged, and no new implementation PR opened. Pending are historical audit candidates, not all active clinical defects.
+
+**Next action:** inspect [new-head CI 43886315404](https://github.com/drsapaev/final/actions/runs/43886315404) when complete, then obtain actual PowerShell wrapper evidence and independent clinical review **before** merging #4106. No claim of gate execution or production system verification.

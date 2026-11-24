@@ -69,6 +69,27 @@ describe('initSentry scrubbing wiring (owner round-12 P1)', () => {
     expect(options.replaysOnErrorSampleRate).toBe(0);
   });
 
+  it('installed hooks do not export verification request proofs or SMS text', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'enabled');
+    const sentry = await import('../sentry');
+    sentry.initSentry();
+    const options = initMock.mock.calls[0][0] as Record<string, unknown> & HookOptions;
+    const canary = `synthetic-otp-${Math.random().toString(36).slice(2)}`;
+    const event = {
+      request: {
+        method: 'POST',
+        url: `/api/v1/phone-verification/verify-code?message=${canary}`,
+        data: { code: canary, custom_message: canary },
+      },
+      extra: { verification_code: canary },
+      breadcrumbs: [{ data: { code: canary } }],
+    };
+    const sent = options.beforeSend!(event);
+    const transaction = options.beforeSendTransaction!(event);
+    const crumb = options.beforeBreadcrumb!({ data: { code: canary } });
+    expect(JSON.stringify([sent, transaction, crumb])).not.toContain(canary);
+  });
+
   it('beforeSendTransaction removes raw URLs and span descriptions while preserving safe span metrics', async () => {
     vi.stubEnv('VITE_SENTRY_DSN', 'enabled');
     const sentry = await import('../sentry');

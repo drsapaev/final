@@ -67,10 +67,10 @@ const RegistrarPanel = () => {
   const todayStr = getLocalDateString();
   // PR-UI-13-5 (Decomp 15): calendar slice (showCalendar/historyDate/tempDateInput).
   const {
-    showCalendar, setShowCalendar,
-    historyDate, setHistoryDate,
-    tempDateInput, setTempDateInput,
+    showCalendar,
+    historyDate,
   } = useRegistrarCalendar();
+  const [welcomeCalendarOpen, setWelcomeCalendarOpen] = useState(false);
 
   // ⭐ SSOT: Queue profiles loaded from API (via Tabs)
   // Used for filtering entries by queue_tags instead of hardcoded mapping
@@ -193,7 +193,7 @@ const RegistrarPanel = () => {
     setAppointments,
     dataSource,
     appointmentsLoading,
-    paginationInfo, stale: worklistStale, loadedDate,
+    paginationInfo, stale: worklistStale, loadedDate, selectedDate,
     loadAppointments,
     loadMoreAppointments,
   } = useRegistrarWorklistData({
@@ -254,7 +254,7 @@ const RegistrarPanel = () => {
     () => computeDepartmentStats(appointments, todayStr, queueProfiles),
     [appointments, todayStr, queueProfiles],
   );
-  const { selectedDoctorLabel, doctorStats, doctorCountLabel, sampleIsToday } = useRegistrarDoctorWorklistFacts({
+  const { selectedDoctorLabel, doctorStats, doctorCountLabel } = useRegistrarDoctorWorklistFacts({
     appointments, doctors, activeDoctorId, showCalendar, historyDate,
     urlDate: searchParams.get('date'), todayStr, loadedDate, tI18n,
   });
@@ -353,27 +353,25 @@ const RegistrarPanel = () => {
         {currentView === 'welcome' && (
           <WelcomeView
             t={t}
-            language={legacyLanguage}
+            language={language || 'ru'}
             theme={theme}
-            textColor={textColor}
             appointments={appointments as Record<string, unknown>[]}
-            departmentStats={departmentStats}
             dataSource={dataSource}
             appointmentsLoading={appointmentsLoading}
             filteredAppointments={filteredAppointments}
             services={services}
-            activeTab={activeTab}
-            historyDate={historyDate}
-            showCalendar={showCalendar}
-            tempDateInput={tempDateInput}
+            today={todayStr}
+            selectedDate={selectedDate}
+            loadedDate={loadedDate}
+            stale={worklistStale}
+            hasUrlFilters={Boolean(searchQuery || statusFilter)}
+            showCalendar={welcomeCalendarOpen}
             loadAppointments={loadAppointments}
             setShowWizard={setShowWizard}
             setWizardEditMode={setWizardEditMode}
             setWizardInitialData={setWizardInitialData}
             setShowPaymentManager={setShowPaymentManager}
-            setHistoryDate={setHistoryDate}
-            setShowCalendar={setShowCalendar}
-            setTempDateInput={setTempDateInput}
+            setShowCalendar={setWelcomeCalendarOpen}
             setSearchParams={setSearchParams}
             navigate={navigate}
             setPaymentDialog={setPaymentDialog as unknown as React.Dispatch<React.SetStateAction<{ open: boolean; row: unknown; paid: boolean; source: unknown }>>}
@@ -383,8 +381,8 @@ const RegistrarPanel = () => {
             openRecordEditor={openRecordEditor}
             handleTableAction={handleTableAction}
             handleStartVisit={handleStartVisit as unknown as (row: unknown) => void | Promise<void>}
-            generateCSV={generateCSV as unknown as (...args: unknown[]) => unknown}
-            downloadCSV={downloadCSV as unknown as (...args: unknown[]) => void}
+            generateCSV={generateCSV}
+            downloadCSV={downloadCSV}
             DataSourceIndicator={() => (
               <DataSourceIndicator
                 dataSource={dataSource}
@@ -392,7 +390,7 @@ const RegistrarPanel = () => {
                 paginationInfo={paginationInfo}
                 onRetry={loadAppointments} stale={worklistStale}
               />
-            )} emptyScopeKind={resolveRegistrarWorklistEmptyScopeKind({ appointments, activeTab, activeDoctorId, queueProfiles })} loadedDateIsToday={sampleIsToday}
+            )} emptyScopeKind={resolveRegistrarWorklistEmptyScopeKind({ appointments, activeTab, activeDoctorId, queueProfiles })}
           />
         )}
 

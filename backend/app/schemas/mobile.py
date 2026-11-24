@@ -15,6 +15,18 @@ class MobileLoginRequest(BaseModel):
 
     phone: str = Field(..., description="Номер телефона")
     password: str | None = Field(None, description="Пароль (опционально)")
+    totp_code: str | None = Field(
+        None,
+        min_length=6,
+        max_length=6,
+        description="TOTP код при включённой 2FA; значение действует в стандартном временном окне и не ограничено одним входом",
+    )
+    backup_code: str | None = Field(
+        None,
+        min_length=8,
+        max_length=10,
+        description="Одноразовый резервный код при включённой 2FA",
+    )
     telegram_id: str | None = Field(None, description="Telegram ID")
     device_token: str | None = Field(
         None, description="Токен устройства для push-уведомлений"
@@ -28,7 +40,8 @@ class MobileLoginResponse(BaseModel):
 
     access_token: str = Field(..., description="JWT токен")
     refresh_token: str | None = Field(
-        None, description="Refresh token для продления сессии (использовать с /mobile/auth/refresh)"
+        None,
+        description="Refresh token для продления сессии (использовать с /mobile/auth/refresh)",
     )
     token_type: str = Field(default="bearer", description="Тип токена")
     expires_in: int = Field(..., description="Время жизни токена в секундах")

@@ -3,6 +3,7 @@ Telegram бот для системы клиники
 """
 
 import logging
+import re
 from datetime import datetime
 from typing import Any
 
@@ -10,11 +11,76 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command, CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler
+from starlette.concurrency import run_in_threadpool
 
 from ...core.config import settings
+from ...db.session import SessionLocal
+from ..appointment_rsvp import (
+    apply_appointment_decision,
+    make_appointment_callback,
+    parse_appointment_callback,
+    preview_appointment_decision,
+)
 from ..queue_service import QueueBusinessService
 
 logger = logging.getLogger(__name__)
+
+
+def _markdown_escape(value: object) -> str:
+    """Escape dynamic fields for Telegram's legacy Markdown parse mode."""
+    return re.sub(r"([\\_*\[\]()`])", r"\\\1", str(value))
+
+
+def _private_callback_actor(callback: types.CallbackQuery) -> int | None:
+    """Trust identity only from the authenticated Telegram private ingress."""
+    message = callback.message
+    chat = getattr(message, "chat", None)
+    actor = getattr(callback.from_user, "id", None)
+    chat_id = getattr(chat, "id", None)
+    if (
+        getattr(chat, "type", None) != "private"
+        or isinstance(actor, bool)
+        or not isinstance(actor, int)
+        or actor <= 0
+        or actor != chat_id
+    ):
+        return None
+    return actor
+
+
+def _run_appointment_decision(callback_data: str, chat_id: int) -> str:
+    with SessionLocal() as db:
+        return apply_appointment_decision(
+            db, callback_data=callback_data, chat_id=chat_id
+        )
+
+
+def _run_appointment_preview(callback_data: str, chat_id: int) -> dict | None:
+    with SessionLocal() as db:
+        return preview_appointment_decision(db, callback_data=callback_data, chat_id=chat_id)
+
+
+def _run_visit_preview(token: str, actor: int) -> dict | None:
+    from ..visit_confirmation_service import VisitConfirmationService
+
+    with SessionLocal() as db:
+        try:
+            return VisitConfirmationService(db).preview_by_telegram(token=token, telegram_user_id=str(actor))
+        finally:
+            db.rollback()
+
+
+def _run_visit_decision(token: str, actor: int, confirm: bool) -> dict[str, Any]:
+    # Called only after Telegram's webhook validation and private-chat check;
+    # caller-supplied public JSON cannot assert a Telegram identity.
+    from ..visit_confirmation_service import VisitConfirmationService
+
+    with SessionLocal() as db:
+        service = VisitConfirmationService(db)
+        method = service.confirm_by_telegram if confirm else service.cancel_by_telegram
+        return method(
+            token=token, telegram_user_id=str(actor), source_ip=None, user_agent="telegram"
+        )
 
 
 """P1-18: This is the PATIENT bot (aiogram-based, env-var token).
@@ -75,8 +141,8 @@ class ClinicTelegramBot:
             }
 
         except Exception as e:
-            logger.error(f"Ошибка отправки Telegram приглашения: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error("Telegram invitation failed error_type=%s", type(e).__name__)
+            return {"success": False, "error": "Telegram delivery failed"}
 
     def _setup_handlers(self):
         """Настройка обработчиков команд"""
@@ -263,7 +329,14 @@ class ClinicTelegramBot:
             return
 
         try:
+            if data.startswith("view_visit:"):
+                await self._handle_visit_preview(callback, data.split(":", 1)[1])
+                return
+
             if data.startswith("confirm_visit:") or data.startswith("cancel_visit:"):
+                if _private_callback_actor(callback) is None:
+                    await callback.answer("Действие недоступно", show_alert=True)
+                    return
                 confirm = data.startswith("confirm_visit:")
                 token = data.split(":", 1)[1]
                 answered = await self._handle_visit_confirmation(
@@ -271,6 +344,15 @@ class ClinicTelegramBot:
                 )
                 if not answered:
                     await callback.answer()
+                return
+
+            if data.startswith("ar:"):
+                await self._handle_appointment_decision(callback, data)
+                return
+
+            if data.startswith("confirm_") or data.startswith("cancel_"):
+                # Previous buttons were unbound to a specific occurrence.
+                await callback.answer("Напоминание устарело; запросите новое", show_alert=True)
                 return
 
             if data.startswith("queue_"):
@@ -288,11 +370,88 @@ class ClinicTelegramBot:
             await callback.answer()
 
         except Exception as e:
-            logger.error(f"Ошибка обработки callback: {e}")
+            logger.error("Telegram callback failed error_type=%s", type(e).__name__)
             try:
                 await callback.answer("Произошла ошибка", show_alert=True)
             except Exception:
                 pass
+
+    async def _handle_appointment_decision(self, callback: types.CallbackQuery, data: str) -> None:
+        """Persist one authenticated RSVP, then acknowledge exactly once."""
+        actor = _private_callback_actor(callback)
+        parsed = parse_appointment_callback(data) if actor is not None else None
+        if parsed is not None and parsed[0] == "v":
+            await self._handle_appointment_preview(callback, data, actor)
+            return
+        result = "unavailable"
+        if parsed is not None:
+            try:
+                result = await run_in_threadpool(
+                    _run_appointment_decision, data, actor
+                )
+            except Exception as exc:
+                logger.error("Appointment callback failed error_type=%s", type(exc).__name__)
+        if result in {"confirmed", "already_confirmed", "cancelled"}:
+            message = {
+                "confirmed": "✅ Запись подтверждена",
+                "already_confirmed": "✅ Запись уже подтверждена",
+                "cancelled": "✅ Запись отменена",
+            }[result]
+            try:
+                previous = getattr(callback.message, "text", None) or ""
+                await callback.message.edit_text(text=f"{previous}\n\n{message}")
+            except Exception as exc:
+                # The commit already happened; do not misreport a UI edit as
+                # a failed decision or retry the mutation.
+                logger.warning("Appointment callback edit failed error_type=%s", type(exc).__name__)
+            try:
+                await callback.answer(message)
+            except Exception:
+                logger.warning("Appointment callback acknowledgement failed")
+            return
+        message = "Напоминание устарело; запросите новое" if result == "stale" else "Действие недоступно"
+        try:
+            await callback.answer(message, show_alert=True)
+        except Exception:
+            logger.warning("Appointment callback acknowledgement failed")
+
+    async def _handle_appointment_preview(self, callback, data: str, actor: int) -> None:
+        try:
+            preview = await run_in_threadpool(_run_appointment_preview, data, actor)
+            if not preview:
+                await callback.answer("Запись недоступна", show_alert=True)
+                return
+            buttons = [InlineKeyboardButton(text="✅ Подтвердить", callback_data=preview["confirm_data"])]
+            if preview["cancel_data"]:
+                buttons.append(InlineKeyboardButton(text="❌ Отменить", callback_data=preview["cancel_data"]))
+            await callback.message.answer(
+                text=preview["text"], parse_mode=None,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[buttons]),
+            )
+            await callback.answer()
+        except Exception as exc:
+            logger.error("Appointment preview failed error_type=%s", type(exc).__name__)
+            await callback.answer("Не удалось показать запись", show_alert=True)
+
+    async def _handle_visit_preview(self, callback, token: str) -> None:
+        actor = _private_callback_actor(callback)
+        if actor is None:
+            await callback.answer("Действие недоступно", show_alert=True)
+            return
+        try:
+            preview = await run_in_threadpool(_run_visit_preview, token, actor)
+            if not preview:
+                await callback.answer("Визит недоступен", show_alert=True)
+                return
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"confirm_visit:{preview['action_token']}"),
+                InlineKeyboardButton(text="❌ Отменить", callback_data=f"cancel_visit:{preview['action_token']}"),
+            ]])
+            await callback.message.answer(text=preview["text"], parse_mode=None, reply_markup=keyboard)
+            await callback.answer()
+        except Exception as exc:
+            logger.error("Visit preview failed error_type=%s", type(exc).__name__)
+            await callback.answer("Не удалось показать визит", show_alert=True)
 
     async def _handle_queue_callback(self, callback: types.CallbackQuery, data: str):
         """Обработка выбора специалиста для очереди"""
@@ -383,51 +542,42 @@ class ClinicTelegramBot:
             )
             return True
         except Exception as e:
-            logger.error(f"Failed to send notification to {user_id}: {str(e)}")
+            logger.error("Telegram delivery failed error_type=%s", type(e).__name__)
             return False
 
     async def send_appointment_reminder(
         self, user_id: int, appointment_data: dict[str, Any]
     ):
         """Отправка напоминания о визите"""
-        doctor = appointment_data.get("doctor", "Врач")
-        time = appointment_data.get("time", "время не указано")
-        date = appointment_data.get("date", "дата не указана")
+        try:
+            appointment_id = appointment_data["id"]
+            revision = appointment_data["occurrence_revision"]
+            link_id = appointment_data["telegram_link_id"]
+            link_epoch = appointment_data["patient_link_epoch"]
+            view_data = make_appointment_callback("v", appointment_id, revision, user_id, link_id, link_epoch)
+        except (KeyError, TypeError, ValueError):
+            logger.warning("Appointment reminder missing a valid occurrence")
+            return False
 
-        message = f"""
-📅 **Напоминание о визите**
-
-👨‍⚕️ Врач: {doctor}
-📅 Дата: {date}
-⏰ Время: {time}
-
-Не забудьте прийти за 15 минут до назначенного времени.
-        """
+        message = "У вас новое уведомление. Откройте его в личном чате."
 
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
-                    InlineKeyboardButton(
-                        text="✅ Подтвердить",
-                        callback_data=f"confirm_{appointment_data.get('id')}",
-                    ),
-                    InlineKeyboardButton(
-                        text="❌ Отменить",
-                        callback_data=f"cancel_{appointment_data.get('id')}",
-                    ),
+                    InlineKeyboardButton(text="Просмотреть", callback_data=view_data),
                 ]
             ]
         )
 
-        await self.send_notification(user_id, message, keyboard)
+        return await self.send_notification(user_id, message, keyboard)
 
     async def send_lab_results_ready(self, user_id: int, results_info: dict[str, Any]):
         """Уведомление о готовности результатов"""
         message = f"""
-🔬 **Результаты анализов готовы**
+🔬 *Результаты анализов готовы*
 
-📋 Исследование: {results_info.get('test_name', 'Анализы')}
-📅 Дата: {results_info.get('date', 'не указана')}
+📋 Исследование: {_markdown_escape(results_info.get('test_name') or 'Анализы')}
+📅 Дата: {_markdown_escape(results_info.get('date') or 'не указана')}
 
 Результаты доступны в приложении.
         """
@@ -443,7 +593,7 @@ class ClinicTelegramBot:
             ]
         )
 
-        await self.send_notification(user_id, message, keyboard)
+        return await self.send_notification(user_id, message, keyboard)
 
     async def setup_webhook(self, webhook_url: str, secret_token: str | None = None):
         """Настройка webhook"""
@@ -474,12 +624,12 @@ class ClinicTelegramBot:
             logger.error(f"Failed to remove webhook: {str(e)}")
             return False
 
-    def get_webhook_handler(self):
+    def get_webhook_handler(self, secret_token: str | None = None):
         """Получить обработчик webhook для aiohttp"""
-        if not self.bot or not self.dp:
+        if not self.bot or not self.dp or not secret_token:
             return None
 
-        return SimpleRequestHandler(dispatcher=self.dp, bot=self.bot)
+        return SimpleRequestHandler(dispatcher=self.dp, bot=self.bot, secret_token=secret_token)
 
     async def _handle_visit_confirmation(
         self, callback: types.CallbackQuery, token: str, confirm: bool
@@ -488,17 +638,25 @@ class ClinicTelegramBot:
 
         Возвращает True, если callback уже был подтвержден/обработан через answer().
         """
-        # TGCONFIRM-BE-002: если серверная операция уже закоммичена, падение
-        # рендера/редактирования НЕ должно повторять подтверждение и не
-        # должно показывать generic-ошибку на коммитнутый успех.
-        committed = False
+        if _private_callback_actor(callback) is None:
+            try:
+                await callback.answer("Действие недоступно", show_alert=True)
+            except Exception:
+                pass
+            return True
+
+        # TGCONFIRM-BE-002/BE-003: если серверная операция (подтверждение
+        # или отмена) уже закоммичена, падение рендера/редактирования НЕ
+        # должно повторять операцию и не должно показывать generic-ошибку
+        # на коммитнутый успех. committed хранит тип операции.
+        committed: str | None = None
         try:
             if confirm:
                 # Подтверждаем визит через API
                 result = await self._confirm_visit_via_api(token, callback.from_user.id)
 
                 if result.get("success"):
-                    committed = True
+                    committed = "confirm"
                     message = "✅ Визит успешно подтвержден!"
                     queue_entries = result.get("queue_numbers") or []
                     if queue_entries:
@@ -525,31 +683,41 @@ class ClinicTelegramBot:
 
                     await callback.message.edit_text(
                         text=f"{callback.message.text}\n\n{message}",
-                        parse_mode="Markdown",
                     )
                     return False
 
-                await callback.answer(
-                    f"Ошибка подтверждения: {result.get('message', 'Неизвестная ошибка')}",
-                    show_alert=True,
-                )
+                await callback.answer("Не удалось подтвердить визит", show_alert=True)
                 return True
 
-            # Отменяем визит
-            await callback.message.edit_text(
-                text=f"{callback.message.text}\n\n❌ Визит отменен",
-                parse_mode="Markdown",
-            )
-            return False
+            # Отменяем визит через API (TGCONFIRM-BE-003): отмена должна
+            # реально сохраниться и инвалидировать токен — не только
+            # редактировать сообщение. Честный отказ, если API не отменил.
+            result = await self._cancel_visit_via_api(token, callback.from_user.id)
+
+            if result.get("success"):
+                committed = "cancel"
+                await callback.message.edit_text(
+                    text=f"{callback.message.text}\n\n❌ Визит отменен",
+                )
+                return False
+
+            await callback.answer("Не удалось отменить визит", show_alert=True)
+            return True
 
         except Exception as e:
-            logger.error(f"Ошибка подтверждения визита: {e}")
+            logger.error("Visit callback failed error_type=%s", type(e).__name__)
             try:
-                if committed:
+                if committed == "confirm":
                     # TGCONFIRM-BE-002: подтверждение уже закоммичено —
                     # сообщаем об успехе операции, а не о generic-ошибке.
                     await callback.answer(
                         "✅ Визит подтвержден; не удалось обновить сообщение — номера в очереди уточните у регистратуры",
+                        show_alert=True,
+                    )
+                elif committed == "cancel":
+                    # TGCONFIRM-BE-003: отмена уже закоммичена на бэкенде.
+                    await callback.answer(
+                        "✅ Визит отменен; не удалось обновить сообщение",
                         show_alert=True,
                     )
                 else:
@@ -563,42 +731,22 @@ class ClinicTelegramBot:
     async def _confirm_visit_via_api(
         self, token: str, telegram_user_id: int
     ) -> dict[str, Any]:
-        """Подтверждает визит через API"""
+        """Use the internal service, not an unauthenticated identity claim."""
         try:
-            import httpx
-
-            # TGCONFIRM-BE-001 (audit #3892, group 20): the callback must call
-            # the configured PUBLIC backend origin with the full /api/v1
-            # prefix (the route is POST /api/v1/telegram/visits/confirm).
-            # Without an explicit API_BASE_URL the callback fails honestly —
-            # never silently assume an internal/localhost origin in a public
-            # deployment, and never raise the historical AttributeError.
-            origin = (settings.API_BASE_URL or "").strip().rstrip("/")
-            if not origin:
-                logger.warning(
-                    "Telegram visit confirmation unavailable: API_BASE_URL is not configured"
-                )
-                return {
-                    "success": False,
-                    "message": "Подтверждение временно недоступно: backend API origin не настроен (API_BASE_URL)",
-                }
-
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{origin}/api/v1/telegram/visits/confirm",
-                    json={"token": token, "channel": "telegram"},
-                    headers={"Content-Type": "application/json"},
-                    timeout=10,
-                )
-
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return {"success": False, "message": f"HTTP {response.status_code}"}
-
+            return await run_in_threadpool(_run_visit_decision, token, telegram_user_id, True)
         except Exception as e:
-            logger.error(f"Ошибка API подтверждения: {e}")
-            return {"success": False, "message": str(e)}
+            logger.error("Visit confirmation failed error_type=%s", type(e).__name__)
+            return {"success": False, "message": "Подтверждение временно недоступно"}
+
+    async def _cancel_visit_via_api(
+        self, token: str, telegram_user_id: int
+    ) -> dict[str, Any]:
+        """Use the internal service with a Telegram-authenticated identity."""
+        try:
+            return await run_in_threadpool(_run_visit_decision, token, telegram_user_id, False)
+        except Exception as e:
+            logger.error("Visit cancellation failed error_type=%s", type(e).__name__)
+            return {"success": False, "message": "Отмена временно недоступна"}
 
 
 # Глобальный экземпляр бота

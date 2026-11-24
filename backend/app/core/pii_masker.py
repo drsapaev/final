@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
-from urllib.parse import parse_qsl, unquote_plus
+from urllib.parse import parse_qsl, unquote, unquote_plus, urlsplit
 
 # ---------------------------------------------------------------------------
 # Field-name list — backend source of truth.
@@ -34,22 +34,54 @@ from urllib.parse import parse_qsl, unquote_plus
 
 PII_FIELD_PATTERNS = [
     # Patient identifiers
-    "iin", "passport_number", "passport_series", "ssn", "national_id",
-    "doc_number", "doc_series",
+    "iin",
+    "passport_number",
+    "passport_series",
+    "ssn",
+    "national_id",
+    "doc_number",
+    "doc_series",
     # Contact info
-    "phone", "phone_number", "mobile", "email",
+    "phone",
+    "phone_number",
+    "mobile",
+    "email",
     # Medical
-    "diagnosis", "diagnoses", "icd10", "icd10_code", "icd10_codes",
-    "complaints", "complaint", "examination", "prescription", "prescriptions",
-    "medications", "medication", "allergies", "allergy",
+    "diagnosis",
+    "diagnoses",
+    "icd10",
+    "icd10_code",
+    "icd10_codes",
+    "complaints",
+    "complaint",
+    "examination",
+    "prescription",
+    "prescriptions",
+    "medications",
+    "medication",
+    "allergies",
+    "allergy",
     # Visit
-    "visit_reason", "patient_name", "patient_full_name", "doctor_notes",
-    "notes", "anamnesis", "anamnesis_morbida",
+    "visit_reason",
+    "patient_name",
+    "patient_full_name",
+    "doctor_notes",
+    "notes",
+    "anamnesis",
+    "anamnesis_morbida",
     # Names
-    "first_name", "last_name", "middle_name", "full_name", "name",
-    "birth_date", "date_of_birth", "dob",
+    "first_name",
+    "last_name",
+    "middle_name",
+    "full_name",
+    "name",
+    "birth_date",
+    "date_of_birth",
+    "dob",
     # Address
-    "address", "street_address", "home_address",
+    "address",
+    "street_address",
+    "home_address",
 ]
 
 PII_KEY_REGEX = re.compile(
@@ -57,8 +89,16 @@ PII_KEY_REGEX = re.compile(
     re.IGNORECASE,
 )
 
-# Phone: +998901234567 → +998901•••567
-PHONE_REGEX = re.compile(r"(\+\d{6})\d{3}(\d{3})")
+# A digit and its following separators cannot overlap, so this scan does not
+# backtrack exponentially on long diagnostic messages. Restrict separators
+# to a single line and require at least nine digits to avoid short dates/times.
+PHONE_REGEX = re.compile(r"(?<!\d)\+?\d(?:[ \t\u00a0\u202f\u2010-\u2015().*•-]*\d){8,}")
+_LABELED_PHONE_REGEX = re.compile(
+    r"(?<![^\W_])((?:phone(?:[_-]?number)?|mobile|tel(?:ephone)?|телефон)"
+    r"[\"']?[ \t]*[:=][ \t]*[\"']?[ \t]*)(\(?\+?\d(?:[ \t\u00a0\u202f\u2010-\u2015().*•-]*\d)*)",
+    re.IGNORECASE,
+)
+_MASKED_PHONE_REGEX = re.compile(r"•{3}\d{3}\Z")
 
 # Email: john.doe@example.com → j•••@example.com
 #
@@ -122,8 +162,10 @@ IIN_REGEX = re.compile(r"\b(\d{4})\d{6}(\d{4})\b")
 # alternation branches start with disjoint character classes (non-quote-
 # non-backslash vs backslash), so the scan stays linear (no ReDoS).
 JSON_CREDENTIAL_REGEX = re.compile(
-    r'("(?:token|previous_token|device_token|fcm_token|push_token'
-    r'|web_push_subscription|vapid_private_key)"\s*:\s*")((?:[^"\\]|\\.)*)(")'
+    r'("(?:token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token'
+    r"|web_push_subscription|vapid_private_key|verification[_-]?code"
+    r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)"\s*:\s*")((?:[^"\\]|\\.)*)(")',
+    re.IGNORECASE,
 )
 
 # PR-6 round 10 (codex P1): FORM / urlencoded credential assignments —
@@ -131,8 +173,10 @@ JSON_CREDENTIAL_REGEX = re.compile(
 # arrive as "token=<credential>&..." with NO quotes, so the JSON regex above
 # cannot see them. Conservative: only credential-looking keys, never prose.
 FORM_CREDENTIAL_REGEX = re.compile(
-    r'\b(token|previous_token|device_token|fcm_token|push_token'
-    r'|web_push_subscription|vapid_private_key)=([^\s&]+)'
+    r"\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token"
+    r"|web_push_subscription|vapid_private_key|verification[_-]?code"
+    r"|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)=([^\s&]+)",
+    re.IGNORECASE,
 )
 
 # Round 14 (codex P2): gate for the percent-decoding form path — only
@@ -171,7 +215,26 @@ FORM_CREDENTIAL_REGEX = re.compile(
 #     fails CLOSED and redacts the whole string: an oversized
 #     unsupported shape is safer to redact entirely than to let a
 #     credential whose '=' sits beyond the window slip through.
-_CREDENTIAL_KEYWORDS = ("token", "web_push_subscription", "vapid")
+_CREDENTIAL_KEYWORDS = (
+    "token",
+    "password",
+    "web_push_subscription",
+    "vapid",
+    "verification_code",
+    "verification-code",
+    "verificationcode",
+    "otp_code",
+    "otp-code",
+    "otpcode",
+    "totp_code",
+    "totp-code",
+    "totpcode",
+    "backup_code",
+    "backup-code",
+    "backupcode",
+    "otp",
+    "totp",
+)
 _CREDENTIAL_FIELD_WINDOW = 130  # keyword→'=' distance cap (≈6× the longest key)
 
 
@@ -192,6 +255,13 @@ def _form_gate_state(decoded: str) -> str:
             i = lowered.find(kw, start)
             if i == -1:
                 break
+            if (
+                kw in ("otp", "totp")
+                and i > 0
+                and (lowered[i - 1].isalnum() or lowered[i - 1] == "_")
+            ):
+                start = i + 1
+                continue
             state = _credential_tail_state(decoded, i + len(kw))
             if state == "unknown":
                 # One inconclusive tail is enough to fail closed for the
@@ -236,6 +306,7 @@ def _credential_tail_state(text: str, j: int) -> str:
         return "unknown"  # post-'=' whitespace run reaches the cut
     return "match"  # non-space char right after the (optional) spaces
 
+
 # PR-6 round 13 (codex P1): Python repr forms of captured Pydantic frame
 # locals — Sentry can serialize a model as
 # PushDeviceRegisterRequest(token='{"endpoint": ...}') where the quoted
@@ -243,12 +314,16 @@ def _credential_tail_state(text: str, j: int) -> str:
 # would stop at the first whitespace, so these escape-aware patterns
 # consume the whole quoted value (disjoint alternation branches — linear).
 _PYREPR_SQ_CREDENTIAL_REGEX = re.compile(
-    r"\b(token|previous_token|device_token|fcm_token|push_token"
-    r'|web_push_subscription|vapid_private_key)=\'((?:[^\'\\]|\\.)*)\''
+    r"\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token"
+    r"|web_push_subscription|vapid_private_key|verification[_-]?code"
+    r"|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)=\'((?:[^\'\\]|\\.)*)\'",
+    re.IGNORECASE,
 )
 _PYREPR_DQ_CREDENTIAL_REGEX = re.compile(
-    r'\b(token|previous_token|device_token|fcm_token|push_token'
-    r'|web_push_subscription|vapid_private_key)="((?:[^"\\]|\\.)*)"'
+    r"\b(token|reset[_-]token|x[_-]reset[_-]token|password|new[_-]password|previous_token|device_token|fcm_token|push_token"
+    r"|web_push_subscription|vapid_private_key|verification[_-]?code"
+    r'|otp[_-]?code|totp[_-]?code|backup[_-]?code|otp|totp)="((?:[^"\\]|\\.)*)"',
+    re.IGNORECASE,
 )
 
 # ---------------------------------------------------------------------------
@@ -260,23 +335,97 @@ SECRET_FIELD_PATTERNS = (
     # push device registry credentials (PR-6) — request bodies of
     # /api/v1/push/devices/* attach to Sentry events on unhandled 5xx
     "token",
+    "reset_token",
+    "x_reset_token",
+    "password",
+    "new_password",
     "previous_token",
     "device_token",
     "fcm_token",
     "push_token",
     "web_push_subscription",
     "vapid_private_key",
+    "verification_code",
+    "verificationcode",
+    "otp_code",
+    "otpcode",
+    "totp_code",
+    "totpcode",
+    "backup_code",
+    "backupcode",
+    "otp",
+    "totp",
 )
+
+
+PUBLIC_SITE_ANALYTICS_INGEST_PATH = "/api/v1/public-site/analytics/events"
+PUBLIC_SITE_ANALYTICS_MAX_TOKEN_BYTES = 17
+
+
+def is_public_site_analytics_ingest_path(value: object) -> bool:
+    """Match the intake in an ASGI path, request URL or Sentry transaction."""
+    if not isinstance(value, str) or not value:
+        return False
+    method, separator, target = value.partition(" ")
+    if separator and re.fullmatch(r"[A-Z]+", method):
+        value = target
+    try:
+        path = unquote(urlsplit(value).path).removesuffix("/")
+    except ValueError:
+        return False
+    return path == PUBLIC_SITE_ANALYTICS_INGEST_PATH
+
+
+def is_sensitive_verification_path(value: object) -> bool:
+    """Identify code-bearing authentication routes without masking ICD `code`.
+
+    `value` may be an ASGI path, a Sentry transaction, or an absolute URL.
+    Ignore query/fragment before matching and require complete path segments.
+    """
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        path = unquote(urlsplit(value).path).lower().rstrip("/")
+    except ValueError:
+        return False
+    return bool(
+        re.search(
+            r"(?:^|/)(?:phone-verification|2fa)(?:/|$)"
+            r"|(?:^|/)password-reset/verify-phone(?:/|$)"
+            r"|(?:^|/)patient-access/(?:verify-otp|activate/confirm)(?:/|$)",
+            path,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
 # Per-field maskers
 # ---------------------------------------------------------------------------
 
+
 def mask_phone(phone: str | None) -> str | None:
+    """Hide a phone field, preserving at most its final three digits."""
     if not phone:
         return phone
-    return PHONE_REGEX.sub(r"\1•••\2", phone)
+    if _MASKED_PHONE_REGEX.fullmatch(phone):
+        return phone
+    digits = "".join(char for char in phone if char.isdecimal())
+    if len(digits) <= 3:
+        return "***"
+    return "•••" + digits[-3:]
+
+
+def _mask_phone_in_text(match: re.Match[str]) -> str:
+    digits = "".join(char for char in match.group() if char.isdecimal())
+    # A 14-digit value may be a document identifier. Unknown oversized
+    # sequences are also safer to hide entirely than partially reveal.
+    if len(digits) == 14 or len(digits) > 15:
+        return "[REDACTED]"
+    return "•••" + digits[-3:]
+
+
+def _mask_labeled_phone(match: re.Match[str]) -> str:
+    return match.group(1) + (mask_phone(match.group(2)) or "***")
 
 
 def mask_email(email: str | None) -> str | None:
@@ -311,7 +460,7 @@ def mask_identifier(value: str | None) -> str | None:
     """Auto-detect phone/email/username format and apply appropriate masking.
 
     Used for auth_svc logs where the same `username` field can be:
-    - A phone number (mobile login): "+998901234567" → "+998901•••567"
+    - A phone number (mobile login): only its last three digits remain.
     - An email (web admin login): "john.doe@example.com" → "j•••@example.com"
     - A plain username: "admin" → "a•••n"
 
@@ -327,13 +476,19 @@ def mask_identifier(value: str | None) -> str | None:
     if not s:
         return value
 
-    # Phone: starts with + and digits (use existing PHONE_REGEX)
-    if s.startswith("+") and any(c.isdigit() for c in s):
-        return mask_phone(s)
-
     # Email: contains @
     if "@" in s:
         return mask_email(s)
+
+    # Mobile logins can be stored without a country prefix or with separators.
+    digits = sum(char.isdecimal() for char in s)
+    if s.startswith("+") or (
+        digits >= 7
+        and all(
+            char.isdecimal() or char.isspace() or char in "()-+.*•‐‑‒–—―" for char in s
+        )
+    ):
+        return mask_phone(s)
 
     # Plain username: partial mask preserving first + last char
     if len(s) == 1:
@@ -361,6 +516,7 @@ def mask_birth_date(d: Any) -> str | None:
 # Recursive object masker
 # ---------------------------------------------------------------------------
 
+
 def mask_pii(obj: Any) -> Any:
     """Recursively mask PII fields in a dict/list structure.
 
@@ -382,6 +538,21 @@ def mask_pii(obj: Any) -> Any:
     return obj
 
 
+def _is_phone_field(key: str) -> bool:
+    """Recognize existing snake_case and camelCase phone field names."""
+    normalized = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key)
+    normalized = normalized.lower().replace("-", "_")
+    return normalized in {
+        "phone",
+        "phone_number",
+        "phone_masked",
+        "phone_e164",
+        "mobile",
+        "mobile_number",
+        "telephone",
+    } or normalized.endswith(("_phone", "_phone_number", "_mobile", "_mobile_number"))
+
+
 def _mask_key_value(key: str, value: Any) -> Any:
     if value is None:
         return None
@@ -389,34 +560,64 @@ def _mask_key_value(key: str, value: Any) -> Any:
 
     # Secret credentials first (PR-6): never partially masked, never
     # recursed into — a credential is a credential in any shape.
-    if key_lower in SECRET_FIELD_PATTERNS:
+    if key_lower.replace("-", "_") in SECRET_FIELD_PATTERNS:
         return "[REDACTED]"
 
     # Full-redact fields (identifiers, medical content)
     full_redact_patterns = {
-        "iin", "passport_number", "passport_series", "ssn", "national_id",
-        "doc_number", "doc_series",
-        "diagnosis", "diagnoses", "icd10", "icd10_code", "icd10_codes",
-        "complaints", "complaint", "examination", "prescription", "prescriptions",
-        "medications", "medication", "allergies", "allergy",
-        "visit_reason", "doctor_notes", "notes", "anamnesis", "anamnesis_morbida",
-        "address", "street_address", "home_address",
+        "iin",
+        "passport_number",
+        "passport_series",
+        "ssn",
+        "national_id",
+        "doc_number",
+        "doc_series",
+        "diagnosis",
+        "diagnoses",
+        "icd10",
+        "icd10_code",
+        "icd10_codes",
+        "complaints",
+        "complaint",
+        "examination",
+        "prescription",
+        "prescriptions",
+        "medications",
+        "medication",
+        "allergies",
+        "allergy",
+        "visit_reason",
+        "doctor_notes",
+        "notes",
+        "anamnesis",
+        "anamnesis_morbida",
+        "address",
+        "street_address",
+        "home_address",
     }
     if key_lower in full_redact_patterns:
         return "[REDACTED]"
 
     # Partial-mask fields (preserve structure for debug)
-    if key_lower in ("phone", "phone_number", "mobile"):
+    if _is_phone_field(key):
         return mask_phone(value) if isinstance(value, str) else "[REDACTED]"
     if key_lower in ("email",):
         return mask_email(value) if isinstance(value, str) else "[REDACTED]"
-    if key_lower in ("first_name", "last_name", "middle_name", "full_name", "name", "patient_name", "patient_full_name"):
+    if key_lower in (
+        "first_name",
+        "last_name",
+        "middle_name",
+        "full_name",
+        "name",
+        "patient_name",
+        "patient_full_name",
+    ):
         return mask_name(value) if isinstance(value, str) else "[REDACTED]"
     if key_lower in ("birth_date", "date_of_birth", "dob"):
         return mask_birth_date(value)
 
     # Recurse into nested structures
-    if isinstance(value, (dict, list)):
+    if isinstance(value, dict | list):
         return mask_pii(value)
     if isinstance(value, str):
         # PR-6 round 4 (codex P1): a string under an ordinary dict key
@@ -444,7 +645,7 @@ def _mask_string_inplace(s: str) -> str:
             parsed = json.loads(s)
         except Exception:
             parsed = None
-        if isinstance(parsed, (dict, list)):
+        if isinstance(parsed, dict | list):
             try:
                 return json.dumps(
                     mask_pii(parsed), ensure_ascii=False, separators=(",", ":")
@@ -464,7 +665,7 @@ def _mask_string_inplace(s: str) -> str:
     # bounded scan (see _form_gate_state) — the previous unanchored
     # regex search was quadratic on long credential-free bodies and
     # starved the event loop from the shared 422 handler.
-    if "%" in s:
+    if "%" in s or ("+" in s and "=" in s):
         try:
             decoded = unquote_plus(s)
         except Exception:
@@ -487,12 +688,12 @@ def _mask_string_inplace(s: str) -> str:
                 if pairs:
                     rebuilt = []
                     for k, v in pairs:
-                        dk = unquote_plus(k).lower()
+                        dk = unquote_plus(k).lower().replace("-", "_")
                         if (
                             dk in SECRET_FIELD_PATTERNS
                             or dk.endswith("token")
                             or "token=" in dk
-                            or any(p in dk for p in SECRET_FIELD_PATTERNS)
+                            or any(p in dk for p in SECRET_FIELD_PATTERNS if len(p) > 4)
                         ):
                             # the credential may sit in the KEY itself (e.g.
                             # "%74oken%3Dsecret") — drop the whole field
@@ -502,8 +703,13 @@ def _mask_string_inplace(s: str) -> str:
                     s = "&".join(rebuilt)
                 else:
                     s = decoded
-    s = PHONE_REGEX.sub(r"\1•••\2", s)
+            elif PHONE_REGEX.search(decoded) or _LABELED_PHONE_REGEX.search(decoded):
+                # Encoded separators can split a phone into short fragments
+                # that the free-text scanner cannot recognize until decoded.
+                s = decoded
     s = EMAIL_REGEX.sub(r"\1•••@\2", s)
+    s = _LABELED_PHONE_REGEX.sub(_mask_labeled_phone, s)
+    s = PHONE_REGEX.sub(_mask_phone_in_text, s)
     s = PASSPORT_REGEX.sub(r"\1••••••", s)
     s = IIN_REGEX.sub(r"\1••••••\2", s)
     # PR-6: credential-shaped JSON keys inside raw bodies / log lines
@@ -530,6 +736,7 @@ def mask_pii_text(s: str) -> str:
 # Convenience: structured logging filter
 # ---------------------------------------------------------------------------
 
+
 class PIIMaskingFilter:
     """logging.Filter that masks PII in record.msg and record.args.
 
@@ -555,11 +762,11 @@ class PIIMaskingFilter:
         # must handle both shapes.
         if record.args:
             try:
-                if isinstance(record.args, (dict, list)):
+                if isinstance(record.args, dict | list):
                     record.args = (mask_pii(record.args),)
                 else:
                     record.args = tuple(
-                        mask_pii(a) if isinstance(a, (dict, list, str)) else a
+                        mask_pii(a) if isinstance(a, dict | list | str) else a
                         for a in record.args
                     )
             except Exception:

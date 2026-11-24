@@ -66,7 +66,7 @@ class TestSanitizeEventPhoneScrubbing:
         }
         sanitize_event(event)
         assert "+998901234567" not in event["exception"]["values"][0]["value"]
-        assert "+998901•••567" in event["exception"]["values"][0]["value"]
+        assert "•••567" in event["exception"]["values"][0]["value"]
 
     def test_scrubs_phone_in_request_body(self):
         """Phone under PII key in request.data is redacted via mask_pii()."""
@@ -229,7 +229,7 @@ class TestSanitizeEventIinScrubbing:
         }
         sanitize_event(event)
         assert "12345678901234" not in event["exception"]["values"][0]["value"]
-        assert "1234••••••1234" in event["exception"]["values"][0]["value"]
+        assert "[REDACTED]" in event["exception"]["values"][0]["value"]
 
 
 class TestSanitizeEventMultiplePii:
@@ -255,7 +255,7 @@ class TestSanitizeEventMultiplePii:
         assert "AA1234567" not in value
         assert "12345678901234" not in value
         # Masked versions present
-        assert "+998901•••567" in value
+        assert "•••567" in value
         assert "j•••@example.com" in value
 
 
@@ -275,7 +275,7 @@ class TestSanitizeEventLogentryScrubbing:
         }
         sanitize_event(event)
         assert "+998901234567" not in event["logentry"]["formatted"]
-        assert "+998901•••567" in event["logentry"]["formatted"]
+        assert "•••567" in event["logentry"]["formatted"]
 
     def test_scrubs_patient_dict_in_logentry_params(self):
         """Dict args with PII keys must be key-redacted, not just regex-masked."""
@@ -294,7 +294,7 @@ class TestSanitizeEventLogentryScrubbing:
         }
         sanitize_event(event)
         params = event["logentry"]["params"][0]
-        assert params["phone"] == "+998901•••567"
+        assert params["phone"] == "•••567"
         assert params["first_name"] == "И."
         assert params["last_name"] == "И."
         assert params["diagnosis"] == "[REDACTED]"
@@ -338,13 +338,13 @@ class TestSanitizeEventBreadcrumbsShape:
         }
         sanitize_event(event)
         crumbs = event["breadcrumbs"]["values"]
-        assert crumbs[0]["data"]["phone"] == "+998901•••567"
+        assert crumbs[0]["data"]["phone"] == "•••567"
         assert crumbs[1]["data"]["diagnosis"] == "[REDACTED]"
 
     def test_breadcrumbs_bare_list_still_scrubbed(self):
         event = {"breadcrumbs": [{"data": {"phone": "+998901234567"}}]}
         sanitize_event(event)
-        assert event["breadcrumbs"][0]["data"]["phone"] == "+998901•••567"
+        assert event["breadcrumbs"][0]["data"]["phone"] == "•••567"
 
     def test_breadcrumbs_with_string_crumb_does_not_raise(self):
         """Non-dict crumbs (e.g. plain strings) must not crash the sanitizer."""
@@ -376,7 +376,7 @@ class TestSanitizeEventBreadcrumbsShape:
         msg = event["breadcrumbs"]["values"][0]["message"]
         assert "+998901234567" not in msg
         assert "john@example.com" not in msg
-        assert "+998901•••567" in msg
+        assert "•••567" in msg
 
     def test_scrubs_breadcrumb_message_in_bare_list_shape(self):
         event = {"breadcrumbs": [{"message": "PHI_TEST_MARKER iin=12345678901234"}]}
@@ -409,7 +409,7 @@ class TestSanitizeEventUnicode:
         sanitize_event(event)
         value = event["exception"]["values"][0]["value"]
         assert "+998901234567" not in value
-        assert "+998901•••567" in value
+        assert "•••567" in value
         assert "PHI_TEST_MARKER" in value  # Latin preserved
         assert "обратился" in value  # Cyrillic preserved
 
@@ -421,7 +421,7 @@ class TestSanitizeEventIdempotency:
         already-scrubbed result.
 
         This protects against regex backreference loops where a masked
-        value (e.g. ``+998901•••567``) might match the regex again.
+        value (e.g. ``•••567``) might match the regex again.
         """
         event = {
             "exception": {
@@ -780,6 +780,52 @@ class TestRegisteredBeforeSendPayloadRedaction:
         ]
 
 
+class TestSystemResourceAlertDiagnostics:
+    def test_keeps_only_numeric_aggregate_evidence(self, monkeypatch):
+        before_send = _make_before_send(monkeypatch)
+        metrics = {
+            "latency_p95_ms": 1900.25,
+            "latency_threshold_ms": 1200.0,
+            "window_requests": 37,
+            "window_seconds": 300,
+        }
+        scrubbed = before_send(
+            {
+                "message": "SYNTHETIC_PRIVATE_TEXT",
+                "tags": {"alert_type": "system_resource", "severity": "critical"},
+                "extra": {**metrics, "diagnosis": "SYNTHETIC_DIAGNOSIS"},
+            },
+            {},
+        )
+        assert scrubbed["extra"] == metrics
+        assert scrubbed["message"] == "[REDACTED]"
+
+    def test_does_not_allow_metrics_on_other_events(self, monkeypatch):
+        before_send = _make_before_send(monkeypatch)
+        for tags in ({}, {"alert_type": "database_error"}):
+            scrubbed = before_send(
+                {"tags": tags, "extra": {"latency_p95_ms": 2000.0}}, {}
+            )
+            assert "extra" not in scrubbed
+
+    def test_rejects_malformed_and_out_of_range_metrics(self, monkeypatch):
+        before_send = _make_before_send(monkeypatch)
+        scrubbed = before_send(
+            {
+                "tags": {"alert_type": "system_resource"},
+                "extra": {
+                    "latency_p95_ms": float("inf"),
+                    "latency_threshold_ms": "SYNTHETIC_TOKEN",
+                    "window_requests": 37.5,
+                    "window_seconds": 3601,
+                    "body": "SYNTHETIC_BODY",
+                },
+            },
+            {},
+        )
+        assert "extra" not in scrubbed
+
+
 class TestRegisteredBeforeSendTransaction:
     def test_registered_callback_scrubs_transaction_payload(self, monkeypatch):
         import json
@@ -967,9 +1013,7 @@ class TestRegisteredBeforeSendTransaction:
         assert scrubbed["transaction"] == "GET /api/v1/patients/{patient_id}"
         assert scrubbed["transaction_info"] == {"source": "route"}
 
-    def test_route_transaction_redacts_identifier_like_segments(
-        self, monkeypatch
-    ):
+    def test_route_transaction_redacts_identifier_like_segments(self, monkeypatch):
         """Route names carrying concrete record ids must fail closed.
 
         The structural route check accepts ``GET /patients/123456789`` with
@@ -1318,7 +1362,7 @@ class TestSanitizeEventPiiInDiagnosticNameField:
         event = {"contexts": {"device": {"name": "+998901234567"}}}
         sanitize_event(event)
         assert "+998901234567" not in event["contexts"]["device"]["name"]
-        assert "+998901•••567" in event["contexts"]["device"]["name"]
+        assert "•••567" in event["contexts"]["device"]["name"]
 
     def test_email_in_diagnostic_name_scrubbed(self):
         """response.name = 'john@example.com' → email masked via regex."""
@@ -1338,7 +1382,7 @@ class TestSanitizeEventPiiInDiagnosticNameField:
         event = {"contexts": {"device": {"name": "12345678901234"}}}
         sanitize_event(event)
         assert "12345678901234" not in event["contexts"]["device"]["name"]
-        assert "1234••••••1234" in event["contexts"]["device"]["name"]
+        assert "[REDACTED]" in event["contexts"]["device"]["name"]
 
     def test_diagnostic_name_with_pii_and_non_pii_mixed_in_context(self):
         """A standard context with both a diagnostic name (non-PII) and

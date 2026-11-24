@@ -1,5 +1,5 @@
 import { useTranslation } from '../../i18n/useTranslation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import {
   Card, CardContent, Typography, Alert, Badge, CircularProgress, Button,
@@ -10,6 +10,7 @@ import { apiClient } from '../../api/client';
 // ADR-0015: use useMcpClient hook instead of importing api/mcpClient directly.
 import { useMcpClient } from '../../hooks/useMcpClient';
 import { sanitizeAIContent } from '../../utils/sanitizer';
+import { assertMedicalAiSafety } from '../../utils/aiSafety';
 import logger from '../../utils/logger';
 import type { HttpApiError } from '../../types/errors';
 
@@ -205,6 +206,7 @@ const AIAssistant = ({
   const mcpAPI = useMcpClient();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AIResult | null>(null);
+  const [resultInputKey, setResultInputKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState('deepseek');
   const [retryCount, setRetryCount] = useState(0);
@@ -215,10 +217,15 @@ const AIAssistant = ({
   // fingerprint (see aiInputFingerprint) — object identity alone changes on
   // every incidental parent re-render of inline data literals.
   const inputFingerprintRef = useRef('');
-  inputFingerprintRef.current = aiInputFingerprint(data);
+  inputFingerprintRef.current = aiInputFingerprint({ data, analysisType: analysisType || (specialty ? 'icd10' : undefined), useMCP });
   // LABAI-FE-003: the LATEST analyzeData invocation owns the loading flag —
   // an older run's finally must not clear the flag a newer run raised.
   const analysisRunRef = useRef(0);
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // X-1 (UX audit) + CARDAI-FE-001 (audit 3886): a specialty-only mount
   // derives the default analysis type, but NO clinical data exists in
@@ -239,18 +246,20 @@ const AIAssistant = ({
     // identity is BOTH its invocation epoch and its input's content
     // fingerprint (the trigger is disabled while loading, so a newer run
     // for a newer input can only start after this one released the flag).
-    const inputKey = aiInputFingerprint(data);
+    const inputKey = inputFingerprintRef.current;
     const runId = ++analysisRunRef.current;
     setLoading(true);
     setError(null);
+    setResult(null);
+    setResultInputKey(null);
     if (!manualRetry) {
-      setResult(null);
       setRetryCount(0);
     }
 
     try {
       let response: { data?: unknown } | undefined;
       let mcpResult: McpResultDto | undefined;
+      let verifiedMcpEnvelope = false;
 
       switch (effectiveAnalysisType) {
         case 'complaint':
@@ -261,6 +270,8 @@ const AIAssistant = ({
               patientGender: data.patient_gender,
               provider: provider
             }) as McpResultDto;
+            assertMedicalAiSafety(mcpResult);
+            verifiedMcpEnvelope = true;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -286,6 +297,8 @@ const AIAssistant = ({
               provider: provider,
               maxSuggestions: data.maxSuggestions || 5
             }) as McpResultDto;
+            assertMedicalAiSafety(mcpResult);
+            verifiedMcpEnvelope = true;
             if (mcpResult.status === 'success') {
               if (mcpResult.data?.clinical_recommendations) {
                 response = { data: mcpResult.data };
@@ -312,6 +325,8 @@ const AIAssistant = ({
               provider: provider,
               includeRecommendations: true
             }) as McpResultDto;
+            assertMedicalAiSafety(mcpResult);
+            verifiedMcpEnvelope = true;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -336,6 +351,8 @@ const AIAssistant = ({
               data.patientHistory as Record<string, unknown> | null,
               provider
             ) as McpResultDto;
+            assertMedicalAiSafety(mcpResult);
+            verifiedMcpEnvelope = true;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -358,6 +375,8 @@ const AIAssistant = ({
               (data.imageType as string) || 'general',
               { modality: data.modality, clinicalContext: data.clinicalContext, provider: provider }
             ) as McpResultDto;
+            assertMedicalAiSafety(mcpResult);
+            verifiedMcpEnvelope = true;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -372,6 +391,16 @@ const AIAssistant = ({
           throw new Error(t('misc.aia_unknown_type'));
       }
 
+      if (!verifiedMcpEnvelope) {
+        assertMedicalAiSafety(response?.data);
+        // The legacy ICD endpoint now uses an object envelope so the safety
+        // metadata also exists for an empty suggestion list. Validate the
+        // envelope before exposing its array to the existing UI consumers.
+        if (effectiveAnalysisType === 'icd10') {
+          response = { data: (response?.data as Record<string, unknown>).data };
+        }
+      }
+
       // Санитизируем AI-generated контент перед отображением (XSS защита)
       const responseError = getAIResponseError(response?.data);
       if (responseError) {
@@ -381,11 +410,12 @@ const AIAssistant = ({
       // LABAI-FE-001/002: the input CONTENT changed while this analysis was
       // in flight — the response belongs to the OLD input; never publish it
       // into the newer input's dialog (result, side effect or success notice).
-      if (inputFingerprintRef.current !== inputKey) {
+      if (!mountedRef.current || analysisRunRef.current !== runId || inputFingerprintRef.current !== inputKey) {
         logger.warn('[AIAssistant] Stale AI response ignored for a changed input generation');
         return;
       }
       const sanitizedData = sanitizeAIResponse(response?.data) as AIResult;
+      setResultInputKey(inputKey);
       setResult(sanitizedData);
       if (onResult) onResult(sanitizedData);
       notify.success(t('misc.aia_analysis_done'));
@@ -396,7 +426,7 @@ const AIAssistant = ({
       const errorMsg = normalizeAIErrorMessage(
         errData?.detail || errData?.error || (err instanceof Error ? err.message : String(err))
       );
-      if (inputFingerprintRef.current !== inputKey) {
+      if (!mountedRef.current || analysisRunRef.current !== runId || inputFingerprintRef.current !== inputKey) {
         // LABAI-FE-001/002: a stale input's failure must not surface as the
         // newer input's error.
         logger.warn('[AIAssistant] Stale AI failure ignored for a changed input generation');
@@ -412,7 +442,7 @@ const AIAssistant = ({
       // disables the trigger); when this run IS the latest, the release is
       // honest even if the input content changed mid-flight — a newer run
       // cannot exist yet, and leaving the flag up would wedge the dialog.
-      if (analysisRunRef.current === runId) {
+      if (mountedRef.current && analysisRunRef.current === runId) {
         setLoading(false);
       }
     }
@@ -703,6 +733,7 @@ const AIAssistant = ({
 
   const renderResult = () => {
     if (error) return <Alert severity="error">{error}</Alert>;
+    if (resultInputKey !== inputFingerprintRef.current) return null;
     if (!result) return null;
     switch (effectiveAnalysisType) {
       case 'complaint':
@@ -722,7 +753,7 @@ const AIAssistant = ({
     }
   };
 
-  const resultProvider = getResultProvider(result);
+  const resultProvider = getResultProvider(resultInputKey === inputFingerprintRef.current ? result : null);
   const usesFallbackProvider = isFallbackProvider(resultProvider);
   const usesServerDefaultProvider = provider === 'default';
 

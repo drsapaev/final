@@ -82,6 +82,7 @@ interface ConfirmDialogProps {
   cancelLabel?: React.ReactNode;
   intent?: 'danger' | 'warning' | 'destructive' | 'primary' | string;
   requireText?: string | null;
+  confirmationOption?: { label: string; onConfirm: (checked: boolean) => void };
   [key: string]: unknown;
 }
 
@@ -95,20 +96,25 @@ export function ConfirmDialog({
   confirmLabel = 'Подтвердить',
   cancelLabel = 'Отмена',
   intent = DEFAULT_INTENT,
+  confirmationOption,
   requireText = null, // optional: require user to type this exact text to enable confirm
 }: ConfirmDialogProps) {
   const config = INTENT_CONFIG[intent] || INTENT_CONFIG[DEFAULT_INTENT];
   const Icon = config.icon;
   const [typedText, setTypedText] = useState('');
+  const [optionChecked, setOptionChecked] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) setTypedText('');
+    if (!isOpen) {
+      setTypedText('');
+      setOptionChecked(false);
+    }
   }, [isOpen]);
 
   const isConfirmDisabled = requireText !== null && typedText !== requireText;
 
   const handleConfirm = () => {
-    // t accessed via closure or i18n.t()
+    confirmationOption?.onConfirm(optionChecked);
     onConfirm?.();
     onClose?.();
   };
@@ -171,6 +177,23 @@ export function ConfirmDialog({
             }}>
               {description}
             </div>
+          )}
+          {confirmationOption && (
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--mac-spacing-2)',
+              marginTop: 'var(--mac-spacing-3)',
+              color: 'var(--mac-text-primary)',
+            }}>
+              <input
+                type="checkbox"
+                aria-label={confirmationOption.label}
+                checked={optionChecked}
+                onChange={(event) => setOptionChecked(event.target.checked)}
+              />
+              {confirmationOption.label}
+            </label>
           )}
           {requireText !== null && (
             <div style={{ marginTop: 'var(--mac-spacing-3)' }}>
@@ -264,6 +287,7 @@ export function useConfirm(): UseConfirmReturn {
   const [state, setState] = useState({
     isOpen: false,
     options: {},
+    requestId: 0,
   });
   const resolverRef = useRef<((value: boolean) => void) | null>(null);
 
@@ -276,7 +300,7 @@ export function useConfirm(): UseConfirmReturn {
         resolverRef.current = null;
       }
       resolverRef.current = resolve;
-      setState({ isOpen: true, options });
+      setState((prev) => ({ isOpen: true, options, requestId: prev.requestId + 1 }));
     });
   }, []);
 
@@ -309,6 +333,7 @@ export function useConfirm(): UseConfirmReturn {
   // Render the dialog via portal to document.body so it overlays everything
   const dialog = typeof document !== 'undefined' ? createPortal(
     <ConfirmDialog
+      key={state.requestId}
       isOpen={state.isOpen}
       onClose={handleClose}
       onConfirm={handleConfirm}

@@ -21,13 +21,13 @@ from fastapi import HTTPException
 from sqlalchemy import event
 from starlette.concurrency import run_in_threadpool
 
-from app.api.v1.endpoints.websocket_auth import authenticate_websocket_token
 from app.api.deps import (
     _auth_db_thread_limiter,
     _get_user_with_blacklist,
     create_access_token,
     get_current_user,
 )
+from app.api.v1.endpoints.websocket_auth import authenticate_websocket_token
 from app.core.config import settings
 from app.models.authentication import TokenBlacklist
 from app.models.user import User
@@ -72,7 +72,7 @@ def test_sync_auth_query_releases_event_loop_while_waiting():
 
     class FakeResult:
         def first(self):
-            return expected_user, False, True
+            return expected_user, False, True, True
 
     class FakeSyncSession:
         calls = 0
@@ -110,7 +110,7 @@ def test_async_auth_query_still_uses_single_execute():
 
     class FakeResult:
         def first(self):
-            return expected_user, False, False
+            return expected_user, False, False, True
 
     class FakeAsyncSession:
         calls = 0
@@ -278,21 +278,22 @@ def test_numeric_sub_single_select(db_session, auth_user):
     assert counter.count == 1
 
 
-def test_text_sub_single_select(db_session, auth_user):
+def test_text_sub_is_rejected_before_database_lookup(db_session, auth_user):
     token = create_access_token({"sub": auth_user.username})
     engine = _engine_of(db_session)
     counter = _SelectCounter(engine)
     try:
-        user = _call_get_current_user(db_session, token)
+        with pytest.raises(HTTPException) as exc:
+            _call_get_current_user(db_session, token)
     finally:
         counter.stop(engine)
 
-    assert user.id == auth_user.id
-    assert counter.count == 1
+    assert exc.value.status_code == 401
+    assert counter.count == 0
 
 
 def test_username_claim_canonical_login_single_select(db_session, auth_user):
-    # Каноническая форма токена 2FA-логина: username-claim имеет приоритет
+    # Canonical 2FA token: numeric subject identifies the user.
     token = create_access_token(
         {
             "sub": str(auth_user.id),
@@ -340,7 +341,7 @@ def test_revoked_jti_single_select(db_session, auth_user):
 
 
 def test_sentinel_revokes_all_user_tokens(db_session, auth_user):
-    token = create_access_token({"sub": auth_user.username})
+    token = create_access_token({"sub": str(auth_user.id)})
     TokenBlacklistService.blacklist_all_user_tokens(
         db_session, auth_user.id, reason="password_change"
     )
@@ -358,13 +359,9 @@ def test_sentinel_revokes_all_user_tokens(db_session, auth_user):
     assert counter.count == 1
 
 
-@pytest.mark.parametrize("subject_kind", ["username", "numeric"])
-def test_notification_websocket_respects_username_subject_sentinel(
-    db_session, auth_user, subject_kind
-):
+def test_notification_websocket_respects_account_revocation(db_session, auth_user):
     """WebSocket auth must honor the same bulk revocation as HTTP auth."""
-    subject = auth_user.username if subject_kind == "username" else str(auth_user.id)
-    token = create_access_token({"sub": subject})
+    token = create_access_token({"sub": str(auth_user.id)})
 
     # Synthetic fixture only. The JWT's own JTI was not individually revoked.
     assert TokenBlacklistService.blacklist_all_user_tokens(
@@ -373,19 +370,19 @@ def test_notification_websocket_respects_username_subject_sentinel(
     assert asyncio.run(authenticate_websocket_token(token, db_session)) is None
 
 
-def test_notification_websocket_allows_unrevoked_username_subject(
+def test_notification_websocket_allows_unrevoked_numeric_subject(
     db_session, auth_user
 ):
-    token = create_access_token({"sub": auth_user.username})
+    token = create_access_token({"sub": str(auth_user.id)})
     authenticated = asyncio.run(authenticate_websocket_token(token, db_session))
     assert authenticated is not None
     assert authenticated.id == auth_user.id
 
 
-def test_notification_websocket_denies_individually_revoked_username_jti(
+def test_notification_websocket_denies_individually_revoked_jti(
     db_session, auth_user
 ):
-    token = create_access_token({"sub": auth_user.username})
+    token = create_access_token({"sub": str(auth_user.id)})
     payload = _decode(token)
     db_session.add(
         TokenBlacklist(
@@ -408,13 +405,12 @@ def test_unknown_user_401(db_session):
     assert exc.value.detail == "User not found"
 
 
-def test_invalid_token_401_user_not_found(db_session):
-    # Невалидный JWT: старое поведение — 401 "User not found" (пользователь не разрешён)
+def test_invalid_token_401(db_session):
     with pytest.raises(HTTPException) as exc:
         _call_get_current_user(db_session, "not-a-jwt")
 
     assert exc.value.status_code == 401
-    assert exc.value.detail == "User not found"
+    assert exc.value.detail == "Could not validate credentials"
 
 
 def test_service_is_token_blacklisted_single_select(db_session, auth_user):
@@ -457,10 +453,19 @@ def test_service_jti_and_sentinel_hits(db_session, auth_user):
         )
         is True
     )
-    # Другой пользователь не затронут
+    # Другой реальный пользователь не затронут; несуществующий principal
+    # сам по себе больше не считается авторизованным.
+    other = User(
+        username="SYNTHETIC_other_epoch_user",
+        hashed_password="synthetic",
+        role="Doctor",
+        is_active=True,
+    )
+    db_session.add(other)
+    db_session.flush()
     assert (
         TokenBlacklistService.is_token_blacklisted(
-            db_session, "brand-new-jti", user_id=auth_user.id + 1
+            db_session, "brand-new-jti", user_id=other.id
         )
         is False
     )

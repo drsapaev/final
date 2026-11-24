@@ -8,6 +8,14 @@ from sqlalchemy.orm import joinedload
 
 from app.core.pii_masker import mask_identifier  # PR-31: mask usernames in logs
 from app.core.roles import is_login_blocked_role
+from app.core.user_token_claims import (
+    has_patient_binding,
+    is_user_access_claims,
+    is_user_allowed_for_claims,
+    parse_user_auth_epoch,
+    user_auth_epoch_matches,
+)
+from app.models.authentication import TokenBlacklist
 from app.services.auth_svc._base import *  # noqa: F401, F403
 from app.services.auth_svc._base import AuthenticationServiceMixinBase
 from app.services.auth_svc._login_profiling import LoginPhaseTimer
@@ -89,14 +97,52 @@ class TokensMixin(AuthenticationServiceMixinBase):
         return encoded_jwt
 
 
-    def create_refresh_token(self, user_id: int, jti: str) -> str:
+    def create_refresh_token(self, user_id: int, jti: str, auth_epoch: int = 0) -> str:
         """Создает JWT refresh токен"""
-        data = {"user_id": user_id, "jti": jti, "type": "refresh"}
+        if type(auth_epoch) is not int or not 0 <= auth_epoch <= 2**63 - 1:
+            raise ValueError("Invalid authentication epoch")
+        data = {"user_id": user_id, "jti": jti, "type": "refresh", "auth_epoch": auth_epoch}
         expire = datetime.now(UTC) + timedelta(days=self.refresh_token_expire_days)
         data.update({"exp": expire})
 
         encoded_jwt = jwt.encode(data, self._secret_for("refresh"), algorithm=self.algorithm)
         return encoded_jwt
+
+    @staticmethod
+    def _lock_auth_user(db: Session, user_id: int) -> User | None:
+        """The common serialization point for session issuance and revocation."""
+        return (
+            db.query(User)
+            .filter(User.id == user_id)
+            .with_for_update(key_share=True)
+            .populate_existing()
+            .first()
+        )
+
+    def _revoke_account_sessions_locked(
+        self, db: Session, user: User, *, exclude_session_id: int | None = None,
+        revoke_password_resets: bool = False,
+    ) -> None:
+        """Revoke the account under its existing User lock without committing."""
+        from app.services.token_blacklist_service import revoke_account_sessions_locked
+
+        revoke_account_sessions_locked(
+            db, user, exclude_session_id=exclude_session_id,
+            revoke_password_resets=revoke_password_resets,
+        )
+
+    def revoke_all_for_new_login_locked(
+        self, db: Session, user: User, *, exclude_session_id: int | None = None
+    ) -> None:
+        """Apply the configured new-login policy in the caller's transaction.
+
+        The caller must hold the User NO KEY UPDATE lock and, when it also
+        holds a 2FA lock, lock existing UserSession rows before that lock.
+        """
+        if getattr(settings, "REVOKE_SESSIONS_ON_NEW_LOGIN", True):
+            self._revoke_account_sessions_locked(
+                db, user, exclude_session_id=exclude_session_id
+            )
 
 
     def verify_token(
@@ -135,20 +181,40 @@ class TokensMixin(AuthenticationServiceMixinBase):
         Используйте этот метод для критических операций.
         """
         payload = self.verify_token(token, token_type)
-        if not payload:
+        if not payload or parse_user_auth_epoch(payload) is None:
             return None
 
-        jti = payload.get("jti")
-        if not jti:
-            return payload  # Старые токены без jti пропускаем
-
-        # Проверяем blacklist
-        from app.services.token_blacklist_service import token_blacklist_service
-        if token_blacklist_service.is_token_blacklisted(db, jti):
-            logger.warning(f"Token {jti} is blacklisted")
+        if token_type == "access" and not is_user_access_claims(payload):
             return None
 
-        return payload
+        try:
+            user_id = payload.get("user_id") if token_type == "refresh" else payload.get("sub")
+            if type(user_id) is int and user_id > 0:
+                query = db.query(User).filter(User.id == user_id)
+            elif isinstance(user_id, str) and user_id.isascii() and user_id.isdigit() and int(user_id) > 0:
+                query = db.query(User).filter(User.id == int(user_id))
+            else:
+                return None
+            user = query.populate_existing().first()
+            if not user or not user.is_active or is_login_blocked_role(user.role) or not user_auth_epoch_matches(payload, user.auth_epoch):
+                return None
+            if token_type == "access" and (
+                not is_user_allowed_for_claims(payload, role=user.role, is_active=user.is_active, is_superuser=user.is_superuser)
+                or not has_patient_binding(db, payload, user.id)
+            ):
+                return None
+            jti = payload.get("jti")
+            if jti is not None and not isinstance(jti, str):
+                return None
+            from app.services.token_blacklist_service import TokenBlacklistService
+            if TokenBlacklistService.is_token_blacklisted(
+                db, jti or "", user_id=user.id, auth_epoch=user.auth_epoch
+            ):
+                return None
+            return payload
+        except Exception as exc:
+            logger.error("Token validation failed: %s", type(exc).__name__)
+            return None
 
 
     def authenticate_user(
@@ -222,7 +288,11 @@ class TokensMixin(AuthenticationServiceMixinBase):
 
             timer.mark("pre_verify")
             logger.debug("Verifying password...")
-            password_valid = verify_password(password, user.hashed_password)
+            # Capture the account state that was actually authenticated,
+            # before the audit helper commits and expires ORM attributes.
+            authenticated_epoch = user.auth_epoch
+            authenticated_hash = user.hashed_password
+            password_valid = verify_password(password, authenticated_hash)
             timer.mark("password_verify")
             logger.debug("Password verification result: %s", password_valid)
 
@@ -264,12 +334,14 @@ class TokensMixin(AuthenticationServiceMixinBase):
             timer.mark("audit_writes")
             timer.report(mask_identifier(username))
 
+            # Non-persistent snapshot permits the issuing step to reject a
+            # logout/password change that raced the password verification.
+            user._password_auth_snapshot = (authenticated_epoch, authenticated_hash)
             return user, "Успешная аутентификация"
 
         except Exception as e:
             timer.report(mask_identifier(username))
-            logger.debug("Exception in authenticate_user: %s", e, exc_info=True)
-            logger.error("Error authenticating user: %s", e, exc_info=True)
+            logger.error("Error authenticating user: %s", type(e).__name__)
             return None, "Ошибка аутентификации"
 
 
@@ -305,6 +377,22 @@ class TokensMixin(AuthenticationServiceMixinBase):
             timer.report(mask_identifier(username))
             logger.debug("Authentication failed, returning error")
             return {"success": False, "message": message, "user": None, "tokens": None}
+
+        # Authentication may race a password change, deactivation or global
+        # logout. Re-read and re-check the principal under the same lock used
+        # for all session minting/revocation; do not issue from stale state.
+        authenticated_snapshot = getattr(user, "_password_auth_snapshot", None)
+        user = self._lock_auth_user(db, user.id)
+        if (
+            not user
+            or not user.is_active
+            or is_login_blocked_role(user.role)
+            or authenticated_snapshot != (user.auth_epoch, user.hashed_password)
+            or not verify_password(password, user.hashed_password)
+        ):
+            db.rollback()
+            return {"success": False, "message": "Ошибка аутентификации", "user": None, "tokens": None}
+        db.expire(user, ["two_factor_auth"])
 
         # ✅ SECURITY: Проверяем, требуется ли 2FA до выдачи токенов
         requires_2fa = False
@@ -391,8 +479,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
         # before creating a new one. Prevents stolen sessions from remaining
         # valid after a fresh login.
         timer.mark("pre_revoke")
-        if getattr(settings, "REVOKE_SESSIONS_ON_NEW_LOGIN", True):
-            self._revoke_all_user_sessions(db, user.id, reason="new_login")
+        self.revoke_all_for_new_login_locked(db, user)
         timer.mark("sessions_revoked")
 
         jti = str(uuid.uuid4())
@@ -403,9 +490,10 @@ class TokensMixin(AuthenticationServiceMixinBase):
                 "role": user.role,
                 "is_active": user.is_active,
                 "is_superuser": user.is_superuser,
+                "auth_epoch": user.auth_epoch,
             }
         )
-        refresh_token = self.create_refresh_token(user.id, jti)
+        refresh_token = self.create_refresh_token(user.id, jti, auth_epoch=user.auth_epoch)
         refresh_token_obj = RefreshToken(
             user_id=user.id,
             token=refresh_token,
@@ -445,76 +533,87 @@ class TokensMixin(AuthenticationServiceMixinBase):
         отозванного refresh-токена трактуется как кража — отзываем всю сессию-семью.
         """
         try:
-            # 1) Проверяем подпись + type=refresh + blacklist.
-            payload = self.verify_token_with_blacklist(refresh_token, "refresh")
-            if not payload:
+            # Verify the signed claims before trusting their owner or JTI.
+            payload = self.verify_token(refresh_token, "refresh")
+            if not payload or type(payload.get("user_id")) is not int or payload["user_id"] <= 0 or not isinstance(payload.get("jti"), str) or not payload["jti"] or parse_user_auth_epoch(payload) is None:
                 return {"success": False, "message": "Недействительный refresh токен"}
 
-            # 2) Проверяем токен в БД.
+            # All account-wide revocation and minting takes this lock first.
+            user = self._lock_auth_user(db, payload["user_id"])
+            if not user or not user.is_active or is_login_blocked_role(user.role) or not user_auth_epoch_matches(payload, user.auth_epoch):
+                db.rollback()
+                return {"success": False, "message": "Недействительный refresh токен"}
+
+            # This helper returns True on a storage failure; refresh fails
+            # closed and checks both the JTI and any applicable legacy marker.
+            from app.services.token_blacklist_service import TokenBlacklistService
+            if TokenBlacklistService.is_token_blacklisted(
+                db, payload["jti"], user_id=user.id, auth_epoch=user.auth_epoch
+            ):
+                db.rollback()
+                return {"success": False, "message": "Недействительный refresh токен"}
+
+            # Lock linked sessions before the refresh record, matching logout
+            # and enrollment. Legacy/direct logins need not have such a row.
+            sessions = (
+                db.query(UserSession)
+                .filter(UserSession.user_id == user.id)
+                .order_by(UserSession.id)
+                .with_for_update()
+                .populate_existing()
+                .all()
+            )
+            linked_sessions = [s for s in sessions if s.refresh_token == refresh_token]
             token_obj = (
                 db.query(RefreshToken)
                 .filter(
-                    and_(
-                        RefreshToken.token == refresh_token,
-                        RefreshToken.expires_at > datetime.now(UTC),
-                    )
+                    RefreshToken.token == refresh_token,
+                    RefreshToken.user_id == user.id,
+                    RefreshToken.jti == payload["jti"],
                 )
+                .with_for_update()
+                .populate_existing()
                 .first()
             )
 
             if not token_obj:
+                db.rollback()
                 return {
                     "success": False,
                     "message": "Refresh токен не найден или истек",
                 }
 
-            # 3) Reuse detection: токен уже был отозван — возможная кража.
+            # The signed token may have expired while waiting on row locks.
+            if not self.verify_token(refresh_token, "refresh"):
+                db.rollback()
+                return {"success": False, "message": "Недействительный refresh токен"}
+
+            # A replay invalidates the whole account's prior epoch in the
+            # same transaction as session and refresh-token revocation.
             if token_obj.revoked:
-                # Отзываем ВСЕ refresh-токены пользователя (session family).
-                db.query(RefreshToken).filter(
-                    RefreshToken.user_id == token_obj.user_id
-                ).update({"revoked": True, "revoked_at": datetime.now(UTC)})
-                db.query(UserSession).filter(
-                    UserSession.user_id == token_obj.user_id,
-                    UserSession.revoked == False,
-                ).update({"revoked": True})
+                self._revoke_account_sessions_locked(db, user)
                 db.commit()
-                from app.services.token_blacklist_service import token_blacklist_service
-                token_blacklist_service.blacklist_all_user_tokens(
-                    db, token_obj.user_id, reason="refresh_token_reuse"
-                )
-                logger.warning(
-                    "Refresh-token reuse detected for user_id=%s — all tokens revoked",
-                    token_obj.user_id,
-                )
+                logger.warning("Refresh-token reuse detected; account sessions revoked")
                 return {
                     "success": False,
                     "message": "Refresh токен недействителен",
                 }
 
-            # 4) Получаем пользователя
-            user = db.query(User).filter(User.id == token_obj.user_id).first()
-            if not user or not user.is_active:
+            now = datetime.now(UTC)
+            expires_at = token_obj.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=UTC)
+            if now >= expires_at or any(
+                s.revoked or now >= (s.expires_at if s.expires_at.tzinfo else s.expires_at.replace(tzinfo=UTC))
+                for s in linked_sessions
+            ):
+                db.rollback()
                 return {
                     "success": False,
-                    "message": "Пользователь не найден или неактивен",
+                    "message": "Refresh токен не найден или истек",
                 }
 
-            # QD-1.1 (queue resource role cleanup, Codex round-1): a refresh
-            # token must never re-mint credentials for an internal-only
-            # sentinel role — the structural non-login invariant holds on
-            # the token surface too, not only at password verification.
-            if is_login_blocked_role(user.role):
-                logger.warning(
-                    "Refresh rejected for internal-only role user_id=%s",
-                    user.id,
-                )
-                return {
-                    "success": False,
-                    "message": "Пользователь не найден или неактивен",
-                }
-
-            # 5) Создаём НОВЫЕ access + refresh токены (rotation).
+            # Rotate only once while holding the account and token locks.
             new_jti = str(uuid.uuid4())
             access_token = self.create_access_token(
                 {
@@ -523,9 +622,10 @@ class TokensMixin(AuthenticationServiceMixinBase):
                     "role": user.role,
                     "is_active": user.is_active,
                     "is_superuser": user.is_superuser,
+                    "auth_epoch": user.auth_epoch,
                 }
             )
-            new_refresh_token = self.create_refresh_token(user.id, new_jti)
+            new_refresh_token = self.create_refresh_token(user.id, new_jti, auth_epoch=user.auth_epoch)
 
             # 6) Отзываем старый refresh-токен и записываем новый в БД.
             token_obj.revoked = True
@@ -543,12 +643,14 @@ class TokensMixin(AuthenticationServiceMixinBase):
             )
             db.add(new_token_obj)
 
-            # Обновляем linked UserSession.refresh_token, чтобы сессия оставалась активной.
-            db.query(UserSession).filter(
-                UserSession.user_id == user.id,
-                UserSession.refresh_token == refresh_token,
-                UserSession.revoked == False,
-            ).update({"refresh_token": new_refresh_token, "last_activity": datetime.now(UTC)})
+            for session in linked_sessions:
+                session.refresh_token = new_refresh_token
+
+            # Token generation can itself take time. Do not commit a rotation
+            # whose signed credential has expired since the previous check.
+            if not self.verify_token(refresh_token, "refresh"):
+                db.rollback()
+                return {"success": False, "message": "Недействительный refresh токен"}
 
             db.commit()
 
@@ -561,7 +663,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
             }
 
         except Exception as e:
-            logger.error(f"Error refreshing token: {e}")
+            logger.error("Error refreshing token: %s", type(e).__name__)
             db.rollback()
             return {"success": False, "message": "Ошибка обновления токена"}
 
@@ -574,6 +676,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
         logout_all: bool = False,
         access_token_jti: str | None = None,
         access_token_exp: datetime | None = None,
+        access_token: str | None = None,
     ) -> dict[str, Any]:
         """Выполняет выход пользователя.
 
@@ -583,70 +686,88 @@ class TokensMixin(AuthenticationServiceMixinBase):
         """
         try:
             if logout_all and user_id:
-                # Отзываем все refresh токены пользователя
-                db.query(RefreshToken).filter(RefreshToken.user_id == user_id).update(
-                    {"revoked": True, "revoked_at": datetime.now(UTC)}
-                )
-
-                # Деактивируем все сессии (модель использует `revoked`, не `is_active`;
-                # поля revoked_at у UserSession нет — см. #2924)
-                db.query(UserSession).filter(
-                    UserSession.user_id == user_id,
-                    UserSession.revoked == False,
-                ).update({"revoked": True})
-
+                user = self._lock_auth_user(db, user_id)
+                if not user:
+                    db.rollback()
+                    return {"success": False, "message": "Ошибка выхода"}
+                if access_token is not None and not self._logout_bearer_claims(db, user, access_token):
+                    db.rollback()
+                    return {"success": False, "message": "Ошибка выхода"}
+                self._revoke_account_sessions_locked(db, user, revoke_password_resets=True)
+                if access_token is not None and not self.verify_token(access_token, "access"):
+                    db.rollback()
+                    return {"success": False, "message": "Ошибка выхода"}
                 db.commit()
-
-                # SECURITY: Sentinel-запись — отзывает ВСЕ access-токены пользователя.
-                from app.services.token_blacklist_service import token_blacklist_service
-                token_blacklist_service.blacklist_all_user_tokens(
-                    db, user_id, reason="logout_all"
-                )
-
                 self._log_user_activity(
                     db, user_id, "logout_all", "Выход со всех устройств"
                 )
 
-            elif refresh_token:
-                # Отзываем конкретный refresh токен
-                token_obj = (
-                    db.query(RefreshToken)
-                    .filter(RefreshToken.token == refresh_token)
-                    .first()
-                )
+            elif refresh_token or (user_id and (access_token_jti or access_token is not None)):
+                # When no user is supplied (legacy internal callers), an
+                # initial lookup only selects the lock owner; the actual row
+                # is re-read under that user's lock before mutation.
+                owner_id = user_id
+                if owner_id is None and refresh_token:
+                    owner_id = db.query(RefreshToken.user_id).filter(
+                        RefreshToken.token == refresh_token
+                    ).scalar()
+                user = self._lock_auth_user(db, owner_id) if owner_id else None
+                if not user:
+                    db.rollback()
+                    return {"success": False, "message": "Ошибка выхода"}
+                if access_token is not None:
+                    claims = self._logout_bearer_claims(db, user, access_token)
+                    if not claims:
+                        db.rollback()
+                        return {"success": False, "message": "Ошибка выхода"}
+                    access_token_jti = claims["jti"]
+                    access_token_exp = datetime.fromtimestamp(claims["exp"], tz=UTC)
+
+                linked_sessions = []
+                token_obj = None
+                if refresh_token:
+                    linked_sessions = (
+                        db.query(UserSession)
+                        .filter(UserSession.user_id == user.id, UserSession.refresh_token == refresh_token)
+                        .order_by(UserSession.id)
+                        .with_for_update()
+                        .populate_existing()
+                        .all()
+                    )
+                    token_obj = (
+                        db.query(RefreshToken)
+                        .filter(RefreshToken.user_id == user.id, RefreshToken.token == refresh_token)
+                        .with_for_update()
+                        .populate_existing()
+                        .first()
+                    )
+                if access_token is not None and not self.verify_token(access_token, "access"):
+                    db.rollback()
+                    return {"success": False, "message": "Ошибка выхода"}
                 if token_obj:
                     token_obj.revoked = True
                     token_obj.revoked_at = datetime.now(UTC)
+                for session in linked_sessions:
+                    session.revoked = True
 
-                    # Деактивируем ТОЛЬКО связанную сессию (не все сессии пользователя).
-                    # UserSession не имеет колонки revoked_at (#2924): запись
-                    # revoked_at здесь поднимала UnconsumedColumnError, весь
-                    # logout откатывался и сессия оставалась активной.
-                    db.query(UserSession).filter(
-                        UserSession.user_id == token_obj.user_id,
-                        UserSession.refresh_token == refresh_token,
-                    ).update({"revoked": True})
-
-                    db.commit()
-
-                    # SECURITY: Отзываем текущий access-токен по jti (если передан).
-                    if access_token_jti and access_token_exp:
-                        from app.services.token_blacklist_service import (
-                            token_blacklist_service,
-                        )
-                        token_blacklist_service.blacklist_token(
-                            db,
-                            jti=access_token_jti,
-                            expires_at=access_token_exp,
-                            user_id=token_obj.user_id,
-                            reason="logout",
-                        )
-
-                    self._log_user_activity(
-                        db, token_obj.user_id, "logout", "Выход из системы"
-                    )
-                else:
-                    db.commit()
+                # Individual access revocation commits atomically with the
+                # refresh/session revocation, without advancing other sessions.
+                if access_token_jti and access_token_exp:
+                    expiry = access_token_exp
+                    if expiry.tzinfo is None:
+                        expiry = expiry.replace(tzinfo=UTC)
+                    if expiry > datetime.now(UTC) and not db.query(TokenBlacklist.id).filter(
+                        TokenBlacklist.jti == access_token_jti
+                    ).first():
+                        db.add(TokenBlacklist(
+                            jti=access_token_jti, user_id=user.id,
+                            expires_at=expiry, reason="logout",
+                        ))
+                if access_token is not None and not self.verify_token(access_token, "access"):
+                    db.rollback()
+                    return {"success": False, "message": "Ошибка выхода"}
+                db.commit()
+                self._log_user_activity(db, user.id, "logout", "Выход из системы")
 
             else:
                 db.commit()
@@ -654,9 +775,22 @@ class TokensMixin(AuthenticationServiceMixinBase):
             return {"success": True, "message": "Успешный выход"}
 
         except Exception as e:
-            logger.error(f"Error logging out user: {e}")
+            logger.error("Error logging out user: %s", type(e).__name__)
             db.rollback()
             return {"success": False, "message": "Ошибка выхода"}
+
+    def _logout_bearer_claims(self, db: Session, user: User, token: str) -> dict[str, Any] | None:
+        """Revalidate public logout credentials under the account row lock."""
+        payload = self.verify_token_with_blacklist(db, token, "access")
+        if (
+            not payload
+            or int(payload["sub"]) != user.id
+            or not isinstance(payload.get("jti"), str)
+            or not payload["jti"]
+            or type(payload.get("exp")) is not int
+        ):
+            return None
+        return payload
 
     def _revoke_all_user_sessions(
         self, db: Session, user_id: int, *, reason: str = "unspecified"
@@ -672,44 +806,27 @@ class TokensMixin(AuthenticationServiceMixinBase):
             reason: Audit reason (e.g. 'new_login', 'security_alert')
         """
         try:
-            now = datetime.now(UTC)
-
-            # Revoke all active refresh tokens
-            refresh_count = (
-                db.query(RefreshToken)
-                .filter(
-                    RefreshToken.user_id == user_id,
-                    RefreshToken.revoked == False,
-                )
-                .update({"revoked": True, "revoked_at": now})
-            )
-
-            # Revoke all active user sessions
-            # (UserSession has no revoked_at column — see #2924; writing it here
-            # raised CompileError and rolled back the whole revocation)
-            session_count = (
-                db.query(UserSession)
-                .filter(
-                    UserSession.user_id == user_id,
-                    UserSession.revoked == False,
-                )
-                .update({"revoked": True})
-            )
-
+            user = self._lock_auth_user(db, user_id)
+            if not user:
+                db.rollback()
+                return 0
+            session_count = db.query(UserSession).filter(
+                UserSession.user_id == user_id, UserSession.revoked.is_(False)
+            ).count()
+            self._revoke_account_sessions_locked(db, user)
             db.commit()
 
-            if refresh_count > 0 or session_count > 0:
+            if session_count > 0:
                 logger.info(
-                    "Revoked %d sessions and %d refresh tokens for user_id (reason=%s)",
+                    "Revoked %d sessions (reason=%s)",
                     session_count,
-                    refresh_count,
                     reason,
                 )
 
             return session_count
 
         except Exception as e:
-            logger.error("Error revoking user sessions: %s", e)
+            logger.error("Error revoking user sessions: %s", type(e).__name__)
             db.rollback()
             return 0
 

@@ -26,6 +26,8 @@ from app.schemas.ai_gateway import (
     SuggestICD10IntegrationRequest,
     SymptomCheckerRequest,
 )
+from app.schemas.medical_ai_safety import MedicalAIResultResponse
+from app.services.ai.medical_safety import with_medical_ai_safety
 from app.services.ai_feature_gating import RequireAiFeature
 from app.services.ai_service import get_ai_service
 
@@ -50,7 +52,7 @@ def _ai_integration_http_error(exc: Exception, operation: str) -> HTTPException:
 # ===================== АНАЛИЗ ЖАЛОБ ПАЦИЕНТОВ =====================
 
 
-@router.post("/analyze-complaints", response_model=dict[str, Any])
+@router.post("/analyze-complaints", response_model=MedicalAIResultResponse)
 async def analyze_patient_complaints(
     request: AnalyzeComplaintsIntegrationRequest,
     db: Session = Depends(get_db),
@@ -73,7 +75,7 @@ async def analyze_patient_complaints(
                 language=request.language,
             )
 
-            return result
+            return with_medical_ai_safety(result)
 
     except HTTPException:
         raise
@@ -84,7 +86,7 @@ async def analyze_patient_complaints(
 # ===================== ПОДБОР КОДОВ МКБ-10 =====================
 
 
-@router.post("/suggest-icd10", response_model=dict[str, Any])
+@router.post("/suggest-icd10", response_model=MedicalAIResultResponse)
 async def suggest_icd10_codes(
     request: SuggestICD10IntegrationRequest,
     db: Session = Depends(get_db),
@@ -104,7 +106,7 @@ async def suggest_icd10_codes(
                 language=request.language,
             )
 
-            return result
+            return with_medical_ai_safety(result)
 
     except HTTPException:
         raise
@@ -115,7 +117,7 @@ async def suggest_icd10_codes(
 # ===================== АНАЛИЗ ДОКУМЕНТОВ =====================
 
 
-@router.post("/analyze-document", response_model=dict[str, Any])
+@router.post("/analyze-document", response_model=MedicalAIResultResponse)
 async def analyze_medical_document(
     request: AnalyzeDocumentIntegrationRequest,
     db: Session = Depends(get_db),
@@ -133,7 +135,7 @@ async def analyze_medical_document(
                 specialty=request.specialty,
             )
 
-            return result
+            return with_medical_ai_safety(result)
 
     except HTTPException:
         raise
@@ -144,7 +146,7 @@ async def analyze_medical_document(
 # ===================== ИНТЕРПРЕТАЦИЯ ЛАБОРАТОРНЫХ АНАЛИЗОВ =====================
 
 
-@router.post("/interpret-lab-results", response_model=dict[str, Any])
+@router.post("/interpret-lab-results", response_model=MedicalAIResultResponse)
 async def interpret_lab_results(
     request: InterpretLabResultsIntegrationRequest,
     db: Session = Depends(get_db),
@@ -181,7 +183,7 @@ async def interpret_lab_results(
                     "specialty": request.specialty,
                 }
 
-            return result
+            return with_medical_ai_safety(result)
 
     except HTTPException:
         raise
@@ -192,7 +194,7 @@ async def interpret_lab_results(
 # ===================== ПОМОЩЬ ПО СИМПТОМАМ =====================
 
 
-@router.post("/symptom-checker", response_model=dict[str, Any])
+@router.post("/symptom-checker", response_model=MedicalAIResultResponse)
 async def check_symptoms(
     request: SymptomCheckerRequest,
     db: Session = Depends(get_db),
@@ -223,7 +225,7 @@ async def check_symptoms(
                     ],
                 }
 
-            return result
+            return with_medical_ai_safety(result)
 
     except HTTPException:
         raise
@@ -296,7 +298,7 @@ def get_ai_usage_stats(
 # ===================== БЫСТРЫЕ ДЕЙСТВИЯ =====================
 
 
-@router.post("/quick/diagnosis-help", response_model=dict[str, Any])
+@router.post("/quick/diagnosis-help", response_model=MedicalAIResultResponse)
 async def quick_diagnosis_help(
     request: QuickDiagnosisHelpRequest,
     db: Session = Depends(get_db),
@@ -339,7 +341,7 @@ async def quick_diagnosis_help(
                     ),
                 )
 
-            return {
+            return with_medical_ai_safety({
                 "complaints_analysis": complaints_result,
                 "icd10_suggestions": icd10_result,
                 "doctor": {
@@ -347,7 +349,7 @@ async def quick_diagnosis_help(
                     "specialty": current_user.role,
                 },
                 "timestamp": datetime.now(UTC).isoformat(),
-            }
+            })
 
     except Exception as e:
         raise _ai_integration_http_error(e, "quick_diagnosis_help") from e

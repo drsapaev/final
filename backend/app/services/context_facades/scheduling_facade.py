@@ -8,12 +8,23 @@ from app.domain.contracts.scheduling_contracts import (
     SchedulingContract,
     SchedulingContractFacade,
 )
+from app.models.appointment import Appointment
+from app.services.appointment_rsvp import can_patient_cancel
 
 logger = logging.getLogger(__name__)
 
 
 class SchedulingContextFacade:
     """Public entry point for cross-context scheduling operations."""
+
+    @staticmethod
+    def can_patient_cancel(appointment: Appointment) -> bool:
+        """Expose scheduling's canonical cancellation policy to other contexts.
+
+        Callers must pass an appointment refreshed under their transaction's
+        row lock; the facade does not acquire or release that lock.
+        """
+        return can_patient_cancel(appointment)
 
     def __init__(self, contract: SchedulingContract) -> None:
         self._contract = SchedulingContractFacade(contract)

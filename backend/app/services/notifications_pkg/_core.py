@@ -10,6 +10,7 @@ from app.services.notifications_pkg._base import (
     Session,
     crud_user_notification_settings,
     _jinja_env,
+    _jinja_text_env,
     get_fcm_service,
     get_notification_platform_service,
     logger,
@@ -167,17 +168,17 @@ class CoreMixin(NotificationSenderMixinBase):
         }
 
 
-    def render_template(self, template_text: str, data: dict[str, Any]) -> str:
-        """Рендеринг шаблона с данными.
-
-        NOTIF-REAUDIT-28 P1-1: использует Environment с autoescape=True
-        для защиты от SSTI/XSS.
-        """
+    def render_template(
+        self, template_text: str, data: dict[str, Any], *, html: bool = True
+    ) -> str | None:
+        """Render in a sandbox, escaping values when the output is HTML."""
         try:
-            template = _jinja_env.from_string(template_text)
+            environment = _jinja_env if html else _jinja_text_env
+            template = environment.from_string(template_text)
             return template.render(**data)
-        except Exception as e:
-            logger.error(f"Ошибка рендеринга шаблона: {e}")
-            return template_text
+        except Exception:
+            # Template errors can contain both template source and recipient data.
+            logger.warning("Notification template rendering failed")
+            return None
 
 

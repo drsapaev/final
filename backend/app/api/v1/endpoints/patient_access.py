@@ -22,10 +22,12 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.security import HTTPBearer  # noqa: F401 (docs parity, unused)
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.rate_limiter import limiter
 from app.db.session import get_db
@@ -113,14 +115,79 @@ class PatientLoginRequest(BaseModel):
         return v
 
 
+_PATIENT_LOGIN_USER_SCHEMA = {
+    "type": "object",
+    "required": ["id", "username", "role", "is_active", "is_superuser"],
+    "properties": {
+        "id": {"type": "integer"},
+        "username": {"type": "string"},
+        "role": {"type": "string"},
+        "is_active": {"type": "boolean"},
+        "is_superuser": {"type": "boolean"},
+    },
+    "additionalProperties": True,
+}
+_PATIENT_LOGIN_RESPONSE = {
+    "description": "Patient access-only session or restricted second-factor challenge",
+    "headers": {
+        "Cache-Control": {
+            "required": True,
+            "schema": {"type": "string", "const": "no-store"},
+        }
+    },
+    "content": {
+        "application/json": {
+            "schema": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "required": ["access_token", "token_type", "user"],
+                        "additionalProperties": False,
+                        "properties": {
+                            "access_token": {"type": "string"},
+                            "token_type": {"type": "string", "const": "bearer"},
+                            "user": _PATIENT_LOGIN_USER_SCHEMA,
+                        },
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "requires_2fa",
+                            "two_factor_method",
+                            "pending_2fa_token",
+                            "user",
+                        ],
+                        "additionalProperties": False,
+                        "properties": {
+                            "requires_2fa": {"type": "boolean", "const": True},
+                            "two_factor_method": {"type": "string", "const": "totp"},
+                            "pending_2fa_token": {"type": "string"},
+                            "user": _PATIENT_LOGIN_USER_SCHEMA,
+                        },
+                    },
+                ]
+            }
+        }
+    },
+}
+
+
 @router.post("/request-otp", response_model=dict[str, Any])
 @limiter.limit("5/minute")
-async def request_patient_otp(request: Request, payload: PatientOtpRequest):
+async def request_patient_otp(
+    request: Request, payload: PatientOtpRequest, db: Session = Depends(get_db)
+):
     """Отправить OTP для входа пациента. Ответ номер-нейтрален (anti-enum)."""
     try:
-        await get_patient_otp_service().send_login_otp(payload.phone, payload.locale)
+        service = get_patient_otp_service()
+        binding = await run_in_threadpool(service.binding_for_phone, db, payload.phone)
+        # Release the read transaction before waiting on the SMS provider.
+        await run_in_threadpool(db.rollback)
+        await service.send_login_otp(payload.phone, payload.locale, binding=binding)
     except PatientOtpError as err:
         raise _http_error(err) from err
+    except SQLAlchemyError as err:
+        raise _http_error(PatientOtpError(503, ERR_SMS_UNAVAILABLE)) from err
     return {
         "success": True,
         "message": ERR_SMS_UNAVAILABLE
@@ -133,28 +200,47 @@ async def request_patient_otp(request: Request, payload: PatientOtpRequest):
 
 @router.post("/verify-otp", response_model=dict[str, Any])
 @limiter.limit("10/minute")
-async def verify_patient_otp(request: Request, payload: PatientOtpVerifyRequest):
+async def verify_patient_otp(
+    request: Request, payload: PatientOtpVerifyRequest, db: Session = Depends(get_db)
+):
     """Проверить OTP -> одноразовый verification_grant (единый ответ при любой неудаче)."""
     try:
-        result = get_patient_otp_service().verify_login_otp(payload.phone, payload.code)
+        result = await run_in_threadpool(
+            get_patient_otp_service().verify_login_otp,
+            payload.phone,
+            payload.code,
+            db=db,
+        )
     except PatientOtpError as err:
         raise _http_error(err) from err
+    except SQLAlchemyError as err:
+        raise _http_error(PatientOtpError(503, ERR_SMS_UNAVAILABLE)) from err
     return {"success": True, **result}
 
 
-@router.post("/login", response_model=dict[str, Any])
+@router.post(
+    "/login", response_model=dict[str, Any], responses={200: _PATIENT_LOGIN_RESPONSE}
+)
 @limiter.limit("10/minute")
 async def patient_login(
-    request: Request, payload: PatientLoginRequest, db: Session = Depends(get_db)
+    request: Request,
+    payload: PatientLoginRequest,
+    response: Response,
+    db: Session = Depends(get_db),
 ):
     """phone + verification_grant -> JWT канонического User(role=Patient).
 
     Fail-closed: 0 или >1 активных verified Patient-пользователей на номер ->
     единый generic 401 (endpoint не становится каталогом пациентов)."""
     try:
-        return get_patient_otp_service().login_with_grant(
-            db, payload.phone, payload.verification_grant
+        result = await run_in_threadpool(
+            get_patient_otp_service().login_with_grant,
+            db,
+            payload.phone,
+            payload.verification_grant,
         )
+        response.headers["Cache-Control"] = "no-store"
+        return result
     except PatientOtpError as err:
         raise _http_error(err) from err
 

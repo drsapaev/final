@@ -20,6 +20,7 @@ import {
   parseRegistrarTimestamp,
 } from '../utils/dateUtils';
 import { finalizePrintableWindow, openPrintableWindow, type PrintableWindowResult } from '../utils/printWindow';
+import { normalizeIssuedQueueTicket } from '../pages/registrar/registrarHelpers';
 
 function normalizePrintableDateString(value: unknown): string | null {
   if (value === null || value === undefined || value === '') {
@@ -158,87 +159,32 @@ function formatTicketTimeWindow(row: Record<string, unknown>): TicketTimeWindow 
   return { value: null, source: null };
 }
 
-function extractQueueNumberCandidate(value: unknown): string | null {
-  if (value === undefined || value === null || value === '') {
-    return null;
+const ticketNumberKeys = ['queue_number', 'number', 'ticket_number', 'queue_position', 'queue_no', 'display_number'] as const;
+
+function readTicketNumber(source: Record<string, unknown> | null | undefined): string | null {
+  for (const key of ticketNumberKeys) {
+    const number = normalizeIssuedQueueTicket(source?.[key]);
+    if (number) return number;
   }
-
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const candidate = extractQueueNumberCandidate(item);
-      if (candidate !== null && candidate !== undefined && candidate !== '') {
-        return String(candidate);
-      }
-    }
-    return null;
-  }
-
-  if (typeof value === 'object' && value !== null) {
-    const obj = value as Record<string, unknown>;
-    const direct = getFirstDefined(
-      obj.queue_number,
-      obj.number,
-      obj.ticket_number,
-      obj.queue_position,
-      obj.queue_no,
-      obj.display_number,
-      obj.id
-    );
-
-    if (direct !== null && direct !== undefined && direct !== '') {
-      return String(direct);
-    }
-
-    for (const nestedValue of Object.values(value)) {
-      const nestedCandidate = extractQueueNumberCandidate(nestedValue);
-      if (nestedCandidate !== null && nestedCandidate !== undefined && nestedCandidate !== '') {
-        return String(nestedCandidate);
-      }
-    }
-
-    return null;
-  }
-
-  return String(value);
+  return null;
 }
 
 function resolveQueueNumber(row: Record<string, unknown> | null | undefined): string | null {
-  const directCandidates = [
-    row?.queue_number,
-    row?.number,
-    row?.ticket_number,
-    row?.queue_position,
-    row?.queue_no,
-    row?.display_number,
-    (row?.queue_entry as Record<string, unknown> | undefined)?.queue_number,
-    (row?.queue_entry as Record<string, unknown> | undefined)?.number,
-    (row?.queue_entry as Record<string, unknown> | undefined)?.ticket_number,
-    (row?.queue_entry as Record<string, unknown> | undefined)?.queue_position,
-    (row?.queue_entry as Record<string, unknown> | undefined)?.queue_no,
-    (row?.queue_entry as Record<string, unknown> | undefined)?.display_number,
-    (row?.queue_ticket as Record<string, unknown> | undefined)?.queue_number,
-    (row?.queue_ticket as Record<string, unknown> | undefined)?.number,
-    (row?.queue_ticket as Record<string, unknown> | undefined)?.ticket_number,
-    (row?.queue_ticket as Record<string, unknown> | undefined)?.queue_position,
-    (row?.queue_ticket as Record<string, unknown> | undefined)?.queue_no,
-    (row?.queue_ticket as Record<string, unknown> | undefined)?.display_number,
-  ];
-
-  const nestedQueueNumber = extractQueueNumberCandidate(row?.queue_numbers);
-  const nestedQueueEntry = extractQueueNumberCandidate(row?.queue_entry);
-  const nestedQueueTicket = extractQueueNumberCandidate(row?.queue_ticket);
-
-  const resolved = getFirstDefined(
-    ...directCandidates,
-    nestedQueueNumber,
-    nestedQueueEntry,
-    nestedQueueTicket
-  );
-
-  if (resolved !== null && resolved !== undefined && resolved !== '') {
-    return String(resolved);
+  const collection = row?.queue_numbers;
+  // Legacy responses key per-queue objects by tag. Read only named number
+  // fields from those objects, never their arbitrary scalar metadata.
+  const tickets = Array.isArray(collection)
+    ? collection
+    : collection && typeof collection === 'object'
+      ? Object.values(collection).filter((item) => item && typeof item === 'object')
+      : [];
+  const sources = [row, row?.queue_entry, row?.queue_ticket, ...tickets];
+  for (const source of sources) {
+    const number = source && typeof source === 'object'
+      ? readTicketNumber(source as Record<string, unknown>)
+      : null;
+    if (number) return number;
   }
-
   return null;
 }
 
@@ -334,17 +280,21 @@ function resolveServicePrice(row: Record<string, unknown>, overrides: Record<str
 }
 
 const QUEUE_DISPLAY_NAMES = {
+  cardio: 'Кардиология',
   cardiology: 'Кардиология',
   cardiology_common: 'Кардиология',
+  derma: 'Дерматология',
   dermatology: 'Дерматология',
   stomatology: 'Стоматология',
   dentistry: 'Стоматология',
+  dental: 'Стоматология',
   echokg: 'ЭхоКГ',
   ecg: 'ЭКГ',
   laboratory: 'Лаборатория',
   lab: 'Лаборатория',
   general: 'Общая очередь',
   cosmetology: 'Косметология',
+  procedures: 'Процедуры',
 };
 
 function normalizeDisplayLabel(value: unknown): string | null {
@@ -366,6 +316,11 @@ function normalizeDisplayLabel(value: unknown): string | null {
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function localizeTicketLabel(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  return QUEUE_DISPLAY_NAMES[value.trim().toLowerCase() as keyof typeof QUEUE_DISPLAY_NAMES] ?? value;
 }
 
 function normalizeTicketSources(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): unknown[] {
@@ -459,8 +414,13 @@ function resolveTicketCabinet(row: Record<string, unknown>, source: Record<strin
   );
 }
 
-function buildPanelTicketPayloadForSource(row: Record<string, unknown>, source: Record<string, unknown>, overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  const mergedRow = {
+function buildPanelTicketPayloadForSource(
+  row: Record<string, unknown>,
+  source: Record<string, unknown>,
+  overrides: Record<string, unknown>,
+  singleTicket: boolean,
+): Record<string, unknown> {
+  const mergedRow: Record<string, unknown> = {
     ...row,
     ...(source && typeof source === 'object' ? source : {}),
     patient_fio: getFirstDefined(
@@ -478,18 +438,18 @@ function buildPanelTicketPayloadForSource(row: Record<string, unknown>, source: 
       row?.specialist_name
     ),
     specialty_name: getFirstDefined(
-      source?.queue_name,
+      localizeTicketLabel(source?.queue_name),
       source?.service_name,
       source?.specialty_name,
       normalizeDisplayLabel(source?.queue_tag),
       normalizeDisplayLabel(source?.specialty),
       normalizeDisplayLabel(source?.department),
       row?.specialty_name,
-      row?.queue_name,
+      localizeTicketLabel(row?.queue_name),
       row?.service_name
     ),
     queue_name: getFirstDefined(
-      source?.queue_name,
+      localizeTicketLabel(source?.queue_name),
       source?.service_name,
       normalizeDisplayLabel(source?.queue_tag),
       normalizeDisplayLabel(source?.specialty),
@@ -508,15 +468,8 @@ function buildPanelTicketPayloadForSource(row: Record<string, unknown>, source: 
       source?.queue_tag,
       row?.department
     ),
-    cabinet: resolveTicketCabinet(row, source, overrides),
-    doctor_cabinet: getFirstDefined(
-      source?.doctor_cabinet,
-      source?.effective_cabinet,
-      source?.cabinet,
-      source?.cabinet_number,
-      row?.doctor_cabinet,
-      row?.cabinet
-    ),
+    cabinet: resolveTicketCabinet(singleTicket ? row : {}, source, overrides),
+    visit_id: source.visit_id ?? (singleTicket ? row.visit_id : undefined),
     visit_date: getFirstDefined(
       source?.visit_date,
       source?.appointment_date,
@@ -536,19 +489,22 @@ function buildPanelTicketPayloadForSource(row: Record<string, unknown>, source: 
       source?.appointment_time,
       row?.appointment_time
     ),
-    queue_number: getFirstDefined(
-      source?.queue_number,
-      source?.number,
-      source?.ticket_number,
-      source?.queue_position,
-      row?.queue_number
-    ),
-    queue_numbers: source ? [source] : row?.queue_numbers,
+    queue_number: readTicketNumber(source) ?? (singleTicket ? readTicketNumber(row) : null),
+    queue_numbers: [],
+    queue_entry: undefined,
+    queue_ticket: undefined,
     service_price: resolveServicePriceForTicket(row, source, overrides),
     price: resolveServicePriceForTicket(row, source, overrides),
     cost: resolveServicePriceForTicket(row, source, overrides),
   };
 
+  // A child ticket cannot borrow another ticket's legacy number or cabinet.
+  for (const key of ticketNumberKeys) {
+    if (key !== 'queue_number') delete mergedRow[key];
+  }
+  for (const key of ['effective_cabinet', 'queue_cabinet', 'cabinet_number', 'doctor_cabinet']) {
+    delete mergedRow[key];
+  }
   return buildPanelTicketPayload(mergedRow, overrides);
 }
 
@@ -560,16 +516,26 @@ export function resolvePanelTicketPayloads(row: Record<string, unknown>, overrid
 
   const seenKeys = new Set();
   const payloads: Record<string, unknown>[] = [];
+  const sources = ticketSources.filter((item): item is Record<string, unknown> =>
+    Boolean(item && typeof item === 'object')
+  );
+  const issuedVisitIds = new Set(sources
+    .filter((source) => source.visit_id && readTicketNumber(source))
+    .map((source) => String(source.visit_id)));
 
-  for (const source of ticketSources) {
-    const payload = buildPanelTicketPayloadForSource(row, source as Record<string, unknown>, overrides);
+  for (const ticket of sources) {
+    // A visit-based slip cannot borrow a neighboring ticket. Skip a
+    // placeholder when its own visit already has an issued queue number.
+    if (ticketSources.length > 1 && !readTicketNumber(ticket) &&
+      (!ticket.visit_id || issuedVisitIds.has(String(ticket.visit_id)))) continue;
+    const payload = buildPanelTicketPayloadForSource(row, ticket, overrides, ticketSources.length === 1);
     const dedupeKey = [
       payload.queue_number,
       payload.specialty_name,
       payload.cabinet || '',
-      (source as Record<string, unknown>)?.visit_id || '',
-      (source as Record<string, unknown>)?.queue_id || '',
-      (source as Record<string, unknown>)?.queue_tag || '',
+      ticket.visit_id || '',
+      ticket.queue_id || '',
+      ticket.queue_tag || '',
     ].join('::');
 
     if (!seenKeys.has(dedupeKey)) {
@@ -585,12 +551,14 @@ export function buildPanelTicketPayload(row: Record<string, unknown>, overrides:
   const queueNumber = resolveQueueNumber(row);
   if (!queueNumber) {
     // Desk/laboratory visits never join the queue machinery (prod:
-    // queue_entries is empty by workflow — visits carry their own id), so
-    // a missing queue number is EXPECTED there. Fall back to the visit
-    // identifier instead of failing the print: "В-<id>" identifies the
-    // talon just as well for these flows. Only rows with no identifier at
-    // all still fail.
-    const visitFallback = getFirstDefined(row?.visit_id, row?.id);
+    // queue_entries is empty by workflow), so a missing queue number is
+    // EXPECTED there. QUEUEPRINT-FE-003: only an EXPLICIT `visit_id` proves
+    // the row is a queue-less VISIT — the visit identifier falls back to
+    // "В-<visit_id>" just as well for these flows. A generic `row.id` is
+    // NOT proven to be a Visit PK (appointment / payment / aggregate rows)
+    // and must never be fabricated into a visit talon; such rows fail
+    // honestly with a recoverable lookup instead.
+    const visitFallback = getFirstDefined(row?.visit_id);
     if (visitFallback === null || visitFallback === undefined || visitFallback === '') {
       logger.warn('[PanelPrint] Queue number missing in row payload', {
         rowKeys: row && typeof row === 'object' ? Object.keys(row) : [],
@@ -615,8 +583,8 @@ export function buildPanelTicketPayload(row: Record<string, unknown>, overrides:
         'Специалист',
       specialty_name:
         overrides.specialtyName ||
-        row?.specialty_name ||
-        row?.queue_name ||
+        localizeTicketLabel(row?.specialty_name) ||
+        localizeTicketLabel(row?.queue_name) ||
         row?.specialty ||
         row?.department ||
         row?.service_name ||
@@ -650,8 +618,8 @@ export function buildPanelTicketPayload(row: Record<string, unknown>, overrides:
       'Специалист',
     specialty_name:
       overrides.specialtyName ||
-      row?.specialty_name ||
-      row?.queue_name ||
+      localizeTicketLabel(row?.specialty_name) ||
+      localizeTicketLabel(row?.queue_name) ||
       row?.specialty ||
       row?.department ||
       row?.service_name ||

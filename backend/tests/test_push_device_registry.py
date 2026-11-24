@@ -1023,20 +1023,22 @@ def test_operational_error_keeps_sanitized_503_mapping(
 
 
 def test_throttle_key_stable_across_token_forms(db_session: Session):
-    # Round 14 (codex P2): mobile initial login mints sub=username while
-    # auth_svc refresh mints sub=user.id + username claim — the throttle
-    # key must resolve both to ONE canonical identity, or a user could
-    # alternate still-valid tokens to reset the bucket.
+    # Login, refresh and leading-zero forms share the immutable user bucket.
     from app.api.v1.endpoints.push_devices import _user_throttle_key
     from app.core.security import create_access_token
     from fastapi import Request as FastAPIRequest
 
     user = _get_or_create_user(db_session, "push_key_user")
 
-    tok_mobile = create_access_token({"sub": user.username})
+    tok_mobile = create_access_token({"sub": str(user.id), "auth_epoch": user.auth_epoch})
+    tok_leading_zero = create_access_token(
+        {"sub": f"0{user.id}", "username": "another-user", "auth_epoch": user.auth_epoch}
+    )
+    tok_username_only = create_access_token({"sub": user.username})
     tok_svc = create_access_token(
         {
             "sub": str(user.id),
+            "auth_epoch": user.auth_epoch,
             "username": user.username,
             "role": user.role,
             "is_active": user.is_active,
@@ -1055,7 +1057,9 @@ def test_throttle_key_stable_across_token_forms(db_session: Session):
         return _user_throttle_key(request)
 
     assert key_for(tok_mobile) == key_for(tok_svc)
-    assert key_for(tok_mobile) == f"push-user:{user.username}"
+    assert key_for(tok_mobile) == key_for(tok_leading_zero)
+    assert key_for(tok_mobile) == f"push-user:{user.id}"
+    assert key_for(tok_username_only) != key_for(tok_mobile)
 
 
 def test_unregister_schema_publishes_either_or_constraint():

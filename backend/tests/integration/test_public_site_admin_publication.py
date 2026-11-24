@@ -14,6 +14,7 @@ from app.models.public_site_media import PublicSiteMedia
 from app.models.service import Service
 from app.models.service_audit import ServiceAuditLog
 from app.models.user import User
+from app.models.user_profile import UserAuditLog
 
 
 def _service(db_session, label: str, *, active: bool = True) -> Service:
@@ -105,6 +106,52 @@ def test_admin_can_preview_persisted_draft_while_public_route_hides_it(
     assert preview.headers["content-type"].startswith("image/png")
     assert preview.headers["cache-control"] == "private, no-store"
     assert preview.headers["x-content-type-options"] == "nosniff"
+
+
+def test_admin_unpublish_hides_logo_and_records_previous_publication_time(
+    client, db_session, auth_headers, tmp_path, monkeypatch
+):
+    media_root = tmp_path / "media"
+    backup_root = tmp_path / "backup"
+    media_root.mkdir()
+    backup_root.mkdir()
+    monkeypatch.setattr(settings, "PUBLIC_SITE_MEDIA_ROOT", media_root)
+    monkeypatch.setattr(settings, "PUBLIC_SITE_MEDIA_BACKUP_ROOT", backup_root)
+
+    admin_url = "/api/v1/admin/public-site/media"
+    upload = client.post(
+        admin_url,
+        data={"asset_kind": "clinic_logo"},
+        files={"file": ("synthetic-logo.png", _png_bytes(), "image/png")},
+        headers=auth_headers,
+    )
+    assert upload.status_code == 201
+    media_id = upload.json()["id"]
+    media_url = upload.json()["media_url"]
+    published = client.put(f"{admin_url}/{media_id}/publish", headers=auth_headers)
+    assert published.status_code == 200
+    assert client.get(media_url).status_code == 200
+    published_at = _utc_datetime(published.json()["published_at"])
+
+    unpublished = client.put(f"{admin_url}/{media_id}/unpublish", headers=auth_headers)
+
+    assert unpublished.status_code == 200
+    assert unpublished.json()["is_published"] is False
+    assert unpublished.json()["published_at"] is None
+    assert client.get(media_url).status_code == 404
+    audit = (
+        db_session.query(UserAuditLog)
+        .filter_by(
+            resource_type="public_site_media",
+            resource_id=media_id,
+            description="Public-site media unpublished",
+        )
+        .one()
+    )
+    assert audit.old_values["is_published"] is True
+    assert isinstance(audit.old_values["published_at"], str)
+    assert _utc_datetime(audit.old_values["published_at"]) == published_at
+    assert audit.new_values == {"is_published": False, "published_at": None}
 
 
 def test_media_preview_and_storage_check_are_admin_only(
