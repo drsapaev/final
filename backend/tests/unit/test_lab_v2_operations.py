@@ -464,11 +464,212 @@ def test_critical_communication_inbox_is_separate_from_acknowledgment(
     )
     assert events == [
         "created",
+        "doctor_route",
         "attempted",
         "delivery_failed",
         "attempted",
         "inbox_recorded",
         "acknowledged",
+    ]
+
+
+@pytest.mark.unit
+def test_doctor_routing_keys_change_on_reassignment_and_reuse_on_retry(
+    db_session, test_patient, test_visit, monkeypatch,
+):
+    doctors = [synthetic_user(db_session, "Doctor") for _ in range(2)]
+    profiles = [Doctor(user_id=user.id, specialty="cardiology", active=True) for user in doctors]
+    db_session.add_all(profiles)
+    db_session.flush()
+    test_visit.doctor_id = profiles[0].id
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+    sender = AsyncMock(side_effect=[True, True, False, True])
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+
+    assert run(dispatch_pending(db_session)) == 1
+    test_visit.doctor_id = profiles[1].id
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 1
+    test_visit.doctor_id = profiles[0].id
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 0
+    task.next_attempt_at = datetime.now(UTC)
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 1
+
+    metadata = [call.kwargs["metadata"] for call in sender.await_args_list]
+    route_ids = [item["doctor_route_id"] for item in metadata]
+    assert all(item["communication_id"] == task.id for item in metadata)
+    assert len(set(route_ids[:3])) == 3
+    assert route_ids[2] == route_ids[3]
+
+
+@pytest.mark.unit
+def test_repeated_escalations_use_distinct_stable_routing_keys(
+    db_session, test_patient, test_visit, monkeypatch,
+):
+    admin = synthetic_user(db_session, "Admin")
+    doctor = synthetic_user(db_session, "Doctor")
+    profile = Doctor(user_id=doctor.id, specialty="cardiology", active=True)
+    db_session.add(profile)
+    db_session.flush()
+    test_visit.doctor_id = profile.id
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    monkeypatch.setattr(settings, "TENANT_SCOPE_ENFORCE_WRITES", False)
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+
+    escalate(db_session, task.id, actor_user_id=admin.id)
+    assert run(dispatch_pending(db_session)) == 2
+    test_visit.doctor_id = None
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 1
+    assert task.state == "needs_assignment"
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", None)
+    escalate(db_session, task.id, actor_user_id=admin.id)
+    assert task.next_attempt_at is None
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    assert run(dispatch_pending(db_session)) == 1
+    escalations = [call.kwargs["metadata"] for call in sender.await_args_list
+                   if call.kwargs["entity_type"] == "lab_critical_escalation"]
+    assert len(escalations) == 2
+    assert escalations[0]["escalation_route_id"] != escalations[1]["escalation_route_id"]
+
+
+@pytest.mark.unit
+def test_repeated_unassigned_tasks_recover_new_route_after_admin_is_configured(
+    db_session, test_patient, test_visit, monkeypatch,
+):
+    admin = synthetic_user(db_session, "Admin")
+    doctor = synthetic_user(db_session, "Doctor")
+    profile = Doctor(user_id=doctor.id, specialty="cardiology", active=True)
+    db_session.add(profile)
+    db_session.flush()
+    test_visit.doctor_id = None
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    monkeypatch.setattr(settings, "TENANT_SCOPE_ENFORCE_WRITES", False)
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+
+    assert run(dispatch_pending(db_session)) == 1
+    test_visit.doctor_id = profile.id
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 1
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", None)
+    test_visit.doctor_id = None
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 0
+    assert task.state == "needs_assignment" and task.next_attempt_at is None
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    assert run(dispatch_pending(db_session)) == 1
+    assert run(dispatch_pending(db_session)) == 0
+    assignments = [call.kwargs["metadata"] for call in sender.await_args_list
+                   if call.kwargs["entity_type"] == "lab_critical_assignment"]
+    assert len(assignments) == 2
+    assert assignments[0]["assignment_route_id"] != assignments[1]["assignment_route_id"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("escalated", [False, True])
+def test_legacy_admin_route_without_marker_preserves_original_metadata(
+    db_session, test_patient, test_visit, monkeypatch, escalated,
+):
+    admin = synthetic_user(db_session, "Admin")
+    test_visit.doctor_id = None
+    monkeypatch.setattr(settings, "LAB_CRITICAL_ESCALATION_ADMIN_ID", admin.id)
+    monkeypatch.setattr(settings, "TENANT_SCOPE_ENFORCE_WRITES", False)
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+    if escalated:
+        escalate(db_session, task.id, actor_user_id=admin.id)
+    for marker in db_session.scalars(
+        select(LabCriticalCommunicationEvent).where(
+            LabCriticalCommunicationEvent.communication_id == task.id,
+            LabCriticalCommunicationEvent.event_type.in_(("assignment_route", "escalation_route")),
+        )
+    ):
+        db_session.delete(marker)
+    db_session.commit()
+    sender = AsyncMock(side_effect=[False, True])
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+
+    assert run(dispatch_pending(db_session)) == 0
+    task.next_attempt_at = datetime.now(UTC)
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 1
+    assert [call.kwargs["metadata"] for call in sender.await_args_list] == [
+        {"communication_id": task.id}, {"communication_id": task.id},
+    ]
+
+
+@pytest.mark.unit
+def test_legacy_doctor_routing_without_marker_preserves_original_metadata(
+    db_session, test_patient, test_visit, monkeypatch,
+):
+    doctor = synthetic_user(db_session, "Doctor")
+    profile = Doctor(user_id=doctor.id, specialty="cardiology", active=True)
+    db_session.add(profile)
+    db_session.flush()
+    test_visit.doctor_id = profile.id
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.append(LabReportValue(
+        field_key="hgb", value_numeric=Decimal("1"),
+        evaluation_snapshot={"interpretation": "critical"},
+    ))
+    task = record_released_report(db_session, report)
+    db_session.commit()
+    for marker in db_session.scalars(
+        select(LabCriticalCommunicationEvent).where(
+            LabCriticalCommunicationEvent.communication_id == task.id,
+            LabCriticalCommunicationEvent.event_type == "doctor_route",
+        )
+    ):
+        db_session.delete(marker)
+    db_session.commit()
+    sender = AsyncMock(side_effect=[False, True])
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+
+    assert run(dispatch_pending(db_session)) == 0
+    task.next_attempt_at = datetime.now(UTC)
+    db_session.commit()
+    assert run(dispatch_pending(db_session)) == 1
+    assert [call.kwargs["metadata"] for call in sender.await_args_list] == [
+        {"communication_id": task.id}, {"communication_id": task.id},
     ]
 
 
@@ -503,12 +704,20 @@ def test_critical_admin_route_retries_and_never_replaces_clinical_acknowledgment
     assert task.state == "needs_assignment"
     assert task.inbox_recorded_at is None
     assert task.acknowledged_at is None
+    route_id = db_session.scalar(
+        select(LabCriticalCommunicationEvent.id).where(
+            LabCriticalCommunicationEvent.communication_id == task.id,
+            LabCriticalCommunicationEvent.event_type == "assignment_route",
+        )
+    )
     for attempt in sender.await_args_list:
         sent = attempt.kwargs
         assert sent["recipient"].id == admin.id
         assert sent["entity_type"] == "lab_critical_assignment"
         assert sent["entity_id"] == task.id
-        assert sent["metadata"] == {"communication_id": task.id}
+        assert sent["metadata"] == {
+            "communication_id": task.id, "assignment_route_id": route_id,
+        }
         assert sent["deep_link"] == f"/lab?tab=operations&communication_id={task.id}"
 
     doctor = synthetic_user(db_session, "Doctor")
@@ -1057,9 +1266,11 @@ def test_recorded_critical_task_follows_current_doctor(
     )
     assert events == [
         "created",
+        "doctor_route",
         "attempted",
         "inbox_recorded",
         "assigned",
+        "doctor_route",
         "attempted",
         "inbox_recorded",
         "acknowledged",

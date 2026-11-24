@@ -100,6 +100,32 @@ def _event(
     )
 
 
+def _delivery_metadata(db: Session, task_id: int, route: str) -> dict[str, int]:
+    """Keep retries stable while distinguishing later routing decisions.
+
+    A latest decision without a route marker predates this format. Its
+    original metadata remains usable for retries during a rolling upgrade.
+    """
+    boundaries = {
+        "doctor_route": ("created", "assigned", "needs_assignment", "doctor_route"),
+        "assignment_route": ("created", "assigned", "needs_assignment", "assignment_route"),
+        "escalation_route": ("escalated", "escalation_route"),
+    }
+    latest = db.execute(
+        select(LabCriticalCommunicationEvent.id, LabCriticalCommunicationEvent.event_type)
+        .where(
+            LabCriticalCommunicationEvent.communication_id == task_id,
+            LabCriticalCommunicationEvent.event_type.in_(boundaries[route]),
+        )
+        .order_by(LabCriticalCommunicationEvent.id.desc())
+        .limit(1)
+    ).first()
+    metadata = {"communication_id": task_id}
+    if latest is not None and latest.event_type == route:
+        metadata[f"{route}_id"] = latest.id
+    return metadata
+
+
 def record_released_report(
     db: Session,
     instance: LabReportInstance,
@@ -145,6 +171,12 @@ def record_released_report(
     db.add(task)
     db.flush()
     _event(db, task.id, "created", actor_user_id=actor_user_id)
+    _event(
+        db,
+        task.id,
+        "doctor_route" if recipient_id is not None else "assignment_route",
+        actor_user_id=actor_user_id,
+    )
     if previous is not None and previous.acknowledged_at is None:
         previous = _locked_task(db, previous.id)
         if previous.acknowledged_at is None:
@@ -177,15 +209,19 @@ def _set_task_recipient(
 ) -> None:
     task.recipient_user_id = recipient_id
     task.inbox_recorded_at = None
-    if task.state == "escalated" and recipient_id is not None:
-        _event(db, task.id, "assigned", actor_user_id=actor_user_id)
-        return
-    task.state = "pending" if recipient_id is not None else "needs_assignment"
-    task.next_attempt_at = _first_attempt_at(recipient_id)
+    if task.state != "escalated" or recipient_id is None:
+        task.state = "pending" if recipient_id is not None else "needs_assignment"
+        task.next_attempt_at = _first_attempt_at(recipient_id)
     _event(
         db,
         task.id,
         "assigned" if recipient_id is not None else "needs_assignment",
+        actor_user_id=actor_user_id,
+    )
+    _event(
+        db,
+        task.id,
+        "doctor_route" if recipient_id is not None else "assignment_route",
         actor_user_id=actor_user_id,
     )
 
@@ -231,6 +267,7 @@ def escalate(
     task.escalated_at = datetime.now(UTC)
     task.next_attempt_at = _first_attempt_at()
     _event(db, task.id, "escalated", actor_user_id=actor_user_id)
+    _event(db, task.id, "escalation_route", actor_user_id=actor_user_id)
     db.commit()
     return task
 
@@ -430,7 +467,7 @@ async def _dispatch_escalated_doctors(db: Session, *, limit: int) -> tuple[int, 
             entity_type="lab_critical_communication",
             entity_id=task_id,
             deep_link="/doctor",
-            metadata={"communication_id": task_id},
+            metadata=_delivery_metadata(db, task_id, "doctor_route"),
         )
         db.rollback()
         task = _locked_task(db, task_id)
@@ -473,10 +510,35 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
                 (LabCriticalCommunication.state == "needs_assignment", "assignment_notified"),
                 else_="escalation_notified",
             )
-            notified = select(LabCriticalCommunicationEvent.id).where(
-                LabCriticalCommunicationEvent.communication_id == LabCriticalCommunication.id,
-                LabCriticalCommunicationEvent.event_type == receipt,
-            ).exists()
+            transition = aliased(LabCriticalCommunicationEvent)
+            latest_transition = (
+                select(func.max(transition.id))
+                .where(
+                    transition.communication_id == LabCriticalCommunication.id,
+                    or_(
+                        and_(
+                            LabCriticalCommunication.state == "needs_assignment",
+                            transition.event_type.in_(("created", "needs_assignment")),
+                        ),
+                        and_(
+                            LabCriticalCommunication.state == "escalated",
+                            transition.event_type == "escalated",
+                        ),
+                    ),
+                )
+                .correlate(LabCriticalCommunication)
+                .scalar_subquery()
+            )
+            notified = (
+                select(LabCriticalCommunicationEvent.id)
+                .where(
+                    LabCriticalCommunicationEvent.communication_id == LabCriticalCommunication.id,
+                    LabCriticalCommunicationEvent.event_type == receipt,
+                    LabCriticalCommunicationEvent.id > func.coalesce(latest_transition, 0),
+                )
+                .correlate(LabCriticalCommunication)
+                .exists()
+            )
             due = or_(
                 due,
                 and_(
@@ -558,6 +620,7 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
             entity_type = "lab_critical_communication"
             deep_link = "/doctor"
             receipt_event = "inbox_recorded"
+            route = "doctor_route"
         else:
             escalated = delivery_state == "escalated"
             title = (
@@ -568,6 +631,7 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
             entity_type = "lab_critical_escalation" if escalated else "lab_critical_assignment"
             deep_link = f"/lab?tab=operations&communication_id={task_id}"
             receipt_event = "escalation_notified" if escalated else "assignment_notified"
+            route = "escalation_route" if escalated else "assignment_route"
         delivered = (
             await notification_sender_service.send_canonical_notification_to_user(
                 db=db,
@@ -582,7 +646,7 @@ async def dispatch_pending(db: Session, *, limit: int = 25) -> int:
                 entity_type=entity_type,
                 entity_id=task_id,
                 deep_link=deep_link,
-                metadata={"communication_id": task_id},
+                metadata=_delivery_metadata(db, task_id, route),
             )
         )
         db.rollback()
