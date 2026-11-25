@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import RoleGate from '../components/RoleGate';
 import AppointmentFlow from '../components/AppointmentFlow';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
@@ -8,6 +8,7 @@ import {
 import { api } from '../api/client';
 
 import logger from '../utils/logger';
+import { getLocalDateString } from '../utils/dateUtils';
 import { useTranslation } from '../i18n/useTranslation';
 import type { CSSProperties } from 'react';
 
@@ -25,50 +26,48 @@ interface AppointmentRow {
   [key: string]: unknown;
 }
 
-function todayStr() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${dd}`;
-}
-
-/**
- * Записи (Appointments): просмотр записей на дату (чтение).
- * Совместимо с GET /appointments?date=YYYY-MM-DD&limit=...
- * Для минимальных перезаписей реализуем только чтение и поиск.
- */
+/** Read-only scheduled appointments, filtered by the clinic calendar day. */
 export default function Appointments() {
   const { t: rawT } = useTranslation();
   const t = rawT;
-  const [date, setDate] = useState(todayStr());
+  const [date, setDate] = useState(getLocalDateString);
   const [rows, setRows] = useState<AppointmentRow[]>([]);
+  const latestRequest = useRef(0);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
+  const [err, setErr] = useState<string | null>(null);
   const [useAdvancedTable, setUseAdvancedTable] = useState(false);
   const [selectedAppointments, setSelectedAppointments] = useState<Set<unknown>>(new Set<unknown>());
 
   const load = useCallback(async () => {
-    setBusy(true);
-    setErr('');
-    try {
-      let res = (await api.get('/appointments', { params: { date, limit: 200 } })) as import('axios').AxiosResponse<Record<string, unknown>>;
-      if (!res || (!Array.isArray(res) && !Array.isArray(res?.data?.items))) {
-        // fallback на другой ключ параметра
-        res = await api.get('/appointments', { params: { d: date, limit: 200 } });
-      }
-      const items: AppointmentRow[] = Array.isArray(res?.data?.items) ? (res.data.items as AppointmentRow[]) : Array.isArray(res?.data) ? (res.data as AppointmentRow[]) : [];
-      setRows(items);
-    } catch (e) {
-      const err = e as { data?: { detail?: string }; message?: string };
-      setErr(err?.data?.detail || err?.message || t('misc.appo_oshibka_zagruzki_zapisey'));
-    } finally {
+    const requestId = ++latestRequest.current;
+    setErr(null);
+    if (!date) {
+      setRows([]);
       setBusy(false);
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const res = await api.get<AppointmentRow[]>('/appointments', {
+        params: { date_from: date, date_to: date, limit: 200 },
+      });
+      if (requestId === latestRequest.current) setRows(res.data);
+    } catch (e) {
+      if (requestId !== latestRequest.current) return;
+      const err = e as { data?: { detail?: string }; message?: string };
+      setRows([]);
+      setErr(err?.data?.detail || err?.message || '');
+    } finally {
+      if (requestId === latestRequest.current) setBusy(false);
     }
   }, [date]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => { latestRequest.current += 1; };
+  }, [load]);
 
   const filtered = useMemo(() => {
     if (!q) return rows;
@@ -142,10 +141,10 @@ export default function Appointments() {
             />
           </div>
 
-          {err && (
+          {err !== null && (
             <AppError
               title={t('misc.appo_ne_udalos_zagruzit_zapisi')}
-              description={String(err)}
+              description={err || t('misc.appo_oshibka_zagruzki_zapisey')}
               action={
                 <Button type="button" variant="outline" size="small" onClick={load} disabled={busy} loading={busy}>
                   Повторить

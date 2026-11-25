@@ -77,6 +77,14 @@ class VisitOut(BaseModel):
     doctor: dict[str, Any] | None = None
 
 
+def _visit_read_model(row: dict[str, Any]) -> VisitOut:
+    # The persisted column is visit_date; the public read contract already
+    # calls it planned_date. Keep legacy rows that lack the canonical column.
+    return VisitOut.model_validate(
+        {**row, "planned_date": row.get("visit_date", row.get("planned_date"))}
+    )
+
+
 class VisitServiceIn(BaseModel):
     code: str | None = Field(default=None, max_length=32)
     name: str = Field(max_length=255)
@@ -288,7 +296,7 @@ def list_visits(
             request=request,
         )
 
-    return [VisitOut(**row) for row in rows]  # type: ignore[arg-type]
+    return [_visit_read_model(row) for row in rows]  # type: ignore[arg-type]
 
 
 @router.post(
@@ -349,7 +357,7 @@ def get_visit(
     )
 
     return VisitWithServices(
-        visit=VisitOut(**payload["visit"]),
+        visit=_visit_read_model(payload["visit"]),
         services=[VisitServiceOut(**item) for item in payload["services"]],
     )
 

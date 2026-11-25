@@ -43,7 +43,7 @@ def test_list_visits_endpoint_delegates_to_service(
                 "started_at": None,
                 "finished_at": None,
                 "notes": "router wiring",
-                "planned_date": planned,
+                "visit_date": date(2026, 3, 7),
                 "source": "desk",
             }
         ]
@@ -67,6 +67,7 @@ def test_list_visits_endpoint_delegates_to_service(
     payload = response.json()
     assert payload[0]["id"] == 17
     assert payload[0]["notes"] == "router wiring"
+    assert payload[0]["planned_date"] == "2026-03-07"
     assert captured == {
         "patient_id": 4,
         "doctor_id": 9,
@@ -94,7 +95,7 @@ def test_get_visit_endpoint_delegates_to_service(
                 "started_at": None,
                 "finished_at": None,
                 "notes": "visit card",
-                "planned_date": None,
+                "visit_date": date(2026, 3, 8),
                 "source": "desk",
                 "patient_name": "Karimov Aziz",
                 "patient_fio": "Karimov Aziz",
@@ -125,6 +126,7 @@ def test_get_visit_endpoint_delegates_to_service(
     payload = response.json()
     assert payload["visit"]["id"] == test_visit.id
     assert payload["visit"]["notes"] == "visit card"
+    assert payload["visit"]["planned_date"] == "2026-03-08"
     assert payload["visit"]["patient_name"] == "Karimov Aziz"
     assert payload["visit"]["doctor_name"] == "Demo Cardiologist"
     assert payload["services"][0]["name"] == "Consultation"
