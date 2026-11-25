@@ -1,0 +1,10 @@
+# Remove this compatibility file once actionlint supports concurrency.queue.
+# The metadata job validates both queue values, and Dependabot guard tests
+# exercise the queue on GitHub Actions. Keep every other diagnostic enabled.
+paths:
+  .github/workflows/codex-pr-app.yml:
+    ignore:
+      - '^unexpected key "queue" for "concurrency" section\. expected one of "cancel-in-progress", "group"$'
+  .github/workflows/dependabot-guard-tests.yml:
+    ignore:
+      - '^unexpected key "queue" for "concurrency" section\. expected one of "cancel-in-progress", "group"$'

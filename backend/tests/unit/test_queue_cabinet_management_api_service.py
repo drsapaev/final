@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -538,8 +539,10 @@ class TestQueueCabinetManagementApiService:
         doctor, _resource, doctor_queue, _resource_queue, _yesterday = (
             self._seed_reassignment_targets(db_session, clinic_day)
         )
+        # mutmut repeats the suite with a fresh SQL fixture but the same Redis.
+        # Reuse the key for this pair only, not for the next suite session.
         headers = admin_auth_headers | {
-            "Idempotency-Key": "synthetic-cabinet-apply-replay-1"
+            "Idempotency-Key": f"synthetic-cabinet-apply-replay-{uuid4().hex}"
         }
         body = {
             "targets": [

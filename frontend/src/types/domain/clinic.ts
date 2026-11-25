@@ -53,6 +53,15 @@ export interface QueueNumberInfo {
   specialty?: string;
 }
 
+/** Read-only calendar projection; this ID must not be passed to Appointment actions. */
+export interface CalendarRescheduledVisit {
+  visitId: number;
+  patientName: string;
+  doctorName: string | null;
+  scheduledTime: string | null;
+  status: string;
+}
+
 export interface Appointment {
   id?: AppointmentId;
   patient_id?: PatientId;

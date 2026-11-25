@@ -58,6 +58,28 @@ const makeAppointment = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('aggregatePatientsForAllDepartments', () => {
+  it('retains recorded birth year and address when the first row of the same linked patient is incomplete', () => {
+    const first = { ...makeAppointment({ id: 181, patient_id: 11 }), patient_birth_year: null, address: '' };
+    const later = makeAppointment({ id: 182, patient_id: 11, patient_birth_year: 1987, address: 'SYNTHETIC-ADDRESS' });
+
+    const result = aggregatePatientsForAllDepartments([first, later]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ patient_birth_year: 1987, address: 'SYNTHETIC-ADDRESS' });
+  });
+
+  it('does not replace filled values or import an address from a name-only identity group', () => {
+    const linked = makeAppointment({ id: 181, patient_id: 11, patient_birth_year: 1987, address: 'SYNTHETIC-PRIMARY' });
+    const duplicate = makeAppointment({ id: 182, patient_id: 11, patient_birth_year: 1980, address: 'SYNTHETIC-OTHER' });
+    const unlinked = { ...makeAppointment({ id: 183 }), patient_id: null, address: '' };
+    const loose = { ...makeAppointment({ id: 184 }), patient_id: null, address: 'SYNTHETIC-DO-NOT-COPY' };
+
+    expect(aggregatePatientsForAllDepartments([linked, duplicate])[0]).toMatchObject({
+      patient_birth_year: 1987, address: 'SYNTHETIC-PRIMARY',
+    });
+    expect(aggregatePatientsForAllDepartments([unlinked, loose])[0].address).toBe('');
+  });
+
   it('keeps a single registration type when all grouped rows match', () => {
     const result = aggregatePatientsForAllDepartments([
       makeAppointment({ id: 1, cost: 0, discount_mode: 'repeat' }),

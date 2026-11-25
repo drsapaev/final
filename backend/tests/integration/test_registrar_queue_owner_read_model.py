@@ -206,8 +206,17 @@ def test_today_queues_exposes_actual_owner_for_each_entry(
         headers=auth_headers,
     )
     assert response.status_code == 200, response.text
-    all_rows = [row for queue in response.json()["queues"] for row in queue["entries"]]
+    queues = response.json()["queues"]
+    all_rows = [row for queue in queues for row in queue["entries"]]
     rows = {(row["record_kind"], row["id"]): row for row in all_rows}
+
+    # Migration 0055 defines the ЭКГ profile as key='echokg', tags=['ecg'].
+    # The UI matches the row's queue_tag before the legacy bucket specialty.
+    ecg_bucket = next(queue for queue in queues if queue["specialty"] == "echokg")
+    ecg_row = rows[("online_queue", entries[2].id)]
+    assert ecg_row in ecg_bucket["entries"]
+    assert ecg_row["queue_tag"] == "ecg"
+    assert rows[("online_queue", entries[0].id)].get("queue_tag") != "ecg"
     owner_keys = {"queue_owner_kind", "queue_owner_id", "daily_queue_id"}
     assert all(owner_keys <= row.keys() for row in all_rows)
 
