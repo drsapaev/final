@@ -98,6 +98,8 @@ jobs:
           mkdir -p mutants
           cp -r alembic mutants/alembic
           cp openapi.json mutants/openapi.json
+          # Real notification-template tests resolve backend/templates beside app/.
+          cp -r templates mutants/templates
           # the atomicity-test fixture (pg_engine) shells out to
           # python -m alembic -c alembic.ini upgrade head with cwd = sandbox
           cp alembic.ini mutants/alembic.ini
