@@ -11,6 +11,9 @@ import logger from '../utils/logger';
 import { getLocalDateString } from '../utils/dateUtils';
 import { useTranslation } from '../i18n/useTranslation';
 import type { CSSProperties } from 'react';
+import type { components } from '../types/generated/api';
+
+type RescheduledVisit = components['schemas']['CalendarRescheduledVisit'];
 
 interface AppointmentRow {
   id?: string | number;
@@ -32,6 +35,7 @@ export default function Appointments() {
   const t = rawT;
   const [date, setDate] = useState(getLocalDateString);
   const [rows, setRows] = useState<AppointmentRow[]>([]);
+  const [movedVisits, setMovedVisits] = useState<RescheduledVisit[]>([]);
   const latestRequest = useRef(0);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
@@ -44,20 +48,28 @@ export default function Appointments() {
     setErr(null);
     if (!date) {
       setRows([]);
+      setMovedVisits([]);
       setBusy(false);
       return;
     }
 
     setBusy(true);
     try {
-      const res = await api.get<AppointmentRow[]>('/appointments', {
-        params: { date_from: date, date_to: date, limit: 200 },
-      });
-      if (requestId === latestRequest.current) setRows(res.data);
+      const [scheduled, moved] = await Promise.all([
+        api.get<AppointmentRow[]>('/appointments', {
+          params: { date_from: date, date_to: date, limit: 200 },
+        }),
+        api.get<RescheduledVisit[]>('/appointments/rescheduled-visits', { params: { day: date } }),
+      ]);
+      if (requestId === latestRequest.current) {
+        setRows(scheduled.data);
+        setMovedVisits(moved.data);
+      }
     } catch (e) {
       if (requestId !== latestRequest.current) return;
       const err = e as { data?: { detail?: string }; message?: string };
       setRows([]);
+      setMovedVisits([]);
       setErr(err?.data?.detail || err?.message || '');
     } finally {
       if (requestId === latestRequest.current) setBusy(false);
@@ -74,6 +86,7 @@ export default function Appointments() {
     if (nextDate === date) return;
     latestRequest.current += 1;
     setRows([]);
+    setMovedVisits([]);
     setErr(null);
     setBusy(Boolean(nextDate));
     setDate(nextDate);
@@ -89,7 +102,13 @@ export default function Appointments() {
       String(a.status || '').toLowerCase().includes(qq)
     );
   }, [q, rows]);
-  const isFilteredEmpty = q.trim().length > 0 && rows.length > 0 && filtered.length === 0;
+  const movedFiltered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return movedVisits.filter(row => [row.patient_name, row.doctor_name, row.status, String(row.visit_id)]
+      .some(value => value?.toLowerCase().includes(needle)));
+  }, [movedVisits, q]);
+  const isFilteredEmpty = q.trim().length > 0 && rows.length + movedVisits.length > 0
+    && filtered.length + movedFiltered.length === 0;
   const toolbarStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -123,7 +142,7 @@ export default function Appointments() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <h2 style={{ margin: 0, color: 'var(--mac-text-primary)' }}>{t('misc.appo_zapisi')}</h2>
               <span style={{ color: 'var(--mac-text-secondary)', fontSize: 13 }}>
-                {filtered.length} из {rows.length}
+                {filtered.length + movedFiltered.length} из {rows.length + movedVisits.length}
               </span>
             </div>
           </CardHeader>
@@ -217,7 +236,7 @@ export default function Appointments() {
                     </td>
                   </tr>
                 ))}
-                {!busy && err === null && filtered.length === 0 && (
+                {!busy && err === null && filtered.length + movedFiltered.length === 0 && (
                   <tr>
                     <td colSpan={5}>
                       <AppEmpty
@@ -235,6 +254,33 @@ export default function Appointments() {
               </table>
 </div>
             </div>
+          )}
+          {movedFiltered.length > 0 && (
+            <section aria-labelledby="rescheduled-visits-title">
+              <h3 id="rescheduled-visits-title">{t('misc.srch_section_visits')}</h3>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>{t('common.patient')}</th>
+                    <th>{t('common.doctor')}</th>
+                    <th>{t('common.time')}</th>
+                    <th>{t('common.status')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movedFiltered.map(row => (
+                    <tr key={row.visit_id}>
+                      <td>{row.visit_id}</td>
+                      <td>{row.patient_name || '—'}</td>
+                      <td>{row.doctor_name || '—'}</td>
+                      <td>{row.scheduled_time || t('admin2.appt_time_not_specified')}</td>
+                      <td>{row.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
           )}
           </CardContent>
         </Card>

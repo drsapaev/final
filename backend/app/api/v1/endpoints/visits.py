@@ -754,6 +754,8 @@ def reschedule_visit(
             raise HTTPException(404, "Visit not found")
         return VisitOut(**fresh)  # type: ignore[arg-type]
     update_values: dict = {"visit_date": new_date}
+    if "calendar_rescheduled" in t.c:
+        update_values["calendar_rescheduled"] = True
     if schedule_changed:
         # PR-1 (Codex round 2, P1): the reminder stamp is only valid for
         # the CURRENT schedule — rescheduling must invalidate it, otherwise
@@ -916,6 +918,8 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
             raise HTTPException(404, "Visit not found")
         return VisitOut(**fresh)  # type: ignore[arg-type]
     tomorrow_values: dict = {"visit_date": tomorrow}
+    if "calendar_rescheduled" in t.c:
+        tomorrow_values["calendar_rescheduled"] = True
     if hasattr(t.c, "reminder_sent_at"):
         tomorrow_values["reminder_sent_at"] = None
     if hasattr(t.c, "reminder_generation"):

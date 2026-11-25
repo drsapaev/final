@@ -7,13 +7,17 @@ import { ThemeProvider } from '../../contexts/ThemeContext';
 
 const mocks = vi.hoisted(() => ({
   appointments: vi.fn(),
+  moved: vi.fn(),
   visit: vi.fn(),
   patient: vi.fn(),
   patients: vi.fn(),
   visitList: vi.fn(),
 }));
 
-vi.mock('../../api/client', () => ({ api: { get: mocks.appointments } }));
+vi.mock('../../api/client', () => ({ api: {
+  get: (path: string, options: unknown) => path === '/appointments/rescheduled-visits'
+    ? mocks.moved(path, options) : mocks.appointments(path, options),
+} }));
 vi.mock('../../api', () => ({ api: { get: mocks.visitList } }));
 vi.mock('../../api/visits', () => ({ getVisit: mocks.visit }));
 vi.mock('../../api/patients', () => ({ getPatient: mocks.patient, searchPatients: mocks.patients }));
@@ -33,6 +37,7 @@ describe('clinical calendar dates', () => {
     vi.resetAllMocks();
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
     localStorage.setItem('language', 'ru');
+    mocks.moved.mockResolvedValue({ data: [] });
     mocks.patients.mockResolvedValue([]);
     mocks.patient.mockResolvedValue({ id: 1, first_name: 'SYNTHETIC-PATIENT' });
     mocks.visitList.mockResolvedValue({ data: [] });
@@ -82,6 +87,23 @@ describe('clinical calendar dates', () => {
     await act(async () => finishSlowDay({ data: [{ id: 2, patient_name: 'SYNTHETIC-STALE' }] }));
     expect(screen.queryByText('SYNTHETIC-STALE')).not.toBeInTheDocument();
     expect(screen.getByText('SYNTHETIC-LATEST')).toBeInTheDocument();
+  });
+
+  it('shows a moved visit without a time in records without an appointment row', async () => {
+    mocks.appointments.mockResolvedValue({ data: [] });
+    mocks.moved.mockResolvedValue({ data: [{
+      visit_id: 7, patient_name: 'SYNTHETIC-WITHOUT-TIME',
+      doctor_name: null, status: 'confirmed', scheduled_time: null,
+    }] });
+    render(<ThemeProvider><Appointments /></ThemeProvider>);
+    const day = screen.getByLabelText(/Дата:/);
+    fireEvent.change(day, { target: { value: '2026-03-08' } });
+    expect(await screen.findByText('SYNTHETIC-WITHOUT-TIME')).toBeInTheDocument();
+    expect(screen.getByText('admin2.appt_time_not_specified')).toBeInTheDocument();
+    expect(screen.queryByText('misc.appo_net_zapisey_na_vybrannuyu_da')).not.toBeInTheDocument();
+    expect(mocks.moved).toHaveBeenLastCalledWith('/appointments/rescheduled-visits', {
+      params: { day: '2026-03-08' },
+    });
   });
 
   it.each([
