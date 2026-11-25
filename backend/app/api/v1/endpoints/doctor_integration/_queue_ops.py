@@ -5,6 +5,8 @@ Split from doctor_integration.py (1900 LOC god file → modular).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from app.api.v1.endpoints.doctor_integration._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     DOCTOR_QUEUE_ALLOWED_TAGS,
@@ -27,13 +29,18 @@ from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
 )
 from app.crud.visit_appointment_pairing import (
     AmbiguousAppointmentPairingError,
+    lock_paired_appointment,
     move_paired_appointment_to_day,
+)
+from app.models.enums import (
+    AppointmentStatus,
+    can_transition_status,
+    normalize_appointment_status,
 )
 from app.schemas.doctor_queue import (
     DoctorQueueStartVisitResponse,
     DoctorQueueTodayResponse,
 )
-from app.models.enums import AppointmentStatus, can_transition_status, normalize_appointment_status
 from app.services.emr_completion_policy import (
     EMR_REQUIRED_DETAIL,
     requires_saved_emr,
@@ -345,7 +352,16 @@ def _clinic_now(db: Session) -> datetime:
     return datetime.now(ZoneInfo(tz_name))
 
 
-def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
+@dataclass(frozen=True)
+class _QueueVisitResolution:
+    visit: Visit
+    original_date: date | None
+    moved_appointment: Appointment | None = None
+
+
+def _resolve_entry_visit(
+    db: Session, queue_entry, doctor, department: str
+) -> _QueueVisitResolution:
     """Визит командной поверхности доктора привязан к САМОЙ записи очереди.
 
     visit_id-first: подтверждённый визит записи (OnlineQueueEntry.visit_id)
@@ -392,7 +408,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             # резолвит свежий визит дня очереди ниже.
             queue_day = getattr(queue_entry.queue, "day", None)
             if queue_day is None or visit.visit_date == queue_day:
-                return visit
+                return _QueueVisitResolution(visit, visit.visit_date)
             shared = (
                 db.query(OnlineQueueEntry.id)
                 .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
@@ -415,14 +431,8 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 is not None
             )
             if not shared:
-                # Codex round-43 P2: парный appointment следует за
-                # перештампованным визитом — completion ищет аппойнтмент
-                # по НОВОЙ visit_date, а канонический паринг бьёт по
-                # patient/date/time/doctor: визит, переехавший без
-                # своего аппойнтмента, оставляет его запланированным на
-                # старом дне (и канонический резолв может родить под
-                # него второй визит). Паринг — тот же, что у
-                # CanonicalVisitRepository (время — оба написания).
+                # Переносим парный appointment с исходного дня под lock.
+                # Completion использует ту же строку после смены даты.
                 # Corrective follow-up (вердикт владельца по смерженному
                 # рантайму, P1): паринг сужается департаментом визита,
                 # берётся под lock, переносится РОВНО ОДНА строка, при
@@ -430,8 +440,11 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 # UPDATE сдвигал ОБА doctorless-аппойнтмента пациента
                 # того же дня (лабораторию вместе с процедурным
                 # переносом).
+                original_date = visit.visit_date
                 try:
-                    move_paired_appointment_to_day(db, visit=visit, new_day=queue_day)
+                    moved_appointment = move_paired_appointment_to_day(
+                        db, visit=visit, new_day=queue_day
+                    )
                 except AmbiguousAppointmentPairingError as exc:
                     raise HTTPException(
                         status_code=status.HTTP_409_CONFLICT,
@@ -442,7 +455,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                         ),
                     ) from exc
                 visit.visit_date = queue_day
-                return visit
+                return _QueueVisitResolution(visit, original_date, moved_appointment)
             # shared by live same-day tickets: fall through to the
             # branch-specific resolution below (fresh visit + relink)
 
@@ -465,6 +478,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             )
             .first()
         )
+        original_date = visit.visit_date if visit is not None else None
         if visit is None:
             # Owner round-3 P2 (PR #3367): commit=False — the visit
             # INSERT joins the CALLER's transaction. Both callers of
@@ -520,6 +534,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             )
             .first()
         )
+        original_date = visit.visit_date if visit is not None else None
         if visit is None:
             # Owner round-3 P2 (PR #3367): commit=False here too — the
             # doctor-branch creation is the same mid-composition INSERT
@@ -539,7 +554,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
 
     if queue_entry.visit_id != visit.id:
         queue_entry.visit_id = visit.id
-    return visit
+    return _QueueVisitResolution(visit, original_date)
 
 
 @router.post("/doctor/queue/{entry_id}/call", response_model=dict[str, Any])
@@ -833,7 +848,7 @@ def start_patient_visit(
             queue_entry,
             doctor,
             getattr(daily_queue, "queue_tag", None) or "general",
-        )
+        ).visit
 
         # BUG 3 fix (Codex P1): transition visit open→in_progress when starting
         # the visit. Without this, visit stays in "open" and complete_visit()
@@ -1141,9 +1156,11 @@ def complete_patient_visit(
             department_hint = resource_department or (
                 getattr(daily_queue, "queue_tag", None) or "general"
             )
-            resolved_visit = _resolve_entry_visit(
+            was_linked = queue_entry.visit_id is not None
+            resolution = _resolve_entry_visit(
                 db, queue_entry, doctor, department_hint
             )
+            resolved_visit = resolution.visit
 
             completion_specialty = (
                 doctor.specialty if doctor else getattr(daily_queue, "queue_tag", None)
@@ -1185,22 +1202,30 @@ def complete_patient_visit(
             )
             resolved_visit.updated_at = changed_at
 
-            # The pairing path above may have staged an appointment date move.
-            # Flush it before refreshing under the lock, so populate_existing
-            # cannot silently discard the staged move. Nothing is committed yet.
+            # The resolver may have staged a move of the existing pair.
             db.flush()
-            appointment = (
-                db.query(Appointment)
-                .filter(
-                    Appointment.patient_id == queue_entry.patient_id,
-                    Appointment.appointment_date == (resolved_visit.visit_date or date.today()),
-                    Appointment.doctor_id == resolved_visit.doctor_id,
+            appointment = resolution.moved_appointment
+            if was_linked and resolution.original_date is None:
+                logger.warning(
+                    "complete_patient_visit: entry %d visit %d has no original appointment date; appointment sync skipped",
+                    queue_entry.id,
+                    resolved_visit.id,
                 )
-                .with_for_update(of=Appointment)
-                .populate_existing()
-                .first()
-            )
+            elif (
+                resolution.original_date is not None
+                and resolution.original_date == resolved_visit.visit_date
+            ):
+                try:
+                    appointment = lock_paired_appointment(
+                        db, visit=resolved_visit, include_terminal=True,
+                    )
+                except AmbiguousAppointmentPairingError as exc:
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=409, detail="Не удалось однозначно определить запись для визита"
+                    ) from exc
             if appointment is not None:
+                db.refresh(appointment)
                 try:
                     _stage_locked_appointment_completion(appointment)
                 except HTTPException:

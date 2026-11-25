@@ -56,6 +56,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
@@ -103,13 +104,17 @@ def resolve_visit_department_id(db: Session, visit: Visit) -> int | None:
     return row[0] if row is not None else None
 
 
-def _canonical_filters(visit: Visit) -> list[Any]:
-    """The CanonicalVisitRepository pairing vocabulary (unchanged)."""
+def _canonical_filters(visit: Visit, *, include_terminal: bool) -> list[Any]:
+    """The CanonicalVisitRepository pairing vocabulary."""
     filters: list[Any] = [
         Appointment.patient_id == visit.patient_id,
         Appointment.appointment_date == visit.visit_date,
-        Appointment.status.not_in(_NON_TERMINAL_APPOINTMENT_STATUSES),
     ]
+    source_visit_id = getattr(Appointment, "source_visit_id", None)
+    if source_visit_id is not None:
+        filters.append(or_(source_visit_id.is_(None), source_visit_id == visit.id))
+    if not include_terminal:
+        filters.append(Appointment.status.not_in(_NON_TERMINAL_APPOINTMENT_STATUSES))
     if visit.doctor_id is None:
         filters.append(Appointment.doctor_id.is_(None))
     else:
@@ -131,23 +136,22 @@ def _locked_candidates(
     return rows
 
 
-def move_paired_appointment_to_day(
-    db: Session, *, visit: Visit, new_day: date
+def lock_paired_appointment(
+    db: Session, *, visit: Visit, include_terminal: bool = False
 ) -> Appointment | None:
-    """Move the ONE appointment paired with ``visit`` to ``new_day``.
+    """Lock and return the unique appointment paired with this dated visit.
 
-    Returns the moved row, or ``None`` when no live appointment is
-    eligible in either stage (an absent appointment is a legal no-op).
-    Raises :class:`AmbiguousAppointmentPairingError` when a stage yields
-    more than one row — the fail-closed contract; NOTHING is moved in
-    that case (the caller's transaction rolls back).
+    Completion includes terminal appointments so the caller can reject a
+    concurrent cancellation using the existing lifecycle check.
     """
+    if visit.visit_date is None:
+        return None
     context = (
         f"визит id={visit.id} (patient_id={visit.patient_id}, "
         f"visit_date={visit.visit_date}, department={visit.department!r}, "
         f"department_id={visit.department_id!r})"
     )
-    canonical = _canonical_filters(visit)
+    canonical = _canonical_filters(visit, include_terminal=include_terminal)
 
     department_id = resolve_visit_department_id(db, visit)
     if department_id is not None:
@@ -162,9 +166,7 @@ def move_paired_appointment_to_day(
             context=context,
         )
         if exact:
-            appointment = exact[0]
-            appointment.appointment_date = new_day
-            return appointment
+            return exact[0]
 
     # Stage 2 — the UNSCOPED fallback: appointments that predate the
     # department axis. NEVER the un-narrowed broad set: a scoped
@@ -177,8 +179,14 @@ def move_paired_appointment_to_day(
         stage="legacy без департамента",
         context=context,
     )
-    if unscoped:
-        appointment = unscoped[0]
+    return unscoped[0] if unscoped else None
+
+
+def move_paired_appointment_to_day(
+    db: Session, *, visit: Visit, new_day: date
+) -> Appointment | None:
+    """Move the unique live appointment paired with the visit to the new day."""
+    appointment = lock_paired_appointment(db, visit=visit)
+    if appointment is not None:
         appointment.appointment_date = new_day
-        return appointment
-    return None
+    return appointment
