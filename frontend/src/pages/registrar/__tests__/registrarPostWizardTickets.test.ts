@@ -1,6 +1,15 @@
-import { describe, expect, it } from 'vitest';
-import { resolvePanelTicketPayloads } from '../../../services/panelPrint';
+import { describe, expect, it, vi } from 'vitest';
+import { buildPanelTicketPrintableHtml, resolvePanelTicketPayloads } from '../../../services/panelPrint';
 import { buildPostWizardPaymentRow } from '../registrarHelpers';
+
+vi.mock('../../../api/adminSettings', () => ({ fetchClinicSettings: vi.fn(async () => []) }));
+vi.mock('../../../api/ticketPrintSettings', async () => {
+  const actual = await vi.importActual<typeof import('../../../api/ticketPrintSettings')>('../../../api/ticketPrintSettings');
+  return {
+    ...actual,
+    fetchTicketPrintSettings: vi.fn(async () => ({ ...actual.TICKET_PRINT_SETTINGS_DEFAULTS, show_price: true })),
+  };
+});
 
 const registration = {
   success: true,
@@ -37,6 +46,40 @@ describe('post-registration printing preserves the exact visit and daily queue',
       { queue_number: '1', service_price: '50000.00' },
       { queue_number: '2', service_price: '0.00' },
     ]);
+  });
+
+  it('prints each exact same-visit charge individually and omits a price for the unknown ticket', async () => {
+    const row = buildPostWizardPaymentRow({
+      ...registration, visit_ids: [101], total_amount: '83000.00',
+      queue_numbers: { 101: [
+        { queue_id: 11, queue_tag: 'ecg', number: 1, service_price: '83000.00' },
+        { queue_id: 22, queue_tag: 'lab', number: 2, service_price: '0.00' },
+        { queue_id: 33, queue_tag: 'procedures', number: 3 },
+      ] },
+    })!;
+
+    const html = await buildPanelTicketPrintableHtml(row);
+    const document = new DOMParser().parseFromString(html, 'text/html');
+    const tickets = [...document.querySelectorAll('.ticket')].map(node => node.textContent?.replace(/\s+/g, '') || '');
+    expect(tickets).toHaveLength(3);
+    expect(tickets[0]).toMatch(/Цена:83000/);
+    expect(tickets[1]).toMatch(/Цена:0(?!\d)/);
+    expect(tickets[2]).not.toContain('Цена:');
+  });
+
+  it.each([null, undefined, '', ' ', 'invalid'])('does not print fabricated 0 on an unnumbered visit when total is %s', async (total) => {
+    const row = buildPostWizardPaymentRow({
+      success: true, visit_ids: [101], total_amount: total,
+    })!;
+    expect(await buildPanelTicketPrintableHtml(row)).not.toContain('Цена:');
+  });
+
+  it('keeps genuine zero for one unnumbered visit, but not a multi-visit cart amount', async () => {
+    const free = buildPostWizardPaymentRow({ success: true, visit_ids: [101], total_amount: '0.00' })!;
+    expect(await buildPanelTicketPrintableHtml(free)).toContain('Цена:');
+    const combined = buildPostWizardPaymentRow({ success: true, visit_ids: [101, 202], total_amount: '50000' })!;
+    expect(combined.cost).toBe(50000);
+    expect(await buildPanelTicketPrintableHtml(combined)).not.toContain('Цена:');
   });
 
   it('does not attach numbers by array position to reversed partial tickets', () => {

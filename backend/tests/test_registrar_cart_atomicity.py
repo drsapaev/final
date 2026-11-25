@@ -447,3 +447,60 @@ def test_ticket_price_stays_unknown_when_a_visit_cannot_be_priced_by_one_queue()
     assert price([scoped], [(line, "ecg")], Decimal("50000")) is None
     assert price([scoped], [(line, None)], Decimal("50000")) is None
     assert price([scoped], [(line, "cardiology_common")], Decimal("60000")) is None
+
+
+def test_initial_mixed_ecg_procedures_lab_tickets_use_separate_prices(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    # A synthetic copy of the shape (three departments), with deliberately
+    # different prices and one genuinely free line.
+    from datetime import date
+
+    test_patient.birth_date = date(1988, 12, 27)
+    test_patient.address = "SYNTHETIC lab address"
+    services = []
+    tags = {"ecg": Decimal("41500"), "procedures": Decimal("27500"), "lab": Decimal("0")}
+    for tag, amount in tags.items():
+        db_session.add(
+            QueueResource(code=tag, queue_tag=tag, display_name=f"SYNTHETIC {tag}")
+        )
+        service = Service(
+            code=f"SYNTH-{tag}", service_code=f"SYNTH-{tag}",
+            name=f"SYNTHETIC {tag}", queue_tag=tag, price=amount,
+            requires_doctor=False, is_consultation=False, active=True,
+        )
+        db_session.add(service)
+        services.append(service)
+    db_session.commit()
+    day = clinic_today(db_session)
+    visit = {
+        "doctor_id": None,
+        "visit_date": day.isoformat(),
+        "department": "lab",
+        "services": [{"service_id": service.id, "quantity": 2} for service in services],
+    }
+    headers = _auth_headers(admin_user)
+    response = client.post(
+        "/api/v1/registrar/cart",
+        headers=headers,
+        json=_cart_payload(patient_id=test_patient.id, visits=[visit]),
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    [visit_id] = payload["visit_ids"]
+    assignments = payload["queue_numbers"][str(visit_id)]
+    assert {item["queue_tag"]: Decimal(item["service_price"]) for item in assignments} == {
+        tag: price * 2 for tag, price in tags.items()
+    }
+    assert sum(Decimal(item["service_price"]) for item in assignments) == Decimal(payload["total_amount"])
+
+    rows = client.get("/api/v1/registrar/queues/today", headers=headers, params={"date_str": day})
+    assert rows.status_code == 200
+    lab_assignment = next(item for item in assignments if item["queue_tag"] == "lab")
+    lab_row = next(
+        row for bucket in rows.json()["queues"] for row in bucket["entries"]
+        if row.get("daily_queue_id") == lab_assignment["queue_id"]
+        and row.get("visit_id") == visit_id
+    )
+    assert lab_row.get("patient_birth_year") == 1988
+    assert lab_row.get("address") == "SYNTHETIC lab address"

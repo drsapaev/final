@@ -273,7 +273,7 @@ function resolveServicePrice(row: Record<string, unknown>, overrides: Record<str
     row?.service_price,
     row?.price,
     row?.price_default,
-    row?.cost,
+    row?.print_cost_known === false ? undefined : row?.cost,
     row?.amount,
     row?.service_cost
   );
