@@ -30,7 +30,18 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
+      # Full baseline includes PostgreSQL + Redis integration fixtures.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     env:
+      ARQ_REDIS_URL: redis://localhost:6379/0
       DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb
       CORS_DISABLE: '1'
       WS_DEV_ALLOW: '1'
