@@ -43,7 +43,7 @@ def test_list_visits_endpoint_delegates_to_service(
                 "started_at": None,
                 "finished_at": None,
                 "notes": "router wiring",
-                "planned_date": planned,
+                "visit_date": date(2026, 3, 7),
                 "source": "desk",
             }
         ]
@@ -67,6 +67,7 @@ def test_list_visits_endpoint_delegates_to_service(
     payload = response.json()
     assert payload[0]["id"] == 17
     assert payload[0]["notes"] == "router wiring"
+    assert payload[0]["planned_date"] == "2026-03-07"
     assert captured == {
         "patient_id": 4,
         "doctor_id": 9,
@@ -75,6 +76,30 @@ def test_list_visits_endpoint_delegates_to_service(
         "limit": 5,
         "offset": 2,
     }
+
+
+def test_list_visits_filters_real_canonical_visit_date(
+    client, db_session, auth_headers, test_visit
+) -> None:
+    day = date(2026, 3, 8)
+    test_visit.visit_date = day
+    other = Visit(
+        patient_id=test_visit.patient_id,
+        doctor_id=test_visit.doctor_id,
+        status="open",
+        visit_date=day + timedelta(days=1),
+    )
+    db_session.add(other)
+    db_session.commit()
+    response = client.get(
+        "/api/v1/visits/visits",
+        params={"planned_date": day.isoformat(), "patient_id": test_visit.patient_id},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert [(row["id"], row["planned_date"]) for row in response.json()] == [
+        (test_visit.id, day.isoformat())
+    ]
 
 
 def test_get_visit_endpoint_delegates_to_service(
@@ -94,7 +119,7 @@ def test_get_visit_endpoint_delegates_to_service(
                 "started_at": None,
                 "finished_at": None,
                 "notes": "visit card",
-                "planned_date": None,
+                "visit_date": date(2026, 3, 8),
                 "source": "desk",
                 "patient_name": "Karimov Aziz",
                 "patient_fio": "Karimov Aziz",
@@ -125,6 +150,7 @@ def test_get_visit_endpoint_delegates_to_service(
     payload = response.json()
     assert payload["visit"]["id"] == test_visit.id
     assert payload["visit"]["notes"] == "visit card"
+    assert payload["visit"]["planned_date"] == "2026-03-08"
     assert payload["visit"]["patient_name"] == "Karimov Aziz"
     assert payload["visit"]["doctor_name"] == "Demo Cardiologist"
     assert payload["services"][0]["name"] == "Consultation"
