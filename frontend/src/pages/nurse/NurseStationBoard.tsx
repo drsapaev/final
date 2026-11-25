@@ -4,7 +4,7 @@
  * The active card follows the SERVER state (§5):
  *  - waiting / no current -> [Вызвать следующего];
  *  - called               -> [Начать приём] [Пациент не явился] [Завершить без выполнения];
- *  - in_progress          -> the station-routed service list (each with its own actions).
+ *  - in_progress          -> service actions, then close the owned queue episode with a reason.
  * NO visit-close action exists here (§5): «Выполнено» completes a
  * ServiceExecution, the Visit stays open — the server decides the flip.
  *
@@ -36,13 +36,19 @@ export type NurseStationBoardProps = {
   onCallNext: () => void;
   onStart: (entryId: number) => void;
   onNoShow: (entryId: number) => void;
-  onEntryIncomplete: (entryId: number) => void;
+  onEntryIncomplete: (entryId: number, started?: true) => void;
   onStartExecution: (visitServiceId: number, queueEntryId: number) => void;
   onCompleteExecution: (executionId: number) => void;
   onIncompleteExecution: (executionId: number) => void;
 };
 
 const ENTRY_ACTIVE = new Set(['called', 'in_progress']);
+
+export function canFinishStartedEntry(entry: NurseBoardEntry | null): boolean {
+  return entry?.status === 'in_progress' && entry.is_my_claim === true
+    && Array.isArray(entry.services)
+    && !entry.services.some((service) => service.in_progress_execution_id != null);
+}
 
 export function NurseStationBoard({
   stationLabel,
@@ -136,21 +142,36 @@ export function NurseStationBoard({
           )}
 
           {current.status === 'in_progress' && (
-            <NurseServiceList
-              services={current.services ?? []}
-              pendingStartExecution={(visitServiceId) =>
-                isPending(`execution:${visitServiceId}`)
-              }
-              pendingComplete={(executionId) =>
-                isPending(`complete:${executionId}`) ||
-                isPending(`incomplete:${executionId}`)
-              }
-              onStartExecution={(visitServiceId) =>
-                onStartExecution(visitServiceId, current.id)
-              }
-              onCompleteExecution={onCompleteExecution}
-              onIncompleteExecution={onIncompleteExecution}
-            />
+            <>
+              <NurseServiceList
+                services={current.services ?? []}
+                pendingStartExecution={(visitServiceId) =>
+                  isPending(`execution:${visitServiceId}`)
+                }
+                pendingComplete={(executionId) =>
+                  isPending(`complete:${executionId}`) ||
+                  isPending(`incomplete:${executionId}`)
+                }
+                onStartExecution={(visitServiceId) =>
+                  onStartExecution(visitServiceId, current.id)
+                }
+                onCompleteExecution={onCompleteExecution}
+                onIncompleteExecution={onIncompleteExecution}
+              />
+              {canFinishStartedEntry(current) && (
+                <div className="nurse-actions">
+                  <button
+                    type="button"
+                    className="nurse-btn nurse-btn--warning"
+                    disabled={isPending(`entry-incomplete:${current.id}`)
+                      || (current.services ?? []).some((service) => isPending(`execution:${service.visit_service_id}`))}
+                    onClick={() => onEntryIncomplete(current.id, true)}
+                  >
+                    {t('nurse.action_entry_finish_with_reason')}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       ) : (
