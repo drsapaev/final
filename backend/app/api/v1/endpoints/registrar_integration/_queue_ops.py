@@ -1161,12 +1161,17 @@ def _process_online_queue_entries(
             else (online_entry.created_at if online_entry.created_at else datetime.now())
         )
 
-        bucket["entries"].append({
+        entry = {
             "type": "online_queue",
             "data": online_entry,
             "created_at": online_entry.created_at if online_entry.created_at else datetime.now(),
             "queue_time": entry_time,
-        })
+        }
+        # Keep the legacy echokg bucket for existing consumers, but expose
+        # the canonical ECG row tag expected by the seeded registrar profile.
+        if daily_queue.queue_tag == "ecg":
+            entry["queue_tag"] = "ecg"
+        bucket["entries"].append(entry)
 
 
 def _process_legacy_appointments(
@@ -1376,6 +1381,7 @@ def _serialize_queue_entry(
         "type": entry_type,
         "record_type": entry_type,
         "queue_entry_id": entry_wrapper.get("queue_entry_id"),
+        **({"queue_tag": entry_wrapper["queue_tag"]} if "queue_tag" in entry_wrapper else {}),
         "queue_owner_kind": queue_owner_kind,
         "queue_owner_id": queue_owner_id,
         "daily_queue_id": daily_queue_id,
