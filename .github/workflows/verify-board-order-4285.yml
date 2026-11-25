@@ -1,0 +1,53 @@
+name: Display board order browser proof
+on:
+  push:
+    branches:
+      - codex/verify-board-order-4285
+permissions:
+  contents: read
+jobs:
+  board-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install project dependencies and Chromium
+        working-directory: frontend
+        run: |
+          npm ci --legacy-peer-deps
+          npx playwright install chromium --only-shell
+      - name: Reproduce both defects on the exact unpatched component and then verify the candidate
+        env:
+          VITE_ENABLE_WS: '1'
+          VITE_API_BASE_URL: same-origin
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file=frontend/src/pages/DisplayBoardUnified.tsx
+          test "$(git rev-parse HEAD^)" = cfbd58ba226b32788b3e78db463a2aca783aa85c
+          proof_dir="$(mktemp -d)"
+          cleanup() {
+            if [[ -n "${vite_pid:-}" ]]; then kill "$vite_pid" 2>/dev/null || true; fi
+            cp "$proof_dir/component.tsx" "$source_file"
+            rm -rf "$proof_dir"
+          }
+          cp "$source_file" "$proof_dir/component.tsx"
+          trap cleanup EXIT
+          (cd frontend; exec node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 18586 --strictPort) >"$proof_dir/vite.log" 2>&1 &
+          vite_pid=$!
+          if ! curl -fsS --retry 30 --retry-connrefused --retry-delay 1 --max-time 5 http://127.0.0.1:18586/display-board >/dev/null; then
+            tail -30 "$proof_dir/vite.log"
+            exit 1
+          fi
+          git show "HEAD^:$source_file" > "$source_file"
+          PROOF_BASELINE=1 node frontend/e2e/board-order-proof.cjs
+          cp "$proof_dir/component.tsx" "$source_file"
+          node frontend/e2e/board-order-proof.cjs

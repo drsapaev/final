@@ -147,6 +147,74 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
     expect(screen.queryByText(/№\s*11/)).not.toBeInTheDocument();
   });
 
+  it('keeps a confirmed invitation across delayed updates and accepts genuine completion from a new snapshot', async () => {
+    const { push, view, requestSnapshot } = await renderBoard({}, {}, false);
+    const selected = { id: 11, queue_id: 1, number: 11, status: 'called' };
+    const unrelated = { id: 27, queue_id: 2, number: 27, status: 'waiting' };
+    const snapshot = {
+      type: 'initial_state', data: {
+        queue_entries: [selected, unrelated],
+        current_call: {
+          event_id: 'synthetic-invitation', queue_id: 1, queue_entry_id: 11,
+          queue_number: 11, expires_at: new Date(Date.now() + 30000).toISOString(),
+        },
+      },
+    };
+    push(snapshot);
+    expect(view.container.querySelector('.displayboard-call-number')).toHaveTextContent('11');
+    const delayed = {
+      type: 'queue_update', event_type: 'queue.updated',
+      data: { queue_id: 1, queue_entries: [{ ...selected, status: 'waiting' }] },
+    };
+    push(delayed);
+    push(delayed);
+    expect(view.container.querySelector('.displayboard-call-number')).toHaveTextContent('11');
+    expect(screen.getByText('27')).toBeInTheDocument();
+    expect(view.container.querySelector('[data-status="called"] .displayboard-queue-number')).toHaveTextContent('11');
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(requestSnapshot).toHaveBeenCalledOnce();
+    push(snapshot);
+    expect(view.container.querySelector('.displayboard-call-number')).toHaveTextContent('11');
+    push(delayed);
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(2);
+    // A frame arriving during the request makes the next unversioned
+    // snapshot ambiguous, so wait for a clean response without dropping
+    // the last confirmed invitation.
+    push(delayed);
+    push({ type: 'initial_state', data: { queue_entries: [unrelated], current_call: null } });
+    expect(view.container.querySelector('.displayboard-call-number')).toHaveTextContent('11');
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(requestSnapshot).toHaveBeenCalledTimes(3);
+    push({ type: 'initial_state', data: { queue_entries: [unrelated], current_call: null } });
+    expect(view.container.querySelector('.displayboard-call-number')).toBeNull();
+    expect(screen.getByText('27')).toBeInTheDocument();
+  });
+
+  it('does not resurrect a completed ticket when a delayed called row arrives after the snapshot', async () => {
+    const { push, view, requestSnapshot } = await renderBoard({}, {}, false);
+    const unrelated = { id: 27, queue_id: 2, number: 27, status: 'waiting' };
+    push({ type: 'initial_state', data: { queue_entries: [unrelated], current_call: null } });
+    expect(view.container.querySelector('.displayboard-call-number')).toBeNull();
+    expect(screen.getByText('27')).toBeInTheDocument();
+    push({
+      type: 'queue_update', event_type: 'queue.updated',
+      data: { queue_id: 1, queue_entries: [{ id: 11, queue_id: 1, number: 11, status: 'called' }] },
+    });
+    expect(view.container.querySelector('.displayboard-call-number')).toBeNull();
+    expect(screen.getByText('27')).toBeInTheDocument();
+    expect(screen.queryByText('11')).toBeNull();
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(requestSnapshot).toHaveBeenCalledOnce();
+    // The same ambiguous envelope could instead be a genuinely new called
+    // row whose live announcement was never received on this connection.
+    push({ type: 'initial_state', data: { current_call: null, queue_entries: [
+      unrelated, { id: 11, queue_id: 1, number: 11, status: 'called' },
+    ] } });
+    expect(screen.getByText('11')).toBeInTheDocument();
+    expect(view.container.querySelector('.displayboard-call-number')).toBeNull();
+  });
+
   it('keeps the expiration timer when a different queue completes the same ticket number', async () => {
     const { push } = await renderBoard();
     push({
@@ -162,7 +230,7 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
     expect(screen.queryByText(/№\s*5/)).not.toBeInTheDocument();
   });
 
-  it.each(['in_progress', 'in_service', 'waiting'])(
+  it.each(['in_progress', 'in_service'])(
     'clears the call when its entry changes to %s', async (status) => {
       const { push } = await renderBoard();
       push({ type: 'patient_call', data: { queue_id: 1, queue_entry_id: 11, queue_number: 5 } });
@@ -172,6 +240,19 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
       expect(screen.queryByText(/№\s*5/)).not.toBeInTheDocument();
     },
   );
+
+  it('clears a call returned to waiting only after confirming that transition', async () => {
+    const { push, requestSnapshot } = await renderBoard();
+    const waiting = { id: 11, queue_id: 1, number: 5, status: 'waiting' };
+    push({ type: 'patient_call', data: { queue_id: 1, queue_entry_id: 11, queue_number: 5 } });
+    push({ type: 'queue_update', data: { queue_id: 1, queue_entries: [waiting] } });
+    expect(screen.getByText(/№\s*5/)).toBeInTheDocument();
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(requestSnapshot).toHaveBeenCalledOnce();
+    push({ type: 'initial_state', data: { queue_entries: [waiting], current_call: null } });
+    expect(screen.queryByText(/№\s*5/)).not.toBeInTheDocument();
+    expect(screen.getByText('5')).toBeInTheDocument();
+  });
 
   it('announces a live call that arrives while the first snapshot is being built', async () => {
     const speak = vi.fn((utterance: { onstart?: () => void }) => utterance.onstart?.());
@@ -483,6 +564,9 @@ describe('DisplayBoardUnified audit-3961 frontend plane', () => {
 
   it('updates the current room and preserves an explicitly unknown resource room', async () => {
     const { push } = await renderBoard();
+    push({ type: 'initial_state', data: { queue_entries: [
+      { id: 12, queue_id: 1, number: 6, status: 'called', cabinet: null },
+    ], current_call: null } });
     push({ type: 'patient_call', data: { queue_id: 1, queue_entry_id: 11, queue_number: 5, cabinet: '101' } });
     push({ type: 'queue_update', data: { queue_id: 1, cabinet: '102', queue_entries: [
       { id: 11, queue_id: 1, number: 5, status: 'called', cabinet: '505' },

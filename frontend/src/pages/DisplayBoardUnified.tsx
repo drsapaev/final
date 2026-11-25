@@ -288,6 +288,12 @@ export default function DisplayBoardUnified({
   const [snapshotReady, setSnapshotReady] = useState(false);
   const [callStateAvailable, setCallStateAvailable] = useState(true);
   const [queueData, setQueueData] = useState<QueueEntryDto[]>([]);
+  const queueDataRef = useRef<QueueEntryDto[]>([]);
+  const updateQueueData = useCallback((next: QueueEntryDto[] | ((previous: QueueEntryDto[]) => QueueEntryDto[])) => {
+    const entries = typeof next === 'function' ? next(queueDataRef.current) : next;
+    queueDataRef.current = entries;
+    setQueueData(entries);
+  }, []);
   const [currentCall, setCurrentCall] = useState<CurrentCall | null>(null);
   const [displayTest, setDisplayTest] = useState<DisplayTest | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -660,7 +666,8 @@ export default function DisplayBoardUnified({
     if (!messageRaw || typeof messageRaw !== 'object') return;
     const message = messageRaw as WSMessage;
     const data = message.data ?? {};
-    if (!snapshotReadyRef.current && ['patient_call', 'queue_update', 'call_completed'].includes(message.type)) {
+    if ((!snapshotReadyRef.current || snapshotResyncRef.current) &&
+        ['patient_call', 'queue_update', 'call_completed'].includes(message.type)) {
       snapshotDirtyRef.current = true;
     }
 
@@ -694,7 +701,9 @@ export default function DisplayBoardUnified({
         const displayed = currentCallRef.current;
         // A live invitation may arrive while the server is making the snapshot.
         if (wasResync || !displayed?.issued_at || typeof data.last_update !== 'string' || displayed.issued_at <= data.last_update) {
-          showCall(call && deadline > Date.now() ? call : null, deadline);
+          const acceptedCall = call && deadline > Date.now() ? call : null;
+          if (wasResync && displayed && (!acceptedCall || !sameCall(displayed, acceptedCall))) stopBoardAudio();
+          showCall(acceptedCall, deadline);
         }
         if (call?.issued_at && call.event_id) {
           const order = call.issued_at + '|' + call.event_id;
@@ -706,7 +715,7 @@ export default function DisplayBoardUnified({
         snapshotReadyRef.current = true;
         setSnapshotReady(true);
         playPendingLiveCall();
-        setQueueData(data.queue_entries);
+        updateQueueData(data.queue_entries);
         clearAnnounceTimers();
         setAnnouncements(Array.isArray(data.announcements) ? data.announcements : []);
         break;
@@ -783,7 +792,7 @@ export default function DisplayBoardUnified({
             specialty: typeof data.specialty === 'string' ? data.specialty : undefined,
             cabinet: data.cabinet ?? undefined,
           };
-          setQueueData((prev) => prev.some((entry) => sameId(entry.id, newEntry.id))
+          updateQueueData((prev) => prev.some((entry) => sameId(entry.id, newEntry.id))
             ? prev : [...prev, newEntry]);
         } else {
           // Обновляем очередь; RQ-24.a.2: владелец/кабинет приходят
@@ -817,6 +826,26 @@ export default function DisplayBoardUnified({
           const matchingEntry = call && rawEntries.find((entry) =>
             sameId(entry.queue_id ?? eventQueueId, call.queue_id) &&
             sameId(entry.id, call.queue_entry_id));
+          // A versionless relay update can arrive after a newer snapshot.
+          // A call may be returned to waiting, or a hidden row newly called;
+          // neither transition is safe to infer from the arrival order.
+          // A live invitation can corroborate its own called row.
+          const matchesCall = (entry: QueueEntryDto) => !!call &&
+            sameId(entry.queue_id, call.queue_id) && sameId(entry.id, call.queue_entry_id);
+          const previousEntries = queueDataRef.current;
+          const sameEntry = (a: QueueEntryDto, b: QueueEntryDto) =>
+            sameId(a.queue_id, b.queue_id) && sameId(a.id, b.id);
+          const contradictsCalledState =
+            matchingEntry?.status === 'waiting' ||
+            scopedEntries.some((entry) => entry.status === 'waiting' && previousEntries.some(
+              (previous) => sameEntry(previous, entry) && previous.status === 'called'
+            )) ||
+            scopedEntries.some((entry) => entry.status === 'called' && !matchesCall(entry) &&
+              !previousEntries.some((previous) => sameEntry(previous, entry) && previous.status === 'called'));
+          if (snapshotReadyRef.current && requestSnapshot && contradictsCalledState) {
+            scheduleSnapshotResync(requestSnapshot);
+            break;
+          }
           if (call && matchingEntry) {
             if (matchingEntry.status !== 'called') {
               showCall(null);
@@ -840,7 +869,7 @@ export default function DisplayBoardUnified({
               }
             }
           }
-          setQueueData((prev) => {
+          updateQueueData((prev) => {
             if (eventQueueId === undefined) {
               // Защита от дрифта контракта (старый бэкенд без queue_id):
               // прежнее поведение — полная замена. Владение очередью по
@@ -1068,7 +1097,7 @@ export default function DisplayBoardUnified({
   // Инициализация
   useEffect(() => {
     setHasSnapshot(false);
-    setQueueData([]);
+    updateQueueData([]);
     setStats(null);
     setAnnouncements([]);
     setSnapshotError('');
@@ -1157,7 +1186,7 @@ export default function DisplayBoardUnified({
         }
       }
     };
-  }, [isBoardView, qs.department, qs.d, refreshMs, currentBoardId, invalidateBoardStateRequests, resetSnapshotResync]);
+  }, [isBoardView, qs.department, qs.d, refreshMs, currentBoardId, invalidateBoardStateRequests, resetSnapshotResync, updateQueueData]);
 
   // Online/offline (старое)
   useEffect(() => {
