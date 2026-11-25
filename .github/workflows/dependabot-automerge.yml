@@ -101,12 +101,17 @@ jobs:
           VERDICT: ${{ steps.classify.outputs.verdict }}
           FILES_OK: ${{ steps.guard.outputs.files_ok }}
           EVENT: ${{ github.event.action }}
+          QUEUE_ENABLED: ${{ vars.FINAL_MERGE_QUEUE_ENABLED }}
         run: |
           # enable             - first classification passed: switch auto-merge ON
           # none               - synchronize, still eligible: keep auto-merge as is
           # disable_and_triage - guard failed: switch auto-merge OFF (if on), manual queue
           # triage             - outside the allowlist: manual queue (never enabled)
-          if [ "$VERDICT" = "triage" ]; then
+          if [ "${QUEUE_ENABLED:-false}" = "true" ]; then
+            # The protected Codex App is the only automated merge path in this
+            # mode. Reuse the verified disable routine before manual admission.
+            echo "action=disable_and_triage" >> "$GITHUB_OUTPUT"
+          elif [ "$VERDICT" = "triage" ]; then
             echo "action=triage" >> "$GITHUB_OUTPUT"
           elif [ "$FILES_OK" != "true" ]; then
             echo "action=disable_and_triage" >> "$GITHUB_OUTPUT"
@@ -139,7 +144,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
           PR_URL: ${{ github.event.pull_request.html_url }}
-          REASON: ${{ steps.guard.outputs.reason }}
+          REASON: ${{ vars.FINAL_MERGE_QUEUE_ENABLED == 'true' && 'shared_slot_required' || steps.guard.outputs.reason }}
         run: |
           # P1 hardening (#3500 review): disabling auto-merge IS the
           # fail-closed guarantee - its failure is never suppressed. The
@@ -174,7 +179,11 @@ jobs:
             echo "auto-merge was not enabled - nothing to disable."
           fi
           gh pr edit "$PR_URL" --add-label deps-needs-triage || true
-          gh pr comment "$PR_URL" --body "Auto-merge blocked by the fail-closed file guard (reason: \`${REASON}\`). Auto-merge is disabled (if it was enabled) and the PR is routed to the manual triage queue per the managed Dependabot flow. Tracking: 'Dependabot manual-review queue' issue."
+          message="Auto-merge blocked by the fail-closed file guard (reason: \`${REASON}\`). Auto-merge is disabled (if it was enabled) and the PR is routed to the manual triage queue per the managed Dependabot flow. Tracking: 'Dependabot manual-review queue' issue."
+          if [ "$REASON" = "shared_slot_required" ]; then
+            message="Native auto-merge is disabled while the shared merge queue is enabled. After normal review, submit this PR through the protected Codex PR App."
+          fi
+          gh pr comment "$PR_URL" --body "$message"
 
       - name: Route to the manual triage queue (outside allowlist)
         if: steps.decide.outputs.action == 'triage'
@@ -182,6 +191,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           EVENT: ${{ github.event.action }}
+          QUEUE_ENABLED: ${{ vars.FINAL_MERGE_QUEUE_ENABLED }}
         run: |
           gh pr edit "$PR_URL" --add-label deps-needs-triage || true
           # Comment on first classification only - Dependabot rebases often,

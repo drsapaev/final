@@ -342,7 +342,7 @@ function normalizeTicketSources(row: Record<string, unknown>, overrides: Record<
   return [];
 }
 
-function resolveServicePriceForTicket(row: Record<string, unknown>, source: Record<string, unknown>, overrides: Record<string, unknown> = {}): Record<string, unknown> | null {
+function resolveServicePriceForTicket(row: Record<string, unknown>, source: Record<string, unknown>, overrides: Record<string, unknown> = {}): unknown {
   const directPrice = getFirstDefined(
     overrides.servicePrice,
     source?.service_price,
@@ -351,7 +351,7 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
     source?.amount
   );
   if (directPrice !== null && directPrice !== undefined && directPrice !== '') {
-    return directPrice as Record<string, unknown>;
+    return directPrice;
   }
 
   const normalizedCandidates = [
@@ -369,9 +369,9 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
   }
 
   const services = Array.isArray(row?.services) ? row.services : [];
-  for (const service of services) {
+  const matchingServices = services.filter((service) => {
     if (!service || typeof service !== 'object') {
-      continue;
+      return false;
     }
 
     const serviceLabels = [
@@ -384,17 +384,20 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
       .filter(Boolean)
       .map((value: Record<string, unknown>) => String(value).trim().toLowerCase());
 
-    if (serviceLabels.some((label) => normalizedCandidates.includes(label))) {
-      return getFirstDefined(
-        service?.price,
-        service?.service_price,
-        service?.amount,
-        service?.cost
-      ) as Record<string, unknown>;
-    }
+    return serviceLabels.some((label) => normalizedCandidates.includes(label));
+  });
+
+  if (matchingServices.length !== 1) {
+    return null;
   }
 
-  return {};
+  const [matchedService] = matchingServices;
+  return getFirstDefined(
+    matchedService.price,
+    matchedService.service_price,
+    matchedService.amount,
+    matchedService.cost
+  );
 }
 
 function resolveTicketCabinet(row: Record<string, unknown>, source: Record<string, unknown> | null = null, overrides: Record<string, unknown> = {}): unknown {
@@ -493,9 +496,6 @@ function buildPanelTicketPayloadForSource(
     queue_numbers: [],
     queue_entry: undefined,
     queue_ticket: undefined,
-    service_price: resolveServicePriceForTicket(row, source, overrides),
-    price: resolveServicePriceForTicket(row, source, overrides),
-    cost: resolveServicePriceForTicket(row, source, overrides),
   };
 
   // A child ticket cannot borrow another ticket's legacy number or cabinet.
@@ -505,7 +505,11 @@ function buildPanelTicketPayloadForSource(
   for (const key of ['effective_cabinet', 'queue_cabinet', 'cabinet_number', 'doctor_cabinet']) {
     delete mergedRow[key];
   }
-  return buildPanelTicketPayload(mergedRow, overrides);
+  // A parent amount can cover several tickets. Print only the recorded charge for this ticket.
+  return {
+    ...buildPanelTicketPayload(mergedRow, overrides),
+    service_price: resolveServicePriceForTicket(row, source, overrides),
+  };
 }
 
 export function resolvePanelTicketPayloads(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Record<string, unknown>[] {
@@ -693,9 +697,13 @@ function renderPanelTicketMarkup(payload: Record<string, unknown>, settings: Rec
   const clinicName = resolveClinicName(payload, {}, branding);
   const logoUrl = resolveClinicLogo(payload, {}, branding);
   const servicePrice = resolveServicePrice(payload);
+  const numericPrice = typeof servicePrice === 'string' && servicePrice.trim() !== ''
+    ? Number(servicePrice)
+    : servicePrice;
   const qrPayload = payload?.qr_payload;
-  const showPriceValue = settings.show_price && servicePrice !== null && servicePrice !== undefined && String(servicePrice) !== '' && Number(servicePrice) !== 0;
-  const priceValue = showPriceValue ? formatMoney(servicePrice, 'UZS') : null;
+  const priceValue = settings.show_price && typeof numericPrice === 'number' && Number.isFinite(numericPrice)
+    ? formatMoney(numericPrice, 'UZS')
+    : null;
 
   // REG-FE-082: блок бренда рендерится только при честном имени/логотипе
   // (реальные настройки или снапшот строки); пустые значения не
