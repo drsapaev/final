@@ -38,6 +38,8 @@ jobs:
           python-version: "3.11"
       - name: Validate registry schema and evidence rules
         run: python tools/audit_registry/check_registry.py
+      - name: Test registry evidence rules
+        run: python -m unittest tools.audit_registry.test_check_registry
       - name: Cross-check against issue #4063 checklist (1:1, no lost/renamed findings)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

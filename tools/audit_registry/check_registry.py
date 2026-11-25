@@ -22,6 +22,8 @@ import sys
 from pathlib import Path
 
 REGISTRY_PATH = Path(__file__).resolve().parents[2] / "docs" / "audit-registry" / "registry.json"
+GITHUB_REPO_API = "https://api.github.com/repos/drsapaev/final"
+FULL_SHA_RE = re.compile(r"[a-f0-9]{40}")
 
 VALID_STATUSES = {
     "UNVERIFIED",
@@ -135,6 +137,8 @@ def crosscheck_issue(entries: list[dict], pat: str | None) -> None:
 
 def verify_merged_pull_requests(entries: list[dict], pat: str | None) -> None:
     verified: dict[int, dict] = {}
+    reachable: set[str] = set()
+    main_sha: str | None = None
     for entry in entries:
         if entry["status"] != "FIXED_VERIFIED_ON_MAIN":
             continue
@@ -143,15 +147,42 @@ def verify_merged_pull_requests(entries: list[dict], pat: str | None) -> None:
             fail(f"{entry['id']}: invalid fix_pr {entry['fix_pr']!r}")
         pr_number = int(number)
         if pr_number not in verified:
-            url = f"https://api.github.com/repos/drsapaev/final/pulls/{pr_number}"
+            url = f"{GITHUB_REPO_API}/pulls/{pr_number}"
             verified[pr_number] = fetch_github_json(url, pat)
         pr = verified[pr_number]
         recorded_sha = str(entry["merge_sha"])
         actual_sha = pr.get("merge_commit_sha") or ""
         if not re.fullmatch(r"[a-f0-9]{7,40}", recorded_sha):
             fail(f"{entry['id']}: invalid merge_sha {recorded_sha!r}")
-        if not pr.get("merged") or not actual_sha.startswith(recorded_sha):
+        if pr.get("merged") is not True or not (
+            isinstance(actual_sha, str)
+            and FULL_SHA_RE.fullmatch(actual_sha)
+            and actual_sha.startswith(recorded_sha)
+        ):
             fail(f"{entry['id']}: fix PR #{pr_number} is not merged with recorded SHA {recorded_sha}")
+        if actual_sha in reachable:
+            continue
+        if main_sha is None:
+            main_ref = fetch_github_json(f"{GITHUB_REPO_API}/git/ref/heads/main", pat)
+            main_object = main_ref.get("object")
+            pin = main_object.get("sha") if isinstance(main_object, dict) else None
+            if not isinstance(pin, str) or not FULL_SHA_RE.fullmatch(pin):
+                fail("could not pin a full commit SHA for canonical main")
+            main_sha = pin
+        comparison = fetch_github_json(
+            f"{GITHUB_REPO_API}/compare/{actual_sha}...{main_sha}?per_page=1", pat
+        )
+        merge_base = comparison.get("merge_base_commit")
+        if (
+            comparison.get("status") not in ("ahead", "identical")
+            or not isinstance(merge_base, dict)
+            or merge_base.get("sha") != actual_sha
+        ):
+            fail(
+                f"{entry['id']}: merged commit for fix PR #{pr_number} is not "
+                f"verified in canonical main at {main_sha}"
+            )
+        reachable.add(actual_sha)
 
 
 def final_closure(entries: list[dict]) -> None:
@@ -186,7 +217,7 @@ def main() -> None:
         crosscheck_issue(entries, args.issue_token)
         verify_merged_pull_requests(entries, args.issue_token)
         print("issue cross-check passed: registry and #4063 checklist IDs and checkboxes match")
-        print("fixed PR merge references verified against GitHub")
+        print("fixed PR merge references verified in canonical main against GitHub")
 
     if args.final_closure:
         final_closure(entries)

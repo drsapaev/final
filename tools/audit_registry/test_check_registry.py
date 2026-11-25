@@ -1,7 +1,7 @@
 import contextlib
 import io
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from tools.audit_registry import check_registry
 
@@ -37,14 +37,57 @@ class RegistryConsistencyTests(unittest.TestCase):
             {"id": "AUTH-BE-001", "status": "FIXED_VERIFIED_ON_MAIN", "fix_pr": "#42", "merge_sha": "abcdef123"},
             {"id": "AUTH-BE-002", "status": "FIXED_VERIFIED_ON_MAIN", "fix_pr": 42, "merge_sha": "abcdef123"},
         ]
-        fetch.return_value = {"merged": True, "merge_commit_sha": "abcdef123" + "0" * 31}
+        fix = "abcdef123" + "0" * 31
+        main = "b" * 40
+        fetch.side_effect = [
+            {"merged": True, "merge_commit_sha": fix},
+            {"object": {"sha": main}},
+            {"status": "ahead", "merge_base_commit": {"sha": fix}},
+        ]
         check_registry.verify_merged_pull_requests(entries, None)
-        self.assertEqual(fetch.call_count, 1)
+        self.assertEqual(
+            fetch.call_args_list,
+            [
+                call(f"{check_registry.GITHUB_REPO_API}/pulls/42", None),
+                call(f"{check_registry.GITHUB_REPO_API}/git/ref/heads/main", None),
+                call(f"{check_registry.GITHUB_REPO_API}/compare/{fix}...{main}?per_page=1", None),
+            ],
+        )
 
+        fetch.side_effect = None
         fetch.return_value = {"merged": False, "merge_commit_sha": "abcdef123" + "0" * 31}
         self.assert_rejected(check_registry.verify_merged_pull_requests, entries, "not merged")
         fetch.return_value = {"merged": True, "merge_commit_sha": "fedcba987" + "0" * 31}
         self.assert_rejected(check_registry.verify_merged_pull_requests, entries, "not merged with recorded SHA")
+
+    @patch.object(check_registry, "fetch_github_json")
+    def test_fixed_entry_rejects_merge_not_reachable_from_main(self, fetch):
+        fix, main = "a" * 40, "b" * 40
+        entries = [
+            {"id": "AUTH-BE-003", "status": "FIXED_VERIFIED_ON_MAIN", "fix_pr": 43, "merge_sha": fix},
+        ]
+        for status, base in (("behind", main), ("diverged", main), ("ahead", main), ("ahead", None)):
+            with self.subTest(status=status, base=base):
+                fetch.side_effect = [
+                    {"merged": True, "merge_commit_sha": fix},
+                    {"object": {"sha": main}},
+                    {"status": status, "merge_base_commit": {"sha": base}},
+                ]
+                self.assert_rejected(check_registry.verify_merged_pull_requests, entries, "not verified in canonical main")
+
+    @patch.object(check_registry, "fetch_github_json")
+    def test_fixed_entry_accepts_main_tip_and_rejects_unavailable_main_pin(self, fetch):
+        fix = "a" * 40
+        entries = [
+            {"id": "AUTH-BE-004", "status": "FIXED_VERIFIED_ON_MAIN", "fix_pr": 44, "merge_sha": fix},
+        ]
+        merged = {"merged": True, "merge_commit_sha": fix}
+        fetch.side_effect = [
+            merged, {"object": {"sha": fix}}, {"status": "identical", "merge_base_commit": {"sha": fix}},
+        ]
+        check_registry.verify_merged_pull_requests(entries, None)
+        fetch.side_effect = [merged, {"object": {"sha": fix[:8]}}]
+        self.assert_rejected(check_registry.verify_merged_pull_requests, entries, "could not pin")
 
     def test_final_closure_rejects_unchecked_fixed_entry(self):
         entries = [{"id": "AUTH-BE-001", "status": "FIXED_VERIFIED_ON_MAIN", "checked": False}]

@@ -26,7 +26,9 @@ that enforces the remediation rules mechanically.
 3. **No unevidenced fixes** — `FIXED_VERIFIED_ON_MAIN` requires `fix_pr`
    (merged), `merge_sha`, `test_before`, `test_after`, `reviewer`, `date`.
    The issue check verifies the recorded PR is merged with the recorded merge
-   SHA. Reviewers must still verify that the evidence proves the particular fix.
+   SHA and verifies that the actual merge commit is reachable from one pinned
+   snapshot of canonical `main`. A merge into another branch alone does not count.
+   Reviewers must still verify that the evidence proves the particular fix.
 4. **No unexplained dispositions** — `DUPLICATE` requires `alias_of`;
    `REFUTED` / `OWNER_ACCEPTED_RISK` require a concrete `justification`
    (test or source evidence; accepted risk additionally requires explicit
