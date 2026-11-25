@@ -7,6 +7,7 @@ import { ThemeProvider } from '../../../contexts/ThemeContext';
 
 const queueMocks = vi.hoisted(() => ({
   callNextPatientInQueue: vi.fn(),
+  getTodayQueue: vi.fn(),
   loadQueueSnapshot: vi.fn(async () => ({ entries: [], is_open: true })),
   specialists: [{ id: '7', full_name: 'Registrar test doctor', specialty: 'cardiology' }],
   generateDoctorQRCode: vi.fn(),
@@ -33,6 +34,10 @@ vi.mock('../../../hooks/useQueueManager', () => ({
   }),
 }));
 
+vi.mock('../../../services/queue', () => ({
+  queueService: { getTodayQueue: queueMocks.getTodayQueue },
+}));
+
 vi.mock('../../../hooks/useQueueWebSocket', () => ({
   useQueueWebSocket: () => ({ state: 'disconnected' }),
 }));
@@ -45,14 +50,22 @@ vi.mock('../../../i18n/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+import * as dateUtils from '../../../utils/dateUtils';
+
 import ModernQueueManager from '../ModernQueueManager';
 
 describe('ModernQueueManager dentist start-visit flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    queueMocks.callNextPatientInQueue.mockResolvedValue({
-      success: true,
-      patient: { id: 42, name: 'Synthetic patient', number: 6 },
+    const { getLocalDateString } = dateUtils;
+    queueMocks.getTodayQueue.mockResolvedValue({ doctor: { id: 7 }, date: getLocalDateString(), entries: [] });
+    queueMocks.callNextPatientInQueue.mockImplementation(async () => {
+      queueMocks.getTodayQueue.mockResolvedValue({
+        doctor: { id: 7 }, date: getLocalDateString(), entries: [{
+          id: 42, patient_id: 1008, patient_name: 'Synthetic patient', number: 6, status: 'called', can_start_visit: true,
+        }],
+      });
+      return { success: true, patient: { id: 42, name: 'Synthetic patient', number: 6 } };
     });
     queueMocks.loadQueueSnapshot.mockResolvedValue({ entries: [], is_open: true });
   });
@@ -90,11 +103,15 @@ describe('ModernQueueManager dentist start-visit flow', () => {
   });
 
   it('keeps call-next as the queue command and offers a separate manager-level start action', async () => {
-    const onStartVisit = vi.fn(async () => true);
+    const onStartVisit = vi.fn(async () => {
+      queueMocks.getTodayQueue.mockResolvedValue({ doctor: { id: 7 }, date: dateUtils.getLocalDateString(), entries: [] });
+      return true;
+    });
     render(
       <ThemeProvider>
         <ModernQueueManager
           mode="doctor"
+          doctorQueueSpecialty="dentistry"
           selectedDoctor="7"
           doctors={[{ id: '7', specialty: 'dentistry' }]}
           onStartVisit={onStartVisit}
@@ -102,7 +119,9 @@ describe('ModernQueueManager dentist start-visit flow', () => {
       </ThemeProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'misc.mqm_call' }));
+    const callButton = screen.getByRole('button', { name: 'misc.mqm_call' });
+    await waitFor(() => expect(callButton).toBeEnabled());
+    fireEvent.click(callButton);
     const startVisitButton = await screen.findByRole('button', { name: 'dental.dental_panel_start_visit_for' });
 
     expect(queueMocks.callNextPatientInQueue).toHaveBeenCalledWith({ specialistId: '7', targetDate: expect.any(String) });
@@ -120,6 +139,7 @@ describe('ModernQueueManager dentist start-visit flow', () => {
       <ThemeProvider>
         <ModernQueueManager
           mode="doctor"
+          doctorQueueSpecialty="dentistry"
           selectedDoctor="7"
           doctors={[{ id: '7', specialty: 'dentistry' }]}
           onStartVisit={onStartVisit}
@@ -127,7 +147,9 @@ describe('ModernQueueManager dentist start-visit flow', () => {
       </ThemeProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'misc.mqm_call' }));
+    const callButton = screen.getByRole('button', { name: 'misc.mqm_call' });
+    await waitFor(() => expect(callButton).toBeEnabled());
+    fireEvent.click(callButton);
     const startVisitButton = await screen.findByRole('button', { name: 'dental.dental_panel_start_visit_for' });
     fireEvent.click(startVisitButton);
 
