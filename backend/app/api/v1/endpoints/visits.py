@@ -77,6 +77,14 @@ class VisitOut(BaseModel):
     doctor: dict[str, Any] | None = None
 
 
+def _visit_read_model(row: dict[str, Any]) -> VisitOut:
+    # The persisted column is visit_date; the public read contract already
+    # calls it planned_date. Keep legacy rows that lack the canonical column.
+    return VisitOut.model_validate(
+        {**row, "planned_date": row.get("visit_date", row.get("planned_date"))}
+    )
+
+
 class VisitServiceIn(BaseModel):
     code: str | None = Field(default=None, max_length=32)
     name: str = Field(max_length=255)
@@ -288,7 +296,7 @@ def list_visits(
             request=request,
         )
 
-    return [VisitOut(**row) for row in rows]  # type: ignore[arg-type]
+    return [_visit_read_model(row) for row in rows]  # type: ignore[arg-type]
 
 
 @router.post(
@@ -349,7 +357,7 @@ def get_visit(
     )
 
     return VisitWithServices(
-        visit=VisitOut(**payload["visit"]),
+        visit=_visit_read_model(payload["visit"]),
         services=[VisitServiceOut(**item) for item in payload["services"]],
     )
 
@@ -746,6 +754,8 @@ def reschedule_visit(
             raise HTTPException(404, "Visit not found")
         return VisitOut(**fresh)  # type: ignore[arg-type]
     update_values: dict = {"visit_date": new_date}
+    if "calendar_rescheduled" in t.c:
+        update_values["calendar_rescheduled"] = True
     if schedule_changed:
         # PR-1 (Codex round 2, P1): the reminder stamp is only valid for
         # the CURRENT schedule — rescheduling must invalidate it, otherwise
@@ -908,6 +918,8 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
             raise HTTPException(404, "Visit not found")
         return VisitOut(**fresh)  # type: ignore[arg-type]
     tomorrow_values: dict = {"visit_date": tomorrow}
+    if "calendar_rescheduled" in t.c:
+        tomorrow_values["calendar_rescheduled"] = True
     if hasattr(t.c, "reminder_sent_at"):
         tomorrow_values["reminder_sent_at"] = None
     if hasattr(t.c, "reminder_generation"):

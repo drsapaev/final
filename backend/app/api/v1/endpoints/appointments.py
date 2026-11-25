@@ -1,6 +1,6 @@
 # app/api/v1/endpoints/appointments.py
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -20,6 +20,10 @@ from app.repositories.public_booking_request_repository import (
     PublicBookingRequestRepository,
 )
 from app.schemas import appointment as appointment_schemas
+from app.services.appointment_calendar import (
+    CalendarRescheduledVisit,
+    list_rescheduled_calendar_visits,
+)
 from app.services.appointment_eligibility import (
     ensure_doctor_eligible_for_appointment as _ensure_appointment_doctor_eligible,
 )
@@ -29,7 +33,10 @@ from app.services.online_queue import (
     get_or_create_day,
     load_stats,
 )
-from app.services.patient_access_audit import log_patient_access
+from app.services.patient_access_audit import (
+    log_patient_access,
+    log_patient_access_many,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -442,6 +449,39 @@ def list_appointments(
         result.append(apt_dict)
 
     return result
+
+
+@router.get("/rescheduled-visits", response_model=list[CalendarRescheduledVisit])
+def read_rescheduled_calendar_visits(
+    request: Request,
+    day: date,
+    doctor_id: int | None = Query(None),
+    limit: int = Query(200, ge=1, le=500),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+):
+    """List staff-moved visits not already represented by a calendar appointment."""
+    if (
+        not _has_broad_appointment_access(current_user)
+        and _normalized_role_value(current_user.role) not in APPOINTMENT_DOCTOR_ROLES
+    ):
+        raise HTTPException(status_code=403, detail="Access denied")
+    _, scoped_doctor_id = _scope_appointment_list_filters(
+        db, patient_id=None, doctor_id=doctor_id, current_user=current_user
+    )
+    rows = list_rescheduled_calendar_visits(
+        db, day=day, doctor_id=scoped_doctor_id, limit=limit
+    )
+    if rows:
+        log_patient_access_many(
+            db,
+            actor_user=current_user,
+            resource_entries=[(patient_id, str(row.visit_id)) for patient_id, row in rows],
+            resource_type="visit",
+            action="view",
+            request=request,
+        )
+    return [row for _, row in rows]
 
 
 @router.post("/", response_model=appointment_schemas.Appointment)
