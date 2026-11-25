@@ -479,7 +479,8 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
         </div> : null}
       >
         {renderContent()}
-        {criticalReports.some((instance) => instance.managed_release) && (
+        {/* Critical follow-up applies to both standard and managed releases. */}
+        {criticalReports.length > 0 && (
           <LabCriticalAcknowledgement
             key={labScope}
             visitId={criticalVisitId}

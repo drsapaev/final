@@ -495,7 +495,7 @@ describe('Lab results refresh within the same encounter', () => {
   });
 });
 
-describe('managed critical communications in the physician workspace', () => {
+describe('critical communications in the physician workspace', () => {
   function task(id: number, reportInstanceId: number): LabCriticalTask {
     return {
       id, report_instance_id: reportInstanceId, state: 'pending', available_actions: ['acknowledge'],
@@ -510,15 +510,18 @@ describe('managed critical communications in the physician workspace', () => {
     return { promise, resolve, reject };
   }
 
-  it('keeps correction lineage, exact-version review and critical acknowledgement independent', async () => {
+  it.each([
+    { release: 'standard', managed: false },
+    { release: 'managed', managed: true },
+  ])('keeps correction lineage, exact-version review and $release critical acknowledgement independent', async ({ managed }) => {
     const original = { ...report(11, 'SYNTHETIC original'), is_current_final: false };
     const correction = report(12, 'SYNTHETIC correction', original.id);
     getWorkspaceLabsMock.mockResolvedValue(workspaceLabs([original, correction]));
     listInstancesMock.mockResolvedValue([
-      { ...finalized(11, original.template_name), patient_id: 1, visit_id: 5, managed_release: true },
-      { ...finalized(12, correction.template_name), patient_id: 1, visit_id: 5, managed_release: true, supersedes_instance_id: 11 },
-      { ...finalized(13, 'SYNTHETIC unbound identity'), managed_release: true },
-      { ...finalized(14, 'SYNTHETIC other patient'), patient_id: 2, visit_id: 5, managed_release: true },
+      { ...finalized(11, original.template_name), patient_id: 1, visit_id: 5, managed_release: managed },
+      { ...finalized(12, correction.template_name), patient_id: 1, visit_id: 5, managed_release: managed, supersedes_instance_id: 11 },
+      { ...finalized(13, 'SYNTHETIC unbound identity'), managed_release: managed },
+      { ...finalized(14, 'SYNTHETIC other patient'), patient_id: 2, visit_id: 5, managed_release: managed },
     ]);
     const currentTask = task(51, 12);
     listCriticalMock.mockResolvedValue([currentTask, task(52, 13), task(53, 14), task(54, 99)]);
