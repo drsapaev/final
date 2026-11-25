@@ -6,9 +6,10 @@ import {
   AppEmpty, AppError, Button, Card, CardContent, CardHeader, Checkbox, Input,
 } from '../components/ui/macos';
 import { api } from '../api/client';
-import { listRescheduledCalendarVisits } from '../api/appointments';
+import { getCalendarDoctorId, listRescheduledCalendarVisits } from '../api/appointments';
 
 import logger from '../utils/logger';
+import auth from '../stores/auth';
 import { getLocalDateString } from '../utils/dateUtils';
 import { useTranslation } from '../i18n/useTranslation';
 import type { CSSProperties } from 'react';
@@ -39,12 +40,14 @@ export default function Appointments() {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [movedErr, setMovedErr] = useState<string | null>(null);
   const [useAdvancedTable, setUseAdvancedTable] = useState(false);
   const [selectedAppointments, setSelectedAppointments] = useState<Set<unknown>>(new Set<unknown>());
 
   const load = useCallback(async () => {
     const requestId = ++latestRequest.current;
     setErr(null);
+    setMovedErr(null);
     if (!date) {
       setRows([]);
       setMovedVisits([]);
@@ -54,15 +57,25 @@ export default function Appointments() {
 
     setBusy(true);
     try {
-      const [scheduled, moved] = await Promise.all([
+      const profile = auth.getState().profile;
+      const role = String(profile?.role ?? profile?.role_name ?? '').toLowerCase();
+      let doctorId: number | undefined;
+      if (role === 'doctor' && profile?.is_superuser !== true) {
+        if (profile?.id == null) throw new Error('Doctor profile could not be loaded');
+        doctorId = await getCalendarDoctorId(profile.id);
+      }
+      if (requestId !== latestRequest.current) return;
+      const [scheduled, moved] = await Promise.allSettled([
         api.get<AppointmentRow[]>('/appointments', {
-          params: { date_from: date, date_to: date, limit: 200 },
+          params: { date_from: date, date_to: date, limit: 200, ...(doctorId == null ? {} : { doctor_id: doctorId }) },
         }),
-        listRescheduledCalendarVisits(date),
+        listRescheduledCalendarVisits(date, doctorId),
       ]);
       if (requestId === latestRequest.current) {
-        setRows(scheduled.data);
-        setMovedVisits(moved);
+        setRows(scheduled.status === 'fulfilled' ? scheduled.value.data : []);
+        setMovedVisits(moved.status === 'fulfilled' ? moved.value : []);
+        if (scheduled.status === 'rejected') setErr('');
+        if (moved.status === 'rejected') setMovedErr('');
       }
     } catch (e) {
       if (requestId !== latestRequest.current) return;
@@ -87,6 +100,7 @@ export default function Appointments() {
     setRows([]);
     setMovedVisits([]);
     setErr(null);
+    setMovedErr(null);
     setBusy(Boolean(nextDate));
     setDate(nextDate);
   };
@@ -235,7 +249,7 @@ export default function Appointments() {
                     </td>
                   </tr>
                 ))}
-                {!busy && err === null && filtered.length + movedFiltered.length === 0 && (
+                {!busy && err === null && movedErr === null && filtered.length + movedFiltered.length === 0 && (
                   <tr>
                     <td colSpan={5}>
                       <AppEmpty
@@ -253,6 +267,17 @@ export default function Appointments() {
               </table>
 </div>
             </div>
+          )}
+          {movedErr !== null && (
+            <AppError
+              title={t('misc.srch_section_visits')}
+              description={t('misc.appo_ne_udalos_zagruzit_zapisi')}
+              action={
+                <Button type="button" variant="outline" size="small" onClick={load} disabled={busy}>
+                  Повторить
+                </Button>
+              }
+            />
           )}
           {movedFiltered.length > 0 && (
             <section aria-labelledby="rescheduled-visits-title">

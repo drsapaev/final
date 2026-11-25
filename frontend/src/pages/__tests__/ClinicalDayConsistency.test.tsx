@@ -7,6 +7,8 @@ import { ThemeProvider } from '../../contexts/ThemeContext';
 
 const mocks = vi.hoisted(() => ({
   appointments: vi.fn(),
+  doctorByUser: vi.fn(),
+  authState: vi.fn(),
   moved: vi.fn(),
   visit: vi.fn(),
   patient: vi.fn(),
@@ -15,9 +17,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../api/client', () => ({ api: {
-  get: (path: string, options: unknown) => path === '/appointments/rescheduled-visits'
-    ? mocks.moved(path, options) : mocks.appointments(path, options),
+  get: (path: string, options: unknown) => {
+    if (path === '/appointments/rescheduled-visits') return mocks.moved(path, options);
+    if (path.startsWith('/doctor-info/doctors/by-user/')) return mocks.doctorByUser(path);
+    return mocks.appointments(path, options);
+  },
 } }));
+vi.mock('../../stores/auth', () => ({ default: { getState: mocks.authState } }));
 vi.mock('../../api', () => ({ api: { get: mocks.visitList } }));
 vi.mock('../../api/visits', () => ({ getVisit: mocks.visit }));
 vi.mock('../../api/patients', () => ({ getPatient: mocks.patient, searchPatients: mocks.patients }));
@@ -37,6 +43,7 @@ describe('clinical calendar dates', () => {
     vi.resetAllMocks();
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
     localStorage.setItem('language', 'ru');
+    mocks.authState.mockReturnValue({ profile: { id: 1, role: 'Registrar' } });
     mocks.moved.mockResolvedValue({ data: [] });
     mocks.patients.mockResolvedValue([]);
     mocks.patient.mockResolvedValue({ id: 1, first_name: 'SYNTHETIC-PATIENT' });
@@ -103,6 +110,31 @@ describe('clinical calendar dates', () => {
     expect(screen.queryByText('misc.appo_net_zapisey_na_vybrannuyu_da')).not.toBeInTheDocument();
     expect(mocks.moved).toHaveBeenLastCalledWith('/appointments/rescheduled-visits', {
       params: { day: '2026-03-08' },
+    });
+  });
+
+  it('keeps the regular appointments when only moved visits are unavailable', async () => {
+    mocks.appointments.mockResolvedValue({ data: [{ id: 12, patient_name: 'SYNTHETIC-INTACT' }] });
+    mocks.moved.mockRejectedValue(new Error('Service unavailable'));
+    render(<ThemeProvider><Appointments /></ThemeProvider>);
+    expect(await screen.findByText('SYNTHETIC-INTACT')).toBeInTheDocument();
+    expect(screen.getByText('misc.srch_section_visits')).toBeInTheDocument();
+    expect(screen.queryByText('misc.appo_net_zapisey_na_vybrannuyu_da')).not.toBeInTheDocument();
+  });
+
+  it('uses the doctor profile resolved for the signed-in user on both reads', async () => {
+    mocks.authState.mockReturnValue({ profile: { id: 77, role: 'Doctor' } });
+    mocks.doctorByUser.mockResolvedValue({ data: { id: 42, is_active: true } });
+    mocks.appointments.mockResolvedValue({ data: [{ id: 12, patient_name: 'SYNTHETIC-OWNED' }] });
+    render(<ThemeProvider><Appointments /></ThemeProvider>);
+    const day = (screen.getByLabelText(/Дата:/) as HTMLInputElement).value;
+    expect(await screen.findByText('SYNTHETIC-OWNED')).toBeInTheDocument();
+    expect(mocks.doctorByUser).toHaveBeenCalledExactlyOnceWith('/doctor-info/doctors/by-user/77');
+    expect(mocks.appointments).toHaveBeenCalledExactlyOnceWith('/appointments', {
+      params: { date_from: day, date_to: day, limit: 200, doctor_id: 42 },
+    });
+    expect(mocks.moved).toHaveBeenCalledExactlyOnceWith('/appointments/rescheduled-visits', {
+      params: { day, doctor_id: 42 },
     });
   });
 
