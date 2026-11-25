@@ -248,6 +248,18 @@ describe('QMAN-FE-002: called-patient list is owned by the current doctor/date s
 });
 
 describe('QMAN-FE-001 (UI half): a failed current-selection load surfaces a recoverable error', () => {
+  it('keeps a selected historical queue readable without exposing current-day visit actions', async () => {
+    queueMocks.getTodayQueue.mockResolvedValue(queueSnapshot([CALLED_ENTRY], 7, '2026-11-04'));
+    renderManager({ selectedDate: '2026-11-03' });
+
+    await waitFor(() => expect(queueMocks.getTodayQueue).toHaveBeenCalledWith('dentistry'));
+    expect(queueMocks.loadQueueSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      targetDate: '2026-11-03',
+    }));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('button', { name: /dental\.dental_panel_start_visit/ })).toBeNull();
+  });
+
   it('shows an error banner with a retry action when the current selection fails to load', async () => {
     queueMocks.loadQueueSnapshot.mockRejectedValue(new Error('network down'));
     renderManager();

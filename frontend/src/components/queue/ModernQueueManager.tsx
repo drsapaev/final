@@ -228,10 +228,20 @@ const ModernQueueManager = ({
       if (!isCurrent()) return;
       if (actionSpecialty && effectiveDoctor) {
         const queue = snapshot as DoctorQueueActionSnapshot | null;
-        if (!queue || !Array.isArray(queue.entries) || queue.date !== effectiveDate
+        if (!queue || !Array.isArray(queue.entries)
+          || typeof queue.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(queue.date)
           || String(queue.doctor?.id) !== effectiveDoctor) {
           throw new Error('');
         }
+        // The action endpoint returns today's queue. A historical selection
+        // can have a valid table, but it never inherits today's actions.
+        if (queue.date > effectiveDate) {
+          setActionSnapshot(null);
+          setQueueLoadError(null);
+          return;
+        }
+        // An older response is not evidence for the current selection.
+        if (queue.date !== effectiveDate) throw new Error('');
         const seen = new Set<number>();
         const patients = queue.entries.flatMap((entry) => {
           if (!entry || entry.status !== 'called' || entry.can_start_visit !== true
