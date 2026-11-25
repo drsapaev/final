@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import RoleGate from '../components/RoleGate';
 import AppointmentFlow from '../components/AppointmentFlow';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
@@ -6,10 +6,14 @@ import {
   AppEmpty, AppError, Button, Card, CardContent, CardHeader, Checkbox, Input,
 } from '../components/ui/macos';
 import { api } from '../api/client';
+import { getCalendarDoctorId, listRescheduledCalendarVisits } from '../api/appointments';
 
 import logger from '../utils/logger';
+import auth from '../stores/auth';
+import { getLocalDateString } from '../utils/dateUtils';
 import { useTranslation } from '../i18n/useTranslation';
 import type { CSSProperties } from 'react';
+import type { CalendarRescheduledVisit } from '../types/domain/clinic';
 
 interface AppointmentRow {
   id?: string | number;
@@ -25,50 +29,81 @@ interface AppointmentRow {
   [key: string]: unknown;
 }
 
-function todayStr() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${dd}`;
-}
-
-/**
- * Записи (Appointments): просмотр записей на дату (чтение).
- * Совместимо с GET /appointments?date=YYYY-MM-DD&limit=...
- * Для минимальных перезаписей реализуем только чтение и поиск.
- */
+/** Read-only scheduled appointments, filtered by the clinic calendar day. */
 export default function Appointments() {
   const { t: rawT } = useTranslation();
   const t = rawT;
-  const [date, setDate] = useState(todayStr());
+  const [date, setDate] = useState(getLocalDateString);
   const [rows, setRows] = useState<AppointmentRow[]>([]);
+  const [movedVisits, setMovedVisits] = useState<CalendarRescheduledVisit[]>([]);
+  const latestRequest = useRef(0);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const [movedErr, setMovedErr] = useState<string | null>(null);
   const [useAdvancedTable, setUseAdvancedTable] = useState(false);
   const [selectedAppointments, setSelectedAppointments] = useState<Set<unknown>>(new Set<unknown>());
 
   const load = useCallback(async () => {
-    setBusy(true);
-    setErr('');
-    try {
-      let res = (await api.get('/appointments', { params: { date, limit: 200 } })) as import('axios').AxiosResponse<Record<string, unknown>>;
-      if (!res || (!Array.isArray(res) && !Array.isArray(res?.data?.items))) {
-        // fallback на другой ключ параметра
-        res = await api.get('/appointments', { params: { d: date, limit: 200 } });
-      }
-      const items: AppointmentRow[] = Array.isArray(res?.data?.items) ? (res.data.items as AppointmentRow[]) : Array.isArray(res?.data) ? (res.data as AppointmentRow[]) : [];
-      setRows(items);
-    } catch (e) {
-      const err = e as { data?: { detail?: string }; message?: string };
-      setErr(err?.data?.detail || err?.message || t('misc.appo_oshibka_zagruzki_zapisey'));
-    } finally {
+    const requestId = ++latestRequest.current;
+    setErr(null);
+    setMovedErr(null);
+    if (!date) {
+      setRows([]);
+      setMovedVisits([]);
       setBusy(false);
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const profile = auth.getState().profile;
+      const role = String(profile?.role ?? profile?.role_name ?? '').toLowerCase();
+      let doctorId: number | undefined;
+      if (role === 'doctor' && profile?.is_superuser !== true) {
+        if (profile?.id == null) throw new Error('Doctor profile could not be loaded');
+        doctorId = await getCalendarDoctorId(profile.id);
+      }
+      if (requestId !== latestRequest.current) return;
+      const [scheduled, moved] = await Promise.allSettled([
+        api.get<AppointmentRow[]>('/appointments', {
+          params: { date_from: date, date_to: date, limit: 200, ...(doctorId == null ? {} : { doctor_id: doctorId }) },
+        }),
+        listRescheduledCalendarVisits(date, doctorId),
+      ]);
+      if (requestId === latestRequest.current) {
+        setRows(scheduled.status === 'fulfilled' ? scheduled.value.data : []);
+        setMovedVisits(moved.status === 'fulfilled' ? moved.value : []);
+        if (scheduled.status === 'rejected') setErr('');
+        if (moved.status === 'rejected') setMovedErr('');
+      }
+    } catch (e) {
+      if (requestId !== latestRequest.current) return;
+      const err = e as { data?: { detail?: string }; message?: string };
+      setRows([]);
+      setMovedVisits([]);
+      setErr(err?.data?.detail || err?.message || '');
+    } finally {
+      if (requestId === latestRequest.current) setBusy(false);
     }
   }, [date]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => { latestRequest.current += 1; };
+  }, [load]);
+
+  const changeDate = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const nextDate = event.target.value;
+    if (nextDate === date) return;
+    latestRequest.current += 1;
+    setRows([]);
+    setMovedVisits([]);
+    setErr(null);
+    setMovedErr(null);
+    setBusy(Boolean(nextDate));
+    setDate(nextDate);
+  };
 
   const filtered = useMemo(() => {
     if (!q) return rows;
@@ -80,7 +115,13 @@ export default function Appointments() {
       String(a.status || '').toLowerCase().includes(qq)
     );
   }, [q, rows]);
-  const isFilteredEmpty = q.trim().length > 0 && rows.length > 0 && filtered.length === 0;
+  const movedFiltered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return movedVisits.filter(row => [row.patientName, row.doctorName, row.status, String(row.visitId)]
+      .some(value => value?.toLowerCase().includes(needle)));
+  }, [movedVisits, q]);
+  const isFilteredEmpty = q.trim().length > 0 && rows.length + movedVisits.length > 0
+    && filtered.length + movedFiltered.length === 0;
   const toolbarStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -114,7 +155,7 @@ export default function Appointments() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <h2 style={{ margin: 0, color: 'var(--mac-text-primary)' }}>{t('misc.appo_zapisi')}</h2>
               <span style={{ color: 'var(--mac-text-secondary)', fontSize: 13 }}>
-                {filtered.length} из {rows.length}
+                {filtered.length + movedFiltered.length} из {rows.length + movedVisits.length}
               </span>
             </div>
           </CardHeader>
@@ -123,7 +164,7 @@ export default function Appointments() {
           <div style={toolbarStyle}>
             <label style={fieldStyle}>
               Дата:&nbsp;
-              <Input type="date" value={date} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>)=>setDate(e.target.value)} />
+              <Input type="date" value={date} onChange={changeDate} />
             </label>
             <Input
               placeholder={t('misc.appo_poisk_po_patsientu_vrachu_st')}
@@ -142,10 +183,10 @@ export default function Appointments() {
             />
           </div>
 
-          {err && (
+          {err !== null && (
             <AppError
               title={t('misc.appo_ne_udalos_zagruzit_zapisi')}
-              description={String(err)}
+              description={err || t('misc.appo_oshibka_zagruzki_zapisey')}
               action={
                 <Button type="button" variant="outline" size="small" onClick={load} disabled={busy} loading={busy}>
                   Повторить
@@ -208,7 +249,7 @@ export default function Appointments() {
                     </td>
                   </tr>
                 ))}
-                {filtered.length === 0 && (
+                {!busy && err === null && movedErr === null && filtered.length + movedFiltered.length === 0 && (
                   <tr>
                     <td colSpan={5}>
                       <AppEmpty
@@ -226,6 +267,44 @@ export default function Appointments() {
               </table>
 </div>
             </div>
+          )}
+          {movedErr !== null && (
+            <AppError
+              title={t('misc.srch_section_visits')}
+              description={t('misc.appo_ne_udalos_zagruzit_zapisi')}
+              action={
+                <Button type="button" variant="outline" size="small" onClick={load} disabled={busy}>
+                  Повторить
+                </Button>
+              }
+            />
+          )}
+          {movedFiltered.length > 0 && (
+            <section aria-labelledby="rescheduled-visits-title">
+              <h3 id="rescheduled-visits-title">{t('misc.srch_section_visits')}</h3>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>{t('common.patient')}</th>
+                    <th>{t('common.doctor')}</th>
+                    <th>{t('common.time')}</th>
+                    <th>{t('common.status')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movedFiltered.map(row => (
+                    <tr key={row.visitId}>
+                      <td>{row.visitId}</td>
+                      <td>{row.patientName || '—'}</td>
+                      <td>{row.doctorName || '—'}</td>
+                      <td>{row.scheduledTime || t('admin2.appt_time_not_specified')}</td>
+                      <td>{row.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
           )}
           </CardContent>
         </Card>

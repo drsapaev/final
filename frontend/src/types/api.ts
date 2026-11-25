@@ -51,6 +51,7 @@ export type PatientProfileOutDto = Schemas['PatientProfileOut'];
 export type PatientSearchResultDto = Schemas['PatientSearchResult'];
 
 export type AppointmentDto = Schemas['Appointment'];
+export type CalendarRescheduledVisitDto = Schemas['CalendarRescheduledVisit'];
 export type AppointmentCreateDto = Schemas['AppointmentCreate'];
 export type AppointmentUpdateDto = Schemas['AppointmentUpdate'];
 export type AppointmentUpcomingOutDto = Schemas['AppointmentUpcomingOut'];
