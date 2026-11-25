@@ -95,7 +95,7 @@ interface DoctorQueueActionSnapshot {
 
 const ModernQueueManager = ({
   mode,
-  selectedDate = getLocalDateString(),
+  selectedDate,
   // PR-3856 review follow-up: NO default for selectedDoctor — `undefined` now
   // strictly means "uncontrolled mode" (internal UI state drives the
   // selection), while any passed value (INCLUDING the empty string) means
@@ -130,17 +130,24 @@ const ModernQueueManager = ({
   } = useQueueManager();
 
   const [internalDoctor, setInternalDoctor] = useState('');
-  const [internalDate, setInternalDate] = useState(getLocalDateString());
+  // An empty value means follow the clinic's current day. An explicit history
+  // date remains selected when a refresh brings a newer clinic day.
+  const [internalDate, setInternalDate] = useState('');
+  const [verifiedClinicDay, setVerifiedClinicDay] = useState<{ owner: string; date: string } | null>(null);
+  const browserDefaultDate = getLocalDateString();
   // PR-3856 review follow-up (controlled vs uncontrolled): when the parent
   // passes `selectedDoctor`, the prop is authoritative INCLUDING the empty
   // string — a parent-driven reset (7 → '') must clear the selection
   // instead of falling back to the last internal UI choice. `undefined`
   // (prop not passed) keeps the uncontrolled internal-state mode.
   const effectiveDoctor = selectedDoctor !== undefined ? String(selectedDoctor) : internalDoctor;
-  const effectiveDate = selectedDate !== undefined && selectedDate !== '' ? selectedDate : internalDate;
+  const actionSpecialty = !isRegistrarMode && onStartVisit ? doctorQueueSpecialty : undefined;
+  const clinicDayOwner = JSON.stringify([effectiveDoctor, actionSpecialty]);
+  const clinicDay = actionSpecialty && verifiedClinicDay?.owner === clinicDayOwner
+    ? verifiedClinicDay.date : undefined;
+  const effectiveDate = selectedDate || internalDate || clinicDay || browserDefaultDate;
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const actionSpecialty = !isRegistrarMode && onStartVisit ? doctorQueueSpecialty : undefined;
   const selectionKey = JSON.stringify([effectiveDoctor, effectiveDate, actionSpecialty]);
   const selectionKeyRef = useRef(selectionKey);
   selectionKeyRef.current = selectionKey;
@@ -233,9 +240,11 @@ const ModernQueueManager = ({
           || String(queue.doctor?.id) !== effectiveDoctor) {
           throw new Error('');
         }
-        // The action endpoint returns today's queue. A historical selection
-        // can have a valid table, but it never inherits today's actions.
-        if (queue.date > effectiveDate) {
+        if (clinicDay && queue.date < clinicDay) throw new Error('');
+        if (queue.date !== clinicDay) setVerifiedClinicDay({ owner: clinicDayOwner, date: queue.date });
+        // Follow the server day only while today is selected implicitly. A
+        // historical selection keeps its table and never borrows live actions.
+        if (queue.date > effectiveDate || (!selectedDate && !internalDate && queue.date !== effectiveDate)) {
           setActionSnapshot(null);
           setQueueLoadError(null);
           return;
@@ -281,7 +290,8 @@ const ModernQueueManager = ({
     // The translation is locale-pure for a fixed key — a stale closure only
     // means the previous locale's text for one error message.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveDoctor, effectiveDate, doctors, loadQueueSnapshot, actionSpecialty, selectionKey]);
+  }, [effectiveDoctor, effectiveDate, doctors, loadQueueSnapshot, actionSpecialty, selectionKey,
+    clinicDay, clinicDayOwner, selectedDate, internalDate]);
 
   // Автоматическая загрузка при изменении врача или даты
   useEffect(() => {
@@ -462,6 +472,7 @@ const ModernQueueManager = ({
 
   // Вызов пациента
   const callPatient = async () => {
+    if (actionSpecialty && (effectiveDate !== clinicDay || queueLoadError)) return;
     if (!effectiveDoctor) {
       toast.error(t('misc.mqm_select_doctor_only'));
       return;
@@ -674,10 +685,10 @@ const ModernQueueManager = ({
                 // Min удален, чтобы можно было смотреть историю и текущий день в любое время.
                 // Max добавлен — без него можно создать очередь на 2030 год.
                 // Раньше: только комментарий, без max.
-                max={getLocalDateString()}
+                max={clinicDay || browserDefaultDate}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                   const newDate = e.target.value;
-                  setInternalDate(newDate);
+                  setInternalDate(newDate === clinicDay ? '' : newDate);
                   if (onDateChange) {
                     onDateChange(newDate);
                   }
@@ -798,7 +809,7 @@ const ModernQueueManager = ({
                 variant="primary"
                 size="default"
                 onClick={callPatient}
-                disabled={!effectiveDoctor || loading}
+                disabled={!effectiveDoctor || loading || Boolean(actionSpecialty && (effectiveDate !== clinicDay || queueLoadError))}
                 className="mqm-button-icon"
                 title="Backend call-next command">
                 <Bell size={16} color="white" aria-hidden="true" />

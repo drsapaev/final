@@ -1,6 +1,6 @@
 /** The active action snapshot is canonical and bound to one doctor/date selection. */
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -116,6 +116,35 @@ describe('QMAN-FE-002: called-patient list is owned by the current doctor/date s
     await userEvent.setup().click(await screen.findByRole('button', { name: 'dental.dental_panel_start_visit_for' }));
     expect(queueMocks.callNextPatientInQueue).not.toHaveBeenCalled();
     expect(onStartVisit).toHaveBeenCalledWith(CALLED_PATIENT);
+  });
+
+  it('follows the clinic day on a UTC workstation without replacing an explicit history selection', async () => {
+    vi.setSystemTime(new Date('2026-11-25T19:00:00Z'));
+    queueMocks.getTodayQueue.mockResolvedValue(queueSnapshot([CALLED_ENTRY], 7, '2026-11-26'));
+    const view = renderManager({ selectedDate: undefined });
+    const startName = 'dental.dental_panel_start_visit_for';
+    await screen.findByRole('button', { name: startName });
+    const dateField = screen.getByLabelText<HTMLInputElement>('misc.mqm_aria_queue_date');
+    expect(dateField.value).toBe('2026-11-26');
+    expect(dateField.max).toBe('2026-11-26');
+    expect(queueMocks.loadQueueSnapshot).toHaveBeenLastCalledWith(expect.objectContaining({
+      targetDate: '2026-11-26',
+    }));
+
+    fireEvent.change(dateField, { target: { value: '2026-11-25' } });
+    await waitFor(() => expect(queueMocks.loadQueueSnapshot).toHaveBeenLastCalledWith(expect.objectContaining({
+      targetDate: '2026-11-25',
+    })));
+    expect(dateField.value).toBe('2026-11-25');
+    expect(screen.queryByRole('button', { name: startName })).toBeNull();
+    expect(screen.getByRole('button', { name: 'misc.mqm_call' })).toBeDisabled();
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    fireEvent.change(dateField, { target: { value: '2026-11-26' } });
+    await screen.findByRole('button', { name: startName });
+    view.unmount();
+    renderManager({ selectedDate: undefined });
+    await screen.findByRole('button', { name: startName });
   });
 
   it('reconciles an automatic call and only exposes positively authorized called entries', async () => {

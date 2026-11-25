@@ -119,7 +119,9 @@ describe('ModernQueueManager dentist start-visit flow', () => {
       </ThemeProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'misc.mqm_call' }));
+    const callButton = screen.getByRole('button', { name: 'misc.mqm_call' });
+    await waitFor(() => expect(callButton).toBeEnabled());
+    fireEvent.click(callButton);
     const startVisitButton = await screen.findByRole('button', { name: 'dental.dental_panel_start_visit_for' });
 
     expect(queueMocks.callNextPatientInQueue).toHaveBeenCalledWith({ specialistId: '7', targetDate: expect.any(String) });
@@ -145,7 +147,9 @@ describe('ModernQueueManager dentist start-visit flow', () => {
       </ThemeProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'misc.mqm_call' }));
+    const callButton = screen.getByRole('button', { name: 'misc.mqm_call' });
+    await waitFor(() => expect(callButton).toBeEnabled());
+    fireEvent.click(callButton);
     const startVisitButton = await screen.findByRole('button', { name: 'dental.dental_panel_start_visit_for' });
     fireEvent.click(startVisitButton);
 
