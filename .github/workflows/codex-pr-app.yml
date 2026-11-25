@@ -28,7 +28,9 @@ on:
 permissions: {}
 
 concurrency:
-  group: codex-pr-app-${{ inputs.pull_request }}
+  # Approvals must remain runnable while the coordinator is holding the slot.
+  group: ${{ inputs.operation == 'merge' && vars.FINAL_MERGE_QUEUE_ENABLED == 'true' && 'final-main-merge-slot' || format('codex-pr-app-{0}', inputs.pull_request) }}
+  queue: max
   cancel-in-progress: false
 
 jobs:
@@ -39,10 +41,60 @@ jobs:
       github.actor == github.repository_owner &&
       github.triggering_actor == github.repository_owner
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      pull-requests: read
     environment: codex-pr-app
 
     steps:
+      - name: Load the coordinator from the trusted workflow commit
+        id: source
+        if: inputs.operation == 'merge' && vars.FINAL_MERGE_QUEUE_ENABLED == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$WORKFLOW_SHA" =~ ^[a-f0-9]{40}$ ]]
+          gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/merge_queue_coordinator.py?ref=${WORKFLOW_SHA}" \
+            --jq '.content' | base64 -d > "$RUNNER_TEMP/final-merge-queue.py"
+          test -s "$RUNNER_TEMP/final-merge-queue.py"
+
+      - name: Create short-lived credentials for same-repo branch synchronization
+        id: sync-app
+        if: steps.source.outcome == 'success'
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.CODEX_PR_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CODEX_PR_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Prepare the active slot and announce the exact review target
+        id: slot
+        if: steps.source.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.sync-app.outputs.token }}
+          APP_SLUG: ${{ steps.sync-app.outputs.app-slug }}
+          PR_NUMBER: ${{ inputs.pull_request }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+        run: |
+          test "$APP_SLUG" = drsapaev-final-codex-pr
+          python3 "$RUNNER_TEMP/final-merge-queue.py" prepare
+
+      - name: Wait inside the slot for exact approval and protected checks
+        if: steps.source.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pull_request }}
+          HEAD_SHA: ${{ steps.slot.outputs.head }}
+          PINNED_BASE: ${{ steps.slot.outputs.base }}
+        run: python3 "$RUNNER_TEMP/final-merge-queue.py" wait
+
       - name: Create a repository-scoped GitHub App token
         id: app
         uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
@@ -59,7 +111,9 @@ jobs:
           APP_SLUG: ${{ steps.app.outputs.app-slug }}
           OPERATION: ${{ inputs.operation }}
           PR_NUMBER: ${{ inputs.pull_request }}
-          HEAD_SHA: ${{ inputs.head_sha }}
+          HEAD_SHA: ${{ steps.slot.outputs.head || inputs.head_sha }}
+          PINNED_BASE: ${{ steps.slot.outputs.base }}
+          QUEUE_ENABLED: ${{ vars.FINAL_MERGE_QUEUE_ENABLED }}
           REVIEW_SUMMARY: ${{ inputs.review_summary }}
         run: |
           python3 - <<'PY'
@@ -143,6 +197,12 @@ jobs:
 
           if app_decision != "APPROVED":
               raise SystemExit("The reviewed head needs a current approval from the Codex App.")
+
+          if os.environ["QUEUE_ENABLED"] == "true":
+              expected_base = os.environ["PINNED_BASE"]
+              actual_base = api(f"repos/{repository}/git/ref/heads/main")["object"]["sha"]
+              if not re.fullmatch("[0-9a-f]{40}", expected_base) or actual_base != expected_base:
+                  raise SystemExit("The queued base changed; refusing stale evidence.")
 
           merge = api(
               f"{endpoint}/merge",

@@ -1,12 +1,13 @@
 """Synthetic ASGI checks for the doctor call and its manual queue counterpart."""
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy import update
 
 from app.api.v1.endpoints.doctor_integration import _queue_ops
+from app.crud.clinic import clinic_today
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.services import display_websocket
@@ -29,9 +30,9 @@ def _doctor(client, db, user):
     return doctor, {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
-def _queue(db, doctor, queue_tag, *, active=True):
+def _queue(db, doctor, queue_tag, *, active=True, day=None):
     queue = DailyQueue(
-        day=date.today(),
+        day=day if day is not None else clinic_today(db),
         specialist_id=doctor.id,
         queue_tag=queue_tag,
         active=active,
@@ -65,9 +66,12 @@ def test_doctor_next_matches_qr_call_order_across_queues(
     priority,
 ):
     doctor, headers = _doctor(client, db_session, test_doctor_user)
-    older_queue_id = _queue(db_session, doctor, "dermatology")
-    newer_queue_id = _queue(db_session, doctor, "dermatology_procedure")
-    inactive = _queue(db_session, doctor, "dermatology_closed", active=False)
+    clinic_day = clinic_today(db_session)
+    older_queue_id = _queue(db_session, doctor, "dermatology", day=clinic_day)
+    newer_queue_id = _queue(db_session, doctor, "dermatology_procedure", day=clinic_day)
+    inactive = _queue(
+        db_session, doctor, "dermatology_closed", active=False, day=clinic_day
+    )
     base = datetime.now(UTC) - timedelta(hours=1)
     _entry(db_session, older_queue_id, 1, queue_time=base + timedelta(minutes=15))
     _entry(db_session, inactive, 1, priority=2, queue_time=base)
@@ -94,9 +98,58 @@ def test_doctor_next_matches_qr_call_order_across_queues(
     manual = QRQueueService(db_session).call_next_patient(
         doctor.id,
         test_doctor_user.id,
-        date.today(),
+        clinic_day,
     )
     assert manual["patient"]["id"] == next_entry.id
+
+
+@pytest.mark.parametrize(
+    ("competitor_priority", "earlier", "restored_wins"),
+    [(0, True, True), (2, False, False), (1, True, False)],
+)
+def test_priority_return_respects_ranking_on_manual_and_doctor_paths(
+    client, db_session, test_doctor_user, monkeypatch,
+    competitor_priority, earlier, restored_wins,
+):
+    doctor, headers = _doctor(client, db_session, test_doctor_user)
+    clinic_day = clinic_today(db_session)
+    queue_a = _queue(db_session, doctor, "dermatology", day=clinic_day)
+    queue_b = _queue(db_session, doctor, "dermatology_procedure", day=clinic_day)
+    enqueue = datetime.now(UTC) - timedelta(hours=1)
+    # #4281 verifies the restore mutation itself. Seed its committed
+    # result here: waiting at priority 1, original enqueue time retained.
+    returned = _entry(db_session, queue_a, 9, priority=1, queue_time=enqueue)
+    competitor = _entry(
+        db_session, queue_b, 1, priority=competitor_priority,
+        queue_time=enqueue + timedelta(minutes=-10 if earlier else 10),
+    )
+    expected = returned if restored_wins else competitor
+    other = competitor if restored_wins else returned
+
+    manual = QRQueueService(db_session).call_next_patient(
+        doctor.id, test_doctor_user.id, clinic_day,
+    )
+    assert manual["patient"]["id"] == expected.id
+    # Restore the independent starting state before exercising exactly
+    # the GET and POST endpoints used by the browser's completion action.
+    db_session.refresh(expected)
+    expected.status = "waiting"
+    expected.called_at = None
+    expected.called_by_user_id = None
+    db_session.commit()
+    def offline_board():
+        raise RuntimeError("synthetic offline board")
+
+    monkeypatch.setattr(display_websocket, "get_display_manager", offline_board)
+    preview = client.get("/api/v1/doctor/dermatology/queue/today", headers=headers)
+    assert preview.status_code == 200
+    assert preview.json()["next_call_entry_id"] == expected.id
+    ack = client.post(f"/api/v1/doctor/queue/{expected.id}/call", headers=headers)
+    assert ack.status_code == 200
+    assert ack.json()["entry"]["id"] == expected.id
+    assert ack.json()["display_delivery"] == "unconfirmed"
+    db_session.refresh(other)
+    assert other.status == "waiting"
 
 
 @pytest.mark.parametrize(

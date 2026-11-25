@@ -139,7 +139,14 @@ def get_doctor_queue_today(
                 f"врача специальности '{specialty}'",
             )
 
-        today = date.today()
+        # DOCWORKLIST-BE-001 (audit 3892 group 24): the day must come from
+        # clinic_today — the queue SSOT clinic-local date (same discipline
+        # as the legacy qrcode/call surfaces) — NOT the host clock: a UTC
+        # backend behind the clinic (e.g. Asia/Tashkent) read the wrong
+        # day and answered queue_exists=false while patients waited.
+        from app.crud.clinic import clinic_today
+
+        today = clinic_today(db)
 
         candidate_specialist_ids = (
             {doctor.id}
@@ -588,7 +595,11 @@ def call_patient(
     try:
         # Получаем запись в очереди
         queue_entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+            db.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.id == entry_id)
+            .with_for_update(of=OnlineQueueEntry)
+            .populate_existing()
+            .first()
         )
 
         if not queue_entry:
@@ -663,8 +674,9 @@ def call_patient(
         if not daily_queue.active:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Очередь закрыта",
+                detail="Очередь неактивна — вызов недоступен",
             )
+
         if "call" not in _doctor_queue_available_actions(queue_entry):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -711,19 +723,26 @@ def call_patient(
             db.refresh(queue_entry)
             manager = get_display_manager()
             if doctor is not None:
-                doctor_name = doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
+                doctor_name = (
+                    doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
+                )
                 cabinet = doctor.cabinet
             else:
                 resource = daily_queue.queue_resource
-                doctor_name = resource.display_name if resource else "Ресурс очереди"
-                cabinet = daily_queue.cabinet_number or (resource.default_cabinet if resource else None)
+                doctor_name = (
+                    resource.display_name if resource is not None else "Ресурс очереди"
+                )
+                cabinet = daily_queue.cabinet_number or (
+                    resource.default_cabinet if resource is not None else None
+                )
 
-            board_ids = manager._resolve_untargeted_board_ids()
-            call_message = manager.build_patient_call_message(
-                queue_entry, doctor_name, cabinet, board_ids=board_ids,
+            call_message, board_ids = manager.prepare_patient_call(
+                queue_entry, doctor_name, cabinet
             )
             statuses = from_thread.run(
-                partial(manager.broadcast_patient_call_data, call_message, board_ids=board_ids)
+                partial(
+                    manager.broadcast_patient_call_data, call_message, board_ids=board_ids
+                )
             )
             target_outcomes = {statuses.get(board) for board in board_ids}
             accepted = {"delivered_local", "published_only"}
@@ -738,7 +757,10 @@ def call_patient(
         except Exception as ws_error:
             # A failed announcement never reverses the committed call or
             # invites an unsafe retry. Do not log patient or board details.
-            logger.warning("Doctor queue display announcement unconfirmed (%s)", type(ws_error).__name__)
+            logger.warning(
+                "Doctor queue display announcement unconfirmed (%s)",
+                type(ws_error).__name__,
+            )
 
         return {
             "success": True,

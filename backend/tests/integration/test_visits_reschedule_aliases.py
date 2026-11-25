@@ -9,11 +9,11 @@ from app.models.visit import Visit
 
 @pytest.mark.integration
 class TestVisitsRescheduleAliases:
-    def _make_visit(self, db_session, test_patient, test_doctor):
+    def _make_visit(self, db_session, test_patient, test_doctor, *, visit_date=None):
         visit = Visit(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            visit_date=date.today(),
+            visit_date=date.today() if visit_date is None else visit_date,
             status="open",
             source="desk",
         )
@@ -23,28 +23,12 @@ class TestVisitsRescheduleAliases:
         return visit
 
     @pytest.mark.parametrize(
-        "path_template, params, expected_date",
+        "path_template, days",
         [
-            (
-                "/api/v1/visits/visits/{visit_id}/reschedule/tomorrow",
-                None,
-                date.today() + timedelta(days=1),
-            ),
-            (
-                "/api/v1/visits/{visit_id}/reschedule/tomorrow",
-                None,
-                date.today() + timedelta(days=1),
-            ),
-            (
-                "/api/v1/visits/visits/{visit_id}/reschedule",
-                {"new_date": (date.today() + timedelta(days=3)).isoformat()},
-                date.today() + timedelta(days=3),
-            ),
-            (
-                "/api/v1/visits/{visit_id}/reschedule",
-                {"new_date": (date.today() + timedelta(days=3)).isoformat()},
-                date.today() + timedelta(days=3),
-            ),
+            ("/api/v1/visits/visits/{visit_id}/reschedule/tomorrow", None),
+            ("/api/v1/visits/{visit_id}/reschedule/tomorrow", None),
+            ("/api/v1/visits/visits/{visit_id}/reschedule", 3),
+            ("/api/v1/visits/{visit_id}/reschedule", 3),
         ],
     )
     def test_reschedule_paths_support_canonical_and_legacy_aliases(
@@ -55,13 +39,18 @@ class TestVisitsRescheduleAliases:
         test_patient,
         test_doctor,
         path_template,
-        params,
-        expected_date,
+        days,
     ):
-        visit = self._make_visit(db_session, test_patient, test_doctor)
+        today = date.today()
+        visit = self._make_visit(
+            db_session, test_patient, test_doctor, visit_date=today
+        )
         path = path_template.format(visit_id=visit.id)
+        expected_date = today + timedelta(days=1 if days is None else days)
+        params = None if days is None else {"new_date": expected_date.isoformat()}
 
         response = client.post(path, headers=auth_headers, params=params)
+        response_day = date.today()
 
         assert response.status_code == 200, response.text
         payload = response.json()
@@ -71,7 +60,10 @@ class TestVisitsRescheduleAliases:
         assert payload["status"] == "open"
 
         db_session.refresh(visit)
-        assert visit.visit_date == expected_date
+        if days is None:
+            assert visit.visit_date in {expected_date, response_day + timedelta(days=1)}
+        else:
+            assert visit.visit_date == expected_date
 
     @pytest.mark.parametrize(
         "reschedule_path_template",
@@ -119,10 +111,12 @@ class TestVisitsRescheduleAliases:
         test_doctor,
     ):
         """R-27 fix: reschedule with new_time should update visit_time."""
+        today = date.today()
+        new_date = today + timedelta(days=2)
         visit = Visit(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            visit_date=date.today(),
+            visit_date=today,
             visit_time="10:00",
             status="open",
             source="desk",
@@ -135,14 +129,14 @@ class TestVisitsRescheduleAliases:
             f"/api/v1/visits/visits/{visit.id}/reschedule",
             headers=auth_headers,
             params={
-                "new_date": (date.today() + timedelta(days=2)).isoformat(),
+                "new_date": new_date.isoformat(),
                 "new_time": "14:30",
             },
         )
 
         assert response.status_code == 200, response.text
         db_session.refresh(visit)
-        assert visit.visit_date == date.today() + timedelta(days=2)
+        assert visit.visit_date == new_date
         assert visit.visit_time == "14:30"
 
     def test_reschedule_without_new_time_preserves_visit_time(
@@ -154,10 +148,12 @@ class TestVisitsRescheduleAliases:
         test_doctor,
     ):
         """R-27 fix: reschedule without new_time should preserve existing visit_time."""
+        today = date.today()
+        new_date = today + timedelta(days=2)
         visit = Visit(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            visit_date=date.today(),
+            visit_date=today,
             visit_time="09:15",
             status="open",
             source="desk",
@@ -170,13 +166,13 @@ class TestVisitsRescheduleAliases:
             f"/api/v1/visits/visits/{visit.id}/reschedule",
             headers=auth_headers,
             params={
-                "new_date": (date.today() + timedelta(days=2)).isoformat(),
+                "new_date": new_date.isoformat(),
             },
         )
 
         assert response.status_code == 200, response.text
         db_session.refresh(visit)
-        assert visit.visit_date == date.today() + timedelta(days=2)
+        assert visit.visit_date == new_date
         assert visit.visit_time == "09:15"  # preserved
 
     def test_reschedule_with_invalid_time_format_returns_422(
@@ -317,22 +313,25 @@ class TestVisitsRescheduleAliases:
             _entries,
         )
 
+        today = date.today()
         visit, emr = self._make_derm_history(
             db_session,
             test_patient,
             test_doctor,
             admin_user,
-            visit_date=date.today() - timedelta(days=5),
+            visit_date=today - timedelta(days=5),
         )
 
         response = client.post(
             f"/api/v1/visits/visits/{visit.id}/reschedule/tomorrow",
             headers=auth_headers,
         )
+        response_day = date.today()
         assert response.status_code == 200, response.text
 
-        tomorrow = date.today() + timedelta(days=1)
         db_session.expire_all()
+        tomorrow = visit.visit_date
+        assert tomorrow in {today + timedelta(days=1), response_day + timedelta(days=1)}
         entries = _entries(db_session, kind="examination", source="emr")
         assert len(entries) == 1
         assert entries[0].record_id == emr.id

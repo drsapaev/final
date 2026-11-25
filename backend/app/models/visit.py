@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -71,6 +73,9 @@ class Visit(Base):
     )  # ✅ SECURITY: SET NULL to preserve visit if doctor deleted
     visit_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     visit_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    calendar_rescheduled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     department: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )  # Department name/key
