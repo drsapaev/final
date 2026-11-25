@@ -26,6 +26,19 @@ describe('post-registration printing preserves the exact visit and daily queue',
     ]);
   });
 
+  it('preserves the persisted per-ticket charge, including a true zero, without borrowing the cart total', () => {
+    expect(print({
+      total_amount: 70000,
+      queue_numbers: {
+        101: [{ ...registration.queue_numbers[101][0], service_price: '50000.00' }],
+        202: [{ ...registration.queue_numbers[202][0], service_price: '0.00' }],
+      },
+    })).toMatchObject([
+      { queue_number: '1', service_price: '50000.00' },
+      { queue_number: '2', service_price: '0.00' },
+    ]);
+  });
+
   it('does not attach numbers by array position to reversed partial tickets', () => {
     expect(print({
       print_tickets: [{ visit_id: 202, queue_id: 22 }, { visit_id: 101, queue_id: 11 }],

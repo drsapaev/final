@@ -21,15 +21,18 @@ PostgreSQL отдельно НЕ проверялись и здесь не за�
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.registrar_wizard import _cart as cart_module
+from app.crud.clinic import clinic_today
+from app.models.online_queue import QueueResource
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
-from app.models.visit import Visit
+from app.models.visit import Visit, VisitService
 from tests.conftest import mint_access_token
 
 pytestmark = [pytest.mark.integration]
@@ -397,3 +400,50 @@ def test_idempotency_new_key_creates_new_operation(
 
     _, invoices, _ = _counts(db_session, test_patient.id)
     assert invoices == 2, "новый ключ должен создавать новую корзину"
+
+
+@pytest.mark.parametrize("unit_price", ["25000.00", "0.00"])
+def test_cart_response_carries_scoped_price_for_issued_queue(
+    client: TestClient, db_session: Session, admin_user, test_patient, unit_price: str
+):
+    tag = "synthetic_cart_ticket"
+    resource = QueueResource(code=tag, queue_tag=tag, display_name="SYNTHETIC ticket")
+    service = Service(
+        code="SYNTHETIC-TICKET",
+        service_code="SYNTHETIC-TICKET",
+        name="SYNTHETIC ticket service",
+        queue_tag=tag,
+        price=Decimal(unit_price),
+        requires_doctor=False,
+        is_consultation=False,
+        active=True,
+    )
+    db_session.add_all([resource, service])
+    db_session.commit()
+
+    visit = _visit(service.id)
+    visit["visit_date"] = clinic_today(db_session).isoformat()
+    visit["services"][0]["quantity"] = 2
+    response = client.post(
+        "/api/v1/registrar/cart",
+        headers=_auth_headers(admin_user),
+        json=_cart_payload(patient_id=test_patient.id, visits=[visit]),
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    visit_id = payload["visit_ids"][0]
+    [assignment] = payload["queue_numbers"][str(visit_id)]
+    assert assignment["queue_tag"] == tag
+    assert assignment["number"] > 0
+    assert Decimal(assignment["service_price"]) == Decimal(unit_price) * 2
+
+
+def test_ticket_price_stays_unknown_when_a_visit_cannot_be_priced_by_one_queue():
+    line = VisitService(name="SYNTHETIC service", price=Decimal("25000"), qty=2)
+    scoped = {"queue_id": 12, "queue_tag": "cardiology_common", "number": 1}
+    second = {"queue_id": 13, "queue_tag": "ecg", "number": 1}
+    price = cart_module._single_queue_ticket_price
+    assert price([scoped, second], [(line, "cardiology_common")], Decimal("50000")) is None
+    assert price([scoped], [(line, "ecg")], Decimal("50000")) is None
+    assert price([scoped], [(line, None)], Decimal("50000")) is None
+    assert price([scoped], [(line, "cardiology_common")], Decimal("60000")) is None

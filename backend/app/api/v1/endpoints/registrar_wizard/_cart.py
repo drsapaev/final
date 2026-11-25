@@ -27,6 +27,30 @@ from app.services.registrar_wizard_queue_assignment_service import (
 )
 
 
+def _single_queue_ticket_price(
+    assignments: list[dict[str, Any]],
+    service_rows: list[tuple[VisitService, str | None]],
+    invoice_visit_amount: Decimal,
+) -> str | None:
+    # Only stamp a price when the sole issued ticket unambiguously covers
+    # every persisted line of this visit. Never attach the cart total, a
+    # catalog price, or an inferred price for split/untagged services.
+    if len(assignments) != 1 or not service_rows:
+        return None
+    assignment = assignments[0]
+    queue_tag = assignment.get("queue_tag")
+    if not queue_tag or not assignment.get("queue_id") or not assignment.get("number"):
+        return None
+    total = Decimal("0")
+    for line, service_tag in service_rows:
+        if service_tag != queue_tag or line.price is None or not line.qty:
+            return None
+        total += line.price * line.qty
+    if total != invoice_visit_amount:
+        return None
+    return str(total)
+
+
 @router.post("/registrar/cart", response_model=CartResponse)
 def create_cart_appointments(
     cart_data: CartRequest,
@@ -324,9 +348,8 @@ def create_cart_appointments(
                         },
                     )
 
-        # Формируем талоны для визитов с присвоенными номерами очередей
+        # Queue assignments carry the issued numbers used for immediate printing.
         print_tickets = []
-        # Блок формирования талонов пропускаем, так как queue_numbers пустой
 
         # Формируем информацию о созданных визитах
         created_visits_info = []
@@ -356,13 +379,20 @@ def create_cart_appointments(
                     doctor_name = "Без врача"
 
                 # Получаем услуги визита
-                visit_services = (
-                    db.query(VisitService)
+                service_rows = (
+                    db.query(VisitService, Service.queue_tag)
+                    .outerjoin(Service, Service.id == VisitService.service_id)
                     .filter(VisitService.visit_id == visit.id)
                     .all()
                 )
+                assignments = queue_numbers.get(visit.id, [])
+                ticket_price = _single_queue_ticket_price(
+                    assignments, service_rows, created_visit_amounts[visit.id]
+                )
+                if ticket_price is not None:
+                    assignments[0] = {**assignments[0], "service_price": ticket_price}
                 services_info = []
-                for vs in visit_services:
+                for vs, _ in service_rows:
                     services_info.append(
                         {
                             "name": vs.name,
