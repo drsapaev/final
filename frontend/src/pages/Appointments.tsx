@@ -6,14 +6,13 @@ import {
   AppEmpty, AppError, Button, Card, CardContent, CardHeader, Checkbox, Input,
 } from '../components/ui/macos';
 import { api } from '../api/client';
+import { listRescheduledCalendarVisits } from '../api/appointments';
 
 import logger from '../utils/logger';
 import { getLocalDateString } from '../utils/dateUtils';
 import { useTranslation } from '../i18n/useTranslation';
 import type { CSSProperties } from 'react';
-import type { components } from '../types/generated/api';
-
-type RescheduledVisit = components['schemas']['CalendarRescheduledVisit'];
+import type { CalendarRescheduledVisit } from '../types/domain/clinic';
 
 interface AppointmentRow {
   id?: string | number;
@@ -35,7 +34,7 @@ export default function Appointments() {
   const t = rawT;
   const [date, setDate] = useState(getLocalDateString);
   const [rows, setRows] = useState<AppointmentRow[]>([]);
-  const [movedVisits, setMovedVisits] = useState<RescheduledVisit[]>([]);
+  const [movedVisits, setMovedVisits] = useState<CalendarRescheduledVisit[]>([]);
   const latestRequest = useRef(0);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
@@ -59,11 +58,11 @@ export default function Appointments() {
         api.get<AppointmentRow[]>('/appointments', {
           params: { date_from: date, date_to: date, limit: 200 },
         }),
-        api.get<RescheduledVisit[]>('/appointments/rescheduled-visits', { params: { day: date } }),
+        listRescheduledCalendarVisits(date),
       ]);
       if (requestId === latestRequest.current) {
         setRows(scheduled.data);
-        setMovedVisits(moved.data);
+        setMovedVisits(moved);
       }
     } catch (e) {
       if (requestId !== latestRequest.current) return;
@@ -104,7 +103,7 @@ export default function Appointments() {
   }, [q, rows]);
   const movedFiltered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return movedVisits.filter(row => [row.patient_name, row.doctor_name, row.status, String(row.visit_id)]
+    return movedVisits.filter(row => [row.patientName, row.doctorName, row.status, String(row.visitId)]
       .some(value => value?.toLowerCase().includes(needle)));
   }, [movedVisits, q]);
   const isFilteredEmpty = q.trim().length > 0 && rows.length + movedVisits.length > 0
@@ -270,11 +269,11 @@ export default function Appointments() {
                 </thead>
                 <tbody>
                   {movedFiltered.map(row => (
-                    <tr key={row.visit_id}>
-                      <td>{row.visit_id}</td>
-                      <td>{row.patient_name || '—'}</td>
-                      <td>{row.doctor_name || '—'}</td>
-                      <td>{row.scheduled_time || t('admin2.appt_time_not_specified')}</td>
+                    <tr key={row.visitId}>
+                      <td>{row.visitId}</td>
+                      <td>{row.patientName || '—'}</td>
+                      <td>{row.doctorName || '—'}</td>
+                      <td>{row.scheduledTime || t('admin2.appt_time_not_specified')}</td>
                       <td>{row.status}</td>
                     </tr>
                   ))}
