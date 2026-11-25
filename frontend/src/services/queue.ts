@@ -223,6 +223,11 @@ export const queueService = {
       callResult && typeof callResult === 'object' && 'entry' in callResult && (callResult as { entry?: unknown }).entry
         ? (callResult as { entry: Record<string, unknown> }).entry
         : nextEntry;
-    return { success: true, entry: canonicalEntry };
+    const delivery = callAck.display_delivery;
+    if (delivery === 'unconfirmed' || delivery === 'partial'
+      || delivery === 'published_only' || delivery === 'delivered_local') {
+      return { success: true as const, entry: canonicalEntry, displayDelivery: delivery };
+    }
+    return { success: true as const, entry: canonicalEntry };
   }
 };

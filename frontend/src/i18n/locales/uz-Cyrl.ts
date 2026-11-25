@@ -6866,6 +6866,7 @@ const uzCyrl = {
     visit_completion_call_next_option: 'Қабул тугагач, кейинги беморни чақириш',
     visit_completed_next_patient_called: 'Кейинги бемор чақирилди.',
     visit_completed_no_next_patient: 'Қабул якунланди. Чақириш мумкин бўлган бемор йўқ.',
+    queue_called_display_unconfirmed: 'Бемор чақирилди. Эълон барча таблоларда тасдиқланмади.',
     visit_completed_call_next_unconfirmed: 'Қабул якунланди. Кейинги бемор чақирилгани тасдиқланмади. Қайта чақиришдан олдин навбатни текширинг.',
     delete: 'Удалить',
     cancel: 'Отмена',

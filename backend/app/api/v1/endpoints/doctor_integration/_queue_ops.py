@@ -717,10 +717,20 @@ def call_patient(
         # masked payload while ORM data and board policy are readable here,
         # then cross to the app event loop with only the plain payload.
         display_delivery = "unconfirmed"
+        called_at_iso = changed_at.isoformat()
+        updated_at_iso = called_at_iso
         try:
             from app.services.display_websocket import get_display_manager
 
             db.refresh(queue_entry)
+            # Reuse the persisted representation used by the board payload.
+            # Legacy database columns may return timezone-naive UTC values.
+            called_at_iso = (
+                queue_entry.called_at.isoformat() if queue_entry.called_at else called_at_iso
+            )
+            updated_at_iso = (
+                queue_entry.updated_at.isoformat() if queue_entry.updated_at else None
+            )
             manager = get_display_manager()
             if doctor is not None:
                 doctor_name = (
@@ -770,8 +780,8 @@ def call_patient(
                 "id": entry_id,
                 "number": ticket_number,
                 "status": "called",
-                "called_at": changed_at.isoformat(),
-                "updated_at": changed_at.isoformat(),
+                "called_at": called_at_iso,
+                "updated_at": updated_at_iso,
             },
         }
 

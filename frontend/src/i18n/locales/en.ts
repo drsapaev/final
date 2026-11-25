@@ -6855,6 +6855,7 @@ const en = {
     visit_completion_call_next_option: 'Call the next patient after completing the visit',
     visit_completed_next_patient_called: 'The next patient was called.',
     visit_completed_no_next_patient: 'Visit completed. No patient is available to call.',
+    queue_called_display_unconfirmed: 'Patient called. The announcement was not confirmed for all displays.',
     visit_completed_call_next_unconfirmed: 'Visit completed. The next call was not confirmed. Check the queue before calling again.',
     delete: 'Удалить',
     cancel: 'Отмена',

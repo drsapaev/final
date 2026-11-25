@@ -17,6 +17,9 @@ export async function reportVisitCompletionCall(
       notify.success(typeof number === 'number' || (typeof number === 'string' && number.trim())
         ? t(calledWithNumberKey, { number })
         : t('misc.visit_completed_next_patient_called'));
+      if (next.displayDelivery === 'unconfirmed' || next.displayDelivery === 'partial') {
+        notify.warning(t('misc.queue_called_display_unconfirmed'));
+      }
     } else if (next?.noCandidate === true) {
       notify.info(t('misc.visit_completed_no_next_patient'));
     } else {
