@@ -32,6 +32,7 @@ no Redis. Tests call the endpoint coroutines directly.
 """
 
 import asyncio
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -47,9 +48,9 @@ import app.api.v1.endpoints.display_websocket as dw
 from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
 from app.core.config import settings
 from app.db.base_class import Base
+from app.models.authentication import TokenBlacklist
 from app.models.clinic import Doctor
 from app.models.department import Department
-from app.models.authentication import TokenBlacklist
 from app.models.display_config import DisplayBoard, DisplayBoardDevice
 from app.models.user import User
 from app.services.display_device_credentials import (
@@ -100,8 +101,8 @@ def handshake_env(monkeypatch):
             self.connected: list[dict] = []
             self.disconnected: list[str] = []
 
-        async def connect(self, websocket, board_id, user=None):
-            self.connected.append({"board_id": board_id, "user": user})
+        async def connect(self, websocket, board_id, user=None, *, device_id=None):
+            self.connected.append({"board_id": board_id, "user": user, "device_id": device_id})
 
         async def disconnect(self, websocket, board_id):
             self.disconnected.append(board_id)
@@ -543,6 +544,47 @@ def test_device_board_socket_closes_after_device_revocation(handshake_env, monke
 
     assert len(handshake_env.manager.connected) == 1
     assert handshake_env.manager.connected[0]["user"] is None
+    assert handshake_env.manager.connected[0]["device_id"] == device_id
     assert handshake_env.manager.disconnected == [board_name]
     assert ws.closes and ws.closes[-1][0] == 1008
     assert "expired or revoked" in (ws.closes[-1][1] or "")
+
+
+def test_authenticated_device_can_request_a_fresh_board_snapshot(
+    handshake_env, monkeypatch
+):
+    admin = _make_user(handshake_env.factory, role="Admin", username="snapshot_admin")
+    session = handshake_env.factory()
+    try:
+        board = DisplayBoard(
+            name="synthetic_snapshot_board", display_name="Synthetic board"
+        )
+        session.add(board)
+        session.commit()
+        session.refresh(board)
+        device, secret = create_display_board_device(
+            session, board=board, device_name="Synthetic TV", created_by=admin.id
+        )
+        token, _ttl, board_name, _session = exchange_display_device_secret(
+            session, device_id=device.id, secret=secret, board_name=board.name
+        )
+        device_id = device.id
+    finally:
+        session.close()
+
+    async def send_snapshot(websocket, requested_board):
+        await websocket.send_text(
+            json.dumps({"type": "initial_state", "board": requested_board})
+        )
+
+    monkeypatch.setattr(
+        handshake_env.manager, "_send_current_state", send_snapshot, raising=False
+    )
+    ws = _FakeWebSocket(token=token, incoming=[json.dumps({"type": "request_update"})])
+    asyncio.run(dw.websocket_display_board(ws, board_name))
+
+    assert handshake_env.manager.connected[0]["device_id"] == device_id
+    assert [json.loads(message) for message in ws.sent] == [
+        {"type": "initial_state", "board": board_name}
+    ]
+    assert handshake_env.manager.disconnected == [board_name]

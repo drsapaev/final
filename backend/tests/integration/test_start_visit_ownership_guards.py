@@ -213,7 +213,7 @@ class TestRegistrarStartVisitOwnership:
 
 @pytest.mark.integration
 class TestDoctorStartVisitPatientBinding:
-    def test_inconsistent_link_rejected_no_mutation(self, client, db_session):
+    def test_inconsistent_link_rejected_no_mutation(self, client, db_session, monkeypatch):
         """DOCSTART-BE-001 RED: queue entry belongs to P1 but visit_id
         anchors P2's visit — doctor start must 409 with no mutation."""
         user_d = _mk_user(db_session)
@@ -226,6 +226,12 @@ class TestDoctorStartVisitPatientBinding:
         entry_bad = _mk_entry(db_session, queue, p1, visit=v2, number=1)
         db_session.commit()
 
+        from unittest.mock import AsyncMock
+
+        from app.services import display_websocket
+
+        refresh = AsyncMock()
+        monkeypatch.setattr(display_websocket, "broadcast_display_queue_state_for_entry", refresh)
         headers = _login(client, user_d)
         response = client.post(
             f"/api/v1/doctor/queue/{entry_bad.id}/start-visit", headers=headers
@@ -235,8 +241,9 @@ class TestDoctorStartVisitPatientBinding:
         assert _visit_state(db_session, v2.id) == "open"
         assert _entry_state(db_session, entry_bad.id) == "called"
         assert _visit_state(db_session, v1.id) == "open"
+        refresh.assert_not_awaited()
 
-    def test_correct_binding_starts_own_visit(self, client, db_session):
+    def test_correct_binding_starts_own_visit(self, client, db_session, monkeypatch):
         """Positive: the correct P1↔V1 binding starts V1 normally."""
         user_d = _mk_user(db_session)
         doctor_d = _mk_doctor(db_session, user_d, "cardiology")
@@ -246,12 +253,21 @@ class TestDoctorStartVisitPatientBinding:
         entry = _mk_entry(db_session, queue, p1, visit=v1, number=1)
         db_session.commit()
 
+        from app.services import display_websocket
+
+        observed = []
+
+        async def record_refresh(entry_id):
+            observed.append((entry_id, _entry_state(db_session, entry_id)))
+
+        monkeypatch.setattr(display_websocket, "broadcast_display_queue_state_for_entry", record_refresh)
         headers = _login(client, user_d)
         response = client.post(
             f"/api/v1/doctor/queue/{entry.id}/start-visit", headers=headers
         )
         assert response.status_code == 200, response.text
         assert _visit_state(db_session, v1.id) == "in_progress"
+        assert observed == [(entry.id, "in_progress")]
 
 
 @pytest.mark.integration

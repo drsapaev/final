@@ -626,10 +626,14 @@ def test_patient_call_message_masks_when_resolution_fails(monkeypatch):
     mgr = _real_manager(_StubPubSub(), rooms={})
     entry = SimpleNamespace(
         id=1,
+        queue_id=2,
         number=3,
         patient_name="SYNTHETIC-Petrov Ivan",
         called_at=None,
-        queue=SimpleNamespace(specialist=SimpleNamespace(specialty="cardiology")),
+        queue=SimpleNamespace(
+            cabinet_number="10",
+            specialist=SimpleNamespace(specialty="cardiology", user=None, cabinet="9"),
+        ),
     )
 
     message = mgr.build_patient_call_message(entry, "Dr X", "10", board_ids=["main_board"])

@@ -5,7 +5,7 @@ import { safeJsonParse } from '../utils/safeJsonParse';
 
 // Helper для WS с прокси. Управление — VITE_ENABLE_WS=0/1
 function wsEnabled() {
-  const v = (import.meta?.env?.VITE_ENABLE_WS ?? '0').toString().trim();
+  const v = (import.meta.env.VITE_ENABLE_WS ?? '0').toString().trim();
   return v === '1' || v.toLowerCase() === 'true';
 }
 
@@ -49,9 +49,18 @@ export function openQueueWS(department: string, dateStr: string, onMessage: (dat
  * Открыть WebSocket для табло очереди (новая система)
  * Подключается к /api/v1/display/ws/board/{board_id}
  */
+export type DisplayTestAudioStatus = 'started' | 'blocked' | 'disabled' | 'unavailable';
+
+export type DisplayTestReply = (result: {
+  test_id: string;
+  status: 'displayed' | 'busy';
+  audio_status?: DisplayTestAudioStatus;
+}) => void;
+export type DisplaySnapshotRequest = () => boolean;
+
 export function openDisplayBoardWS(
   boardId: string,
-  onMessage: (data: unknown) => void,
+  onMessage: (data: unknown, replyToTest?: DisplayTestReply, requestSnapshot?: DisplaySnapshotRequest) => void,
   onConnect: () => void,
   onDisconnect: () => void,
   tokenProvider?: () => Promise<string | null>,
@@ -126,6 +135,7 @@ export function openDisplayBoardWS(
       logger.log('🔌 Подключаемся к WebSocket (token via subprotocol)');
 
       ws = new WebSocket(url, subprotocols);
+      const socket = ws;
 
       ws.onopen = () => {
         logger.log(`✅ WebSocket подключен к табло ${boardId}`);
@@ -145,11 +155,28 @@ export function openDisplayBoardWS(
         }, 30000);
       };
 
-      ws.onmessage = (ev) => {
+      socket.onmessage = (ev) => {
+        if (closed || socket !== ws) return;
         try {
           const obj = safeJsonParse(ev.data);
-          logger.log('📨 Получено WebSocket сообщение:', obj);
-          onMessage && onMessage(obj);
+          onMessage(obj, (data) => {
+            if (!closed && socket === ws && socket.readyState === WebSocket.OPEN) {
+              try {
+                socket.send(JSON.stringify({ type: 'display_test_ack', data }));
+              } catch {
+                logger.warn('Display test acknowledgment could not be sent');
+              }
+            }
+          }, () => {
+            if (closed || socket !== ws || socket.readyState !== WebSocket.OPEN) return false;
+            try {
+              socket.send(JSON.stringify({ type: 'request_update' }));
+              return true;
+            } catch {
+              logger.warn('Display snapshot request could not be sent');
+              return false;
+            }
+          });
         } catch (e) {
           logger.warn('Ошибка парсинга WebSocket сообщения:', e);
         }

@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 import jwt
-
 from fastapi import (
     APIRouter,
     Depends,
@@ -23,6 +22,7 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -37,30 +37,35 @@ from app.core.config import settings
 from app.core.rate_limiter import limiter
 from app.core.roles import DOCTOR_ROLE_SPELLINGS, Roles, normalize_role_value
 from app.crud import display_config as crud_display
+from app.db.session import SessionLocal
 from app.models.user import User
 from app.repositories.display_websocket_api_repository import (
     resolve_display_board_targets,
 )
-from app.schemas.misc_endpoints import AnnouncementRequest, CallPatientRequest
-from app.services.display_websocket import get_display_manager
-from app.services.display_websocket_api_service import (
-    DisplayWebSocketApiDomainError,
-    DisplayWebSocketApiService,
-)
-from app.db.session import SessionLocal
 from app.schemas.display_device import (
     DisplayBoardDeviceTokenRequest,
     DisplayBoardDeviceTokenResponse,
+)
+from app.schemas.misc_endpoints import (
+    AnnouncementRequest,
+    CallPatientRequest,
+    DisplayTestAck,
 )
 from app.services.display_device_credentials import (
     DISPLAY_DEVICE_SESSION_TTL_SECONDS,
     DISPLAY_DEVICE_TOKEN_TTL_SECONDS,
     DISPLAY_DEVICE_TOKEN_TYPE,
+    DisplayDevicePrincipal,
     authenticate_display_device_token,
     display_device_session_cookie_name,
     display_device_session_cookie_prefix,
-    exchange_display_device_session,
     exchange_display_device_secret,
+    exchange_display_device_session,
+)
+from app.services.display_websocket import get_display_manager
+from app.services.display_websocket_api_service import (
+    DisplayWebSocketApiDomainError,
+    DisplayWebSocketApiService,
 )
 
 logger = logging.getLogger(__name__)
@@ -370,7 +375,10 @@ async def websocket_display_board(
         # idempotent; the finally below keeps failure paths covered).
         db.close()
 
-        await manager.connect(websocket, board_id, authenticated_user)
+        if isinstance(principal, DisplayDevicePrincipal):
+            await manager.connect(websocket, board_id, device_id=principal.device_id)
+        else:
+            await manager.connect(websocket, board_id, authenticated_user)
 
         try:
             loop = asyncio.get_running_loop()
@@ -415,6 +423,25 @@ async def websocket_display_board(
                 elif message.get("type") == "request_update":
                     # Запрос обновления состояния
                     await manager._send_current_state(websocket, board_id)
+                elif message.get("type") == "display_test_ack" and isinstance(
+                    principal, DisplayDevicePrincipal
+                ):
+                    try:
+                        ack = DisplayTestAck.model_validate(message.get("data"))
+                    except ValidationError:
+                        continue
+                    current_principal = _reauthorize_display_socket(
+                        token, board_name=board_id, allow_device=True
+                    )
+                    if not isinstance(current_principal, DisplayDevicePrincipal):
+                        await websocket.close(
+                            code=status.WS_1008_POLICY_VIOLATION,
+                            reason="Display authorization expired or revoked",
+                        )
+                        break
+                    await manager.acknowledge_display_test(
+                        websocket, board_id, current_principal.device_id, ack
+                    )
 
         except WebSocketDisconnect:
             pass

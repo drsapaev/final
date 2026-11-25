@@ -48,6 +48,7 @@ describe('DisplayBoardUnified contract', () => {
         waiting: 4,
         serving: 2,
         done: 1,
+        stats_available: true,
         queue_entries: [
           { number: 99, patient_name: 'REST Patient', status: 'waiting' },
         ],
@@ -78,7 +79,8 @@ describe('DisplayBoardUnified contract', () => {
         params: { department: 'Reg', date: '2026-05-23', board: 'main_board' },
       });
     });
-    expect(screen.getByText('17')).toBeInTheDocument();
+    expect(screen.queryByText('17')).not.toBeInTheDocument();
+    expect(screen.queryByText('4')).not.toBeInTheDocument();
     expect(screen.queryByText('REST Patient')).not.toBeInTheDocument();
     expect(screen.queryByText('REST Call')).not.toBeInTheDocument();
     expect(screen.queryByText(/REST Announcement/)).not.toBeInTheDocument();
@@ -104,6 +106,7 @@ describe('DisplayBoardUnified contract', () => {
 
     expect(await screen.findByText('WS Call')).toBeInTheDocument();
     expect(screen.getByText(/WS Announcement/)).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
   });
 });
 
@@ -154,6 +157,8 @@ describe('DisplayBoardUnified row distinctness (RQ-24.a.2)', () => {
 
   it('attaches queue-level owner/specialty/cabinet from queue_update to rows', async () => {
     const { push } = await renderBoard();
+
+    push({ type: 'initial_state', data: { queue_entries: [], current_call: null } });
 
     push({
       type: 'queue_update',
@@ -403,7 +408,9 @@ describe('DisplayBoardUnified stale-WS banner (QR-FE-009)', () => {
     });
     let onConnectCb: (() => void) | null = null;
     let onDisconnectCb: (() => void) | null = null;
-    wsMock.openDisplayBoardWS.mockImplementation((_boardId: string, _onMessage: (data: unknown) => void, onConnect?: () => void, onDisconnect?: () => void) => {
+    let onMessageCb: ((data: unknown) => void) | null = null;
+    wsMock.openDisplayBoardWS.mockImplementation((_boardId: string, onMessage: (data: unknown) => void, onConnect?: () => void, onDisconnect?: () => void) => {
+      onMessageCb = onMessage;
       onConnectCb = onConnect ?? null;
       onDisconnectCb = onDisconnect ?? null;
       return vi.fn();
@@ -428,6 +435,7 @@ describe('DisplayBoardUnified stale-WS banner (QR-FE-009)', () => {
       view,
       connect: () => act(() => { onConnectCb?.(); }),
       disconnect: () => act(() => { onDisconnectCb?.(); }),
+      snapshot: () => act(() => { onMessageCb?.({ type: 'initial_state', data: { queue_entries: [] } }); }),
     };
   };
 
@@ -438,12 +446,13 @@ describe('DisplayBoardUnified stale-WS banner (QR-FE-009)', () => {
   });
 
   it('shows the stale banner after a dropped WS session and hides it on reconnect', async () => {
-    const { connect, disconnect } = await renderBoardWithLifecycle();
+    const { connect, disconnect, snapshot } = await renderBoardWithLifecycle();
 
     // Initial mount: not connected yet, never connected — no banner.
     expect(screen.queryByTestId('dbu-stale-banner')).not.toBeInTheDocument();
 
     connect();
+    snapshot();
     expect(screen.queryByTestId('dbu-stale-banner')).not.toBeInTheDocument();
 
     disconnect();
@@ -451,6 +460,8 @@ describe('DisplayBoardUnified stale-WS banner (QR-FE-009)', () => {
 
     // WS reconnects → server initial_state heals the board → banner hides.
     connect();
+    expect(screen.getByTestId('dbu-stale-banner')).toBeInTheDocument();
+    snapshot();
     expect(screen.queryByTestId('dbu-stale-banner')).not.toBeInTheDocument();
   });
 });

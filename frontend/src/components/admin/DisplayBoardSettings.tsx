@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Monitor,
   Palette,
@@ -19,9 +19,7 @@ import {
 
   Play,
 
-  Trash2,
-  Plus,
-  Edit } from
+  Plus } from
 'lucide-react';
 import {
   Card, Button, Select,
@@ -32,9 +30,11 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import type { DisplayTestAudioStatus } from '../../api/ws';
 
 interface DisplayBoard {
   id: string | number;
+  name?: string;
   display_name?: string;
   location?: string;
   theme?: string;
@@ -66,15 +66,41 @@ interface DisplayBanner {
   [key: string]: unknown;
 }
 
+interface DisplayDevice {
+  id: number;
+  device_name: string;
+  status: string;
+}
+
+interface DisplayStats {
+  total_boards: number;
+  total_calls_today: number | null;
+  total_announcements: number;
+  uptime_percentage: number | null;
+}
+
+type TestType = 'call' | 'announcement';
+
+interface DisplayTestResult {
+  status: 'displayed' | 'busy' | 'unconfirmed' | 'dispatch_failed';
+  audio_status?: DisplayTestAudioStatus | null;
+}
+
 const DisplayBoardSettings = () => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [boards, setBoards] = useState<DisplayBoard[]>([]); // P2 fix: restored value (was const [, setX]; used in loadDisplayData L75)
-  const [selectedBoard, setSelectedBoard] = useState<DisplayBoard | null>(null);
+  const [boards, setBoards] = useState<DisplayBoard[]>([]);
+  const [selectedBoardId, setSelectedBoardId] = useState<DisplayBoard['id']>();
+  const selectedBoard = boards.find((board) => board.id === selectedBoardId);
   const [themes, setThemes] = useState<DisplayTheme[]>([]);
-  const [stats, setStats] = useState<Record<string, unknown>>({});
+  const [stats, setStats] = useState<DisplayStats | null>(null);
+  const [detailsVersion, refreshBoardDetails] = useState(0);
+  const [devices, setDevices] = useState<DisplayDevice[]>([]);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [deviceLoadFailed, setDeviceLoadFailed] = useState(false);
+  const [deviceId, setDeviceId] = useState('');
   // DISPLAYBANNER-FE-001 (audit PR #3961): баннеры реальны — загружаются
   // с бэкенда (#4016 CRUD), форма Add действительно создаёт баннер
   // (POST), а мёртвые кнопки Edit/Delete без обработчиков убраны.
@@ -83,7 +109,8 @@ const DisplayBoardSettings = () => {
   const [bannerTitle, setBannerTitle] = useState('');
   const [bannerDescription, setBannerDescription] = useState('');
   const [bannerDuration, setBannerDuration] = useState('10');
-  const [testResults, setTestResults] = useState<Record<string, { testing?: boolean; success?: boolean; message?: string; error?: string; [k: string]: unknown }>>({});
+  const [testing, setTesting] = useState<TestType | null>(null);
+  const [testResult, setTestResult] = useState<DisplayTestResult | null>(null);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // Опции конфиденциальности
@@ -100,64 +127,61 @@ const DisplayBoardSettings = () => {
   { value: 'en', label: 'English' }];
 
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const loadData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-
-      // Загружаем табло, темы и статистику
-      const [boardsRes, themesRes, statsRes] = await Promise.all([
-      api.get('/admin/display/boards'),
-      api.get('/admin/display/themes'),
-      api.get('/admin/display/stats')]
-      );
-
-      if (boardsRes.status >= 200 && boardsRes.status < 300) {
-        const boardsData = boardsRes.data;
-        setBoards(boardsData);
-        if (boardsData.length > 0) {
-          setSelectedBoard(boardsData[0]);
-        }
-      }
-
-      if (themesRes.status >= 200 && themesRes.status < 300) {
-        const themesData = themesRes.data;
-        setThemes(themesData);
-      }
-
-      if (statsRes.status >= 200 && statsRes.status < 300) {
-        const statsData = statsRes.data;
-        setStats(statsData);
-      }
-
-      // DISPLAYBANNER-FE-001: баннеры первого табло загружаются с
-      // реального бэкенд-CRUD (audit #3961) — список больше не мёртвый [].
-      if (boardsRes.status >= 200 && boardsRes.status < 300) {
-        const boardsData = boardsRes.data as DisplayBoard[];
-        if (boardsData.length > 0) {
-          try {
-            const bannersRes = await api.get(
-              `/admin/display/boards/${boardsData[0].id}/banners`
-            );
-            const payload = bannersRes.data as { banners?: DisplayBanner[] };
-            setBanners(Array.isArray(payload?.banners) ? payload.banners : []);
-          } catch (bannerError) {
-            logger.warn('Не удалось загрузить баннеры табло:', bannerError);
-            setBanners([]);
-          }
-        }
-      }
-
-    } catch (error) {
-      logger.error('Ошибка загрузки данных табло:', error);
-      setMessage({ type: 'error', text: t('admin2.db_banner_error') });
+      const [profiles, themeResult, statsResult] = await Promise.allSettled([
+        api.get<DisplayBoard[]>('/admin/display/boards'),
+        api.get<DisplayTheme[]>('/admin/display/themes'),
+        api.get<DisplayStats>('/admin/display/stats'),
+      ]);
+      if (profiles.status === 'rejected') throw profiles.reason;
+      const available = profiles.value.data;
+      setBoards(available);
+      setSelectedBoardId((previous) => available.find((board) => board.id === previous)?.id ?? available[0]?.id);
+      setThemes(themeResult.status === 'fulfilled' ? themeResult.value.data : []);
+      setStats(statsResult.status === 'fulfilled' ? statsResult.value.data : null);
+      refreshBoardDetails((version) => version + 1);
+    } catch {
+      setMessage({ type: 'error', text: t('admin2.db_error_load_boards') });
     } finally {
       setLoading(false);
     }
   };
+
+  const loadDataRef = useRef(loadData);
+  loadDataRef.current = loadData;
+  useEffect(() => {
+    void loadDataRef.current();
+  }, []);
+
+  useEffect(() => {
+    setBanners([]);
+    setShowBannerForm(false);
+    setBannerTitle('');
+    setBannerDescription('');
+    setBannerDuration('10');
+    setDevices([]);
+    setDeviceId('');
+    setTestResult(null);
+    setDeviceLoadFailed(false);
+    if (selectedBoardId === undefined) return;
+
+    let stale = false;
+    setDevicesLoading(true);
+    const path = '/admin/display/boards/' + selectedBoardId;
+    void api.get<{ banners?: DisplayBanner[] }>(path + '/banners').then(({ data }) => {
+      if (!stale) setBanners(Array.isArray(data?.banners) ? data.banners : []);
+    }).catch(() => logger.warn('Не удалось загрузить баннеры табло'));
+    void api.get<DisplayDevice[]>(path + '/devices').then(({ data }) => {
+      if (!stale) setDevices(Array.isArray(data) ? data.filter((device) => device.status === 'active') : []);
+    }).catch(() => {
+      if (!stale) setDeviceLoadFailed(true);
+    }).finally(() => {
+      if (!stale) setDevicesLoading(false);
+    });
+    return () => { stale = true; };
+  }, [selectedBoardId, detailsVersion]);
 
   // DISPLAYBANNER-FE-001: реальное создание баннера через POST
   // /admin/display/boards/{id}/banners (audit #3961).
@@ -201,7 +225,8 @@ const DisplayBoardSettings = () => {
   };
 
   const handleBoardSettingChange = (key: string, value: unknown) => {
-    setSelectedBoard((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setBoards((previous) => previous.map((board) =>
+      board.id === selectedBoardId ? { ...board, [key]: value } : board));
   };
 
   const saveBoard = async () => {
@@ -227,50 +252,20 @@ const DisplayBoardSettings = () => {
     }
   };
 
-  const testBoard = async (testType: string) => {
-    if (!selectedBoard) return;
-
+  const testBoard = async (testType: TestType) => {
+    if (!selectedBoard || !deviceId || testing) return;
+    setTesting(testType);
+    setTestResult(null);
     try {
-      setTestResults((prev) => ({ ...prev, [testType]: { testing: true } }));
-
-      const testData = {
+      const { data } = await api.post<DisplayTestResult>('/admin/display/boards/' + selectedBoard.id + '/test', {
+        device_id: Number(deviceId),
         test_type: testType,
-        test_data: testType === 'call' ? {
-          ticket_number: 'A007',
-          patient_name: t('admin2.db2_test_patient_name'),
-          doctor_name: t('admin2.db2_test_doctor_name'),
-          cabinet: '101'
-        } : {
-          message: t('admin2.db2_test_announcement')
-        }
-      };
-
-      const response = (await api.post(`/admin/display/boards/${selectedBoard.id}/test`, testData)) as import('axios').AxiosResponse<Record<string, unknown>>;
-
-      if (response.status >= 200 && response.status < 300) {
-        const result = response.data;
-        setTestResults((prev) => ({
-          ...prev,
-          [testType]: {
-            success: true,
-            message: String(result.message ?? ''),
-            data: result.test_data
-          }
-        }));
-        setMessage({ type: 'success', text: t('admin2.db_test_success', { type: testType }) });
-      } else {
-        throw new Error(t('admin2.db2_test_error'));
-      }
-    } catch (error) {
-      logger.error('Ошибка тестирования:', error);
-      setTestResults((prev) => ({
-        ...prev,
-        [testType]: {
-          success: false,
-          error: (error instanceof Error ? error.message : String(error))
-        }
-      }));
-      setMessage({ type: 'error', text: t('admin2.db_error_test') });
+      });
+      setTestResult({ status: data?.status ?? 'unconfirmed', audio_status: data?.audio_status });
+    } catch {
+      setTestResult({ status: 'dispatch_failed' });
+    } finally {
+      setTesting(null);
     }
   };
 
@@ -313,11 +308,11 @@ const DisplayBoardSettings = () => {
         </div>
 
         <div className="flex gap-3">
-          <Button variant="outline" onClick={loadData} disabled={loading}>
+          <Button variant="outline" onClick={loadData} disabled={loading || saving || testing !== null}>
             <RefreshCw size={16} className="mr-2" />
             {t('admin2.db_refresh')}
           </Button>
-          <Button onClick={saveBoard} disabled={saving}>
+          <Button onClick={saveBoard} disabled={saving || testing !== null}>
             {saving ?
             <RefreshCw size={16} className="animate-spin mr-2" /> :
 
@@ -327,6 +322,19 @@ const DisplayBoardSettings = () => {
           </Button>
         </div>
       </div>
+
+      <Select
+        aria-label={t('admin2.db_board_profile')}
+        value={String(selectedBoard.id)}
+        options={boards.map((board) => ({
+          value: String(board.id), label: board.display_name ?? board.name ?? String(board.id),
+        }))}
+        disabled={saving || testing !== null}
+        onChange={(event: SelectChangeEvent) => {
+          setSelectedBoardId(boards.find((board) => String(board.id) === event.target.value)?.id);
+          setMessage({ type: '', text: '' });
+        }}
+      />
 
       {/* Сообщения */}
       {message.text &&
@@ -346,19 +354,22 @@ const DisplayBoardSettings = () => {
       {/* Статистика */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-blue-600">{Number(stats.total_boards ?? 0)}</div>
+          <div className="text-2xl font-bold text-blue-600">{stats?.total_boards ?? '—'}</div>
           <div className="text-sm text-gray-600">{t('admin2.db_stat_total_boards')}</div>
         </Card>
         <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-green-600">{Number(stats.total_calls_today ?? 0)}</div>
+          <div className="text-sm font-medium">{stats?.total_calls_today ?? t('admin2.db_metrics_unavailable')}</div>
           <div className="text-sm text-gray-600">{t('admin2.db_stat_calls_today')}</div>
         </Card>
         <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-orange-600">{Number(stats.total_announcements ?? 0)}</div>
+          <div className="text-2xl font-bold text-orange-600">{stats?.total_announcements ?? '—'}</div>
           <div className="text-sm text-gray-600">{t('admin2.db_stat_announcements')}</div>
         </Card>
         <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-purple-600">{Math.round(Number(stats.uptime_percentage ?? 0))}%</div>
+          <div className="text-sm font-medium">
+            {typeof stats?.uptime_percentage === 'number'
+              ? Math.round(stats.uptime_percentage) + '%' : t('admin2.db_metrics_unavailable')}
+          </div>
           <div className="text-sm text-gray-600">{t('admin2.db_stat_uptime')}</div>
         </Card>
       </div>
@@ -555,62 +566,51 @@ const DisplayBoardSettings = () => {
           {t('admin2.db_testing')}
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="text-center">
-            <Button
-              onClick={() => testBoard('call')}
-              disabled={testResults.call?.testing}
-              className="w-full mb-2">
-              
-              {testResults.call?.testing ?
-              <RefreshCw size={16} className="animate-spin mr-2" /> :
-
-              <Play size={16} className="mr-2" />
-              }
-              {t('admin2.db_test_call')}
-            </Button>
-            {testResults.call && !testResults.call.testing &&
-            <div className={`text-sm ${testResults.call.success ? 'text-green-600' : 'text-red-600'}`}>
-                {testResults.call.success ? t('admin2.db_test_success_label') : t('admin2.db_test_error_label')}
-              </div>
-            }
-          </div>
-
-          <div className="text-center">
-            <Button
-              onClick={() => testBoard('announcement')}
-              disabled={testResults.announcement?.testing}
-              className="w-full mb-2"
-              variant="outline">
-              
-              {testResults.announcement?.testing ?
-              <RefreshCw size={16} className="animate-spin mr-2" /> :
-
-              <MessageCircle size={16} className="mr-2" />
-              }
-              {t('admin2.db_test_announcement')}
-            </Button>
-            {testResults.announcement && !testResults.announcement.testing &&
-            <div className={`text-sm ${testResults.announcement.success ? 'text-green-600' : 'text-red-600'}`}>
-                {testResults.announcement.success ? t('admin2.db_test_success_label') : t('admin2.db_test_error_label')}
-              </div>
-            }
-          </div>
-
-          <div className="text-center">
-            <Button
-              onClick={() => window.open('/display-board', '_blank')}
-              className="w-full mb-2"
-              variant="outline">
-              
-              <Eye size={16} className="mr-2" />
-              {t('admin2.db_open_board')}
-            </Button>
-            <div className="text-sm text-gray-500">
-              {t('admin2.db_open_board_desc')}
-            </div>
+        <div className="mb-4">
+          <Select
+            aria-label={t('admin2.db_test_device')}
+            value={deviceId}
+            options={[
+              { value: '', label: t('admin2.db_test_select_device') },
+              ...devices.map((device) => ({ value: String(device.id), label: device.device_name })),
+            ]}
+            onChange={(event: SelectChangeEvent) => {
+              setDeviceId(event.target.value);
+              setTestResult(null);
+            }}
+            disabled={devicesLoading || devices.length === 0 || testing !== null}
+          />
+          <div className="text-sm text-gray-500" role="status">
+            {devicesLoading ? t('admin2.db_loading') : deviceLoadFailed
+              ? t('admin2.db_test_devices_error') : devices.length === 0
+                ? t('admin2.db_test_no_devices') : null}
           </div>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Button onClick={() => testBoard('call')} disabled={!deviceId || testing !== null}>
+            {testing === 'call' ? <RefreshCw size={16} className="animate-spin mr-2" /> : <Play size={16} className="mr-2" />}
+            {t('admin2.db_test_call')}
+          </Button>
+          <Button onClick={() => testBoard('announcement')} disabled={!deviceId || testing !== null} variant="outline">
+            {testing === 'announcement' ? <RefreshCw size={16} className="animate-spin mr-2" /> : <MessageCircle size={16} className="mr-2" />}
+            {t('admin2.db_test_announcement')}
+          </Button>
+          <Button
+            disabled={!selectedBoard.name}
+            onClick={() => window.open('/display-board?board=' + encodeURIComponent(selectedBoard.name ?? ''), '_blank', 'noopener,noreferrer')}
+            variant="outline"
+          >
+            <Eye size={16} className="mr-2" />
+            {t('admin2.db_open_board')}
+          </Button>
+        </div>
+        {testResult &&
+          <div className="mt-3 text-sm" role="status">
+            {t('admin2.db_test_result_' + testResult.status)}
+            {testResult.audio_status && <div>{t('admin2.db_test_audio_' + testResult.audio_status)}</div>}
+          </div>
+        }
       </Card>
 
       {/* Управление контентом */}

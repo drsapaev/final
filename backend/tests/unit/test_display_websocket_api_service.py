@@ -46,9 +46,11 @@ class TestDisplayWebSocketApiService:
             called_at=None,
             queue=SimpleNamespace(
                 specialist_id=7,
+                cabinet_number="501",
                 specialist=SimpleNamespace(
                     user=SimpleNamespace(full_name="Dr Linked"),
                     cabinet="12",
+                    specialty="cardio",
                 ),
             ),
         )
@@ -87,7 +89,9 @@ class TestDisplayWebSocketApiService:
 
         assert result["success"] is True
         assert entry.status == "called"
-        manager.broadcast_patient_call.assert_awaited_once()
+        manager.broadcast_patient_call.assert_awaited_once_with(
+            queue_entry=entry, doctor_name="Dr Linked", cabinet="501", board_ids=None
+        )
 
     @pytest.mark.asyncio
     async def test_doctor_cannot_call_patient_when_only_user_id_matches_queue(self):

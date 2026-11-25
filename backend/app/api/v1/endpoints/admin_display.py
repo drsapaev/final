@@ -4,11 +4,19 @@ API endpoints для управления табло в админ панели
 
 import logging
 import shutil
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -38,16 +46,23 @@ from app.models.display_config import (
 from app.models.user import User
 from app.schemas.display_config import DisplayBoardUpdate
 from app.schemas.display_device import (
-    DisplayBoardDeviceCreateRequest,
     DisplayBoardDeviceCreatedResponse,
+    DisplayBoardDeviceCreateRequest,
     DisplayBoardDeviceResponse,
 )
-from app.schemas.misc_endpoints import DisplayBannerRequest, DisplayTestRequest
+from app.schemas.misc_endpoints import (
+    DisplayBannerRequest,
+    DisplayStatsResponse,
+    DisplayTestRequest,
+    DisplayTestResponse,
+)
 from app.services.display_device_credentials import (
+    DISPLAY_DEVICE_ACTIVE,
     create_display_board_device,
     revoke_display_board_device,
     rotate_display_board_device,
 )
+from app.services.display_websocket import get_display_manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -226,8 +241,6 @@ def update_display_board(
         # воркеры получают best-effort control-сообщение (nameformat_ctl).
         if "show_patient_names" in payload:
             try:
-                from app.services.display_websocket import get_display_manager
-
                 get_display_manager().invalidate_name_format_cache(updated_board.name)
             except Exception as hook_exc:
                 logger.warning(
@@ -605,52 +618,37 @@ def get_display_themes(
 # ===================== ТЕСТИРОВАНИЕ ТАБЛО =====================
 
 
-@router.post("/display/boards/{board_id}/test", response_model=dict[str, Any])
-def test_display_board(
+@router.post("/display/boards/{board_id}/test", response_model=DisplayTestResponse)
+async def test_display_board(
     board_id: int,
     test_data: DisplayTestRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
-):
-    """Тестировать табло"""
-    try:
-        ensure_default_display_config(db)
-        test_type = test_data.test_type
+) -> DisplayTestResponse:
+    """Проверить выбранное зарегистрированное устройство."""
+    target = (
+        db.query(DisplayBoard.name, DisplayBoard.active, DisplayBoardDevice.status)
+        .join(DisplayBoardDevice, DisplayBoardDevice.board_id == DisplayBoard.id)
+        .filter(DisplayBoard.id == board_id, DisplayBoardDevice.id == test_data.device_id)
+        .first()
+    )
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Display device not found")
+    board_name, board_active, device_status = target
+    if not board_active or device_status != DISPLAY_DEVICE_ACTIVE:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Display device is inactive")
 
-        if test_type == "call":
-            # Тестовый вызов пациента
-            return {
-                "success": True,
-                "message": "Тестовый вызов отправлен на табло",
-                "test_data": {
-                    "ticket_number": "A007",
-                    "patient_name": "Тестовый П.",
-                    "doctor_name": "Доктор Тест",
-                    "cabinet": "101",
-                    "call_time": datetime.now(UTC).isoformat(),
-                },
-            }
-        elif test_type == "announcement":
-            # Тестовое объявление
-            return {
-                "success": True,
-                "message": "Тестовое объявление отправлено",
-                "test_data": {
-                    "announcement": "Тестовое объявление от админ панели",
-                    "type": "info",
-                },
-            }
-        else:
-            return {"success": True, "message": f"Тест типа {test_type} выполнен"}
-
-    except Exception as e:
-        raise _admin_display_http_error(e) from e
+    # The wait for a browser acknowledgment does not need a DB transaction.
+    db.close()
+    return await get_display_manager().test_device(
+        board_name, test_data.device_id, test_data.test_type
+    )
 
 
 # ===================== СТАТИСТИКА ТАБЛО =====================
 
 
-@router.get("/display/stats", response_model=dict[str, Any])
+@router.get("/display/stats", response_model=DisplayStatsResponse)
 def get_display_stats(
     days_back: int = 7,
     db: Session = Depends(get_db),
@@ -664,24 +662,23 @@ def get_display_stats(
         active_boards = len([board for board in boards if board.active])
         total_banners = db.query(DisplayBanner).count()
         total_announcements = db.query(DisplayAnnouncement).count()
-        total_calls_today = total_boards * 45 if total_boards else 0
         by_board = {
             board.name: {
-                "calls": 45 if board.active else 0,
+                "calls": None,
                 "announcements": db.query(DisplayAnnouncement)
                 .filter(DisplayAnnouncement.board_id == board.id)
                 .count(),
-                "uptime": 99.8 if board.active else 0.0,
+                "uptime": None,
             }
             for board in boards
         }
         return {
             "total_boards": total_boards,
             "active_boards": active_boards,
-            "total_calls_today": total_calls_today,
+            "total_calls_today": None,
             "total_announcements": total_announcements,
             "total_banners": total_banners,
-            "uptime_percentage": 99.8 if active_boards else 0.0,
+            "uptime_percentage": None,
             "by_board": by_board,
         }
     except Exception as e:

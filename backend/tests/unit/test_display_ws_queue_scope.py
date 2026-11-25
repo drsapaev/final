@@ -8,15 +8,18 @@ untouched queues. Synthetic fixtures only — no real patients/staff.
 """
 import asyncio
 import json
+import os
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
 from app.models.display_config import DisplayBoard
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.setting import Setting
+from app.services.display_board_state import DisplayCallStore
 from app.services.display_websocket import DisplayWebSocketManager
 
 
@@ -129,11 +132,50 @@ def _synthetic_entry(entry_id: int, number: int, status: str) -> SimpleNamespace
         patient_name=f"Synthetic Patient {entry_id}",
         status=status,
         source="reception",
-        created_at=datetime(2026, 11, 4, 8, 0, tzinfo=timezone.utc),
+        created_at=datetime(2026, 11, 4, 8, 0, tzinfo=UTC),
         called_at=(
-            datetime(2026, 11, 4, 8, 5, tzinfo=timezone.utc) if status == "called" else None
+            datetime(2026, 11, 4, 8, 5, tzinfo=UTC) if status == "called" else None
         ),
     )
+
+
+@pytest.mark.asyncio
+async def test_post_commit_refresh_broadcasts_current_entry_state(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from app.services import display_websocket
+
+    queue = _synthetic_queue(101)
+    entry = _synthetic_entry(9001, 7, "in_progress")
+    entry.queue = queue
+    session = _FakeSession({OnlineQueueEntry: _FakeQuery(result_all=[entry], result_first=entry)})
+    monkeypatch.setattr(display_websocket, "SessionLocal", lambda: session)
+    manager = DisplayWebSocketManager(pubsub=_FakePubSubBridge())
+    manager._queue_update_board_ids = lambda: ["main_board"]
+    manager._resolve_name_format = lambda _ids: "none"
+    manager.broadcast_to_board = AsyncMock(return_value="delivered_local")
+    monkeypatch.setattr(display_websocket, "get_display_manager", lambda: manager)
+
+    await display_websocket.broadcast_display_queue_state_for_entry(entry.id)
+
+    manager.broadcast_to_board.assert_awaited_once()
+    board, message = manager.broadcast_to_board.await_args.args
+    assert board == "main_board"
+    assert message["event_type"] == "queue.updated"
+    assert message["data"]["queue_id"] == queue.id
+    assert message["data"]["queue_entries"][0]["id"] == entry.id
+    assert message["data"]["queue_entries"][0]["status"] == "in_progress"
+
+
+@pytest.mark.asyncio
+async def test_post_commit_refresh_failure_does_not_propagate(monkeypatch):
+    from app.services import display_websocket
+
+    def unavailable():
+        raise RuntimeError("SYNTHETIC unavailable")
+
+    monkeypatch.setattr(display_websocket, "SessionLocal", unavailable)
+    await display_websocket.broadcast_display_queue_state_for_entry(9001)
 
 
 @pytest.mark.asyncio
@@ -254,3 +296,136 @@ async def test_broadcast_without_scope_still_single_queue_contract(monkeypatch):
     assert updates, ws.messages
     assert updates[-1]["data"]["queue_id"] == 303
     assert "event_type" not in updates[-1]
+
+    queue.cabinet_number = "401"
+    entries[0].queue = queue
+    await manager.broadcast_queue_update(entries[0], "queue.created")
+    created = ws.messages[-1]
+    assert created["event_type"] == "queue.created"
+    assert created["data"]["queue_entry_id"] == 9201
+    assert created["data"]["queue_id"] == 303
+    assert created["data"]["cabinet"] == "401"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("resource_owned", [False, True])
+async def test_current_call_recovers_only_on_its_target_profile(monkeypatch, resource_owned):
+    queue = _synthetic_queue(505)
+    queue.cabinet_number = "302"
+    queue.specialist = SimpleNamespace(
+        cabinet="208", user=None, specialty="cardiology",
+    )
+    if resource_owned:
+        queue.queue_resource_id = 33
+        queue.queue_resource = SimpleNamespace(display_name="Synthetic procedure", default_cabinet="109")
+        queue.specialist = None
+    entry = _synthetic_entry(5501, 8, "called")
+    entry.queue = queue
+    entry.queue_id = queue.id
+    session = _FakeSession({
+        DailyQueue: _FakeQuery(result_all=[queue]),
+        OnlineQueueEntry: _FakeQuery(result_all=[entry]),
+        DisplayBoard: _FakeQuery(result_first=SimpleNamespace(show_patient_names="none")),
+        Setting: _FakeQuery(result_all=[]),
+    })
+    monkeypatch.setattr("app.services.display_websocket.SessionLocal", lambda: session)
+
+    redis_url = os.getenv("TEST_DISPLAY_REDIS_URL")
+    store = DisplayCallStore(redis_url)
+    reconnect_store = DisplayCallStore(redis_url) if redis_url else store
+    sender = DisplayWebSocketManager(pubsub=_FakePubSubBridge(), call_store=store)
+    receiver = DisplayWebSocketManager(pubsub=_FakePubSubBridge(), call_store=reconnect_store)
+    board_name = f"synthetic-{uuid4()}"
+    monkeypatch.setattr(sender, "_call_durations", lambda _: {board_name: 11})
+    ws = _FakeWebSocket()
+    sender.connections[board_name] = {ws}
+
+    older = sender.build_patient_call_message(entry, "Synthetic owner", "999", [board_name])
+    await sender.broadcast_patient_call(entry, "Synthetic owner", "999", [board_name])
+    live = ws.messages[-1]
+    assert live["data"]["queue_id"] == queue.id
+    assert live["data"]["queue_entry_id"] == entry.id
+    assert live["data"]["cabinet"] == "302"
+    assert live["display_duration"] == 11
+    assert (
+        datetime.fromisoformat(live["data"]["expires_at"])
+        - datetime.fromisoformat(live["data"]["issued_at"])
+    ).total_seconds() == 11
+
+    await sender.broadcast_patient_call_data(older, [board_name])
+    assert len(ws.messages) == 1
+    queue.cabinet_number = "303"
+    await receiver._send_current_state(ws, board_name)
+    snapshot = ws.messages[-1]["data"]
+    assert snapshot["queue_entries"][0]["cabinet"] == "303"
+    assert snapshot["current_call"]["cabinet"] == "303"
+    assert snapshot["current_call"]["event_id"] == live["data"]["event_id"]
+    assert snapshot["current_call"]["expires_at"] == live["data"]["expires_at"]
+    assert snapshot["current_call"]["patient_name"] == "Пациент"
+
+    await receiver._send_current_state(ws, "synthetic-other-display")
+    assert ws.messages[-1]["data"]["current_call"] is None
+    entry.status = "served"
+    await receiver._send_current_state(ws, board_name)
+    assert ws.messages[-1]["data"]["current_call"] is None
+
+    if redis_url:
+        await store._redis.aclose()
+        await reconnect_store._redis.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("station_cabinet", ["505", None])
+async def test_nurse_station_cabinet_survives_live_updates_and_reconnect(monkeypatch, station_cabinet):
+    queue = _synthetic_queue(606)
+    queue.queue_resource_id = 44
+    queue.queue_resource = SimpleNamespace(display_name="SYNTHETIC station", default_cabinet="101")
+    queue.cabinet_number = "102"
+    entry = _synthetic_entry(6601, 5, "called")
+    entry.queue = queue
+    entry.queue_id = queue.id
+    other_entry = _synthetic_entry(6602, 6, "called")
+    other_entry.queue = queue
+    other_entry.queue_id = queue.id
+    session = _FakeSession({
+        DailyQueue: _FakeQuery(result_all=[queue]),
+        OnlineQueueEntry: _FakeQuery(result_all=[entry, other_entry]),
+        DisplayBoard: _FakeQuery(result_first=SimpleNamespace(show_patient_names="none")),
+        Setting: _FakeQuery(result_all=[]),
+    })
+    monkeypatch.setattr("app.services.display_websocket.SessionLocal", lambda: session)
+    redis_url = os.getenv("TEST_DISPLAY_REDIS_URL")
+    store = DisplayCallStore(redis_url)
+    reconnect_store = DisplayCallStore(redis_url) if redis_url else store
+    manager = DisplayWebSocketManager(pubsub=_FakePubSubBridge(), call_store=store)
+    receiver = DisplayWebSocketManager(pubsub=_FakePubSubBridge(), call_store=reconnect_store)
+    board_name = f"synthetic-nurse-{uuid4()}"
+    monkeypatch.setattr(manager, "_call_durations", lambda _: {board_name: 30})
+    websocket = _FakeWebSocket()
+    manager.connections[board_name] = {websocket}
+
+    await manager.broadcast_patient_call(
+        entry, "SYNTHETIC station", station_cabinet,
+        board_ids=[board_name], preserve_cabinet=True,
+    )
+    assert websocket.messages[-1]["data"]["cabinet"] == station_cabinet
+    assert "_preserve_cabinet" not in websocket.messages[-1]
+
+    await manager.broadcast_daily_queue_state(queue, board_ids=[board_name])
+    rows = websocket.messages[-1]["data"]["queue_entries"]
+    assert rows[0]["cabinet"] == station_cabinet
+    assert rows[1]["cabinet"] is None
+
+    await receiver._send_current_state(websocket, board_name)
+    snapshot = websocket.messages[-1]["data"]
+    assert snapshot["current_call"]["cabinet"] == station_cabinet
+    assert snapshot["queue_entries"][0]["cabinet"] == station_cabinet
+    assert snapshot["queue_entries"][1]["cabinet"] is None
+
+    await manager._send_current_state(websocket, "other_board")
+    assert websocket.messages[-1]["data"]["queue_entries"][0]["cabinet"] is None
+    if redis_url:
+        stored = await store._redis.get(store._key(board_name))
+        assert b"SYNTHETIC Patient" not in stored
+        await store._redis.aclose()
+        await reconnect_store._redis.aclose()
