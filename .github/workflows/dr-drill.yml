@@ -21,8 +21,9 @@ concurrency:
 jobs:
   dr-drill:
     name: 🔄 Verify backup restores
-    runs-on: ubuntu-latest
-    # Only run on the main repo, not forks — forks don't have staging DB access.
+    # Pin the runner and Python pairing verified by security-scan and AI Safety.
+    runs-on: ubuntu-24.04
+    # Run only in the canonical repository; the database is a job-local service.
     if: github.repository == 'drsapaev/final'
 
     services:
@@ -48,9 +49,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v7
+      - name: Setup Python
+        uses: actions/setup-python@v7
         with:
-          python-version: '3.11.10'
+          python-version: '3.11.18'
 
       - name: Install backend deps
         run: |
@@ -113,8 +115,8 @@ jobs:
 
   # Canonical R1 notifier (the previous inline issues.create failed silently
   # with 403: workflow grants only contents:read; issue creation needs
-  # issues:write — granted job-scoped here). DR failures alert on any event:
-  # a broken restore is a P0 regardless of how the drill was triggered.
+  # issues:write — granted job-scoped here). Alert on failure for both
+  # scheduled and manual drills; only a completed run provides restore proof.
   notify-failure:
     name: 🔔 Notify on failure
     runs-on: ubuntu-latest
@@ -127,11 +129,16 @@ jobs:
       - name: Create failure issue
         uses: ./.github/actions/notify-failure
         with:
-          title: 🔴 DR Drill failed — backup does NOT restore cleanly
+          title: 🔴 DR Drill failed — recovery rehearsal not verified
           detail: |
-            The latest backup cannot be restored to a working state.
-            For a medical system this is a P0 incident — if prod burns tonight, you cannot recover.
-            Identify whether the failure is in pg_dump, pg_restore, or the smoke test:
-            - pg_restore failing → backup format problem (check pg_dump version compatibility)
-            - smoke test failing → schema drift; run `alembic upgrade head` against the restored backup
-            Do NOT close this issue until the DR drill passes again.
+            This workflow rehearses recovery in an isolated CI database. By default
+            it restores a synthetic archive created in this run. A failed run by
+            itself does not establish that a production backup is damaged.
+
+            Check the first failed step:
+            - Runner, Python, dependencies, migration, seed, or pg_dump: restore was not exercised.
+            - Run DR drill: inspect archive selection, pg_restore, smoke checks, and cleanup
+              to identify the failure; do not infer the cause from the job status alone.
+
+            Close only after a successful run demonstrates dump, restore, smoke checks,
+            and cleanup. Production-backup recoverability requires separate evidence.
