@@ -78,6 +78,30 @@ def test_list_visits_endpoint_delegates_to_service(
     }
 
 
+def test_list_visits_filters_real_canonical_visit_date(
+    client, db_session, auth_headers, test_visit
+) -> None:
+    day = date(2026, 3, 8)
+    test_visit.visit_date = day
+    other = Visit(
+        patient_id=test_visit.patient_id,
+        doctor_id=test_visit.doctor_id,
+        status="open",
+        visit_date=day + timedelta(days=1),
+    )
+    db_session.add(other)
+    db_session.commit()
+    response = client.get(
+        "/api/v1/visits/visits",
+        params={"planned_date": day.isoformat(), "patient_id": test_visit.patient_id},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert [(row["id"], row["planned_date"]) for row in response.json()] == [
+        (test_visit.id, day.isoformat())
+    ]
+
+
 def test_get_visit_endpoint_delegates_to_service(
     client, monkeypatch, auth_headers, test_visit
 ) -> None:

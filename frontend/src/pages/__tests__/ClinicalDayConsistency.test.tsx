@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import Appointments from '../Appointments';
@@ -64,6 +64,24 @@ describe('clinical calendar dates', () => {
     fireEvent.change(day, { target: { value: '' } });
     await waitFor(() => expect(screen.queryByText('SYNTHETIC-SCHEDULED')).not.toBeInTheDocument());
     expect(mocks.appointments).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears the old day immediately and ignores a slow response when switching again', async () => {
+    mocks.appointments.mockResolvedValueOnce({ data: [{ id: 1, patient_name: 'SYNTHETIC-OLD' }] });
+    let finishSlowDay!: (value: { data: { id: number; patient_name: string }[] }) => void;
+    mocks.appointments.mockImplementationOnce(() => new Promise(resolve => { finishSlowDay = resolve; }));
+    mocks.appointments.mockResolvedValueOnce({ data: [{ id: 3, patient_name: 'SYNTHETIC-LATEST' }] });
+    render(<ThemeProvider><Appointments /></ThemeProvider>);
+    expect(await screen.findByText('SYNTHETIC-OLD')).toBeInTheDocument();
+    const day = screen.getByLabelText(/Дата:/);
+    fireEvent.change(day, { target: { value: '2026-03-08' } });
+    expect(screen.queryByText('SYNTHETIC-OLD')).not.toBeInTheDocument();
+    expect(screen.queryByText('misc.appo_net_zapisey_na_vybrannuyu_da')).not.toBeInTheDocument();
+    fireEvent.change(day, { target: { value: '2026-03-09' } });
+    expect(await screen.findByText('SYNTHETIC-LATEST')).toBeInTheDocument();
+    await act(async () => finishSlowDay({ data: [{ id: 2, patient_name: 'SYNTHETIC-STALE' }] }));
+    expect(screen.queryByText('SYNTHETIC-STALE')).not.toBeInTheDocument();
+    expect(screen.getByText('SYNTHETIC-LATEST')).toBeInTheDocument();
   });
 
   it.each([

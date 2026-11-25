@@ -69,6 +69,16 @@ export default function Appointments() {
     return () => { latestRequest.current += 1; };
   }, [load]);
 
+  const changeDate = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const nextDate = event.target.value;
+    if (nextDate === date) return;
+    latestRequest.current += 1;
+    setRows([]);
+    setErr(null);
+    setBusy(Boolean(nextDate));
+    setDate(nextDate);
+  };
+
   const filtered = useMemo(() => {
     if (!q) return rows;
     const qq = q.toLowerCase();
@@ -122,7 +132,7 @@ export default function Appointments() {
           <div style={toolbarStyle}>
             <label style={fieldStyle}>
               Дата:&nbsp;
-              <Input type="date" value={date} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>)=>setDate(e.target.value)} />
+              <Input type="date" value={date} onChange={changeDate} />
             </label>
             <Input
               placeholder={t('misc.appo_poisk_po_patsientu_vrachu_st')}
@@ -207,7 +217,7 @@ export default function Appointments() {
                     </td>
                   </tr>
                 ))}
-                {filtered.length === 0 && (
+                {!busy && err === null && filtered.length === 0 && (
                   <tr>
                     <td colSpan={5}>
                       <AppEmpty
