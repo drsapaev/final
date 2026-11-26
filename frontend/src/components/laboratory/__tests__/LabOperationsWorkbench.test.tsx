@@ -96,6 +96,7 @@ describe('Laboratory operations', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Проверить строки' }));
 
     expect(await screen.findByText('DEVICE-HGB-RAW')).toBeInTheDocument();
+    expect(screen.getByText('Сверьте код с утверждённым сопоставлением анализаторов вашей клиники, исправьте CSV и загрузите его повторно. Строка не сохранена.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Сохранить проверенные строки' })).toBeDisabled();
     expect(api.importRows).toHaveBeenCalledTimes(1);
   });

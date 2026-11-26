@@ -351,7 +351,10 @@ export default function LabOperationsWorkbench({ reportId, communicationId = nul
                   <strong>{labels.row} {row.row_index + 1}{row.report_instance_id !== null && ` · ${labels.report} #${row.report_instance_id}`}</strong>
                   <span>{row.error_code ? (labels[row.error_code as keyof Labels] || labels.error) : labels[row.status]}</span>
                   {row.unmapped_analyte_code && (
-                    <span>{labels.analyte}: <code>{row.unmapped_analyte_code}</code></span>
+                    <>
+                      <span>{labels.analyte}: <code>{row.unmapped_analyte_code}</code></span>
+                      <span>{labels.unknown_analyte_help}</span>
+                    </>
                   )}
                   {row.existing_values > 0 && <span>{labels.existing} {row.existing_values}</span>}
                 </li>
