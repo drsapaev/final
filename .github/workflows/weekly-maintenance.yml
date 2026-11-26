@@ -16,7 +16,8 @@ concurrency:
 jobs:
   maintenance-report:
     name: Maintenance health report
-    runs-on: ubuntu-latest
+    # Match the pinned Python runner used by the nightly security scan.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
 
     steps:
@@ -31,7 +32,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.11.10'
+          python-version: '3.11.18'
 
       - name: Prepare report files
         shell: bash
@@ -261,9 +262,13 @@ jobs:
             echo ""
             echo "| Check | Status | Exit code | Details |"
             echo "| --- | --- | --- | --- |"
-            tail -n +2 maintenance-reports/checks.tsv | while IFS=$'\t' read -r check status exit_code details; do
-              echo "| ${check} | ${status} | ${exit_code} | ${details} |"
-            done
+            if [ -f maintenance-reports/checks.tsv ]; then
+              tail -n +2 maintenance-reports/checks.tsv | while IFS=$'\t' read -r check status exit_code details; do
+                echo "| ${check} | ${status} | ${exit_code} | ${details} |"
+              done
+            else
+              echo "| Report preparation | not run | — | Check earlier setup steps; no check results were produced. |"
+            fi
             echo ""
             echo "Artifacts contain command logs and machine-readable audit output."
           } >> "$GITHUB_STEP_SUMMARY"
