@@ -263,3 +263,68 @@ def test_doctor_call_loses_a_claim_after_reading_waiting(
     response = client.post(f"/api/v1/doctor/queue/{entry_id}/call", headers=headers)
     assert response.status_code == 409
     get_manager.assert_not_called()
+
+
+def test_stalled_board_does_not_delay_healthy_board_or_repeat_call(
+    client, db_session, test_doctor_user, monkeypatch
+):
+    import asyncio
+    import json
+
+    doctor, headers = _doctor(client, db_session, test_doctor_user)
+    entry = _entry(db_session, _queue(db_session, doctor, "dermatology"), 17)
+    trace = []
+    messages = []
+
+    class Stalled:
+        async def send_text(self, _payload):
+            trace.append("stalled")
+            try:
+                await asyncio.sleep(0.8)
+            except asyncio.CancelledError:
+                trace.append("cancelled")
+                raise
+
+    class Healthy:
+        async def send_text(self, payload):
+            trace.append("healthy")
+            messages.append(json.loads(payload))
+
+    bridge = AsyncMock()
+    bridge.subscribe.return_value = True
+    bridge.publish.return_value = False  # no other worker confirmed
+    manager = display_websocket.DisplayWebSocketManager(pubsub=bridge)
+    stalled, healthy = Stalled(), Healthy()
+    manager.connections = {"stalled-board": {stalled}, "healthy-board": {healthy}}
+    monkeypatch.setattr(
+        manager,
+        "_resolve_untargeted_board_ids",
+        lambda: ["stalled-board", "healthy-board"],
+    )
+    monkeypatch.setattr(manager, "_resolve_name_format", lambda _ids: "none")
+    monkeypatch.setattr(display_websocket, "get_display_manager", lambda: manager)
+    monkeypatch.setattr(
+        display_websocket, "DISPLAY_SOCKET_SEND_TIMEOUT_SECONDS", 0.08, raising=False
+    )
+    monkeypatch.setattr(
+        display_websocket, "DISPLAY_CALL_TARGET_TIMEOUT_SECONDS", 0.3, raising=False
+    )
+
+    url = f"/api/v1/doctor/queue/{entry.id}/call"
+    response = client.post(url, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert response.json()["display_delivery"] == "partial"
+    assert not {"stalled-board", "healthy-board"} & set(response.text.split('"'))
+    assert trace == ["stalled", "healthy", "cancelled"]
+    assert len(messages) == 1
+    assert messages[0]["data"]["queue_number"] == entry.number
+    assert "SYNTHETIC-QUEUE-FLOW" not in str(messages)
+    db_session.refresh(entry)
+    assert entry.status == "called"
+    called_at = entry.called_at
+
+    assert client.post(url, headers=headers).status_code == 400
+    db_session.refresh(entry)
+    assert entry.called_at == called_at
+    assert len(messages) == 1
