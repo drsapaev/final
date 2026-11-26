@@ -656,3 +656,9 @@ PR #4236 остаётся открытым Draft; проверенные рев�
 БД, миграции, seed и backend/frontend runtime не запускались; записи пациента не создавались и не использовались; экран врачу не предъявлялся, клинического вердикта и замеров нет. Статическая команда `alembic heads --verbose` нашла единственную вершину `0109_emr_calendar_merge`; применение миграций не выполнялось. `py_compile` прошёл для 12 файлов из scoped gate. Frontend build завершился с ошибкой до сборки приложения: Vite не разрешил импорт `nitro/vite` (`ERR_MODULE_NOT_FOUND`) из доступного локального dependency tree.
 
 M13.09 и M13.10 остаются раздельно **NOT_RUN**. Индивидуальный проход, парное сравнение, мнение врача и критерии 5 врачей не оценивались. M13.09/M13.10 и общий план не закрыты; merge, release и deploy не выполнялись. Продолжение локального сценария требует доступного task-owned PostgreSQL, который можно безопасно запустить на этом хосте, и зависимости `nitro/vite`, разрешимой из worktree без записи в `C:\final`.
+
+### Изолированная frontend-проверка — 2026-11-27 01:39 +05:00
+
+После неудачной сборки из основного worktree tracked frontend-файлы были выгружены с SHA `d1980942efb2f87ff9a6b1a84522b04cce2f41b8` в task-owned scratch, а локальные зависимости скопированы туда же с совпадающим `package-lock` SHA-256. Сборка выполнялась без установки пакетов и сети: `npm run build` — **PASS**, 57.72 s. Sidebar localization unit test — `npm run test:run -- src/components/ui/macos/__tests__/Sidebar.navI18n.test.tsx` — **PASS**, 1 file / 13 tests, 3.85 s. Эта попытка устранила локальную проблему разрешения `nitro/vite` для frontend build и не затрагивала основной checkout.
+
+Проверялись только frontend build и изолированный sidebar unit test. Backend, PostgreSQL, миграции, seed, API/UI runtime и браузерный EMR сценарий не запускались; записей пациента не было. Врачебный экран не предъявлялся. M13.09 и M13.10 по-прежнему **NOT_RUN**.
