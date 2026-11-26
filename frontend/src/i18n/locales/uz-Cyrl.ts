@@ -11639,6 +11639,8 @@ const uzCyrl = {
     workplace_select: 'Иш жойини танланг',
     workplace_change: 'Алмаштириш',
     station_cabinet: 'Хона {cabinet}',
+    late_work_title: 'Талон ёпилгандан кейинги янги тайинловлар',
+    late_work_hint: 'Аввалги талон ёпилган. Кейинги қадамни регистратурадан аниқланг.',
     board_current: 'Жорий бемор',
     board_no_current: 'Ҳозир сизда бемор йўқ',
     board_next: 'Кейинги',

@@ -9,7 +9,7 @@
  * test is useNurseServingBoard + the real components.
  */
 
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StrictMode } from 'react';
@@ -1622,5 +1622,65 @@ describe('NURSE-V2 N2-5 tablet — re-review: routine station change keeps the d
     // ...and the drain card (the nurse's own started work) never left.
     expect(screen.getByText(/Старая станция/)).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Выполнено' }).length).toBe(1);
+  });
+});
+
+
+describe('late work for the selected nurse station', () => {
+  const title = 'Новые назначения после закрытия талона';
+  const historicalEntry = {
+    ...WAITING_BOARD.waiting[0],
+    id: 99,
+    number: 5,
+    status: 'incomplete',
+    patient_name: 'Синтетический пациент',
+    visit_id: 78,
+    services: [
+      { ...IN_PROGRESS_BOARD.my_entry!.services![0], name: 'Новая услуга', pending: true },
+      { ...IN_PROGRESS_BOARD.my_entry!.services![1], name: 'Готовая услуга', pending: false },
+    ],
+  };
+
+  it('shows only pending services and leaves history, ownership and writes untouched', async () => {
+    setup({ board: { ...IN_PROGRESS_BOARD, late_pending: [historicalEntry] } });
+    const section = await screen.findByRole('region', { name: title });
+    expect(within(section).getByText('Новая услуга')).toBeInTheDocument();
+    expect(within(section).queryByText('Готовая услуга')).not.toBeInTheDocument();
+    expect(within(section).queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByText('Анна Тестова')).toBeInTheDocument();
+    for (const write of [callNextMock, startMock, startExecutionMock, completeExecutionMock,
+      incompleteExecutionMock, noShowMock, entryIncompleteMock]) {
+      expect(write).not.toHaveBeenCalled();
+    }
+  });
+
+  it('removes the historical card when a fresh board returns the replacement waiting ticket', async () => {
+    setup({ board: { ...WAITING_BOARD, late_pending: [historicalEntry] } });
+    expect(await screen.findByRole('region', { name: title })).toBeInTheDocument();
+    boardMock.mockResolvedValue({
+      ...WAITING_BOARD,
+      waiting: [{ ...WAITING_BOARD.waiting[0], id: 100, number: 6, visit_id: 78 }],
+      late_pending: [],
+    });
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Обновить' }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: title })).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Вызвать следующего' })).toBeInTheDocument();
+    expect(callNextMock).not.toHaveBeenCalled();
+  });
+
+  it('clears the old station’s cards before the next station finishes loading', async () => {
+    const user = userEvent.setup();
+    setup({ workplaces: [WORKPLACE_A, WORKPLACE_B], board: { ...WAITING_BOARD, late_pending: [historicalEntry] } });
+    await user.click(await screen.findByRole('button', { name: /Процедурный кабинет/ }));
+    expect(await screen.findByRole('region', { name: title })).toBeInTheDocument();
+    let finish!: (board: NurseStationBoard) => void;
+    boardMock.mockImplementationOnce(() => new Promise<NurseStationBoard>((resolve) => { finish = resolve; }));
+    await user.click(screen.getByRole('button', { name: 'Сменить' }));
+    await user.click(await screen.findByRole('button', { name: /Перевязочная/ }));
+    expect(boardMock).toHaveBeenLastCalledWith(20);
+    expect(screen.queryByText('Новая услуга')).not.toBeInTheDocument();
+    finish({ ...WAITING_BOARD, queue_resource_id: 20, waiting: [], late_pending: [] });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Вызвать следующего' })).toBeInTheDocument());
+    expect(screen.queryByRole('region', { name: title })).not.toBeInTheDocument();
   });
 });
