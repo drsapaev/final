@@ -125,6 +125,13 @@ class LabImportRowOut(BaseModel):
     receipt_id: int | None = None
     updated_at: datetime | None = None
     existing_values: int = 0
+    unmapped_analyte_code: Code | None = Field(
+        default=None,
+        description=(
+            "The submitted source code that failed unique analyte mapping; "
+            "provided only to let an authorized operator resolve the import manually."
+        ),
+    )
     error_code: (
         Literal[
             "report_not_found",

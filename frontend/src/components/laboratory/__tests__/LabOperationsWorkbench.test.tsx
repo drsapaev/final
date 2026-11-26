@@ -71,6 +71,35 @@ describe('Laboratory operations', () => {
     expect(rows[1]).toHaveTextContent('Сохранено');
   });
 
+  it('shows an unmapped analyzer code without making that row saveable', async () => {
+    const messageId = '00000000-0000-4000-8000-000000000021';
+    api.importRows.mockResolvedValueOnce({ rows: [{
+      row_index: 0,
+      message_id: messageId,
+      report_instance_id: 42,
+      status: 'error',
+      error_code: 'unknown_analyte',
+      unmapped_analyte_code: 'DEVICE-HGB-RAW',
+      updated_at: null,
+      existing_values: 0,
+    }] });
+    const file = new File([], 'unmapped.csv', { type: 'text/csv' });
+    Object.defineProperty(file, 'text', { value: async () => [
+      LAB_IMPORT_CSV_HEADER,
+      `${messageId},42,SP-SYNTHETIC,DEVICE-HGB-RAW,g_l,11,,,`,
+    ].join('\n') });
+
+    render(<LabOperationsWorkbench orderId={null} reportId={null} onQueueChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Импорт CSV' }));
+    fireEvent.change(screen.getByLabelText('Импорт CSV'), { target: { files: [file] } });
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Проверить строки' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить строки' }));
+
+    expect(await screen.findByText('DEVICE-HGB-RAW')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Сохранить проверенные строки' })).toBeDisabled();
+    expect(api.importRows).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves the invalid row and applies the valid row at its original position', async () => {
     const onQueueChanged = vi.fn().mockResolvedValue(undefined);
     const invalid = { row_index: 0, message_id: null, report_instance_id: null, status: 'error',

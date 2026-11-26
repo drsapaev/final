@@ -220,6 +220,44 @@ def test_same_report_import_rows_use_the_same_preview_without_losing_other_write
 
 
 @pytest.mark.unit
+def test_unknown_analyte_preview_returns_source_code_for_manual_resolution(
+    client, db_session, admin_auth_headers, test_patient
+):
+    _, report = synthetic_report(db_session, test_patient.id)
+    specimen = accepted_specimen(db_session, report, "SYN-UNKNOWN-ANALYTE")
+    source_code = "DEVICE-HGB-RAW"
+    response = client.post(
+        f"{IMPORT_URL}/preview",
+        json={
+            "source": "csv",
+            "rows": [
+                {
+                    "message_id": str(uuid4()),
+                    "report_instance_id": report.id,
+                    "specimen_barcode": specimen.barcode,
+                    "method_code": (report.patient_snapshot or {}).get("method_code"),
+                    "values": [
+                        {
+                            "analyte_code": source_code,
+                            "unit_code": None,
+                            "value_text": "11",
+                        }
+                    ],
+                }
+            ],
+        },
+        headers=admin_auth_headers,
+    )
+
+    assert response.status_code == 200
+    outcome = response.json()["rows"][0]
+    assert outcome["status"] == "error"
+    assert outcome["error_code"] == "unknown_analyte"
+    assert outcome["unmapped_analyte_code"] == source_code
+    assert db_session.scalar(select(LabImportReceipt.id)) is None
+
+
+@pytest.mark.unit
 def test_warning_codes_follow_exact_imported_value_through_release_and_correction(
     client,
     db_session,
@@ -452,6 +490,9 @@ def test_openapi_import_rows_retain_the_typed_input_contract():
     result = schemas["LabImportRowOut"]
     assert "row_index" in result["required"]
     assert {"type": "null"} in result["properties"]["message_id"]["anyOf"]
+    unmapped_code = result["properties"]["unmapped_analyte_code"]
+    assert {"type": "null"} in unmapped_code["anyOf"]
+    assert "unmapped_analyte_code" not in result["required"]
     for contract in ("LabImportValue", "LabReportRenderedFieldOut"):
         schema = schemas[contract]
         flags = schema["properties"]["instrument_flags"]

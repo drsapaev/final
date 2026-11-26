@@ -25,6 +25,7 @@ export interface LabImportOutcome {
   status: 'ready' | 'saved' | 'duplicate' | 'error';
   updated_at: string | null;
   existing_values: number;
+  unmapped_analyte_code?: string | null;
   error_code: string | null;
 }
 

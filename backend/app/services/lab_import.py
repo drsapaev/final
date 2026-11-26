@@ -17,9 +17,10 @@ from app.services.lab_reporting import LabReportingDomainError, LabReportingServ
 
 
 class RowRejected(Exception):
-    def __init__(self, code: str):
+    def __init__(self, code: str, *, unmapped_analyte_code: str | None = None):
         super().__init__(code)
         self.code = code
+        self.unmapped_analyte_code = unmapped_analyte_code
 
 
 @dataclass(frozen=True)
@@ -88,7 +89,7 @@ def _map_values(
         if source == "manual" and not definitions and code in field_map:
             definitions = [field_map[code]]
         if len(definitions) != 1:
-            raise RowRejected("unknown_analyte")
+            raise RowRejected("unknown_analyte", unmapped_analyte_code=code)
         field = definitions[0]
         if field.field_key in seen_fields:
             raise RowRejected("duplicate_analyte")
@@ -333,6 +334,7 @@ def process_import_batch(
                     report_instance_id=report_instance_id,
                     status="error",
                     error_code=exc.code,
+                    unmapped_analyte_code=exc.unmapped_analyte_code,
                 )
             )
         finally:

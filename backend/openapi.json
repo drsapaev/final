@@ -100009,6 +100009,21 @@
             "title": "Existing Values",
             "default": 0
           },
+          "unmapped_analyte_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.%/^-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unmapped Analyte Code",
+            "description": "The submitted source code that failed unique analyte mapping; provided only to let an authorized operator resolve the import manually."
+          },
           "error_code": {
             "anyOf": [
               {

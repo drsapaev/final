@@ -32803,6 +32803,11 @@ export type components = {
              * @default 0
              */
             existing_values: number;
+            /**
+             * Unmapped Analyte Code
+             * @description The submitted source code that failed unique analyte mapping; provided only to let an authorized operator resolve the import manually.
+             */
+            unmapped_analyte_code?: string | null;
             /** Error Code */
             error_code?: ("report_not_found" | "report_locked" | "stale_report" | "specimen_mismatch" | "method_mismatch" | "unknown_analyte" | "duplicate_analyte" | "unit_mismatch" | "invalid_value" | "message_conflict" | "values_exist" | "invalid_row") | null;
         };
