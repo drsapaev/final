@@ -66,3 +66,76 @@ def test_scheduler_module_exposes_orchestrator_not_the_ghost_method():
     # Защита от регрессии вызова: оркестратор существует, «призрак» — нет.
     assert hasattr(mod, "run_lab_notifications")
     assert not hasattr(mod.LabNotificationService, "run_all_notifications")
+
+
+def test_finalize_enqueues_only_successful_report(
+    client, auth_headers, test_patient, test_visit, monkeypatch
+):
+    from app.api.v1.endpoints import lab_reporting
+
+    queued: list[int] = []
+    monkeypatch.setattr(lab_reporting, "run_legacy_report_critical_scan", queued.append)
+
+    base = "/api/v1/lab"
+    templates = client.get(f"{base}/templates", headers=auth_headers)
+    assert templates.status_code == 200
+    template = next(t for t in templates.json() if t["code"] == "cbc_oak")
+    draft = client.post(
+        f"{base}/report-instances",
+        headers=auth_headers,
+        json={
+            "patient_id": test_patient.id,
+            "visit_id": test_visit.id,
+            "template_id": template["id"],
+        },
+    )
+    assert draft.status_code == 200, draft.text
+    report_id = draft.json()["id"]
+    report = f"{base}/report-instances/{report_id}"
+
+    invalid = client.post(
+        f"{base}/report-instances/2000000000/finalize", headers=auth_headers
+    )
+    assert invalid.status_code == 404
+    assert not queued
+
+    response = client.post(
+        f"{report}/bulk-values",
+        headers=auth_headers,
+        json=[
+            {"field_key": "wbc", "value_text": "6.1"},
+            {"field_key": "hgb", "value_text": "140"},
+        ],
+    )
+    assert response.status_code == 200, response.text
+    released = client.post(f"{report}/finalize", headers=auth_headers)
+    assert released.status_code == 200, released.text
+    assert released.json()["status"] == "FINALIZED"
+    assert queued == [report_id]
+
+    repeated = client.post(f"{report}/finalize", headers=auth_headers)
+    assert repeated.status_code == 409
+    assert queued == [report_id]
+
+
+def test_immediate_scan_owns_context_and_exact_job_scope(monkeypatch):
+    from contextlib import contextmanager
+
+    calls = []
+    worker_db = object()
+
+    @contextmanager
+    def open_session():
+        calls.append("open")
+        try:
+            yield worker_db
+        finally:
+            calls.append("close")
+
+    async def scan(self, *, report_instance_id):
+        calls.append((self.db, report_instance_id))
+
+    monkeypatch.setattr(mod, "SessionLocal", open_session)
+    monkeypatch.setattr(mod.LabNotificationService, "check_critical_values", scan)
+    mod.run_legacy_report_critical_scan(123)
+    assert calls == ["open", (worker_db, 123), "close"]

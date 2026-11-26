@@ -2,12 +2,14 @@
 Lab Results Auto-Notification Service
 Сервис автоматических уведомлений о готовности анализов
 """
+import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.db.session import SessionLocal
 from app.models.clinic import Doctor
 from app.models.lab import LabOrder, LabResult
 from app.models.notification import (
@@ -291,7 +293,9 @@ class LabNotificationService:
             )
         return newly_delivered
 
-    async def check_critical_values(self) -> dict[str, Any]:
+    async def check_critical_values(
+        self, *, report_instance_id: int | None = None
+    ) -> dict[str, Any]:
         """
         Проверяет результаты на критические значения и уведомляет врачей
 
@@ -302,11 +306,20 @@ class LabNotificationService:
             # Находим результаты за последние 24 часа
             yesterday = datetime.now(UTC) - timedelta(hours=24)
 
-            recent_results = self.db.query(LabResult).filter(LabResult.created_at >= yesterday).all()
+            query = self.db.query(LabResult).filter(LabResult.created_at >= yesterday)
+            if report_instance_id is not None:
+                query = query.filter(LabResult.source_instance_id == report_instance_id)
+            recent_results = query.all()
 
             critical_found = []
 
             for result in recent_results:
+                # A prior send may have committed and expired ORM rows.
+                if (
+                    report_instance_id is not None
+                    and result.source_instance_id != report_instance_id
+                ):
+                    continue
                 # Проверяем на критические значения
                 test_name = result.test_name.lower() if result.test_name else ""
 
@@ -329,6 +342,9 @@ class LabNotificationService:
 
                                 # Уведомляем врача
                                 await self._notify_doctor_critical_value(result, value, thresholds)
+                                # Never hold projection locks across different samples,
+                                # even when both notices had already been delivered.
+                                self.db.commit()
                         except (ValueError, TypeError):
                             pass
 
@@ -343,6 +359,29 @@ class LabNotificationService:
         except Exception as e:
             logger.error(f"Error checking critical values: {e}")
             return {"error": str(e)}
+
+    def _lock_current_critical_sample(
+        self, *, result_id: int, value: str | None, report_instance_id: int | None
+    ) -> bool:
+        """Serialize the check/send window with the periodic scanner.
+
+        The inbox writer commits before broadcasting. Call again for the
+        companion event: it needs a new lock and the projection may already
+        have been replaced by a correction. Legacy rows may lack a report ID.
+        """
+        if self.db.get_bind().dialect.name != "postgresql":
+            return True
+        row = (
+            self.db.query(LabResult.id)
+            .filter(
+                LabResult.id == result_id,
+                LabResult.value == value,
+                LabResult.source_instance_id == report_instance_id,
+            )
+            .with_for_update(of=LabResult)
+            .first()
+        )
+        return row is not None
 
     async def _notify_doctor_critical_value(
         self,
@@ -385,6 +424,13 @@ class LabNotificationService:
             "critical_high": thresholds["high"],
             "is_critical": True,
         }
+        result_id = result.id
+        projected_value = result.value
+        source_id = result.source_instance_id
+        if not self._lock_current_critical_sample(
+            result_id=result_id, value=projected_value, report_instance_id=source_id
+        ):
+            return
         canonical_recorded = self._lab_inbox_delivery_exists(
             event_type="lab_critical_result",
             recipient_id=doctor_user.id,
@@ -418,6 +464,10 @@ class LabNotificationService:
             )
             return
 
+        if not self._lock_current_critical_sample(
+            result_id=result_id, value=projected_value, report_instance_id=source_id
+        ):
+            return
         finding_recorded = self._lab_inbox_delivery_exists(
             event_type="lab_critical_finding",
             recipient_id=doctor_user.id,
@@ -471,6 +521,19 @@ class LabNotificationService:
             "(LabOrder.follow_up_date does not exist)"
         )
         return {"skipped": "LabOrder.follow_up_date column does not exist"}
+
+
+def run_legacy_report_critical_scan(report_instance_id: int) -> None:
+    """Best-effort immediate scan; the periodic scanner remains the fallback."""
+    try:
+        with SessionLocal() as db:
+            asyncio.run(
+                LabNotificationService(db).check_critical_values(
+                    report_instance_id=report_instance_id,
+                )
+            )
+    except Exception as exc:
+        logger.warning("Immediate lab critical scan failed: %s", type(exc).__name__)
 
 
 async def run_lab_notifications(db: Session) -> dict[str, Any]:
