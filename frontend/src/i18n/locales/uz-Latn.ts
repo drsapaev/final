@@ -6852,6 +6852,8 @@ const uzLatn = {
     pay_story_department_2: 'Stomatologiya',
   },
   misc: {
+    sidebar_expand: 'Yon panelni kengaytirish',
+    sidebar_collapse: 'Yon panelni yig‘ish',
     visit_completion_call_next_option: 'Qabul tugagach, keyingi bemorni chaqirish',
     visit_completed_next_patient_called: 'Keyingi bemor chaqirildi.',
     visit_completed_no_next_patient: 'Qabul yakunlandi. Chaqirish mumkin bo‘lgan bemor yo‘q.',

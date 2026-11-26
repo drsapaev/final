@@ -6852,6 +6852,8 @@ const kk = {
     pay_story_department_2: 'Стоматология',
   },
   misc: {
+    sidebar_expand: 'Бүйірлік тақтаны жаю',
+    sidebar_collapse: 'Бүйірлік тақтаны жию',
     visit_completion_call_next_option: 'Қабылдау аяқталған соң келесі пациентті шақыру',
     visit_completed_next_patient_called: 'Келесі пациент шақырылды.',
     visit_completed_no_next_patient: 'Қабылдау аяқталды. Шақыратын пациент жоқ.',
