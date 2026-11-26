@@ -172,6 +172,8 @@ def _critical_evaluation_provenance(db: Session, task_id: int) -> dict[str, obje
             "unit_code": unit_code if isinstance(unit_code, str) else None,
         })
 
+    if not critical_fields:
+        return {}
     return {
         "report_instance_id": instance.id,
         "template_version_id": instance.template_version_id,
