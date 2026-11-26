@@ -23,7 +23,7 @@ import {
   NurseDrainingCard,
   NurseWorkplacePicker,
 } from './NurseWorkplacePicker';
-import { NurseStationBoard } from './NurseStationBoard';
+import { canFinishStartedEntry, NurseStationBoard } from './NurseStationBoard';
 import { useNurseServingBoard } from './useNurseServingBoard';
 import './nurseTablet.css';
 
@@ -35,6 +35,7 @@ export default function NurseTabletPage() {
     mode: 'execution' | 'entry';
     executionId?: number;
     entryId?: number;
+    started?: true;
   } | null>(null);
 
   const isPending = (key: string) => board.pending.has(key);
@@ -134,7 +135,9 @@ export default function NurseTabletPage() {
     if (dialog.mode === 'entry') {
       const entryLive =
         stationBoard != null &&
-        (stationBoard.active ?? []).some((entry) => entry.id === dialog.entryId);
+        (stationBoard.active ?? []).some((entry) =>
+          entry.id === dialog.entryId && (!dialog.started || canFinishStartedEntry(entry)),
+        );
       if (!entryLive) {
         setDialog(null);
       }
@@ -172,18 +175,22 @@ export default function NurseTabletPage() {
   // terminal incomplete mutation used to fire TWICE per submit.
   const handleDialogSubmit = useCallback(
     (reason: string) => {
-      const current = dialogRef.current;
-      if (current == null) {
+      const subject = dialogRef.current;
+      if (subject == null) {
         return;
       }
-      if (current.mode === 'execution' && current.executionId != null) {
-        void board.incompleteExecution(current.executionId, reason);
-      } else if (current.mode === 'entry' && current.entryId != null) {
-        void board.entryIncomplete(current.entryId, reason);
+      if (subject.mode === 'execution' && subject.executionId != null) {
+        void board.incompleteExecution(subject.executionId, reason);
+      } else if (subject.mode === 'entry' && subject.entryId != null) {
+        const canFinishCurrent = current?.id === subject.entryId && canFinishStartedEntry(current)
+          && !(current.services ?? []).some((service) => board.pending.has(`execution:${service.visit_service_id}`));
+        if (!subject.started || canFinishCurrent) {
+          void board.entryIncomplete(subject.entryId, reason);
+        }
       }
       setDialog(null);
     },
-    [board],
+    [board, current],
   );
 
   return (
@@ -317,8 +324,8 @@ export default function NurseTabletPage() {
               onCallNext={() => void board.callNext()}
               onStart={(entryId) => void board.start(entryId)}
               onNoShow={(entryId) => void board.noShow(entryId)}
-              onEntryIncomplete={(entryId) =>
-                setDialog({ mode: 'entry', entryId })
+              onEntryIncomplete={(entryId, started) =>
+                setDialog({ mode: 'entry', entryId, started })
               }
               onStartExecution={(visitServiceId, queueEntryId) =>
                 void board.startExecution(visitServiceId, queueEntryId)

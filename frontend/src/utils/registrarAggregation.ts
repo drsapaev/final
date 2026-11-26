@@ -246,6 +246,20 @@ const buildPatientGroupKey = (appointment: Record<string, unknown>, index: numbe
   return `row:${appointment?.id ?? index}`;
 };
 
+const isLinkedPatientId = (value: unknown): boolean => (
+  (typeof value === 'number' || (typeof value === 'string' && /^[1-9]\d*$/.test(value)))
+  && Number.isSafeInteger(Number(value)) && Number(value) > 0
+);
+
+const hasBirthYear = (value: unknown): boolean => (
+  (typeof value === 'number' && Number.isInteger(value) && value > 0)
+  || (typeof value === 'string' && /^[1-9]\d{3}$/.test(value.trim()))
+);
+
+const hasAddress = (value: unknown): value is string => (
+  typeof value === 'string' && !['', '—', 'Не указан'].includes(value.trim())
+);
+
 const pickPatientGender = (appointment: Record<string, unknown>): string => {
   const gender = appointment?.patient_gender ??
     appointment?.patient_sex ??
@@ -409,6 +423,18 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
         patientGroups[patientKey].queue_entry_ids = [...queueSet];
         if (!patientGroups[patientKey].queue_entry_id) {
           patientGroups[patientKey].queue_entry_id = nextQueueEntryId;
+        }
+      }
+
+      // Fill missing display facts only in an explicitly linked patient
+      // group, never from rows grouped by a matching name/phone snapshot.
+      const group = patientGroups[patientKey];
+      if (isLinkedPatientId(appointment.patient_id)) {
+        if (!hasBirthYear(group.patient_birth_year) && hasBirthYear(appointment.patient_birth_year)) {
+          group.patient_birth_year = appointment.patient_birth_year;
+        }
+        if (!hasAddress(group.address) && hasAddress(appointment.address)) {
+          group.address = appointment.address;
         }
       }
 

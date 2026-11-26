@@ -484,7 +484,11 @@ export const buildPostWizardPaymentRow = (wizardResult: Record<string, unknown> 
   if (printTickets.length > 0) {
     printTickets.push(...issuedAssignments.filter((assignment) => !usedAssignments.has(assignment)));
   }
-  const totalAmount = Number(wizardResult.total_amount ?? 0);
+  const rawTotal = wizardResult.total_amount;
+  const totalAmount = Number(rawTotal ?? 0);
+  const knownSingleVisitPrice = visitIds.length === 1
+    && (typeof rawTotal === 'number' || (typeof rawTotal === 'string' && /^\d+(?:\.\d+)?$/.test(rawTotal.trim())))
+    && Number.isFinite(totalAmount) && totalAmount >= 0;
 
   return {
     id: visitIds[0],
@@ -502,6 +506,7 @@ export const buildPostWizardPaymentRow = (wizardResult: Record<string, unknown> 
     queue_number: firstQueueNumber?.queue_number ?? null,
     number: firstQueueNumber?.queue_number ?? null,
     cost: totalAmount,
+    print_cost_known: knownSingleVisitPrice,
     payment_amount: totalAmount,
     payment_status: totalAmount > 0 ? 'pending' : 'paid',
     payment_type: null,

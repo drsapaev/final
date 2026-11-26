@@ -283,6 +283,43 @@ describe('NURSE-V2 N2-5 tablet — station board', () => {
     expect(screen.getAllByRole('button', { name: 'Не завершено' }).length).toBe(1);
   });
 
+  it('finishes only the queue episode with a required reason after the failed attempt was resolved', async () => {
+    const user = userEvent.setup();
+    setup({ board: IN_PROGRESS_BOARD });
+    await screen.findByText('Перевязка');
+    expect(screen.queryByRole('button', { name: 'Завершить обслуживание с причиной' })).not.toBeInTheDocument();
+    incompleteExecutionMock.mockImplementationOnce(async () => {
+      const resolved = {
+        ...IN_PROGRESS_BOARD.my_entry!,
+        services: IN_PROGRESS_BOARD.my_entry!.services!.map((service) => ({
+          ...service,
+          in_progress_execution_id: null,
+          latest_attempt_status: service.visit_service_id === 702 ? 'incomplete' : service.latest_attempt_status,
+        })),
+      };
+      boardMock.mockResolvedValue({ ...IN_PROGRESS_BOARD, my_entry: resolved, active: [resolved] });
+      return { id: 55, status: 'incomplete', entry_served: false };
+    });
+    await user.click(screen.getByRole('button', { name: 'Не завершено' }));
+    fireEvent.change(await screen.findByLabelText(/Причина \(обязательно\)/), { target: { value: 'Синтетическая причина' } });
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    const finish = await screen.findByRole('button', { name: 'Завершить обслуживание с причиной' });
+    entryIncompleteMock.mockImplementationOnce(async () => {
+      boardMock.mockResolvedValue(WAITING_BOARD);
+      return { entry_id: 11, new_status: 'incomplete' };
+    });
+    await user.click(finish);
+    const reason = await screen.findByLabelText(/Причина \(обязательно\)/);
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
+    fireEvent.change(reason, { target: { value: '  Синтетическое завершение  ' } });
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(entryIncompleteMock).toHaveBeenCalledWith(10, 11, { reason: 'Синтетическое завершение' }));
+    expect(incompleteExecutionMock).toHaveBeenCalledTimes(1);
+    expect(completeExecutionMock).not.toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: 'Вызвать следующего' })).toBeEnabled();
+  });
+
   it('renders NO visit-close action anywhere', async () => {
     setup({ board: IN_PROGRESS_BOARD });
     await screen.findByText('Инъекция');

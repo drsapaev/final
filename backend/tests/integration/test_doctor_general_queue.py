@@ -7,6 +7,7 @@ from decimal import Decimal
 import pytest
 
 from app.core.security import get_password_hash
+from app.crud.clinic import clinic_today
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.emr_v2 import EMRRecord
@@ -54,8 +55,9 @@ def _create_doctor_queue_world(
     db_session.commit()
     db_session.refresh(doctor)
 
+    clinic_day = clinic_today(db_session)
     queue = DailyQueue(
-        day=date.today(),
+        day=clinic_day,
         specialist_id=doctor.id,
         queue_tag=specialty,
         active=True,
@@ -68,7 +70,7 @@ def _create_doctor_queue_world(
         id=visit_id,
         patient_id=test_patient.id,
         doctor_id=doctor.id,
-        visit_date=date.today(),
+        visit_date=clinic_day,
         status="in_progress",
     )
     db_session.add(visit)
@@ -110,7 +112,7 @@ class TestDoctorGeneralQueue:
         test_patient,
     ):
         queue = DailyQueue(
-            day=date.today(),
+            day=clinic_today(db_session),
             specialist_id=test_doctor_user.id,
             queue_tag="general",
             active=True,
@@ -181,7 +183,7 @@ class TestDoctorGeneralQueue:
         db_session.refresh(doctor)
 
         queue = DailyQueue(
-            day=date.today(),
+            day=clinic_today(db_session),
             specialist_id=doctor.id,
             queue_tag="general",
             active=True,

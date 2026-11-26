@@ -550,7 +550,7 @@ def test_public_booking_notification_outbox_migration_is_applied_with_rls(pg_eng
         )
 
     # The fixture must reach the current repository head.
-    assert revision == "0108_emr_rollback_compat"
+    assert revision == "0109_emr_calendar_merge"
     assert rls_enabled is True
     assert {
         "pk_public_booking_notification_outbox",

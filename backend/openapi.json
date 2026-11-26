@@ -19270,6 +19270,88 @@
         }
       }
     },
+    "/api/v1/appointments/rescheduled-visits": {
+      "get": {
+        "tags": [
+          "appointments",
+          "appointments"
+        ],
+        "summary": "Read Rescheduled Calendar Visits",
+        "description": "List staff-moved visits not already represented by a calendar appointment.",
+        "operationId": "read_rescheduled_calendar_visits_api_v1_appointments_rescheduled_visits_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Day"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Doctor Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarRescheduledVisit"
+                  },
+                  "title": "Response Read Rescheduled Calendar Visits Api V1 Appointments Rescheduled Visits Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/appointments/{appointment_id}": {
       "put": {
         "tags": [
@@ -83214,6 +83296,53 @@
           "can_apply"
         ],
         "title": "CabinetReassignmentPreviewResponse"
+      },
+      "CalendarRescheduledVisit": {
+        "properties": {
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          },
+          "doctor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Name"
+          },
+          "scheduled_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled Time"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_id",
+          "patient_name",
+          "doctor_name",
+          "scheduled_time",
+          "status"
+        ],
+        "title": "CalendarRescheduledVisit"
       },
       "CallNextPatientResponse": {
         "properties": {

@@ -5994,6 +5994,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/appointments/rescheduled-visits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Rescheduled Calendar Visits
+         * @description List staff-moved visits not already represented by a calendar appointment.
+         */
+        get: operations["read_rescheduled_calendar_visits_api_v1_appointments_rescheduled_visits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/appointments/{appointment_id}": {
         parameters: {
             query?: never;
@@ -26862,6 +26882,19 @@ export type components = {
             items: components["schemas"]["CabinetReassignmentPreviewItem"][];
             /** Can Apply */
             can_apply: boolean;
+        };
+        /** CalendarRescheduledVisit */
+        CalendarRescheduledVisit: {
+            /** Visit Id */
+            visit_id: number;
+            /** Patient Name */
+            patient_name: string;
+            /** Doctor Name */
+            doctor_name: string | null;
+            /** Scheduled Time */
+            scheduled_time: string | null;
+            /** Status */
+            status: string;
         };
         /**
          * CallNextPatientResponse
@@ -57417,6 +57450,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Appointment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_rescheduled_calendar_visits_api_v1_appointments_rescheduled_visits_get: {
+        parameters: {
+            query: {
+                day: string;
+                doctor_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarRescheduledVisit"][];
                 };
             };
             /** @description Validation Error */
