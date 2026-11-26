@@ -309,6 +309,25 @@ class DisplayWebSocketManager:
                 merged.append(name)
         return merged
 
+    def prepare_patient_call(
+        self,
+        queue_entry: OnlineQueueEntry,
+        doctor_name: str,
+        cabinet: str | None = None,
+        board_ids: list[str] | None = None,
+    ) -> tuple[dict, list[str]]:
+        """Snapshot the message and the boards whose privacy policy shaped it.
+
+        A missing target list selects the active board registry. An explicit
+        empty target list sends to zero boards.
+        """
+        if board_ids is None:
+            board_ids = self._resolve_untargeted_board_ids()
+        message = self.build_patient_call_message(
+            queue_entry, doctor_name, cabinet, board_ids=board_ids
+        )
+        return message, board_ids
+
     async def broadcast_patient_call_data(
         self,
         call_message: dict,
@@ -360,16 +379,7 @@ class DisplayWebSocketManager:
         """
         statuses: dict[str, str] = {}
         try:
-            # RQ-24.a.1: формат имён резолвится внутри
-            # build_patient_call_message по show_patient_names целевых
-            # табло (board_ids передается явно; kwarg name_format не
-            # существует в сигнатуре — CI RED HEAD был TypeError).
-            # DISPLAYTARGET-BE-001: [] — явный пустой набор целей;
-            # None — все активные табло.
-            # DISPLAYRELAY-BE-001 (audit PR #3961): «все» — реестр ∪ локальные.
-            if board_ids is None:
-                board_ids = self._resolve_untargeted_board_ids()
-            call_message = self.build_patient_call_message(
+            call_message, board_ids = self.prepare_patient_call(
                 queue_entry, doctor_name, cabinet, board_ids=board_ids
             )
             statuses = await self.broadcast_patient_call_data(

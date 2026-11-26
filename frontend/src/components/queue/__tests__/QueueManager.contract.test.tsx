@@ -88,7 +88,8 @@ describe('Queue manager command contract', () => {
 
     expect(integrationSource).toContain('onStartVisit={onStartVisit}');
     expect(integrationSource).not.toContain('nullPatient');
-    expect(managerSource).toContain('setCalledPatients');
+    expect(integrationSource).toContain('doctorQueueSpecialty={specialty}');
+    expect(managerSource).toContain('queueService.getTodayQueue(actionSpecialty)');
     expect(managerSource).toContain('onStartVisit(patient)');
     expect(managerSource).toContain('dental.dental_panel_start_visit_for');
     expect(dentistSource).toContain('onStartVisit={handleStartQueueVisit}');
