@@ -24,6 +24,7 @@ on:
       - 'backend/app/services/feature_flags.py'
       - 'frontend/e2e/ai-safety-guardrails.spec.ts'
       - 'frontend/e2e/ai-safety-guardrails.spec.js'
+      - '.github/workflows/ai-safety-guardrails.yml'
   schedule:
     # Nightly 02:30 UTC — catch regressions from unrelated refactors
     - cron: '30 2 * * *'
@@ -39,7 +40,8 @@ concurrency:
 jobs:
   ai-safety-contract-test:
     name: 🛡️ AI safety contract regression
-    runs-on: ubuntu-latest
+    # Keep this pair aligned with the verified security-scan runner.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     services:
@@ -73,7 +75,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.11.10'
+          python-version: '3.11.18'
 
       - name: Setup Node
         uses: actions/setup-node@v7

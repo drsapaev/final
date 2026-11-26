@@ -111,7 +111,9 @@ class VisitsApiService:
         if status_q:
             stmt = stmt.where(table.c.status == status_q)
         if planned is not None:
-            if "planned_date" in table.c:
+            if "visit_date" in table.c:
+                stmt = stmt.where(table.c.visit_date == planned)
+            elif "planned_date" in table.c:
                 stmt = stmt.where(table.c.planned_date == planned)
             else:
                 return []

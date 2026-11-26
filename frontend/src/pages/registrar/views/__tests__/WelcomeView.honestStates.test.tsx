@@ -48,9 +48,15 @@ vi.mock('@/components/ui/macos', () => ({
 }));
 
 vi.mock('@/components/tables/EnhancedAppointmentsTable', () => ({
-  default: ({ showCheckboxes, data, onRowClick, filteredExport }: import('@/components/tables/appointmentsTableContracts').EnhancedAppointmentsTableProps) => (
+  default: ({ showCheckboxes, data, onRowClick, onActionClick, filteredExport }: import('@/components/tables/appointmentsTableContracts').EnhancedAppointmentsTableProps) => (
     <div data-testid="appointments-stub" data-show-checkboxes={String(Boolean(showCheckboxes))}>
-      {data?.map((row, index) => <button key={index} onClick={() => onRowClick?.(row)}>Open {index}</button>)}
+      {data?.map((row, index) => (
+        <div key={String(row.id ?? index)}>
+          <button type="button" onClick={() => onRowClick?.(row)}>Open {index}</button>
+          <button type="button" onClick={() => onActionClick?.('in_cabinet', row)}>test-in-cabinet</button>
+          <button type="button" onClick={() => onActionClick?.('complete', row)}>test-complete</button>
+        </div>
+      ))}
       {filteredExport && <button disabled={filteredExport.disabled}
         onClick={() => filteredExport.onExport(data?.slice(0, 1) ?? [])}>{filteredExport.label}</button>}
     </div>
@@ -123,7 +129,7 @@ const makeProps = (overrides: Record<string, unknown> = {}) => ({
   setContextMenu: vi.fn(),
   openRecordPreview: vi.fn(),
   openRecordEditor: vi.fn(),
-  updateAppointmentStatus: vi.fn(),
+  handleTableAction: vi.fn().mockResolvedValue(undefined),
   handleStartVisit: vi.fn(),
   generateCSV: vi.fn(),
   downloadCSV: vi.fn(),
@@ -392,6 +398,28 @@ describe('REG-FE-032 — clinic-timezone date labels', () => {
 
     expect(screen.getByText(/30 октября 2026/)).toBeInTheDocument();
     expect(screen.queryByText(/29 октября/)).toBeNull();
+  });
+});
+
+// REG-FE-006: the Welcome action must never bypass the parent table router,
+// which owns the confirmation and prevents clinical status mutation on cancel.
+describe('REG-FE-006 — Welcome clinical actions share the confirm-gated router', () => {
+  const row = { id: 87, patient_fio: 'SYNTHETIC PATIENT' };
+
+  it.each([
+    ['test-in-cabinet', 'in_cabinet'],
+    ['test-complete', 'complete'],
+  ])('delegates %s to the existing action handler', async (label, action) => {
+    const handleTableAction = vi.fn().mockResolvedValue(undefined);
+    const oldDirectMutation = vi.fn();
+    render(<WelcomeView {...makeProps({
+      appointments: [row], filteredAppointments: [row], handleTableAction,
+      updateAppointmentStatus: oldDirectMutation,
+    })} />);
+
+    fireEvent.click(screen.getByRole('button', { name: label }));
+    await waitFor(() => expect(handleTableAction).toHaveBeenCalledWith(action, row, undefined));
+    expect(oldDirectMutation).not.toHaveBeenCalled();
   });
 });
 

@@ -64,15 +64,19 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import Mock
 
 import pytest
-from sqlalchemy import create_engine, text
+from fastapi import BackgroundTasks, HTTPException
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
+from app.api.v1.endpoints.doctor_integration._queue_ops import call_patient
 from app.crud import online_queue as crud_online_queue
+from app.crud.clinic import clinic_today
 from app.crud.queue_resource_routing import lock_daily_queue_creation
 from app.db.base_class import Base
 from app.models import (  # noqa: F401 - register the complete metadata
@@ -89,6 +93,7 @@ from app.repositories.queue_limits_repository import QueueLimitsRepository
 from app.repositories.visit_confirmation_repository import (
     VisitConfirmationRepository,
 )
+from app.services.display_websocket import get_display_manager
 from app.services.queue_api_service import QueueApiService
 from app.services.queue_service import queue_service
 
@@ -868,3 +873,92 @@ def test_graphql_v1_last_slot_is_serialized_and_duplicate_does_not_respend(
         assert len(entries) == 1
         assert entries[0].patient_id == winners[0][0]
         assert entries[0].source == "online"
+
+
+@pytest.mark.integration
+def test_direct_call_schedules_one_display_delivery(lock_parity_engine, monkeypatch):
+    engine = lock_parity_engine
+    doctor_id = _seed_doctor(engine)
+    suffix = uuid.uuid4().hex
+    with Session(engine) as setup:
+        callers = [
+            User(
+                username=f"synthetic-call-{suffix}-{index}",
+                full_name="Synthetic operator", role="Admin", hashed_password="!",
+                is_active=True,
+            )
+            for index in range(2)
+        ]
+        patient = Patient(first_name="Synthetic", last_name="Queue Call")
+        queue = DailyQueue(
+            day=clinic_today(setup), specialist_id=doctor_id,
+            queue_tag="cardiology_common", active=True,
+        )
+        setup.add_all([*callers, patient, queue])
+        setup.flush()
+        entry = OnlineQueueEntry(
+            queue_id=queue.id, patient_id=patient.id, number=1,
+            patient_name="Synthetic Queue Call", status="waiting", source="desk",
+        )
+        setup.add(entry)
+        setup.flush()
+        entry_id = entry.id
+        caller_ids = [user.id for user in callers]
+        setup.commit()
+
+    prepare = Mock(return_value=({"type": "synthetic"}, ["synthetic-display"]))
+    monkeypatch.setattr(get_display_manager(), "prepare_patient_call", prepare)
+    standby_name = f"test-doctor-call-{suffix}"
+
+    def call_again():
+        with Session(engine) as db:
+            db.execute(
+                text("SELECT set_config('application_name', :name, true)"),
+                {"name": standby_name},
+            )
+            assert db.get(OnlineQueueEntry, entry_id).status == "waiting"
+            tasks = BackgroundTasks()
+            with pytest.raises(HTTPException) as denied:
+                call_patient(
+                    entry_id, db=db, current_user=db.get(User, caller_ids[1]),
+                    background_tasks=tasks,
+                )
+            assert tasks.tasks == []
+            return denied.value.status_code
+
+    with ThreadPoolExecutor(max_workers=1) as pool, Session(engine) as first:
+        first.scalar(
+            select(OnlineQueueEntry).where(OnlineQueueEntry.id == entry_id).with_for_update()
+        )
+        pending = pool.submit(call_again)
+        deadline = time.monotonic() + 5
+        with engine.connect() as observer:
+            while time.monotonic() < deadline:
+                waiting = observer.scalar(
+                    text(
+                        "SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
+                        "WHERE application_name=:name AND wait_event_type='Lock')"
+                    ),
+                    {"name": standby_name},
+                )
+                observer.rollback()
+                if waiting:
+                    break
+                time.sleep(0.04)
+            else:
+                pytest.fail("The second call did not reach the entry lock")
+
+        tasks = BackgroundTasks()
+        result = call_patient(
+            entry_id, db=first, current_user=first.get(User, caller_ids[0]),
+            background_tasks=tasks,
+        )
+        assert result["success"]
+        assert len(tasks.tasks) == 1
+        assert pending.result(timeout=8) == 400
+
+    assert prepare.call_count == 1
+    with Session(engine) as check:
+        entry = check.get(OnlineQueueEntry, entry_id)
+        assert entry.status == "called"
+        assert entry.called_by_user_id == caller_ids[0]
