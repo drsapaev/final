@@ -51,10 +51,10 @@ describe('PR-UI-19 (C-6): Sidebar labelKey i18n resolution', () => {
       const { rerender, unmount } = render(
         <Sidebar items={[]} header={header} collapsible collapsed={false} />
       );
-      expect(screen.getByRole('button', { name: collapse, exact: true })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: collapse })).toBeInTheDocument();
 
       rerender(<Sidebar items={[]} header={header} collapsible collapsed />);
-      expect(screen.getByRole('button', { name: expand, exact: true })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: expand })).toBeInTheDocument();
       unmount();
     }
   });
