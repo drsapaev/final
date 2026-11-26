@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, aliased
 from app.core.config import settings
 from app.core.roles import DOCTOR_FAMILY_GATE_ROLES
 from app.models.clinic import Doctor
-from app.models.lab import LabReportInstance
+from app.models.lab import LabReportInstance, LabReportValue
 from app.models.lab_critical_communication import (
     LabCriticalCommunication,
     LabCriticalCommunicationEvent,
@@ -101,7 +101,7 @@ def _event(
     )
 
 
-def _delivery_metadata(db: Session, task_id: int, route: str) -> dict[str, int]:
+def _delivery_metadata(db: Session, task_id: int, route: str) -> dict[str, object]:
     """Keep retries stable while distinguishing later routing decisions.
 
     A latest decision without a route marker predates this format. Its
@@ -121,10 +121,62 @@ def _delivery_metadata(db: Session, task_id: int, route: str) -> dict[str, int]:
         .order_by(LabCriticalCommunicationEvent.id.desc())
         .limit(1)
     ).first()
-    metadata = {"communication_id": task_id}
+    metadata: dict[str, object] = {"communication_id": task_id}
     if latest is not None and latest.event_type == route:
         metadata[f"{route}_id"] = latest.id
+    metadata.update(_critical_evaluation_provenance(db, task_id))
     return metadata
+
+
+def _critical_evaluation_provenance(db: Session, task_id: int) -> dict[str, object]:
+    """Expose the immutable evaluation identity, without its medical values."""
+    task = db.get(LabCriticalCommunication, task_id)
+    if task is None:
+        return {}
+    instance = db.get(LabReportInstance, task.report_instance_id)
+    if instance is None:
+        return {}
+
+    field_keys = {
+        field_key for field_key in (task.field_keys or [])
+        if isinstance(field_key, str) and field_key
+    }
+    values = db.scalars(
+        select(LabReportValue)
+        .where(
+            LabReportValue.instance_id == instance.id,
+            LabReportValue.field_key.in_(field_keys),
+        )
+        .order_by(LabReportValue.field_key)
+    ).all() if field_keys else []
+
+    critical_fields = []
+    for value in values:
+        snapshot = value.evaluation_snapshot
+        if (
+            instance.template_version_id is None
+            or not isinstance(snapshot, dict)
+            or snapshot.get("template_version_id") != instance.template_version_id
+            or snapshot.get("visible") is not True
+            or snapshot.get("status") != "evaluated"
+            or snapshot.get("interpretation") != "critical"
+        ):
+            continue
+        analyte_code = snapshot.get("analyte_code")
+        unit = snapshot.get("unit")
+        unit_code = snapshot.get("unit_code")
+        critical_fields.append({
+            "field_key": value.field_key,
+            "analyte_code": analyte_code if isinstance(analyte_code, str) else None,
+            "unit": unit if isinstance(unit, str) else None,
+            "unit_code": unit_code if isinstance(unit_code, str) else None,
+        })
+
+    return {
+        "report_instance_id": instance.id,
+        "template_version_id": instance.template_version_id,
+        "critical_fields": critical_fields,
+    }
 
 
 def record_released_report(

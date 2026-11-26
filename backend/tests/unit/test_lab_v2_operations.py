@@ -516,6 +516,70 @@ def test_doctor_routing_keys_change_on_reassignment_and_reuse_on_retry(
 
 
 @pytest.mark.unit
+def test_critical_inbox_includes_canonical_provenance_without_result_values(
+    db_session, test_patient, test_visit, monkeypatch,
+):
+    doctor = synthetic_user(db_session, "Doctor")
+    profile = Doctor(user_id=doctor.id, specialty="cardiology", active=True)
+    db_session.add(profile)
+    db_session.flush()
+    test_visit.doctor_id = profile.id
+    _, report = synthetic_report(db_session, test_patient.id, visit_id=test_visit.id)
+    report.values.extend([
+        LabReportValue(
+            field_key="hemoglobin",
+            value_numeric=Decimal("6.2"),
+            result_payload={"kind": "numeric"},
+            evaluation_snapshot={
+                "status": "evaluated",
+                "interpretation": "critical",
+                "visible": True,
+                "template_version_id": report.template_version_id,
+                "analyte_code": "hemoglobin",
+                "unit": "g/L",
+                "unit_code": "gram_per_liter",
+                "thresholds": {"critical_low": "70"},
+            },
+        ),
+        LabReportValue(
+            field_key="stale_version",
+            value_numeric=Decimal("1"),
+            result_payload={"kind": "numeric"},
+            evaluation_snapshot={
+                "status": "evaluated",
+                "interpretation": "critical",
+                "visible": True,
+                "template_version_id": report.template_version_id + 1,
+                "analyte_code": "stale_analyte",
+                "unit": "stale unit",
+                "unit_code": "stale_unit",
+            },
+        ),
+    ])
+    task = record_released_report(db_session, report)
+    db_session.commit()
+    sender = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        notification_sender_service, "send_canonical_notification_to_user", sender,
+    )
+
+    assert run(dispatch_pending(db_session)) == 1
+
+    metadata = sender.await_args.kwargs["metadata"]
+    assert metadata["communication_id"] == task.id
+    assert metadata["report_instance_id"] == report.id
+    assert metadata["template_version_id"] == report.template_version_id
+    assert metadata["critical_fields"] == [{
+        "field_key": "hemoglobin",
+        "analyte_code": "hemoglobin",
+        "unit": "g/L",
+        "unit_code": "gram_per_liter",
+    }]
+    assert "value" not in metadata
+    assert "thresholds" not in metadata
+
+
+@pytest.mark.unit
 def test_repeated_escalations_use_distinct_stable_routing_keys(
     db_session, test_patient, test_visit, monkeypatch,
 ):
