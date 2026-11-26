@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:20.19.6-slim AS builder
+FROM node:24.22.1-slim AS builder
 
 ARG VITE_API_BASE=/api/v1
 ARG VITE_API_URL=http://localhost:18080
@@ -33,6 +33,7 @@ RUN npm ci --legacy-peer-deps --include=dev
 
 COPY src /app/src
 COPY public /app/public
+RUN find /app/public -type d -exec chmod 0755 {} + && find /app/public -type f -exec chmod 0644 {} +
 COPY index.html /app/index.html
 COPY vite.config.ts /app/vite.config.ts
 COPY sw.template.js /app/sw.template.js
