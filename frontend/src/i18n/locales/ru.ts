@@ -6983,6 +6983,8 @@ const ru = {
 
   // ─── Misc (file manager, queue mgmt, 2FA, settings, ECG, photos, etc.) ───
   misc: {
+    sidebar_expand: 'Развернуть боковую панель',
+    sidebar_collapse: 'Свернуть боковую панель',
     visit_completion_call_next_option: 'Позвать следующего пациента после завершения',
     visit_completed_next_patient_called: 'Следующий пациент вызван.',
     visit_completed_no_next_patient: 'Приём завершён. Нет пациента, доступного для вызова.',
@@ -11797,6 +11799,7 @@ const ru = {
     action_start: 'Начать приём',
     action_no_show: 'Пациент не явился',
     action_entry_incomplete: 'Завершить без выполнения',
+    action_entry_finish_with_reason: 'Завершить обслуживание с причиной',
     action_service_start: 'Начать услугу',
     action_service_complete: 'Выполнено',
     action_service_incomplete: 'Не завершено',
@@ -11810,7 +11813,7 @@ const ru = {
     service_status_incomplete: 'Не завершена',
     service_attempt: 'попытка {attempt}',
     reason_title_execution: 'Причина незавершения услуги',
-    reason_title_entry: 'Причина завершения без выполнения',
+    reason_title_entry: 'Причина незавершённого обслуживания',
     reason_label: 'Причина (обязательно)',
     reason_blank: 'Укажите причину',
     reason_too_long: 'Максимум 200 символов',

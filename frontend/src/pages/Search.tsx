@@ -12,6 +12,7 @@ import {
 import { getRoleHomeRoute } from '../routing/routeSelectors';
 import { useTranslation } from '../i18n/useTranslation';
 import { getErrorMessage } from '../utils/type-guards';
+import { formatRegistrarDate } from '../utils/dateUtils';
 
 const registrarHomeRoute = getRoleHomeRoute('registrar');
 
@@ -405,6 +406,8 @@ export default function Search() {
             <div style={styles.grid}>
               {visits.map(visit => {
                 const statusInfo = getStatusColor(visit.status);
+                const visitDate = formatRegistrarDate(visit.planned_date);
+                const createdDate = formatRegistrarDate(visit.created_at);
                 const visitPatientName = patientNames[String(visit.patient_id ?? '')] || t('misc.srch_visit_patient_fallback', { patientId: visit.patient_id });
                 return (
                   <div
@@ -436,7 +439,7 @@ export default function Search() {
                         {statusInfo.label}
                       </span>
                       <span style={styles.visitDate}>
-                        📅 {formatDate(visit.created_at || visit.planned_date)}
+                        📅 {visitDate || (createdDate ? `${t('misc.ue_field_created_at')}: ${createdDate}` : '—')}
                       </span>
                     </div>
                     {visit.notes && (

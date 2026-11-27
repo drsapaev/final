@@ -6,8 +6,8 @@
  * DTO shape before transformation.
  */
 
-import type { AppointmentDto } from '../../types/api';
-import type { Appointment } from '../../types/domain/clinic';
+import type { AppointmentDto, CalendarRescheduledVisitDto } from '../../types/api';
+import type { Appointment, CalendarRescheduledVisit } from '../../types/domain/clinic';
 import { AppointmentDtoSchema } from './schemas/appointmentSchema';
 
 export function mapAppointmentDto(dto: AppointmentDto | unknown): Appointment {
@@ -37,4 +37,16 @@ export function mapAppointmentDtos(dtos: AppointmentDto[] | unknown): Appointmen
     }
   }
   return out;
+}
+
+export function mapCalendarRescheduledVisitDto(
+  dto: CalendarRescheduledVisitDto,
+): CalendarRescheduledVisit {
+  return {
+    visitId: dto.visit_id,
+    patientName: dto.patient_name,
+    doctorName: dto.doctor_name,
+    scheduledTime: dto.scheduled_time,
+    status: dto.status,
+  };
 }

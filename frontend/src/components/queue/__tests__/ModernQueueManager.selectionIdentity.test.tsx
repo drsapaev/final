@@ -1,24 +1,6 @@
-/**
- * QMAN-FE-001 / QMAN-FE-002 (audit 3886, ledger group «manager called-patient
- * state and WebSocket reconnect»): ModernQueueManager selection identity.
- *
- * - QMAN-FE-002: the local `calledPatients` list is owned by ONE
- *   doctor/date selection. A selection transition (doctor A → B, or a new
- *   target date) must invalidate the list — entries called under A must not
- *   expose Start Visit actions under B. A pending call-next response for A
- *   that resolves only after the switch to B must not append A's patient to
- *   B's list.
- * - QMAN-FE-001 (UI half): a failed load of the CURRENT selection surfaces a
- *   visible recoverable error with a retry action instead of silently
- *   keeping another selection's queue on screen (the hook-level fail-closed
- *   clearing is pinned in useQueueManager.snapshot.test.ts).
- *
- * Red-first: on pre-fix source the identity cases fail (A's entry keeps its
- * Start Visit button under B; the stale response appends to B's list) and
- * no load-error banner exists.
- */
+/** The active action snapshot is canonical and bound to one doctor/date selection. */
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -26,6 +8,7 @@ import { ThemeProvider } from '../../../contexts/ThemeContext';
 
 const queueMocks = vi.hoisted(() => ({
   callNextPatientInQueue: vi.fn(),
+  getTodayQueue: vi.fn(),
   loadQueueSnapshot: vi.fn(async () => ({ entries: [], is_open: true })),
   specialists: [{ id: '7', full_name: 'Doctor A', specialty: 'cardiology' }],
   generateDoctorQRCode: vi.fn(),
@@ -52,6 +35,10 @@ vi.mock('../../../hooks/useQueueManager', () => ({
   }),
 }));
 
+vi.mock('../../../services/queue', () => ({
+  queueService: { getTodayQueue: queueMocks.getTodayQueue },
+}));
+
 vi.mock('../../../hooks/useQueueWebSocket', () => ({
   useQueueWebSocket: () => ({ state: 'disconnected' }),
 }));
@@ -76,12 +63,17 @@ const DOCTORS = [
 ];
 
 const CALLED_PATIENT = { id: 42, name: 'Synthetic patient', number: 6 };
+const CALLED_ENTRY = { id: 42, patient_id: 1008, visit_id: 801, patient_name: 'Synthetic patient', number: 6, status: 'called', can_start_visit: true };
+const queueSnapshot = (entries: Array<typeof CALLED_ENTRY> = [], doctorId = 7, date = '2026-11-03') => ({
+  doctor: { id: doctorId }, date, entries,
+});
 
 function renderManager(props: Record<string, unknown> = {}) {
   return render(
     <ThemeProvider>
       <ModernQueueManager
         mode="doctor"
+        doctorQueueSpecialty="dentistry"
         doctors={DOCTORS}
         selectedDoctor="7"
         selectedDate="2026-11-03"
@@ -95,9 +87,10 @@ function renderManager(props: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   queueMocks.loadQueueSnapshot.mockResolvedValue({ entries: [], is_open: true });
-  queueMocks.callNextPatientInQueue.mockResolvedValue({
-    success: true,
-    patient: CALLED_PATIENT,
+  queueMocks.getTodayQueue.mockResolvedValue(queueSnapshot());
+  queueMocks.callNextPatientInQueue.mockImplementation(async () => {
+    queueMocks.getTodayQueue.mockResolvedValue(queueSnapshot([CALLED_ENTRY]));
+    return { success: true, patient: CALLED_PATIENT };
   });
 });
 
@@ -113,6 +106,74 @@ async function callNextPatient() {
 }
 
 describe('QMAN-FE-002: called-patient list is owned by the current doctor/date selection', () => {
+  it.each(['dentistry', 'dermatology'])('restores %s from the server without a local call', async (specialty) => {
+    queueMocks.getTodayQueue.mockResolvedValue(queueSnapshot([CALLED_ENTRY]));
+    const onStartVisit = vi.fn(async () => true);
+    const view = renderManager({ onStartVisit, doctorQueueSpecialty: specialty });
+    await screen.findByRole('button', { name: 'dental.dental_panel_start_visit_for' });
+    view.unmount();
+    renderManager({ onStartVisit, doctorQueueSpecialty: specialty });
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'dental.dental_panel_start_visit_for' }));
+    expect(queueMocks.callNextPatientInQueue).not.toHaveBeenCalled();
+    expect(onStartVisit).toHaveBeenCalledWith(CALLED_PATIENT);
+  });
+
+  it('follows the clinic day on a UTC workstation without replacing an explicit history selection', async () => {
+    vi.setSystemTime(new Date('2026-11-25T19:00:00Z'));
+    queueMocks.getTodayQueue.mockResolvedValue(queueSnapshot([CALLED_ENTRY], 7, '2026-11-26'));
+    const view = renderManager({ selectedDate: undefined });
+    const startName = 'dental.dental_panel_start_visit_for';
+    await screen.findByRole('button', { name: startName });
+    const dateField = screen.getByLabelText<HTMLInputElement>('misc.mqm_aria_queue_date');
+    expect(dateField.value).toBe('2026-11-26');
+    expect(dateField.max).toBe('2026-11-26');
+    expect(queueMocks.loadQueueSnapshot).toHaveBeenLastCalledWith(expect.objectContaining({
+      targetDate: '2026-11-26',
+    }));
+
+    fireEvent.change(dateField, { target: { value: '2026-11-25' } });
+    await waitFor(() => expect(queueMocks.loadQueueSnapshot).toHaveBeenLastCalledWith(expect.objectContaining({
+      targetDate: '2026-11-25',
+    })));
+    expect(dateField.value).toBe('2026-11-25');
+    expect(screen.queryByRole('button', { name: startName })).toBeNull();
+    expect(screen.getByRole('button', { name: 'misc.mqm_call' })).toBeDisabled();
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    fireEvent.change(dateField, { target: { value: '2026-11-26' } });
+    await screen.findByRole('button', { name: startName });
+    view.unmount();
+    renderManager({ selectedDate: undefined });
+    await screen.findByRole('button', { name: startName });
+  });
+
+  it('reconciles an automatic call and only exposes positively authorized called entries', async () => {
+    renderManager();
+    await waitFor(() => expect(queueMocks.getTodayQueue).toHaveBeenCalled());
+    queueMocks.getTodayQueue.mockResolvedValue(queueSnapshot([
+      { ...CALLED_ENTRY, can_start_visit: false },
+      { ...CALLED_ENTRY, id: 88, status: 'in_progress' },
+      { ...CALLED_ENTRY, id: 0 },
+      { ...CALLED_ENTRY, id: 45 },
+    ]));
+    window.dispatchEvent(new CustomEvent('queueUpdated', { detail: { action: 'nextPatientCalled' } }));
+    expect(await screen.findAllByRole('button', { name: 'dental.dental_panel_start_visit_for' })).toHaveLength(1);
+    expect(queueMocks.callNextPatientInQueue).not.toHaveBeenCalled();
+  });
+
+  it('does not expose Start from another doctor or the previous server day', async () => {
+    queueMocks.getTodayQueue.mockResolvedValue(queueSnapshot([CALLED_ENTRY], 3, '2026-11-03'));
+    const { unmount } = renderManager();
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'dental.dental_panel_start_visit_for' })).toBeNull();
+    unmount();
+
+    queueMocks.getTodayQueue.mockResolvedValue(queueSnapshot([CALLED_ENTRY], 7, '2026-11-02'));
+    renderManager();
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'dental.dental_panel_start_visit_for' })).toBeNull();
+  });
+
   it('a called entry for doctor A disappears when the selection switches to doctor B', async () => {
     const { rerender } = renderManager();
     await callNextPatient();
@@ -126,6 +187,7 @@ describe('QMAN-FE-002: called-patient list is owned by the current doctor/date s
       <ThemeProvider>
         <ModernQueueManager
           mode="doctor"
+          doctorQueueSpecialty="dentistry"
           doctors={DOCTORS}
           selectedDoctor="3"
           selectedDate="2026-11-03"
@@ -151,6 +213,7 @@ describe('QMAN-FE-002: called-patient list is owned by the current doctor/date s
       <ThemeProvider>
         <ModernQueueManager
           mode="doctor"
+          doctorQueueSpecialty="dentistry"
           doctors={DOCTORS}
           selectedDoctor="7"
           selectedDate="2026-11-04"
@@ -182,6 +245,7 @@ describe('QMAN-FE-002: called-patient list is owned by the current doctor/date s
       <ThemeProvider>
         <ModernQueueManager
           mode="doctor"
+          doctorQueueSpecialty="dentistry"
           doctors={DOCTORS}
           selectedDoctor="3"
           selectedDate="2026-11-03"
@@ -213,6 +277,18 @@ describe('QMAN-FE-002: called-patient list is owned by the current doctor/date s
 });
 
 describe('QMAN-FE-001 (UI half): a failed current-selection load surfaces a recoverable error', () => {
+  it('keeps a selected historical queue readable without exposing current-day visit actions', async () => {
+    queueMocks.getTodayQueue.mockResolvedValue(queueSnapshot([CALLED_ENTRY], 7, '2026-11-04'));
+    renderManager({ selectedDate: '2026-11-03' });
+
+    await waitFor(() => expect(queueMocks.getTodayQueue).toHaveBeenCalledWith('dentistry'));
+    expect(queueMocks.loadQueueSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      targetDate: '2026-11-03',
+    }));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('button', { name: /dental\.dental_panel_start_visit/ })).toBeNull();
+  });
+
   it('shows an error banner with a retry action when the current selection fails to load', async () => {
     queueMocks.loadQueueSnapshot.mockRejectedValue(new Error('network down'));
     renderManager();
