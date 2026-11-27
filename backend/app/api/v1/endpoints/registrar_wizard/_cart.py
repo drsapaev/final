@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import Counter
 from decimal import ROUND_HALF_EVEN, Context, Decimal, localcontext
 from typing import Any
 
 from fastapi import Request
+from sqlalchemy import tuple_
 from sqlalchemy.exc import DBAPIError
 
 from app.api.trusted_financial_auth import financial_admin, financial_reviewer
@@ -21,7 +23,7 @@ from app.core.roles import normalize_role_value
 from app.crud.clinic import clinic_today
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.models.all_free_request import AllFreeRequest
-from app.models.online_queue import DailyQueue
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.services.all_free_approval import ALL_FREE_DECISION_REQUIRED
 from app.services.all_free_request_service import (
     AllFreeRequestError,
@@ -59,6 +61,132 @@ from app.services.registrar_edit_delta_service import (
 from app.services.registrar_wizard_queue_assignment_service import (
     DuplicateCartResourceQueueVisitsError,
 )
+
+
+def _single_queue_ticket_price(
+    assignments: list[dict[str, Any]],
+    service_rows: list[tuple[VisitService, str | None]],
+    invoice_visit_amount: Decimal,
+) -> str | None:
+    # Only stamp a price when the sole issued ticket unambiguously covers
+    # every persisted line of this visit. Never attach the cart total, a
+    # catalog price, or an inferred price for split/untagged services.
+    if len(assignments) != 1 or not service_rows:
+        return None
+    assignment = assignments[0]
+    queue_tag = assignment.get("queue_tag")
+    if not queue_tag or not assignment.get("queue_id") or not assignment.get("number"):
+        return None
+    total = Decimal("0")
+    for line, service_tag in service_rows:
+        if service_tag != queue_tag or line.price is None or not line.qty:
+            return None
+        total += line.price * line.qty
+    if total != invoice_visit_amount:
+        return None
+    return str(total)
+
+
+def _issued_ticket_prices(
+    db: Session,
+    visit: Visit,
+    assignments: list[dict[str, Any]],
+    service_rows: list[tuple[VisitService, str | None]],
+    invoice_visit_amount: Decimal,
+) -> list[str] | None:
+    # These rows come from the queue writer, not from the browser. Validate
+    # the actual issued identities as well as the visit and patient binding.
+    keys = [(assignment.get("queue_id"), assignment.get("number")) for assignment in assignments]
+    if not keys or not service_rows or len(set(keys)) != len(keys):
+        return None
+    if any(not q or not n for q, n in keys):
+        return None
+    entries = db.query(
+        OnlineQueueEntry.queue_id, OnlineQueueEntry.number, OnlineQueueEntry.services
+    ).filter(
+        OnlineQueueEntry.visit_id == visit.id,
+        OnlineQueueEntry.patient_id == visit.patient_id,
+        tuple_(OnlineQueueEntry.queue_id, OnlineQueueEntry.number).in_(keys),
+    ).all()
+    entry_services = {(entry.queue_id, entry.number): entry.services for entry in entries}
+    if len(entries) != len(keys) or any(key not in entry_services for key in keys):
+        return None
+
+    line_counts: Counter[int] = Counter()
+    line_amounts: dict[int, Decimal] = {}
+    for line, _ in service_rows:
+        if line.service_id is None or line.price is None or not line.qty:
+            return None
+        line_counts[line.service_id] += 1
+        line_amounts[line.service_id] = (
+            line_amounts.get(line.service_id, Decimal("0")) + line.price * line.qty
+        )
+    if sum(line_amounts.values(), Decimal("0")) != invoice_visit_amount:
+        return None
+
+    assigned_counts: Counter[int] = Counter()
+    amounts = []
+    for key in keys:
+        identified_services = entry_services[key]
+        if not isinstance(identified_services, list) or not identified_services:
+            return None
+        ids = set()
+        for ticket_line in identified_services:
+            service_id = ticket_line.get("id") if isinstance(ticket_line, dict) else None
+            if type(service_id) is not int or service_id not in line_amounts:
+                return None
+            assigned_counts[service_id] += 1
+            if service_id in ids or assigned_counts[service_id] != 1:
+                # Without persisted line ids, repeated service ids cannot be
+                # allocated across entries, even if amounts happen to match.
+                return None
+            ids.add(service_id)
+        amounts.append(str(sum((line_amounts[service_id] for service_id in ids), Decimal("0"))))
+    if assigned_counts != line_counts:
+        return None
+    return amounts
+
+
+def _attach_issued_ticket_prices(
+    db: Session, invoice_id: int, visits: list[Visit], queue_numbers: dict[int, list[dict]],
+) -> None:
+    if not queue_numbers:
+        return
+    # The provisional registrar total is intentionally preserved for the
+    # All Free audit baseline. Use the final, transaction-local allocation.
+    amounts: dict[int, list[Decimal]] = {}
+    for visit_id, amount in (
+        db.query(PaymentInvoiceVisit.visit_id, PaymentInvoiceVisit.visit_amount)
+        .filter(
+            PaymentInvoiceVisit.invoice_id == invoice_id,
+            PaymentInvoiceVisit.visit_id.in_(queue_numbers),
+        )
+        .all()
+    ):
+        amounts.setdefault(visit_id, []).append(amount)
+
+    for visit in visits:
+        assignments = queue_numbers.get(visit.id, [])
+        allocated = amounts.get(visit.id, [])
+        if not assignments or len(allocated) != 1:
+            continue
+        rows = (
+            db.query(VisitService, Service.queue_tag)
+            .outerjoin(Service, Service.id == VisitService.service_id)
+            .filter(VisitService.visit_id == visit.id)
+            .all()
+        )
+        total = allocated[0]
+        prices = _issued_ticket_prices(db, visit, assignments, rows, total)
+        if prices is None:
+            single = _single_queue_ticket_price(assignments, rows, total)
+            if single is not None:
+                prices = [single]
+        if prices is not None:
+            queue_numbers[visit.id] = [
+                {**assignment, "service_price": price}
+                for assignment, price in zip(assignments, prices, strict=True)
+            ]
 
 
 @router.post("/registrar/cart", response_model=CartResponse)
@@ -471,6 +599,7 @@ def create_cart_appointments(
                 if [link.visit_id for link in links] != sorted(visit.id for visit in created_visits):
                     raise FinancialFenceError("Состав счёта изменился")
 
+        _attach_issued_ticket_prices(db, invoice.id, created_visits, queue_numbers)
         if all_free_bearer is not None:
             check_bearer_expiry(all_free_bearer)
         db.commit()

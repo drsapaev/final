@@ -30,11 +30,16 @@ from sqlalchemy.orm import Session
 from app.api.v1.endpoints.registrar_wizard import _cart as cart_module
 from app.crud.clinic import clinic_today
 from app.models.all_free_request import AllFreeRequest
+from app.models.clinic import ClinicSettings
+from app.models.online_queue import QueueResource
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
-from app.models.visit import Visit
+from app.models.visit import Visit, VisitService
 from tests.conftest import mint_access_token
 from tests.integration.doctor_schedule_fixtures import mock_invitations  # noqa: F401
+from tests.integration.test_all_free_registrar_workflow import (
+    migrated_visit_confirmation_context,  # noqa: F401
+)
 
 pytestmark = [pytest.mark.integration]
 
@@ -470,3 +475,146 @@ def test_idempotency_new_key_creates_new_operation(
 
     _, invoices, _ = _counts(db_session, test_patient.id)
     assert invoices == 2, "новый ключ должен создавать новую корзину"
+
+
+@pytest.mark.parametrize("unit_price", ["25000.00", "0.00"])
+def test_cart_response_carries_scoped_price_for_issued_queue(
+    client: TestClient, db_session: Session, admin_user, test_patient, unit_price: str
+):
+    tag = "synthetic_cart_ticket"
+    resource = QueueResource(code=tag, queue_tag=tag, display_name="SYNTHETIC ticket")
+    service = Service(
+        code="SYNTHETIC-TICKET",
+        service_code="SYNTHETIC-TICKET",
+        name="SYNTHETIC ticket service",
+        queue_tag=tag,
+        price=Decimal(unit_price),
+        requires_doctor=False,
+        is_consultation=False,
+        active=True,
+    )
+    db_session.add_all([resource, service])
+    db_session.commit()
+
+    visit = _visit(service.id)
+    visit["visit_date"] = clinic_today(db_session).isoformat()
+    visit["services"][0]["quantity"] = 2
+    response = client.post(
+        "/api/v1/registrar/cart",
+        headers=_auth_headers(admin_user),
+        json=_cart_payload(patient_id=test_patient.id, visits=[visit]),
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    visit_id = payload["visit_ids"][0]
+    [assignment] = payload["queue_numbers"][str(visit_id)]
+    assert assignment["queue_tag"] == tag
+    assert assignment["number"] > 0
+    assert Decimal(assignment["service_price"]) == Decimal(unit_price) * 2
+
+
+def test_ticket_price_stays_unknown_when_a_visit_cannot_be_priced_by_one_queue():
+    line = VisitService(name="SYNTHETIC service", price=Decimal("25000"), qty=2)
+    scoped = {"queue_id": 12, "queue_tag": "cardiology_common", "number": 1}
+    second = {"queue_id": 13, "queue_tag": "ecg", "number": 1}
+    price = cart_module._single_queue_ticket_price
+    assert price([scoped, second], [(line, "cardiology_common")], Decimal("50000")) is None
+    assert price([scoped], [(line, "ecg")], Decimal("50000")) is None
+    assert price([scoped], [(line, None)], Decimal("50000")) is None
+    assert price([scoped], [(line, "cardiology_common")], Decimal("60000")) is None
+
+
+def test_initial_mixed_ecg_procedures_lab_tickets_use_separate_prices(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    # Three distinct queues, including a genuinely free service.
+    services = []
+    tags = {"ecg": Decimal("41500"), "procedures": Decimal("27500"), "lab": Decimal("0")}
+    for tag, amount in tags.items():
+        db_session.add(
+            QueueResource(code=tag, queue_tag=tag, display_name=f"SYNTHETIC {tag}")
+        )
+        service = Service(
+            code=f"SYNTH-{tag}", service_code=f"SYNTH-{tag}",
+            name=f"SYNTHETIC {tag}", queue_tag=tag, price=amount,
+            requires_doctor=False, is_consultation=False, active=True,
+        )
+        db_session.add(service)
+        services.append(service)
+    db_session.commit()
+    day = clinic_today(db_session)
+    visit = {
+        "doctor_id": None,
+        "visit_date": day.isoformat(),
+        "department": "lab",
+        "services": [{"service_id": service.id, "quantity": 2} for service in services],
+    }
+    headers = _auth_headers(admin_user)
+    response = client.post(
+        "/api/v1/registrar/cart",
+        headers=headers,
+        json=_cart_payload(patient_id=test_patient.id, visits=[visit]),
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    [visit_id] = payload["visit_ids"]
+    assignments = payload["queue_numbers"][str(visit_id)]
+    assert {item["queue_tag"]: Decimal(item["service_price"]) for item in assignments} == {
+        tag: price * 2 for tag, price in tags.items()
+    }
+    assert sum(Decimal(item["service_price"]) for item in assignments) == Decimal(payload["total_amount"])
+
+
+@pytest.mark.usefixtures("migrated_visit_confirmation_context")
+@pytest.mark.parametrize("auto_approve", [False, True])
+def test_same_day_all_free_ticket_follows_final_invoice(
+    client, db_session, admin_user, test_patient, auto_approve, monkeypatch
+):
+    from unittest.mock import AsyncMock
+
+    notify = AsyncMock(return_value=True)
+    monkeypatch.setattr(cart_module.notification_sender_service, "send_all_free_request_notification", notify)
+    setting = db_session.query(ClinicSettings).filter_by(key="all_free_auto_approve").one_or_none()
+    if setting is None:
+        db_session.add(ClinicSettings(key="all_free_auto_approve", value=auto_approve, category="benefits"))
+    else:
+        setting.value = auto_approve
+    tag = "ecg"
+    db_session.add(QueueResource(code=tag, queue_tag=tag, display_name="SYNTHETIC ECG"))
+    service = Service(
+        code="SYNTHETIC-ALL-FREE-TICKET", service_code="SYNTHETIC-ALL-FREE-TICKET",
+        name="SYNTHETIC all free ticket", queue_tag=tag, price=Decimal("25000"),
+        requires_doctor=False, is_consultation=False, active=True,
+    )
+    db_session.add(service)
+    db_session.commit()
+    visit = _visit(service.id)
+    visit["visit_date"] = clinic_today(db_session).isoformat()
+    visit["services"][0]["quantity"] = 2
+    payload = _cart_payload(patient_id=test_patient.id, visits=[visit])
+    payload.update(discount_mode="all_free", all_free=True)
+    headers = _auth_headers(admin_user) | {"Idempotency-Key": f"synthetic-current-ticket-all-free-{auto_approve}"}
+    response = client.post("/api/v1/registrar/cart", headers=headers, json=payload)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    [visit_id] = result["visit_ids"]
+    allocation = (
+        db_session.query(PaymentInvoiceVisit.visit_amount)
+        .filter_by(invoice_id=result["invoice_id"], visit_id=visit_id).scalar()
+    )
+    request = db_session.query(AllFreeRequest).filter_by(visit_id=visit_id).one()
+    assert request.baseline_total == Decimal("50000")
+    assert result["print_tickets"] == []
+    if auto_approve:
+        assert request.status == "approved"
+        [ticket] = result["queue_numbers"][str(visit_id)]
+        assert Decimal(ticket["service_price"]) == allocation == Decimal("0")
+    else:
+        assert request.status == "pending"
+        assert not result["queue_numbers"].get(str(visit_id))
+        assert allocation == Decimal("50000")
+    counts = _counts(db_session, test_patient.id)
+    replay = client.post("/api/v1/registrar/cart", headers=headers, json=payload)
+    assert replay.status_code == 200, replay.text
+    assert replay.json() == result
+    assert _counts(db_session, test_patient.id) == counts
