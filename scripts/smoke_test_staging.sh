@@ -3,11 +3,13 @@
 # docs/runbooks/STAGING_VALIDATION.md.
 #
 # Usage:
-#   bash scripts/smoke_test_staging.sh
+#   bash scripts/smoke_test_staging.sh [--strict]
 #
 # Exit codes:
 #   0 = all runnable checks passed (skipped checks are reported loudly)
 #   1 = at least one check failed
+#   2 = checks skipped in --strict mode
+#  64 = invalid arguments
 #
 # Honesty contract:
 #   Each check puts its substantive command last or explicitly propagates
@@ -26,6 +28,14 @@
 # drill DB (cleaned up automatically).
 
 set -uo pipefail
+
+STRICT=0
+if [ "$#" -eq 1 ] && [ "$1" = "--strict" ]; then
+    STRICT=1
+elif [ "$#" -ne 0 ]; then
+    echo "Usage: bash scripts/smoke_test_staging.sh [--strict]" >&2
+    exit 64
+fi
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -120,7 +130,7 @@ dr_drill_check() {
     fi
     (
         cd backend || exit 1
-        python -m app.scripts.dr_drill 2>&1 | tail -10
+        python -m app.scripts.dr_drill 2>&1 | tail -10 || exit 1
     )
 }
 
@@ -155,7 +165,7 @@ with e.connect() as c:
 from app.services.ai_feature_gating import RequireAiFeature
 dep = RequireAiFeature('ai_smart_template')
 print('    RequireAiFeature dependency instantiated correctly.')
-" 2>&1
+" 2>&1 || exit 1
         echo "    NOTE: proves wiring only (flag row + dependency class)."
         echo "    Behavioral toggle->503 is manual (runbook Check 3)."
     )
@@ -174,7 +184,7 @@ ai_safety_check() {
     # Run a subset of safety-related tests
     (
         cd backend || exit 1
-        python -m pytest tests/unit/test_pii_masker.py -v --tb=short 2>&1 | tail -20
+        python -m pytest tests/unit/test_pii_masker.py -v --tb=short 2>&1 | tail -20 || exit 1
         echo "    NOTE: PII masker subset only."
         echo "    requires_doctor_confirmation Playwright contract runs in nightly"
         echo "    CI (ai-safety-guardrails.yml), not here; full proof is manual"
@@ -202,11 +212,14 @@ print(f'    Cron jobs: {len(WorkerSettings.cron_jobs)} defined')
 " 2>&1 || exit 1
         if [ -n "${ARQ_TEST_REDIS_URL:-}${REDIS_URL:-}" ]; then
             echo "    Live enqueue+process proof on scratch queue..."
-            python -m app.scripts.arq_enqueue_process_check 2>&1
+            python -m app.scripts.arq_enqueue_process_check 2>&1 || exit 1
         else
             echo "    NOTE: proves module wiring only."
             echo "    Set ARQ_TEST_REDIS_URL (or REDIS_URL) to run the live"
             echo "    enqueue+process proof; otherwise it stays manual (runbook Check 5)."
+            if [ "$STRICT" -eq 1 ]; then
+                exit 2
+            fi
         fi
     )
 }
@@ -220,9 +233,11 @@ pii_check() {
     (
         cd backend || exit 1
         python -c "
-from app.core.pii_masker import mask_pii, mask_phone, mask_email, mask_name
+from app.core.pii_masker import mask_pii, mask_pii_text, mask_phone, mask_email, mask_name
 
-assert mask_phone('+998901234567') == '•••567'
+phone = '+998901234567'
+assert mask_phone(phone) == '•••567'
+assert mask_pii_text('phone: ' + phone) == 'phone: •••567'
 assert mask_email('john@example.com').startswith('j')
 assert mask_name('Иван Иванов') == 'И.И.'
 
@@ -242,7 +257,7 @@ print('    PII scrubbing: all assertions passed.')
     )
 }
 
-run_check 6 "PII scrubbing (3 layers)" pii_check
+run_check 6 "PII masker (fields and free text)" pii_check
 
 # ---------------------------------------------------------------------------
 # Check 7: Pre-commit hooks installed
@@ -266,9 +281,12 @@ precommit_check() {
     # This pipeline is the last statement, so its exit status (pipefail
     # included) is the check's verdict.
     if command -v pre-commit >/dev/null 2>&1; then
-        pre-commit run --files README.md 2>&1 | tail -5 | sed 's/^/    /'
+        pre-commit run --files README.md 2>&1 | tail -5 | sed 's/^/    /' || return 1
     else
         echo "    pre-commit command not in PATH (but hook is installed)"
+        if [ "$STRICT" -eq 1 ]; then
+            return 2
+        fi
     fi
 }
 
@@ -285,7 +303,7 @@ backend_tests_check() {
     # Run a quick subset (full suite takes 5+ min)
     (
         cd backend || exit 1
-        python -m pytest tests/unit/ -x --tb=line -q 2>&1 | tail -15
+        python -m pytest tests/unit/ -x --tb=line -q 2>&1 | tail -15 || exit 1
     )
 }
 
@@ -301,7 +319,7 @@ bandit_check() {
     fi
     # Bandit exits non-zero when it finds MEDIUM+ issues; this is the last
     # statement, so the verdict is bandit's own.
-    bandit -r backend -ll 2>&1 | tail -10 | sed 's/^/    /'
+    bandit -r backend -ll 2>&1 | tail -10 | sed 's/^/    /' || return 1
 }
 
 run_check 9 "Bandit security scan (MEDIUM+)" bandit_check
@@ -318,7 +336,7 @@ frontend_check() {
         cd frontend || exit 1
         npm run build 2>&1 | tail -5 | sed 's/^/    /' || exit 1
         echo "    Build OK — running frontend unit tests (vitest)..."
-        npm run test:run 2>&1 | tail -15
+        npm run test:run 2>&1 | tail -15 || exit 1
     )
 }
 
@@ -354,9 +372,13 @@ if [ $SKIP -gt 0 ]; then
     echo ""
     echo -e "${YELLOW}All runnable checks passed, but $SKIP check(s) were skipped.${NC}"
     echo -e "See docs/runbooks/STAGING_VALIDATION.md for the skipped items."
+    if [ "$STRICT" -eq 1 ]; then
+        exit 2
+    fi
     exit 0
 fi
 
-echo -e "${GREEN}✓ All automated checks passed.${NC}"
-echo -e "Complete the remaining checks in docs/runbooks/STAGING_VALIDATION.md before a production deploy."
+echo -e "${GREEN}✓ All automated smoke checks passed at their stated coverage.${NC}"
+echo "This is not full staging validation or a production release decision."
+echo -e "See docs/runbooks/STAGING_VALIDATION.md for the full checklist."
 exit 0

@@ -304,41 +304,64 @@ below uses a legacy test label and is not Cloud release evidence.
 
 ### Backend
 
+Run from the root of the isolated staging checkout. The environment supplying
+the DSN must be authorized for synthetic sends to the staging backend project.
+
 ```bash
-cd backend
 (
- : "${STAGING_SENTRY_DSN:?Set a dedicated staging-only Sentry DSN in this shell}"
+ set -eu
+ : "${STAGING_SENTRY_DSN:?Set a dedicated staging-only backend Sentry DSN}"
  export SENTRY_DSN="$STAGING_SENTRY_DSN"
- export SENTRY_ENV=staging-validation-test
- python -c "
-from app.core.sentry import init_sentry, capture_exception
+ export SENTRY_ENV=staging
+ export APP_VERSION="$(git rev-parse HEAD)"
+ cd backend
+ python - <<'PYTHON'
+import sentry_sdk
+from app.core.sentry import init_sentry
+
 init_sentry()
-try:
-    raise RuntimeError('staging validation smoke test - backend')
-except RuntimeError as e:
-    capture_exception(e)
-print('Sent. Check Sentry dashboard in 10 seconds.')
-"
+event_id = sentry_sdk.capture_exception(
+    RuntimeError("SYNTHETIC staging validation smoke - backend")
+)
+if not event_id:
+    raise SystemExit("No backend event ID; check the staging Sentry SDK config")
+sentry_sdk.get_client().flush(timeout=15)
+print(f"Backend event ID: {event_id}; verify receipt in the staging project")
+PYTHON
 )
 ```
 
-`STAGING_SENTRY_DSN` must belong to the dedicated staging Sentry project. Do
-not copy a production DSN into this variable or commit it to the repository.
-
-**Expected**: console prints `Sent. Check Sentry dashboard in 10 seconds.`
-Within 10 seconds, Sentry dashboard (https://sentry.io) → Issues should
-show a new `RuntimeError: staging validation smoke test - backend`.
+Find the exact event ID (not just the issue title) in
+[kosmed-staging-backend](https://kosmed-clinic.sentry.io/projects/kosmed-staging-backend/).
+Verify `environment=staging` and `release=<tested full SHA>`. Printing an ID
+or flushing the SDK is not evidence of receipt.
 
 ### Frontend
 
-Build and serve the isolated staging frontend with `VITE_SENTRY_DSN` set to
-the dedicated staging Sentry project. Do not deploy to Vercel for this check.
+Build and serve the isolated frontend with the frontend project's
+`VITE_SENTRY_DSN`, `VITE_SENTRY_ENV=staging`, and `VITE_APP_VERSION` set to
+the full tested SHA in the **Vite build environment**. Do not deploy to Vercel.
+For a staging Compose build, set both `APP_VERSION` and
+`VERCEL_GIT_COMMIT_SHA` to the same full, lowercase checked-out commit SHA
+in the staging env file. These settings identify the Sentry release and the
+service worker build, respectively. When a build SHA is supplied, the staging builder rejects a
+release that is not a full SHA or does not match the build SHA. For a
+prebuilt artifact, verify both values were set when it was built; setting
+them on the Nginx container cannot change the embedded release. If the
+release is missing or differs, report verification as `BLOCKED`, not PASS.
 
-1. Open `http://127.0.0.1:<STAGING_FRONTEND_PORT>` in the browser, using the
-   frontend port from this worktree's `ops/staging.env`
-2. Open DevTools Console (F12)
-3. Run: `setTimeout(() => { throw new Error("staging validation smoke test - frontend") }, 1000)`
-4. Within 10 seconds, Sentry dashboard should show the new error
+1. Open the isolated loopback frontend in a fresh browser context with no
+   real patient or user data. Confirm the service-worker SHA.
+2. In DevTools Network, watch the Sentry envelope request for the error. In
+   Console, run: `setTimeout(() => { throw new Error("SYNTHETIC staging validation smoke - frontend") }, 1000)`.
+3. Record only the error event's `event_id` from its envelope, not the URL,
+   full payload, screenshot or HAR. Distinguish the error from telemetry
+   such as pageload or trace events.
+4. Find the exact ID in
+   [kosmed-staging-frontend](https://kosmed-clinic.sentry.io/projects/kosmed-staging-frontend/)
+   and verify `environment=staging` and `release=<tested full SHA>`. Record
+   the outcome for each project separately. Only mark receipt PASS when the
+   event is present with the expected values.
 
 ### If it fails
 
@@ -753,7 +776,9 @@ except Exception:
 if not result.get("ok"):
     raise SystemExit("Telegram getMe failed; inspect staging bot configuration without sharing the token")
 bot = result["result"]
-print(f"OK: is_bot={bot.get('is_bot')} username=@{bot.get('username', '')}")
+if bot.get("is_bot") is not True or bot.get("username", "").lower() != "kosmed_staging_bot":
+    raise SystemExit("Wrong Telegram bot; no message sent")
+print("OK: verified dedicated staging bot")
 PY
 
 # 2. Send one test message only to the explicitly designated synthetic staging
@@ -767,6 +792,27 @@ import urllib.request
 
 token = os.environ.get("STAGING_TELEGRAM_TOKEN") or getpass.getpass("Staging bot token: ")
 chat_id = getpass.getpass("Synthetic staging test chat ID: ")
+if not chat_id.removeprefix("-").isascii() or not chat_id.removeprefix("-").isdigit() or not chat_id.startswith("-"):
+    raise SystemExit("Expected the dedicated staging group ID; no message sent")
+chat_request = urllib.request.Request(
+    f"https://api.telegram.org/bot{token}/getChat",
+    data=urllib.parse.urlencode({"chat_id": chat_id}).encode(),
+)
+try:
+    with urllib.request.urlopen(chat_request, timeout=15) as response:
+        chat_result = json.load(response)
+except Exception:
+    raise SystemExit("Cannot verify staging Telegram group; no message sent") from None
+group = chat_result.get("result", {})
+if (
+    chat_result.get("ok") is not True
+    or str(group.get("id")) != chat_id
+    or group.get("type") not in {"group", "supergroup"}
+    or group.get("title") != "KosMed Staging Alerts"
+    or group.get("username")
+    or group.get("active_usernames")
+):
+    raise SystemExit("Unexpected Telegram destination; no message sent")
 body = urllib.parse.urlencode({"chat_id": chat_id, "text": "Staging Telegram delivery check"}).encode()
 request = urllib.request.Request(
     f"https://api.telegram.org/bot{token}/sendMessage",
@@ -778,15 +824,25 @@ try:
         result = json.load(response)
 except Exception:
     raise SystemExit("Telegram test send failed; inspect staging configuration without sharing token or chat ID") from None
-if not result.get("ok"):
-    raise SystemExit("Telegram test send failed; inspect staging configuration without sharing token or chat ID")
-print("OK: Telegram accepted the staging test message")
+if result.get("ok") is not True or not result.get("result", {}).get("message_id"):
+    raise SystemExit("Telegram did not confirm a message ID for the staging transport check")
+print("OK: Telegram accepted the staging test message and returned a message ID")
 PY
 
-# 3. Trigger a reminder for the synthetic, staging-linked patient via arq
-# (Check 5 step 2); verify it arrives in that same synthetic test chat.
+# 3. Do not link the group as a patient. The separate patient-reminder
+# check below requires a consented private one-to-one chat.
 )
 ```
+
+**These are separate checks.** The group verifies Bot API transport only.
+For patient reminder delivery, the existing application requires an active,
+opted-in link to a positive Telegram chat ID (a private one-to-one chat).
+The operator must approve a dedicated test recipient who has started
+`@kosmed_staging_bot`. Verify that recipient with the test bot, link it only to
+a synthetic patient in the disposable DB, enqueue the versioned reminder
+through arq, and observe the actual message in the private conversation.
+Do not relax the private-chat guard or report group delivery as patient
+reminder proof. With no approved private recipient, record `NOT_RUN`.
 
 The staging DB must contain either no bot-token setting or the same dedicated
 staging bot token. If a token was configured through Admin → Telegram settings,
@@ -1032,12 +1088,19 @@ each such check prints a NOTE stating exactly what it does **not** prove):
 
 ```bash
 bash scripts/smoke_test_staging.sh
+# CI: also fail when an automated check cannot run
+bash scripts/smoke_test_staging.sh --strict
 ```
 
 This script:
 - Reads prerequisites from the shell environment (export `SENTRY_DSN` and
   `DATABASE_URL` first; it does **not** load `backend/.env` itself)
-- Runs each check; missing prerequisites are counted as **skipped**, not failed
+- Runs each check; missing prerequisites are counted as **skipped**. In
+  `--strict` mode any skipped check returns exit code 2 if no check failed;
+  any failed check returns exit code 1. A successful strict run only verifies
+  the script’s stated coverage, not the unautomated runbook checks or a release.
+  Strict mode also requires live scratch-queue processing and a runnable
+  pre-commit command.
 - Prints ✓ / ✗ / ⊘ next to each check
 - Exits 0 if all runnable checks pass, 1 if any check fails
 - Outputs a summary listing failed and skipped checks (incomplete coverage
@@ -1111,3 +1174,93 @@ depends on honest reporting.
 | `.github/workflows/dr-drill.yml` | Weekly DR drill CI |
 | `.github/workflows/ai-safety-guardrails.yml` | Nightly AI safety CI |
 | `AGENTS.md` | AI agent rules (references this runbook) |
+
+### GitHub-hosted staging baseline
+
+The **Isolated cloud staging baseline** workflow runs on PRs and pushes to
+main on a disposable Ubuntu runner, with no integration secrets. It validates
+the checked-out SHA through the backend and service worker, migrations,
+isolated synthetic PostgreSQL data, Nginx API routing, and Compose cleanup.
+The existing Gate D workflow is independent. A baseline PASS is not a release
+admission: full smoke and external delivery remain explicitly NOT_RUN.
+
+### Dedicated cloud staging destinations
+
+Use these destinations for synthetic staging checks only. Never substitute
+production Sentry projects, the patient bot, real patient data, or a recipient
+outside the test chat.
+
+| Resource | Dedicated destination | Required proof |
+|---|---|---|
+| Frontend Sentry (React) | [kosmed-staging-frontend](https://kosmed-clinic.sentry.io/projects/kosmed-staging-frontend/) | Synthetic browser error retrieved by event ID in this project; `environment=staging`, release matches the tested SHA |
+| Backend Sentry (FastAPI) | [kosmed-staging-backend](https://kosmed-clinic.sentry.io/projects/kosmed-staging-backend/) | Synthetic backend error retrieved by event ID in this project; same environment and SHA |
+| Telegram transport | `@kosmed_staging_bot`; private group **KosMed Staging Alerts** | Verify the bot identity and the pinned group first; check that Telegram returns a message ID and the synthetic transport test appears in the group |
+| External patient reminder recipient | A separate approved one-to-one chat with the test bot. Not configured. | arq processes the versioned reminder for a linked synthetic patient and the message appears in the approved private chat; report separately from group transport and do not claim SMS delivery |
+
+### Staging credentials and network access
+
+**GitHub Actions and Codex Cloud are separate.** The protected GitHub
+environment [`staging-integrations`](https://github.com/drsapaev/final/settings/environments/27887087023/edit)
+is restricted to trusted `main` runs. Its variables and secrets are not
+available in a Codex Cloud task, and the Compose baseline deliberately
+uses neither. The protected environment has the two staging DSNs and the
+test bot token. That does not prove delivery or mean a Codex Cloud agent has
+access.
+
+| Check | Where the value belongs | Status / use |
+|---|---|---|
+| Sentry frontend, project ID `4512459389730816` | CI variable `STAGING_VITE_SENTRY_DSN` maps to `VITE_SENTRY_DSN` at the isolated frontend build | Send only; the frontend DSN is public in the bundle. |
+| Sentry backend, project ID `4512459393335296` | CI variable `STAGING_SENTRY_DSN` maps to `SENTRY_DSN` at isolated backend runtime | Send only; neither DSN permits event retrieval. |
+| Sentry event retrieval | Proposed verifier-only secret `STAGING_SENTRY_EVENT_READ_TOKEN`; not provisioned or wired into a workflow | Use an identity whose effective read access is limited to these two staging projects, or verify event IDs manually in the two dashboards. Do not use an organization-wide production-readable token or the release workflow's `SENTRY_AUTH_TOKEN`. |
+| Telegram bot | Protected CI secret `STAGING_TELEGRAM_BOT_TOKEN`; the isolated app uses `TELEGRAM_BOT_TOKEN` | Must resolve to `@kosmed_staging_bot`. A token stored in the isolated DB can override the app variable; stop on mismatch. |
+| Telegram group transport | `STAGING_TELEGRAM_CHAT_ID` is the operator label for the ID of **KosMed Staging Alerts**; use it in the confirmed manual group check | Not a configured CI secret or a private reminder recipient. Verify the group identity before sending; don't commit or log its ID or invite link. |
+| Private patient reminder | Protected `STAGING_TELEGRAM_CHALLENGE` for an authorized one-shot run | No static chat ID. The workflow derives a positive ID only from the fresh approved private challenge. Do not use the group ID here. |
+
+Use [`ops/staging.env.sample`](../../ops/staging.env.sample) as the canonical
+template for the git-ignored `ops/staging.env`. The template contains
+only empty integration fields and names. Keep actual integration values in
+the approved secret store and inject them only into the authorized run. Do
+not pass tokens, verifier inputs or private IDs to Docker builds or ordinary
+agent jobs; do not persist them in setup scripts, shell history, logs,
+artifacts or cached containers.
+
+**Recommended split:** use Codex Cloud for isolated synthetic baseline work and
+protected GitHub Actions for tests requiring external credentials. If a
+separately authorized Codex Cloud staging environment must test a live
+integration, review its [environment and network settings](https://learn.chatgpt.com/docs/environments/cloud-environments)
+independently. Allow only the exact HTTPS ingest hostname from each staging
+DSN (host portion only, no URL credentials or path), the correct regional
+Sentry API hostname used by the verifier for event reads, and
+`api.telegram.org` for Telegram. The service must also be reachable by the
+actual SDK or test process through the configured network policy;
+Sentry ingestion and Telegram sending require POST. Do not enable unrestricted
+internet, disable TLS verification or repurpose legacy setup-only secrets by
+copying them into a persistent file. Where supported, bind HTTPS-only tokens
+to the specific service with network secrets rather than exposing raw values.
+Verify compatibility in that environment before claiming access.
+
+With missing access or egress, mark the affected check `BLOCKED` or
+`NOT_RUN`. Record the provider-side event ID(s) verified in both staging
+projects and Telegram acceptance plus recipient observation separately from
+the baseline. A flushed SDK, a timestamp in the database, or a baseline PASS
+does not prove delivery.
+
+#### One-shot private Telegram patient reminder (manual)
+
+The workflow **Staging Telegram private reminder (manual)** must be on trusted
+`main` and uses only the protected `staging-integrations` environment. It
+does not run on pushes, PRs, or job retries. Obtain approval for exactly one
+synthetic message to the intended owner's private chat. Set a fresh random
+32–64 character lowercase hex value as the environment secret
+`STAGING_TELEGRAM_CHALLENGE`; share it only with that approved recipient.
+They send `/staging_check <value>` in the private chat with the staging bot.
+Dispatch the job promptly: the message must be no more than 20 minutes old
+when checked. Do not print the challenge or use it as a workflow input.
+
+The runner checks the bot identity and the private chat, consumes the
+challenge, then seeds a disposable synthetic visit and uses a one-job arq
+worker without retries. Confirm the resulting message in the recipient's
+chat separately from the provider acceptance in CI. If the result is
+uncertain, check the chat before considering another test. A new challenge
+requires fresh authorization for another message. Never publish chat IDs,
+use real patient data, or weaken the private-chat rule.
