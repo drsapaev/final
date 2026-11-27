@@ -1422,19 +1422,25 @@ jobs:
           if ! "$d/compose" up -d --no-build --pull never --wait --wait-timeout 280 postgres redis backend frontend >/dev/null 2>&1; then
             echo "::error::Protected staging failed to start; runtime logs were not collected."
             {
-              echo '### Sanitized staging startup state'
+              printf '%s\n' '### Sanitized staging startup state' | tee -a "$GITHUB_STEP_SUMMARY"
               mapfile -t container_ids < <(docker ps -a -q --filter "label=com.docker.compose.project=$project")
               if [[ ${#container_ids[@]} -eq 0 ]]; then
-                echo 'No task-owned containers were created.'
+                printf '%s\n' 'No task-owned containers were created.' | tee -a "$GITHUB_STEP_SUMMARY"
               else
                 for container_id in "${container_ids[@]}"; do
-                  if ! docker inspect --format '{{.Name}} service={{index .Config.Labels "com.docker.compose.service"}} state={{.State.Status}} exit_code={{.State.ExitCode}} oom_killed={{.State.OOMKilled}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id" 2>/dev/null; then
-                    echo 'A task-owned container state could not be inspected.'
+                  if state_line="$(docker inspect --format 'service={{index .Config.Labels "com.docker.compose.service"}} state={{.State.Status}} exit_code={{.State.ExitCode}} oom_killed={{.State.OOMKilled}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id" 2>/dev/null)"; then
+                    if [[ "$state_line" =~ ^service=(postgres|redis|backend|frontend)[[:space:]]state=([a-z_]+)[[:space:]]exit_code=(-?[0-9]+)[[:space:]]oom_killed=(true|false)[[:space:]]health=(none|starting|healthy|unhealthy)$ ]]; then
+                      printf 'service=%s state=%s exit_code=%s oom_killed=%s health=%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}" "${BASH_REMATCH[5]}" | tee -a "$GITHUB_STEP_SUMMARY"
+                    else
+                      printf '%s\n' 'A task-owned container state was unavailable or outside the approved diagnostic format.' | tee -a "$GITHUB_STEP_SUMMARY"
+                    fi
+                  else
+                    printf '%s\n' 'A task-owned container state could not be inspected.' | tee -a "$GITHUB_STEP_SUMMARY"
                   fi
                 done
               fi
-              echo 'Container logs and environment values were not collected.'
-            } >> "$GITHUB_STEP_SUMMARY"
+              printf '%s\n' 'Container logs and environment values were not collected.' | tee -a "$GITHUB_STEP_SUMMARY"
+            }
             exit 1
           fi
           if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then

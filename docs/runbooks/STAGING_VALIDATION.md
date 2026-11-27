@@ -153,6 +153,9 @@ stop before dispatch or report the failed restoration and keep the environment
 blocked.
 
 The native menu job builds only the exact PR SHA in a fresh synthetic stack.
+Startup failures report only the allowlisted Compose service, state, exit code,
+OOM and health fields to the step log and summary; runtime logs and environment values
+are never collected.
 It checks the Telegram bot and approved private chat from the backend process,
 then reads getWebhookInfo; it stops unless the webhook URL is empty and the
 pending-update count is zero. The bot token remains in the backend container.
