@@ -43,7 +43,7 @@
 }
 
 .emr-smart-field-v2__input:disabled {
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     cursor: not-allowed;
 }
 

@@ -21,7 +21,7 @@
 
 .emr-vitals__separator {
     font-size: 16px;
-    color: var(--mac-text-tertiary, #aeaeb2);
+    color: var(--emr-v2-text-tertiary, var(--mac-text-tertiary, #aeaeb2));
     margin: 0 -4px;
     padding-top: 12px;
 }
@@ -108,7 +108,7 @@
     right: 6px;
     bottom: 5px;
     font-size: 10px;
-    color: var(--mac-text-tertiary, #aeaeb2);
+    color: var(--emr-v2-text-tertiary, var(--mac-text-tertiary, #aeaeb2));
     pointer-events: none;
 }
 

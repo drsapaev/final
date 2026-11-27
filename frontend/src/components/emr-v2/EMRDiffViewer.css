@@ -5,7 +5,7 @@
 .emr-diff {
     display: flex;
     flex-direction: column;
-    background: var(--mac-bg-primary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
     border-radius: 8px;
     box-shadow: 0 4px 20px color-mix(in srgb, black, transparent 85%);
     max-width: 600px;
@@ -19,7 +19,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     border-bottom: 1px solid #e0e0e0;
 }
 

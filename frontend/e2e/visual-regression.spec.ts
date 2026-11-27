@@ -1009,6 +1009,7 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     for (const viewport of [
       { width: 375, height: 812 },
       { width: 768, height: 1024 },
+      { width: 1024, height: 768 },
       { width: 1280, height: 800 },
       { width: 1920, height: 1080 },
     ]) {
@@ -1024,7 +1025,7 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
       expect(content.x).toBeGreaterThanOrEqual(0);
       expect(summary.x + summary.width).toBeLessThanOrEqual(viewport.width + 1);
       expect(content.x + content.width).toBeLessThanOrEqual(viewport.width + 1);
-      if (viewport.width >= 1120) {
+      if (viewport.width >= 1200) {
         expect(summary.x + summary.width).toBeLessThanOrEqual(content.x + 1);
       } else {
         expect(summary.y + summary.height).toBeLessThanOrEqual(content.y + 1);
@@ -1048,6 +1049,7 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
       for (const viewport of [
         { width: 375, height: 812 },
         { width: 768, height: 1024 },
+        { width: 1024, height: 768 },
         { width: 1280, height: 800 },
         { width: 1920, height: 1080 },
       ]) {
@@ -1062,7 +1064,7 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
         expect(content.x).toBeGreaterThanOrEqual(0);
         expect(summary.x + summary.width).toBeLessThanOrEqual(viewport.width + 1);
         expect(content.x + content.width).toBeLessThanOrEqual(viewport.width + 1);
-        if (viewport.width >= 1120) {
+        if (viewport.width >= 1200) {
           expect(summary.x + summary.width).toBeLessThanOrEqual(content.x + 1);
         } else {
           expect(summary.y + summary.height).toBeLessThanOrEqual(content.y + 1);

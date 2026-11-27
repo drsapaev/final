@@ -26,7 +26,7 @@
     position: sticky;
     bottom: 0;
     z-index: 2;
-    background: var(--mac-bg-primary, Canvas);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary, Canvas));
 }
 
 .emr-workspace-identity,
@@ -56,7 +56,7 @@
 .emr-workspace-sidebar {
     grid-area: summary;
     padding: var(--mac-spacing-4, 16px);
-    background: var(--mac-bg-secondary, Canvas);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary, Canvas));
     border-bottom: 1px solid var(--mac-separator, currentColor);
     overflow-wrap: anywhere;
 }
@@ -114,7 +114,7 @@
 
 .emr-workspace-allergy {
     color: var(--mac-text-primary, CanvasText);
-    background: var(--mac-bg-tertiary, Canvas);
+    background: var(--emr-v2-surface-tertiary, var(--mac-bg-tertiary, Canvas));
     border-inline-start: 3px solid var(--mac-warning, currentColor);
     padding: var(--mac-spacing-1, 4px) var(--mac-spacing-2, 8px);
 }
@@ -139,7 +139,7 @@
     width: 100%;
     min-height: 36px;
     color: var(--mac-text-primary, CanvasText);
-    background: var(--mac-bg-primary, Canvas);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary, Canvas));
     border: 1px solid var(--mac-border, currentColor);
     border-radius: var(--mac-radius-sm, 6px);
     padding: var(--mac-spacing-1, 4px) var(--mac-spacing-2, 8px);
@@ -165,7 +165,7 @@
 
 .emr-workspace-mode-option[aria-pressed="true"] {
     color: var(--mac-text-primary);
-    background: var(--mac-bg-tertiary);
+    background: var(--emr-v2-surface-tertiary, var(--mac-bg-tertiary));
     font-weight: var(--mac-font-weight-semibold);
 }
 
@@ -246,7 +246,7 @@
     outline-offset: 2px;
 }
 
-@media (min-width: 1120px) {
+@media (min-width: 1200px) {
     .emr-workspace-layout {
         grid-template-areas: "summary editor";
         grid-template-columns: minmax(260px, 28%) minmax(0, 1fr);

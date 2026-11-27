@@ -31,7 +31,7 @@
 /* States */
 
 .emr-status-indicator--new {
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     color: var(--mac-text-secondary);
 }
 

@@ -8,7 +8,7 @@
     /* High z-index to appear above all EMR sections */
     min-width: 320px;
     max-width: 450px;
-    background: var(--mac-bg-primary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
     border: 1px solid #c5d5f5;
     border-radius: 10px;
     box-shadow: 0 8px 30px rgba(66, 133, 244, 0.2);
@@ -204,7 +204,7 @@
 }
 
 .ai-popover__dismiss {
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     color: #888;
 }
 
@@ -215,7 +215,7 @@
 /* Footer */
 .ai-popover__footer {
     padding: 6px 12px;
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     border-top: 1px solid #eee;
     font-size: 0.7rem;
     color: #888;

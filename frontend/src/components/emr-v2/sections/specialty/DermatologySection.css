@@ -17,7 +17,7 @@
 .dermatology-select {
     width: 100%;
     padding: 8px 12px;
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     border: 1px solid var(--mac-border);
     border-radius: var(--mac-radius-md);
     color: var(--mac-text-primary);
@@ -41,7 +41,7 @@
     align-items: center;
     gap: 6px;
     padding: 6px 12px;
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     border: 1px solid var(--mac-border);
     border-radius: var(--mac-radius-md);
     cursor: pointer;
@@ -50,7 +50,7 @@
 }
 
 .dermatology-checkbox:hover:not(:has(input:disabled)) {
-    background: var(--mac-bg-tertiary);
+    background: var(--emr-v2-surface-tertiary, var(--mac-bg-tertiary));
     border-color: var(--mac-accent-blue-500);
 }
 

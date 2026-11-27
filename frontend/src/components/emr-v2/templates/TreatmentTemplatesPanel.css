@@ -24,7 +24,7 @@
     width: 90%;
     max-width: 600px;
     max-height: 80vh;
-    background: var(--mac-bg-primary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
     border-radius: 12px;
     box-shadow: 0 20px 60px color-mix(in srgb, black, transparent 70%);
     display: flex;
@@ -100,7 +100,7 @@
     padding: 8px 14px;
     border: 1px solid #e0e0e0;
     border-radius: 20px;
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     font-size: 0.85rem;
     cursor: pointer;
     white-space: nowrap;
@@ -200,7 +200,7 @@
 .treatment-templates-empty {
     text-align: center;
     padding: 40px 20px;
-    color: var(--mac-text-tertiary);
+    color: var(--emr-v2-text-tertiary, var(--mac-text-tertiary));
 }
 
 /* Preview */
@@ -259,7 +259,7 @@
     align-items: center;
     gap: 6px;
     padding: 8px 14px;
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     border: 1px solid #ddd;
     border-radius: 6px;
     font-size: 0.85rem;

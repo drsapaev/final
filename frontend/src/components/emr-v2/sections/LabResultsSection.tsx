@@ -384,7 +384,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
               padding: '10px 12px',
               border: '1px solid var(--mac-border)',
               borderRadius: '8px',
-              background: 'var(--mac-bg-secondary)',
+              background: 'var(--emr-v2-surface-secondary, var(--mac-bg-secondary))',
             }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
               <TestTube2 size={16} aria-hidden="true" style={{ color: 'var(--mac-text-secondary)' }} />
@@ -485,7 +485,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false, review
                       padding: '12px',
                       border: '1px solid var(--mac-border)',
                       borderRadius: '10px',
-                      background: 'var(--mac-bg-primary)',
+                      background: 'var(--emr-v2-surface-primary, var(--mac-bg-primary))',
                       cursor: ordering ? 'not-allowed' : 'pointer',
                       textAlign: 'left',
                     }}>

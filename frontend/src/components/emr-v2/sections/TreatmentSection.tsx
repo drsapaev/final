@@ -304,7 +304,7 @@ export function TreatmentSection({
                 alignItems: 'stretch',
                 gap: 'var(--mac-spacing-2)',
                 padding: 'var(--mac-spacing-2)',
-                background: tmpl.is_pinned ? 'var(--mac-bg-primary)8e1' : '#f9f9f9',
+                background: tmpl.is_pinned ? 'var(--emr-v2-surface-primary, var(--mac-bg-primary, Canvas))' : '#f9f9f9',
                 border: tmpl.is_pinned ? '2px solid #ffb300' : '1px solid #e0e0e0',
                 borderRadius: 'var(--mac-radius-sm)'
               }}>
@@ -531,7 +531,7 @@ export function TreatmentSection({
               style={{
                 flex: 1,
                 padding: 'var(--mac-spacing-3)',
-                background: 'var(--mac-bg-primary)3e0',
+                background: 'var(--emr-v2-surface-primary, var(--mac-bg-primary, Canvas))',
                 border: '1px solid #ff9800',
                 borderRadius: 'var(--mac-radius-sm)',
                 cursor: 'pointer',
