@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.main import app
 from app.models.audit import AuditLog
-from app.models.lab import LabReportValue
+from app.models.lab import LabClinicalConfigurationVersion, LabReportValue
 from app.models.lab_import import LabImportReceipt
 from app.models.role_permission import Permission
 from app.schemas.lab_import import LabImportBatch, LabImportRow
@@ -277,6 +277,28 @@ def test_warning_codes_follow_exact_imported_value_through_release_and_correctio
             for code in ("lab:review", "lab:release", "lab:qc")
         ],
     )
+    approved_at = datetime.now(UTC)
+    db_session.add(
+        LabClinicalConfigurationVersion(
+            version_no=1,
+            status="APPROVED",
+            configuration_schema_version=1,
+            configuration_snapshot={},
+            primary_lab_physician_user_id=reviewer.id,
+            approved_by_user_id=reviewer.id,
+            approved_role_code="Lab",
+            approval_authority_snapshot={
+                "actor_user_id": reviewer.id,
+                "actor_role_code": "Lab",
+                "assignment": "primary",
+            },
+            created_by_user_id=admin_user.id,
+            created_at=approved_at,
+            updated_at=approved_at,
+            approved_at=approved_at,
+        )
+    )
+    db_session.commit()
     service = LabReportingService(db_session)
     monkeypatch.setattr(service, "_emit_lab_results_ready_notification", lambda _: None)
     template = next(item for item in service.list_templates() if item.code == "cbc_oak")

@@ -1253,3 +1253,93 @@ def test_openapi_nurse_serving_publishes_domain_and_auth_errors(
     detail_contract = schema["components"]["schemas"]["NurseServingErrorDetail"]
     assert set(detail_contract["required"]) == {"detail"}
     assert detail_contract["properties"]["detail"]["type"] == "string"
+
+
+def test_openapi_lab_universal_integration_contract(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    paths = schema["paths"]
+    components = schema["components"]["schemas"]
+
+    analyzer_import = paths["/api/v1/lab/imports/analyzer"]["post"]
+    analyzer_preview = paths["/api/v1/lab/imports/analyzer/preview"]["post"]
+    for operation in (analyzer_import, analyzer_preview):
+        assert {"200", "413", "422"} <= set(operation["responses"])
+        request_body = operation["requestBody"]
+        assert request_body["required"] is True
+        request_schema = request_body["content"]["application/json"]["schema"]
+        assert request_schema["additionalProperties"] is False
+        assert request_schema["required"] == [
+            "profile_version_id",
+            "report_instance_id",
+            "message",
+        ]
+        assert request_schema["properties"]["profile_version_id"]["minimum"] == 1
+        assert request_schema["properties"]["report_instance_id"]["minimum"] == 1
+        assert request_schema["properties"]["message"]["writeOnly"] is True
+        assert request_schema["properties"]["message"]["maxLength"] == 1_000_000
+        assert request_schema["properties"]["expected_updated_at"]["anyOf"][-1] == {
+            "type": "null"
+        }
+
+        for status_code in ("413", "422"):
+            error_schema = operation["responses"][status_code]["content"][
+                "application/json"
+            ]["schema"]
+            assert error_schema["$ref"].rsplit("/", 1)[-1] == (
+                "AnalyzerImportErrorResponse"
+            )
+
+        response = operation["responses"]["200"]["content"]["application/json"][
+            "schema"
+        ]
+        assert response["$ref"].rsplit("/", 1)[-1] == "LabImportBatchOut"
+
+    clinical_versions = paths[
+        "/api/v1/clinic/lab-clinical-configurations"
+    ]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    assert clinical_versions["type"] == "array"
+    assert (
+        clinical_versions["items"]["$ref"].rsplit("/", 1)[-1]
+        == "ConfigurationVersionOut"
+    )
+
+    approvals = paths["/api/v1/clinic/lab-equipment-integration-approvals"]["get"]
+    approval_items = approvals["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"]["items"]
+    assert approval_items["$ref"].rsplit("/", 1)[-1] == "AnalyzerMappingApprovalOut"
+    approval_properties = components["AnalyzerMappingApprovalOut"]["properties"]
+    assert not {
+        "patient_id",
+        "patient_name",
+        "date_of_birth",
+        "phone",
+    }.intersection(approval_properties)
+
+    simulator = paths[
+        "/api/v1/clinic/lab-equipment-integration-versions/{version_id}/simulator-check"
+    ]["post"]
+    request_schema = simulator["requestBody"]["content"]["application/json"][
+        "schema"
+    ]
+    assert request_schema["additionalProperties"] is False
+    assert request_schema["properties"]["message"]["maxLength"] == 1_000_000
+    response = simulator["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
+    assert response["$ref"].rsplit("/", 1)[-1] == "SimulatorCheckOut"
+    simulator_properties = components["SimulatorCheckOut"]["properties"]
+    assert "message" not in simulator_properties
+    assert simulator_properties["status"]["const"] == "PASS"
+    assert simulator_properties["result_count"]["maximum"] == 100
+    assert simulator_properties["evidence_ref"]["pattern"] == (
+        r"^synthetic-test://sha256/[0-9a-f]{64}$"
+    )
+
+    operation_ids = [
+        operation["operationId"]
+        for route in paths.values()
+        for method, operation in route.items()
+        if method in HTTP_ROUTE_METHODS and "operationId" in operation
+    ]
+    assert len(operation_ids) == len(set(operation_ids))

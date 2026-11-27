@@ -52,6 +52,14 @@ class SimulatorCheckRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1_000_000, repr=False)
 
 
+class SimulatorCheckOut(BaseModel):
+    version_id: int = Field(gt=0)
+    adapter_key: str = Field(min_length=1, max_length=100)
+    status: Literal["PASS"]
+    result_count: int = Field(ge=0, le=100)
+    evidence_ref: str = Field(pattern=r"^synthetic-test://sha256/[0-9a-f]{64}$")
+
+
 async def _read_simulator_request(request: Request) -> SimulatorCheckRequest:
     body = bytearray()
     async for chunk in request.stream():
@@ -253,6 +261,7 @@ def create_lab_integration_version(
 
 @router.post(
     "/lab-equipment-integration-versions/{version_id}/simulator-check",
+    response_model=SimulatorCheckOut,
     openapi_extra={
         "requestBody": {
             "required": True,

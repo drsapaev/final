@@ -34,6 +34,59 @@ class LabAnalyzerImportRequest(BaseModel):
     expected_updated_at: AwareDatetime | None = None
 
 
+class AnalyzerImportErrorDetail(BaseModel):
+    """Safe import failure code; raw analyzer input is never returned."""
+
+    code: str = Field(min_length=1, max_length=64)
+
+
+class AnalyzerImportErrorResponse(BaseModel):
+    detail: AnalyzerImportErrorDetail
+
+
+_ANALYZER_IMPORT_REQUEST_BODY = {
+    "required": True,
+    "content": {
+        "application/json": {
+            "schema": {
+                "type": "object",
+                "required": ["profile_version_id", "report_instance_id", "message"],
+                "additionalProperties": False,
+                "properties": {
+                    "profile_version_id": {"type": "integer", "minimum": 1},
+                    "report_instance_id": {"type": "integer", "minimum": 1},
+                    "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1_000_000,
+                        "writeOnly": True,
+                        "description": "Analyzer payload parsed by the server; never echoed in a response.",
+                    },
+                    "expected_updated_at": {
+                        "anyOf": [
+                            {"type": "string", "format": "date-time"},
+                            {"type": "null"},
+                        ],
+                        "default": None,
+                    },
+                },
+            }
+        }
+    },
+}
+
+_ANALYZER_IMPORT_ERROR_RESPONSES = {
+    413: {
+        "model": AnalyzerImportErrorResponse,
+        "description": "The analyzer message exceeded the bounded request size.",
+    },
+    422: {
+        "model": AnalyzerImportErrorResponse,
+        "description": "Invalid message, unsupported mapping, or rejected import; raw content is not returned.",
+    },
+}
+
+
 def _import_analyzer_request(
     payload: LabAnalyzerImportRequest,
     *,
@@ -99,7 +152,12 @@ def preview_lab_import(
     )
 
 
-@router.post("/imports/analyzer", response_model=LabImportBatchOut)
+@router.post(
+    "/imports/analyzer",
+    response_model=LabImportBatchOut,
+    openapi_extra={"requestBody": _ANALYZER_IMPORT_REQUEST_BODY},
+    responses=_ANALYZER_IMPORT_ERROR_RESPONSES,
+)
 async def import_analyzer_lab_values(
     request: Request,
     response: Response,
@@ -113,7 +171,12 @@ async def import_analyzer_lab_values(
     )
 
 
-@router.post("/imports/analyzer/preview", response_model=LabImportBatchOut)
+@router.post(
+    "/imports/analyzer/preview",
+    response_model=LabImportBatchOut,
+    openapi_extra={"requestBody": _ANALYZER_IMPORT_REQUEST_BODY},
+    responses=_ANALYZER_IMPORT_ERROR_RESPONSES,
+)
 async def preview_analyzer_lab_import(
     request: Request,
     response: Response,

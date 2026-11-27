@@ -59358,7 +59358,7 @@
         },
         "responses": {
           "200": {
-            "description": "Issued Code 128 label",
+            "description": "Issued label using the selected clinic profile (Code128, QR, or DataMatrix), or the legacy Code128 stock default",
             "content": {
               "application/pdf": {
                 "schema": {
@@ -59855,6 +59855,186 @@
         ]
       }
     },
+    "/api/v1/lab/imports/analyzer": {
+      "post": {
+        "tags": [
+          "lab-operations"
+        ],
+        "summary": "Import Analyzer Lab Values",
+        "operationId": "import_analyzer_lab_values_api_v1_lab_imports_analyzer_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "profile_version_id": {
+                    "type": "integer",
+                    "minimum": 1.0
+                  },
+                  "report_instance_id": {
+                    "type": "integer",
+                    "minimum": 1.0
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 1000000,
+                    "minLength": 1,
+                    "description": "Analyzer payload parsed by the server; never echoed in a response.",
+                    "writeOnly": true
+                  },
+                  "expected_updated_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "profile_version_id",
+                  "report_instance_id",
+                  "message"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabImportBatchOut"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The analyzer message exceeded the bounded request size.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyzerImportErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid message, unsupported mapping, or rejected import; raw content is not returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyzerImportErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/lab/imports/analyzer/preview": {
+      "post": {
+        "tags": [
+          "lab-operations"
+        ],
+        "summary": "Preview Analyzer Lab Import",
+        "operationId": "preview_analyzer_lab_import_api_v1_lab_imports_analyzer_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "profile_version_id": {
+                    "type": "integer",
+                    "minimum": 1.0
+                  },
+                  "report_instance_id": {
+                    "type": "integer",
+                    "minimum": 1.0
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 1000000,
+                    "minLength": 1,
+                    "description": "Analyzer payload parsed by the server; never echoed in a response.",
+                    "writeOnly": true
+                  },
+                  "expected_updated_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "profile_version_id",
+                  "report_instance_id",
+                  "message"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabImportBatchOut"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The analyzer message exceeded the bounded request size.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyzerImportErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid message, unsupported mapping, or rejected import; raw content is not returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyzerImportErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/lab/metrics": {
       "get": {
         "tags": [
@@ -59888,6 +60068,661 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LabMetricsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/lab-clinical-configurations": {
+      "get": {
+        "tags": [
+          "clinic-management",
+          "lab-clinical-configuration"
+        ],
+        "summary": "Get Clinical Configurations",
+        "operationId": "get_clinical_configurations_api_v1_clinic_lab_clinical_configurations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConfigurationVersionOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Clinical Configurations Api V1 Clinic Lab Clinical Configurations Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "clinic-management",
+          "lab-clinical-configuration"
+        ],
+        "summary": "Create Clinical Configuration Draft",
+        "operationId": "create_clinical_configuration_draft_api_v1_clinic_lab_clinical_configurations_post",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationVersionOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/clinic/lab-clinical-configurations/{version_id}": {
+      "put": {
+        "tags": [
+          "clinic-management",
+          "lab-clinical-configuration"
+        ],
+        "summary": "Update Clinical Configuration Draft",
+        "operationId": "update_clinical_configuration_draft_api_v1_clinic_lab_clinical_configurations__version_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationVersionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/lab-clinical-configurations/{version_id}/submit": {
+      "post": {
+        "tags": [
+          "clinic-management",
+          "lab-clinical-configuration"
+        ],
+        "summary": "Submit Clinical Configuration",
+        "operationId": "submit_clinical_configuration_api_v1_clinic_lab_clinical_configurations__version_id__submit_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationVersionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/lab-clinical-configurations/{version_id}/approve": {
+      "post": {
+        "tags": [
+          "clinic-management",
+          "lab-clinical-configuration"
+        ],
+        "summary": "Approve Clinical Configuration",
+        "operationId": "approve_clinical_configuration_api_v1_clinic_lab_clinical_configurations__version_id__approve_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationVersionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/lab-equipment-integrations": {
+      "get": {
+        "tags": [
+          "clinic-management",
+          "lab-equipment-integrations"
+        ],
+        "summary": "Get Lab Equipment Integrations",
+        "operationId": "get_lab_equipment_integrations_api_v1_clinic_lab_equipment_integrations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IntegrationProfileOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Lab Equipment Integrations Api V1 Clinic Lab Equipment Integrations Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/clinic/lab-equipment-integration-approvals": {
+      "get": {
+        "tags": [
+          "clinic-management",
+          "lab-equipment-integrations"
+        ],
+        "summary": "Get Pending Analyzer Mapping Approvals",
+        "operationId": "get_pending_analyzer_mapping_approvals_api_v1_clinic_lab_equipment_integration_approvals_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AnalyzerMappingApprovalOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Pending Analyzer Mapping Approvals Api V1 Clinic Lab Equipment Integration Approvals Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/clinic/lab-equipment-integration-versions/{version_id}/clinical-approval": {
+      "post": {
+        "tags": [
+          "clinic-management",
+          "lab-equipment-integrations"
+        ],
+        "summary": "Approve Lab Analyzer Mapping",
+        "operationId": "approve_lab_analyzer_mapping_api_v1_clinic_lab_equipment_integration_versions__version_id__clinical_approval_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationProfileVersionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/equipment/{equipment_id}/lab-integration": {
+      "get": {
+        "tags": [
+          "clinic-management",
+          "lab-equipment-integrations"
+        ],
+        "summary": "Get Equipment Lab Integration",
+        "operationId": "get_equipment_lab_integration_api_v1_clinic_equipment__equipment_id__lab_integration_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "equipment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Equipment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IntegrationProfileOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Equipment Lab Integration Api V1 Clinic Equipment  Equipment Id  Lab Integration Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "clinic-management",
+          "lab-equipment-integrations"
+        ],
+        "summary": "Register Equipment Lab Integration",
+        "operationId": "register_equipment_lab_integration_api_v1_clinic_equipment__equipment_id__lab_integration_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "equipment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Equipment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntegrationProfileCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationProfileOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/lab-equipment-integrations/{profile_id}/versions": {
+      "post": {
+        "tags": [
+          "clinic-management",
+          "lab-equipment-integrations"
+        ],
+        "summary": "Create Lab Integration Version",
+        "operationId": "create_lab_integration_version_api_v1_clinic_lab_equipment_integrations__profile_id__versions_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntegrationProfileVersionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationProfileVersionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/lab-equipment-integration-versions/{version_id}/simulator-check": {
+      "post": {
+        "tags": [
+          "clinic-management",
+          "lab-equipment-integrations"
+        ],
+        "summary": "Run Synthetic Simulator Check",
+        "operationId": "run_synthetic_simulator_check_api_v1_clinic_lab_equipment_integration_versions__version_id__simulator_check_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulatorCheckOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/lab-equipment-integration-versions/{version_id}/physical-validation": {
+      "post": {
+        "tags": [
+          "clinic-management",
+          "lab-equipment-integrations"
+        ],
+        "summary": "Save Physical Validation",
+        "operationId": "save_physical_validation_api_v1_clinic_lab_equipment_integration_versions__version_id__physical_validation_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhysicalValidationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationProfileVersionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/lab-equipment-integration-versions/{version_id}/activate": {
+      "post": {
+        "tags": [
+          "clinic-management",
+          "lab-equipment-integrations"
+        ],
+        "summary": "Activate Lab Equipment Integration",
+        "operationId": "activate_lab_equipment_integration_api_v1_clinic_lab_equipment_integration_versions__version_id__activate_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationProfileVersionOut"
                 }
               }
             }
@@ -79750,6 +80585,7 @@
           },
           "total_original_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Original Amount"
           },
           "doctor_name": {
@@ -80383,6 +81219,135 @@
         ],
         "title": "AnalyzeSkinRequest",
         "description": "Request body for POST /ai/analyze-skin."
+      },
+      "AnalyzerImportErrorDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "AnalyzerImportErrorDetail",
+        "description": "Safe import failure code; raw analyzer input is never returned."
+      },
+      "AnalyzerImportErrorResponse": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/AnalyzerImportErrorDetail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "AnalyzerImportErrorResponse"
+      },
+      "AnalyzerMappingApprovalOut": {
+        "properties": {
+          "version_id": {
+            "type": "integer",
+            "title": "Version Id"
+          },
+          "profile_id": {
+            "type": "integer",
+            "title": "Profile Id"
+          },
+          "version_no": {
+            "type": "integer",
+            "title": "Version No"
+          },
+          "equipment_id": {
+            "type": "integer",
+            "title": "Equipment Id"
+          },
+          "equipment_name": {
+            "type": "string",
+            "title": "Equipment Name"
+          },
+          "equipment_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equipment Model"
+          },
+          "adapter_key": {
+            "type": "string",
+            "title": "Adapter Key"
+          },
+          "protocol_code": {
+            "type": "string",
+            "title": "Protocol Code"
+          },
+          "mapping_profile": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Mapping Profile"
+          },
+          "simulator_validation_status": {
+            "type": "string",
+            "title": "Simulator Validation Status"
+          },
+          "simulator_evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Simulator Evidence Ref"
+          },
+          "physical_validation_status": {
+            "type": "string",
+            "title": "Physical Validation Status"
+          },
+          "physical_evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physical Evidence Ref"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version_id",
+          "profile_id",
+          "version_no",
+          "equipment_id",
+          "equipment_name",
+          "equipment_model",
+          "adapter_key",
+          "protocol_code",
+          "mapping_profile",
+          "simulator_validation_status",
+          "simulator_evidence_ref",
+          "physical_validation_status",
+          "physical_evidence_ref",
+          "created_at"
+        ],
+        "title": "AnalyzerMappingApprovalOut"
       },
       "AnnouncementRequest": {
         "properties": {
@@ -85635,7 +86600,8 @@
                 "type": "number"
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
               },
               {
                 "type": "null"
@@ -85684,6 +86650,7 @@
           },
           "unit_price": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Unit Price"
           },
           "quantity": {
@@ -85696,6 +86663,7 @@
           },
           "final_price": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Final Price"
           }
         },
@@ -85780,6 +86748,7 @@
           },
           "total_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount"
           },
           "approval_status": {
@@ -85881,6 +86850,7 @@
           },
           "total_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount"
           },
           "queue_numbers": {
@@ -85934,36 +86904,43 @@
         "properties": {
           "total_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount",
             "description": "Валовые поступления: исходные суммы paid/completed, БЕЗ вычета возвратов"
           },
           "cash_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Cash Amount",
             "description": "Валовые поступления наличными (gross, без вычета возвратов)"
           },
           "card_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Card Amount",
             "description": "Валовые поступления картой (gross, без вычета возвратов)"
           },
           "refunded_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Refunded Amount",
             "description": "Сумма возвратов по платежам, входящим в gross (частичные возвраты при статусе paid/completed)"
           },
           "net_total_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Net Total Amount",
             "description": "Поступления за вычетом возвратов: total_amount − refunded_amount"
           },
           "net_cash_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Net Cash Amount",
             "description": "Наличные за вычетом возвратов"
           },
           "net_card_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Net Card Amount",
             "description": "Карта за вычетом возвратов"
           },
@@ -85973,6 +86950,7 @@
           },
           "pending_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Pending Amount",
             "description": "Ожидаемая задолженность; с CSH-FE-028 (#3814) считается за вычетом возвратов"
           },
@@ -87026,6 +88004,144 @@
         "title": "CompleteVisitRequest",
         "description": "Request body for POST /doctor/queue/{entry_id}/complete.\n\nvisit_data is optional and polymorphic (may contain diagnosis,\nprescriptions, notes, etc.). When None, defaults to empty dict."
       },
+      "ConfigurationVersionOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "version_no": {
+            "type": "integer",
+            "title": "Version No"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "configuration_schema_version": {
+            "type": "integer",
+            "title": "Configuration Schema Version"
+          },
+          "configuration_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Configuration Snapshot"
+          },
+          "primary_lab_physician_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Lab Physician User Id"
+          },
+          "substitute_lab_physician_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Substitute Lab Physician User Id"
+          },
+          "approved_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By User Id"
+          },
+          "approved_role_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Role Code"
+          },
+          "approval_authority_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Authority Snapshot"
+          },
+          "created_by_user_id": {
+            "type": "integer",
+            "title": "Created By User Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version_no",
+          "status",
+          "configuration_schema_version",
+          "configuration_snapshot",
+          "primary_lab_physician_user_id",
+          "substitute_lab_physician_user_id",
+          "approved_by_user_id",
+          "approved_role_code",
+          "approval_authority_snapshot",
+          "created_by_user_id",
+          "created_at",
+          "updated_at",
+          "approved_at",
+          "archived_at"
+        ],
+        "title": "ConfigurationVersionOut"
+      },
       "ConfirmVisitRequest": {
         "properties": {
           "confirmation_method": {
@@ -87292,7 +88408,8 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               }
             ],
             "title": "Amount",
@@ -87323,7 +88440,8 @@
                 "minimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -87339,7 +88457,8 @@
                 "minimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -87415,7 +88534,8 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               }
             ],
             "title": "Amount",
@@ -87446,7 +88566,8 @@
                 "minimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -87462,7 +88583,8 @@
                 "minimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -87878,7 +89000,8 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               }
             ],
             "title": "New Price"
@@ -87931,12 +89054,14 @@
           },
           "original_price": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Original Price"
           },
           "visit_price_before": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -87946,6 +89071,7 @@
           },
           "new_price": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "New Price"
           },
           "reason": {
@@ -88317,7 +89443,8 @@
                 "type": "number"
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -88576,7 +89703,8 @@
                 "type": "number"
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -90930,7 +92058,8 @@
                 "minimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -92275,7 +93404,8 @@
                 "minimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -94546,6 +95676,7 @@
           },
           "total_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount",
             "default": "0"
           },
@@ -94988,7 +96119,8 @@
                 "minimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -95065,7 +96197,8 @@
                 "minimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -95147,7 +96280,8 @@
           "cost": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -95298,7 +96432,8 @@
           "cost": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -95531,7 +96666,8 @@
                 "minimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -97965,14 +99101,17 @@
           },
           "amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
           },
           "remaining_before": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining Before"
           },
           "remaining_after": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining After"
           }
         },
@@ -97995,6 +99134,7 @@
           },
           "amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
           },
           "method": {
@@ -98063,6 +99203,7 @@
           },
           "amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
           }
         },
@@ -98166,6 +99307,324 @@
         ],
         "title": "IndexPhraseResponse",
         "description": "Ответ на индексацию"
+      },
+      "IntegrationProfileCreate": {
+        "properties": {
+          "device_role": {
+            "type": "string",
+            "enum": [
+              "analyzer",
+              "printer",
+              "label_printer",
+              "scanner",
+              "local_agent"
+            ],
+            "title": "Device Role"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device_role"
+        ],
+        "title": "IntegrationProfileCreate"
+      },
+      "IntegrationProfileOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "equipment_id": {
+            "type": "integer",
+            "title": "Equipment Id"
+          },
+          "device_role": {
+            "type": "string",
+            "title": "Device Role"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrationProfileVersionOut"
+            },
+            "type": "array",
+            "title": "Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "equipment_id",
+          "device_role",
+          "created_at",
+          "versions"
+        ],
+        "title": "IntegrationProfileOut"
+      },
+      "IntegrationProfileVersionCreate": {
+        "properties": {
+          "adapter_key": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Adapter Key"
+          },
+          "protocol_code": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Protocol Code"
+          },
+          "transport_code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Transport Code"
+          },
+          "mapping_profile": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Mapping Profile"
+          },
+          "transport_settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Transport Settings"
+          },
+          "device_settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Device Settings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "adapter_key",
+          "protocol_code",
+          "transport_code"
+        ],
+        "title": "IntegrationProfileVersionCreate"
+      },
+      "IntegrationProfileVersionOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "profile_id": {
+            "type": "integer",
+            "title": "Profile Id"
+          },
+          "version_no": {
+            "type": "integer",
+            "title": "Version No"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "adapter_key": {
+            "type": "string",
+            "title": "Adapter Key"
+          },
+          "protocol_code": {
+            "type": "string",
+            "title": "Protocol Code"
+          },
+          "transport_code": {
+            "type": "string",
+            "title": "Transport Code"
+          },
+          "mapping_profile": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Mapping Profile"
+          },
+          "transport_settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Transport Settings"
+          },
+          "device_settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Device Settings"
+          },
+          "simulator_validation_status": {
+            "type": "string",
+            "title": "Simulator Validation Status"
+          },
+          "simulator_validated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Simulator Validated At"
+          },
+          "simulator_evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Simulator Evidence Ref"
+          },
+          "physical_validation_status": {
+            "type": "string",
+            "title": "Physical Validation Status"
+          },
+          "physical_validated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physical Validated At"
+          },
+          "physical_validated_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physical Validated By User Id"
+          },
+          "physical_evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physical Evidence Ref"
+          },
+          "clinical_approved_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Approved By User Id"
+          },
+          "clinical_approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Approved At"
+          },
+          "clinical_approval_configuration_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Approval Configuration Version Id"
+          },
+          "clinical_approval_authority_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Approval Authority Snapshot"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "activated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activated At"
+          },
+          "retired_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retired At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "profile_id",
+          "version_no",
+          "status",
+          "adapter_key",
+          "protocol_code",
+          "transport_code",
+          "mapping_profile",
+          "transport_settings",
+          "device_settings",
+          "simulator_validation_status",
+          "simulator_validated_at",
+          "simulator_evidence_ref",
+          "physical_validation_status",
+          "physical_validated_at",
+          "physical_validated_by_user_id",
+          "physical_evidence_ref",
+          "clinical_approved_by_user_id",
+          "clinical_approved_at",
+          "clinical_approval_configuration_version_id",
+          "clinical_approval_authority_snapshot",
+          "created_at",
+          "activated_at",
+          "retired_at"
+        ],
+        "title": "IntegrationProfileVersionOut"
       },
       "IntegrityCheckResult": {
         "properties": {
@@ -99558,7 +101017,8 @@
           "low": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -99569,7 +101029,8 @@
           "high": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -99580,7 +101041,8 @@
           "warning_low": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -99591,7 +101053,8 @@
           "warning_high": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -99602,7 +101065,8 @@
           "critical_low": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -99613,7 +101077,8 @@
           "critical_high": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -99733,7 +101198,8 @@
           "value_numeric": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -99816,7 +101282,8 @@
             "type": "string",
             "enum": [
               "manual",
-              "csv"
+              "csv",
+              "analyzer"
             ],
             "title": "Source"
           },
@@ -100086,7 +101553,8 @@
                 "type": "number"
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -101772,7 +103240,8 @@
           "value_numeric": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -102581,7 +104050,8 @@
                 "type": "number"
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -103526,6 +104996,17 @@
             },
             "type": "array",
             "title": "Report Instance Ids"
+          },
+          "integration_profile_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Integration Profile Version Id"
           }
         },
         "type": "object",
@@ -104756,7 +106237,8 @@
                 "minimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -104891,7 +106373,8 @@
           "cost": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -105086,7 +106569,8 @@
                 "minimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -105642,7 +107126,8 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$"
               },
               {
                 "type": "null"
@@ -112260,6 +113745,7 @@
           },
           "amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
           },
           "method": {
@@ -113864,6 +115350,31 @@
         "title": "PhraseSuggestion",
         "description": "Одна подсказка"
       },
+      "PhysicalValidationRequest": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "FAIL"
+            ],
+            "title": "Status"
+          },
+          "evidence_ref": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Evidence Ref"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "evidence_ref"
+        ],
+        "title": "PhysicalValidationRequest"
+      },
       "Prescription": {
         "properties": {
           "appointment_id": {
@@ -114186,16 +115697,19 @@
           },
           "original_price": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Original Price"
           },
           "new_price": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "New Price"
           },
           "visit_price_before": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -114206,7 +115720,8 @@
           "visit_price_difference": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -114293,7 +115808,8 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               }
             ],
             "title": "New Price"
@@ -114341,12 +115857,14 @@
           },
           "original_price": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Original Price"
           },
           "visit_price_before": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -114356,6 +115874,7 @@
           },
           "new_price": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "New Price"
           },
           "reason": {
@@ -117846,7 +119365,8 @@
           "price": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -117912,7 +119432,8 @@
           "price": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -121296,7 +122817,8 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               }
             ],
             "title": "Amount",
@@ -121463,14 +122985,17 @@
           },
           "original_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Original Amount"
           },
           "refunded_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Refunded Amount"
           },
           "remaining_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining Amount"
           },
           "reason": {
@@ -121939,14 +123464,17 @@
         "properties": {
           "total_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount"
           },
           "paid_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Paid Amount"
           },
           "remaining_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining Amount"
           },
           "payment_status": {
@@ -122172,7 +123700,8 @@
                 "exclusiveMinimum": 0.0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$"
               },
               {
                 "type": "null"
@@ -122446,14 +123975,17 @@
           },
           "total_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Amount"
           },
           "paid_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Paid Amount"
           },
           "remaining_amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining Amount"
           },
           "payment_status": {
@@ -125045,7 +126577,8 @@
                 "type": "number"
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -125196,7 +126729,8 @@
                 "type": "number"
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
               },
               {
                 "type": "null"
@@ -125933,7 +127467,8 @@
                 "type": "number"
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -126515,6 +128050,46 @@
         ],
         "title": "SetupStatusOut"
       },
+      "SimulatorCheckOut": {
+        "properties": {
+          "version_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id"
+          },
+          "adapter_key": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Adapter Key"
+          },
+          "status": {
+            "type": "string",
+            "const": "PASS",
+            "title": "Status"
+          },
+          "result_count": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Result Count"
+          },
+          "evidence_ref": {
+            "type": "string",
+            "pattern": "^synthetic-test://sha256/[0-9a-f]{64}$",
+            "title": "Evidence Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version_id",
+          "adapter_key",
+          "status",
+          "result_count",
+          "evidence_ref"
+        ],
+        "title": "SimulatorCheckOut"
+      },
       "SpecialtyCatalogCreateIn": {
         "properties": {
           "code": {
@@ -126676,7 +128251,8 @@
                 "type": "number"
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -136142,6 +137718,7 @@
           },
           "amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount"
           },
           "method": {
@@ -137270,7 +138847,8 @@
           "price_default": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"

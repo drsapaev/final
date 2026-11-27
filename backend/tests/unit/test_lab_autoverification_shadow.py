@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from app.core.config import Settings, settings
 from app.crud import audit as audit_crud
+from app.models.lab import LabClinicalConfigurationVersion
 from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment
 from app.models.patient import Patient
 from app.models.role_permission import Permission, Role, user_roles_table
@@ -57,6 +58,28 @@ def make_report(shadow_service, db_session):
     )
     db_session.commit()
     patient_id, actor_id = patient.id, actor.id
+    approved_at = datetime.now(UTC)
+    db_session.add(
+        LabClinicalConfigurationVersion(
+            version_no=1,
+            status="APPROVED",
+            configuration_schema_version=1,
+            configuration_snapshot={},
+            primary_lab_physician_user_id=actor_id,
+            approved_by_user_id=actor_id,
+            approved_role_code="Lab",
+            approval_authority_snapshot={
+                "actor_user_id": actor_id,
+                "actor_role_code": "Lab",
+                "assignment": "primary",
+            },
+            created_by_user_id=actor_id,
+            created_at=approved_at,
+            updated_at=approved_at,
+            approved_at=approved_at,
+        )
+    )
+    db_session.commit()
 
     template = service.create_template({
         "code": "synthetic_shadow",

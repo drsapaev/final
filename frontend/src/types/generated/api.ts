@@ -18924,6 +18924,40 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lab/imports/analyzer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Analyzer Lab Values */
+        post: operations["import_analyzer_lab_values_api_v1_lab_imports_analyzer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/imports/analyzer/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Analyzer Lab Import */
+        post: operations["preview_analyzer_lab_import_api_v1_lab_imports_analyzer_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lab/metrics": {
         parameters: {
             query?: never;
@@ -18935,6 +18969,212 @@ export type paths = {
         get: operations["lab_metrics_api_v1_lab_metrics_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clinic/lab-clinical-configurations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Clinical Configurations */
+        get: operations["get_clinical_configurations_api_v1_clinic_lab_clinical_configurations_get"];
+        put?: never;
+        /** Create Clinical Configuration Draft */
+        post: operations["create_clinical_configuration_draft_api_v1_clinic_lab_clinical_configurations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clinic/lab-clinical-configurations/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Clinical Configuration Draft */
+        put: operations["update_clinical_configuration_draft_api_v1_clinic_lab_clinical_configurations__version_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clinic/lab-clinical-configurations/{version_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Clinical Configuration */
+        post: operations["submit_clinical_configuration_api_v1_clinic_lab_clinical_configurations__version_id__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clinic/lab-clinical-configurations/{version_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Clinical Configuration */
+        post: operations["approve_clinical_configuration_api_v1_clinic_lab_clinical_configurations__version_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clinic/lab-equipment-integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Lab Equipment Integrations */
+        get: operations["get_lab_equipment_integrations_api_v1_clinic_lab_equipment_integrations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clinic/lab-equipment-integration-approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pending Analyzer Mapping Approvals */
+        get: operations["get_pending_analyzer_mapping_approvals_api_v1_clinic_lab_equipment_integration_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clinic/lab-equipment-integration-versions/{version_id}/clinical-approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Lab Analyzer Mapping */
+        post: operations["approve_lab_analyzer_mapping_api_v1_clinic_lab_equipment_integration_versions__version_id__clinical_approval_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clinic/equipment/{equipment_id}/lab-integration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Equipment Lab Integration */
+        get: operations["get_equipment_lab_integration_api_v1_clinic_equipment__equipment_id__lab_integration_get"];
+        put?: never;
+        /** Register Equipment Lab Integration */
+        post: operations["register_equipment_lab_integration_api_v1_clinic_equipment__equipment_id__lab_integration_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clinic/lab-equipment-integrations/{profile_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Lab Integration Version */
+        post: operations["create_lab_integration_version_api_v1_clinic_lab_equipment_integrations__profile_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clinic/lab-equipment-integration-versions/{version_id}/simulator-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Synthetic Simulator Check */
+        post: operations["run_synthetic_simulator_check_api_v1_clinic_lab_equipment_integration_versions__version_id__simulator_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clinic/lab-equipment-integration-versions/{version_id}/physical-validation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Physical Validation */
+        post: operations["save_physical_validation_api_v1_clinic_lab_equipment_integration_versions__version_id__physical_validation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clinic/lab-equipment-integration-versions/{version_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Lab Equipment Integration */
+        post: operations["activate_lab_equipment_integration_api_v1_clinic_lab_equipment_integration_versions__version_id__activate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -25782,6 +26022,54 @@ export type components = {
             provider?: string | null;
         };
         /**
+         * AnalyzerImportErrorDetail
+         * @description Safe import failure code; raw analyzer input is never returned.
+         */
+        AnalyzerImportErrorDetail: {
+            /** Code */
+            code: string;
+        };
+        /** AnalyzerImportErrorResponse */
+        AnalyzerImportErrorResponse: {
+            detail: components["schemas"]["AnalyzerImportErrorDetail"];
+        };
+        /** AnalyzerMappingApprovalOut */
+        AnalyzerMappingApprovalOut: {
+            /** Version Id */
+            version_id: number;
+            /** Profile Id */
+            profile_id: number;
+            /** Version No */
+            version_no: number;
+            /** Equipment Id */
+            equipment_id: number;
+            /** Equipment Name */
+            equipment_name: string;
+            /** Equipment Model */
+            equipment_model: string | null;
+            /** Adapter Key */
+            adapter_key: string;
+            /** Protocol Code */
+            protocol_code: string;
+            /** Mapping Profile */
+            mapping_profile: {
+                [key: string]: unknown;
+            };
+            /** Simulator Validation Status */
+            simulator_validation_status: string;
+            /** Simulator Evidence Ref */
+            simulator_evidence_ref: string | null;
+            /** Physical Validation Status */
+            physical_validation_status: string;
+            /** Physical Evidence Ref */
+            physical_evidence_ref: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
          * AnnouncementRequest
          * @description Request body for POST /display/announcement.
          */
@@ -28046,6 +28334,49 @@ export type components = {
          */
         CompleteVisitRequest: {
             [key: string]: unknown;
+        };
+        /** ConfigurationVersionOut */
+        ConfigurationVersionOut: {
+            /** Id */
+            id: number;
+            /** Version No */
+            version_no: number;
+            /** Status */
+            status: string;
+            /** Configuration Schema Version */
+            configuration_schema_version: number;
+            /** Configuration Snapshot */
+            configuration_snapshot: {
+                [key: string]: unknown;
+            };
+            /** Primary Lab Physician User Id */
+            primary_lab_physician_user_id: number | null;
+            /** Substitute Lab Physician User Id */
+            substitute_lab_physician_user_id: number | null;
+            /** Approved By User Id */
+            approved_by_user_id: number | null;
+            /** Approved Role Code */
+            approved_role_code: string | null;
+            /** Approval Authority Snapshot */
+            approval_authority_snapshot: {
+                [key: string]: unknown;
+            } | null;
+            /** Created By User Id */
+            created_by_user_id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Approved At */
+            approved_at: string | null;
+            /** Archived At */
+            archived_at: string | null;
         };
         /** ConfirmVisitRequest */
         ConfirmVisitRequest: {
@@ -32073,6 +32404,113 @@ export type components = {
             /** Message */
             message: string;
         };
+        /** IntegrationProfileCreate */
+        IntegrationProfileCreate: {
+            /**
+             * Device Role
+             * @enum {string}
+             */
+            device_role: "analyzer" | "printer" | "label_printer" | "scanner" | "local_agent";
+        };
+        /** IntegrationProfileOut */
+        IntegrationProfileOut: {
+            /** Id */
+            id: number;
+            /** Equipment Id */
+            equipment_id: number;
+            /** Device Role */
+            device_role: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Versions */
+            versions: components["schemas"]["IntegrationProfileVersionOut"][];
+        };
+        /** IntegrationProfileVersionCreate */
+        IntegrationProfileVersionCreate: {
+            /** Adapter Key */
+            adapter_key: string;
+            /** Protocol Code */
+            protocol_code: string;
+            /** Transport Code */
+            transport_code: string;
+            /** Mapping Profile */
+            mapping_profile?: {
+                [key: string]: unknown;
+            };
+            /** Transport Settings */
+            transport_settings?: {
+                [key: string]: unknown;
+            };
+            /** Device Settings */
+            device_settings?: {
+                [key: string]: unknown;
+            };
+        };
+        /** IntegrationProfileVersionOut */
+        IntegrationProfileVersionOut: {
+            /** Id */
+            id: number;
+            /** Profile Id */
+            profile_id: number;
+            /** Version No */
+            version_no: number;
+            /** Status */
+            status: string;
+            /** Adapter Key */
+            adapter_key: string;
+            /** Protocol Code */
+            protocol_code: string;
+            /** Transport Code */
+            transport_code: string;
+            /** Mapping Profile */
+            mapping_profile: {
+                [key: string]: unknown;
+            };
+            /** Transport Settings */
+            transport_settings: {
+                [key: string]: unknown;
+            };
+            /** Device Settings */
+            device_settings: {
+                [key: string]: unknown;
+            };
+            /** Simulator Validation Status */
+            simulator_validation_status: string;
+            /** Simulator Validated At */
+            simulator_validated_at: string | null;
+            /** Simulator Evidence Ref */
+            simulator_evidence_ref: string | null;
+            /** Physical Validation Status */
+            physical_validation_status: string;
+            /** Physical Validated At */
+            physical_validated_at: string | null;
+            /** Physical Validated By User Id */
+            physical_validated_by_user_id: number | null;
+            /** Physical Evidence Ref */
+            physical_evidence_ref: string | null;
+            /** Clinical Approved By User Id */
+            clinical_approved_by_user_id: number | null;
+            /** Clinical Approved At */
+            clinical_approved_at: string | null;
+            /** Clinical Approval Configuration Version Id */
+            clinical_approval_configuration_version_id: number | null;
+            /** Clinical Approval Authority Snapshot */
+            clinical_approval_authority_snapshot: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Activated At */
+            activated_at: string | null;
+            /** Retired At */
+            retired_at: string | null;
+        };
         /**
          * IntegrityCheckResult
          * @description Результат проверки целостности
@@ -32741,7 +33179,7 @@ export type components = {
              * Source
              * @enum {string}
              */
-            source: "manual" | "csv";
+            source: "manual" | "csv" | "analyzer";
             /**
              * Rows
              * @description Rows are validated individually and outcomes follow the input order.
@@ -33955,6 +34393,8 @@ export type components = {
             visit_service_ids: number[];
             /** Report Instance Ids */
             report_instance_ids: number[];
+            /** Integration Profile Version Id */
+            integration_profile_version_id?: number | null;
         };
         /** LabSpecimenListOut */
         LabSpecimenListOut: {
@@ -37892,6 +38332,16 @@ export type components = {
              * @description Дата последнего использования
              */
             lastUsed?: string | null;
+        };
+        /** PhysicalValidationRequest */
+        PhysicalValidationRequest: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "PASS" | "FAIL";
+            /** Evidence Ref */
+            evidence_ref: string;
         };
         /**
          * Prescription
@@ -42682,6 +43132,22 @@ export type components = {
         SetupStatusOut: {
             /** Initialized */
             initialized: boolean;
+        };
+        /** SimulatorCheckOut */
+        SimulatorCheckOut: {
+            /** Version Id */
+            version_id: number;
+            /** Adapter Key */
+            adapter_key: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "PASS";
+            /** Result Count */
+            result_count: number;
+            /** Evidence Ref */
+            evidence_ref: string;
         };
         /** SpecialtyCatalogCreateIn */
         SpecialtyCatalogCreateIn: {
@@ -83124,7 +83590,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Issued Code 128 label */
+            /** @description Issued label using the selected clinic profile (Code128, QR, or DataMatrix), or the legacy Code128 stock default */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -83433,6 +83899,102 @@ export interface operations {
             };
         };
     };
+    import_analyzer_lab_values_api_v1_lab_imports_analyzer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    profile_version_id: number;
+                    report_instance_id: number;
+                    /** @description Analyzer payload parsed by the server; never echoed in a response. */
+                    message: string;
+                    expected_updated_at?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabImportBatchOut"];
+                };
+            };
+            /** @description The analyzer message exceeded the bounded request size. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyzerImportErrorResponse"];
+                };
+            };
+            /** @description Invalid message, unsupported mapping, or rejected import; raw content is not returned. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyzerImportErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_analyzer_lab_import_api_v1_lab_imports_analyzer_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    profile_version_id: number;
+                    report_instance_id: number;
+                    /** @description Analyzer payload parsed by the server; never echoed in a response. */
+                    message: string;
+                    expected_updated_at?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabImportBatchOut"];
+                };
+            };
+            /** @description The analyzer message exceeded the bounded request size. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyzerImportErrorResponse"];
+                };
+            };
+            /** @description Invalid message, unsupported mapping, or rejected import; raw content is not returned. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyzerImportErrorResponse"];
+                };
+            };
+        };
+    };
     lab_metrics_api_v1_lab_metrics_get: {
         parameters: {
             query?: {
@@ -83451,6 +84013,414 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LabMetricsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_clinical_configurations_api_v1_clinic_lab_clinical_configurations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigurationVersionOut"][];
+                };
+            };
+        };
+    };
+    create_clinical_configuration_draft_api_v1_clinic_lab_clinical_configurations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigurationVersionOut"];
+                };
+            };
+        };
+    };
+    update_clinical_configuration_draft_api_v1_clinic_lab_clinical_configurations__version_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigurationVersionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_clinical_configuration_api_v1_clinic_lab_clinical_configurations__version_id__submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigurationVersionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_clinical_configuration_api_v1_clinic_lab_clinical_configurations__version_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigurationVersionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lab_equipment_integrations_api_v1_clinic_lab_equipment_integrations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationProfileOut"][];
+                };
+            };
+        };
+    };
+    get_pending_analyzer_mapping_approvals_api_v1_clinic_lab_equipment_integration_approvals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyzerMappingApprovalOut"][];
+                };
+            };
+        };
+    };
+    approve_lab_analyzer_mapping_api_v1_clinic_lab_equipment_integration_versions__version_id__clinical_approval_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationProfileVersionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_equipment_lab_integration_api_v1_clinic_equipment__equipment_id__lab_integration_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationProfileOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_equipment_lab_integration_api_v1_clinic_equipment__equipment_id__lab_integration_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationProfileCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_lab_integration_version_api_v1_clinic_lab_equipment_integrations__profile_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationProfileVersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationProfileVersionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_synthetic_simulator_check_api_v1_clinic_lab_equipment_integration_versions__version_id__simulator_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    message: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulatorCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_physical_validation_api_v1_clinic_lab_equipment_integration_versions__version_id__physical_validation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhysicalValidationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationProfileVersionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_lab_equipment_integration_api_v1_clinic_lab_equipment_integration_versions__version_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationProfileVersionOut"];
                 };
             };
             /** @description Validation Error */
