@@ -35,6 +35,10 @@ on:
       native-live:
         type: boolean
         required: true
+      native-menu:
+        type: boolean
+        required: false
+        default: false
       native-arq:
         type: boolean
         default: false
@@ -677,6 +681,22 @@ jobs:
           d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           project="miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           result=PASS
+          if [[ "${RUN_MENU_ACCEPTANCE:-false}" == true && -f "$d/menu-webhook-owned" ]]; then
+            webhook_url="https://miniapp-staging.finalclinic.fyi/api/v1/telegram/webhook"
+            if [[ -s "$d/menu-webhook.py" && -x "$d/compose" ]] && \
+              "$d/compose" ps --services --status running 2>/dev/null | grep -Fxq backend; then
+              if "$d/compose" exec -T backend python -c "$(cat "$d/menu-webhook.py")" cleanup "$webhook_url" >/dev/null 2>&1; then
+                rm -f -- "$d/menu-webhook-owned"
+                printf 'Final webhook cleanup retry: PASS.\n' >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo '::error::Final webhook cleanup retry failed; no pending updates were discarded.'
+                result=FAIL
+              fi
+            else
+              echo '::error::The backend needed to verify staging webhook cleanup is unavailable.'
+              result=FAIL
+            fi
+          fi
           if [[ -x "$d/compose" ]]; then
             "$d/compose" down --volumes --remove-orphans --rmi local || result=FAIL
           fi
@@ -700,26 +720,62 @@ jobs:
     if: >-
       github.repository == 'drsapaev/final' &&
       github.event_name == 'workflow_dispatch' &&
-      github.ref == 'refs/heads/main' &&
-      (inputs.native-protected || inputs.native-live || inputs.native-arq) &&
+      ((github.ref == 'refs/heads/main' && !inputs.native-menu) ||
+       (github.ref == 'refs/heads/codex/telegram-patient-menu' && inputs.native-menu)) &&
+      (inputs.native-protected || inputs.native-live || inputs.native-arq || inputs.native-menu) &&
       !inputs.native-rehearsal &&
       (!inputs.native-lab-arq || inputs.native-arq) &&
       (!(inputs.native-live || inputs.native-arq) ||
        (github.workflow_ref == 'drsapaev/final/.github/workflows/staging-miniapp-native-live.yml@refs/heads/main' &&
         !inputs.native-protected &&
         ((inputs.native-live && !inputs.native-arq && inputs.source-sha == '33f35996a1f86726b17f8caa819d1ed99aa1729a') ||
-         (inputs.native-arq && !inputs.native-live))))
+         (inputs.native-arq && !inputs.native-live))) &&
+      (!inputs.native-menu ||
+       (github.workflow_ref == 'drsapaev/final/.github/workflows/staging-miniapp-native-live.yml@refs/heads/codex/telegram-patient-menu' &&
+        !inputs.native-protected && !inputs.native-live && !inputs.native-arq &&
+        !inputs.native-lab-arq))
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ (inputs.native-live || inputs.native-arq) && 65 || 35 }}
+    timeout-minutes: ${{ (inputs.native-live || inputs.native-arq || inputs.native-menu) && 65 || 35 }}
     environment: staging-integrations
     permissions:
       pull-requests: read
     env:
-      REVIEWED_SHA: ${{ !inputs.native-arq && '33f35996a1f86726b17f8caa819d1ed99aa1729a' || inputs.source-sha }}
+      REVIEWED_SHA: ${{ (inputs.native-arq || inputs.native-menu) && inputs.source-sha || '33f35996a1f86726b17f8caa819d1ed99aa1729a' }}
       RUN_ARQ_ACCEPTANCE: ${{ inputs.native-arq }}
       RUN_LAB_ARQ_ACCEPTANCE: ${{ inputs.native-lab-arq }}
+      RUN_MENU_ACCEPTANCE: ${{ inputs.native-menu }}
       WORKFLOW_SHA: ${{ github.workflow_sha }}
     steps:
+      - name: Verify the exact ready PR 4271 menu head
+        if: env.RUN_MENU_ACCEPTANCE == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$REVIEWED_SHA" =~ ^[a-f0-9]{40}$ || "$WORKFLOW_SHA" != "$REVIEWED_SHA" ]]; then
+            echo '::error::The dispatched workflow ref must be the exact full PR #4271 head SHA.'
+            exit 1
+          fi
+          if ! gh api --hostname github.com repos/drsapaev/final/pulls/4271 | python3 -c '
+          import json
+          import sys
+
+          pr = json.load(sys.stdin)
+          head, base = pr["head"], pr["base"]
+          sys.exit(not (
+              pr["number"] == 4271 and pr["state"] == "open" and not pr["draft"]
+              and pr["mergeable"] is True
+              and head["repo"]["full_name"] == base["repo"]["full_name"] == "drsapaev/final"
+              and head["ref"] == "codex/telegram-patient-menu"
+              and base["ref"] == "main"
+              and head["sha"] == sys.argv[1]
+          ))
+          ' "$REVIEWED_SHA" 2>/dev/null; then
+            echo '::error::PR #4271 must remain open, Ready for review, same-repository, and at the exact dispatched head.'
+            exit 1
+          fi
+
       - name: Verify the exact PR 4251 metadata
         if: env.RUN_LAB_ARQ_ACCEPTANCE == 'true'
         shell: bash
@@ -787,7 +843,27 @@ jobs:
           source="$d/source"
           origin=https://github.com/drsapaev/final.git
           git init -q "$source"
-          if [[ "$RUN_LAB_ARQ_ACCEPTANCE" == true ]]; then
+          if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
+            for revision in "$sha" "$WORKFLOW_SHA"; do
+              if [[ ! "$revision" =~ ^[a-f0-9]{40}$ ]]; then
+                echo '::error::A full PR #4271 and workflow SHA are required.'
+                exit 1
+              fi
+            done
+            git -C "$source" fetch -q --no-tags --depth=64 "$origin" \
+              refs/heads/main:refs/remotes/origin/main \
+              refs/heads/codex/telegram-patient-menu:refs/remotes/origin/pr-4271-branch \
+              refs/pull/4271/head:refs/remotes/origin/pr-4271
+            main_sha="$(git -C "$source" rev-parse refs/remotes/origin/main)"
+            if [[ "$(git -C "$source" rev-parse refs/remotes/origin/pr-4271-branch)" != "$sha" ||
+                  "$(git -C "$source" rev-parse refs/remotes/origin/pr-4271)" != "$sha" ]] ||
+              ! git -C "$source" merge-base --is-ancestor "$main_sha" "$sha"; then
+              echo '::error::PR #4271 or main changed, or the requested head does not include current main.'
+              exit 1
+            fi
+            printf 'PR #4271 source verification: PASS at exact ready head `%s` on current main `%s`.\n' \
+              "$sha" "$main_sha" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$RUN_LAB_ARQ_ACCEPTANCE" == true ]]; then
             pinned_app=7a1d512e87bd052dd1ee06199fec7a82e7d27d0e
             review_base=11d4a5edd1979ed167ae4acb6b75e7d72eda9239
             for revision in "$sha" "$WORKFLOW_SHA"; do
@@ -971,17 +1047,306 @@ jobs:
           #!/usr/bin/env bash
           set -euo pipefail
           d="$(dirname "$0")"
-          exec docker compose --project-name "miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
-            --env-file "$d/runtime.env" -f "$d/source/ops/compose.staging.yml" -f "$d/native.yml" "$@"
+          args=(--project-name "miniapp-native-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            --env-file "$d/runtime.env"
+            -f "$d/source/ops/compose.staging.yml"
+            -f "$d/native.yml")
+          if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
+            args+=(-f "$d/menu.yml")
+          fi
+          exec docker compose "${args[@]}" "$@"
           SH
           chmod 700 "$d/compose"
+          if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
+            upstream=$(getent ahostsv4 api.telegram.org | awk '$2 == "STREAM" && !seen++ {print $1}')
+            python3 -c 'import ipaddress, sys; assert ipaddress.IPv4Address(sys.argv[1]).is_global' "$upstream"
+            runner_uid=$(id -u)
+            runner_gid=$(id -g)
+            touch "$d/approved-chat-id"
+            chmod 600 "$d/approved-chat-id"
+            cat > "$d/telegram-relay.py" <<'PY'
+          import selectors
+          import socket
+          import socketserver
+          import sys
+
+          bind, upstream = sys.argv[1:]
+
+          class Relay(socketserver.BaseRequestHandler):
+              def handle(self):
+                  try:
+                      with socket.create_connection((upstream, 443), timeout=8) as remote, selectors.DefaultSelector() as selector:
+                          self.request.settimeout(30)
+                          selector.register(self.request, selectors.EVENT_READ, remote)
+                          selector.register(remote, selectors.EVENT_READ, self.request)
+                          while events := selector.select(timeout=30):
+                              for key, _ in events:
+                                  data = key.fileobj.recv(65536)
+                                  if not data:
+                                      return
+                                  key.data.sendall(data)
+                  except OSError:
+                      return
+
+          class Server(socketserver.ThreadingTCPServer):
+              allow_reuse_address = True
+              daemon_threads = True
+
+          with Server((bind, 443), Relay) as server:
+              server.serve_forever()
+          PY
+            cat > "$d/menu-webhook-proxy.py" <<'PY'
+          import http.client
+          import json
+          import sys
+          from http.server import BaseHTTPRequestHandler, HTTPServer
+          from pathlib import Path
+
+          PATH = "/api/v1/telegram/webhook"
+          CHAT_FILE = Path("/run/secrets/approved-chat-id")
+          ALLOWED = frozenset({
+              "/start", "/start@kosmed_staging_bot",
+              "⚙️ Настройки", "⚙️ Sozlamalar",
+              "🇺🇿 O'zbekcha", "🇷🇺 Русский",
+          })
+          LIMIT = 32 * 1024
+
+          def sanitize(update, approved):
+              if not isinstance(update, dict) or set(update) != {"update_id", "message"}:
+                  return None
+              message = update.get("message")
+              if not isinstance(message, dict):
+                  return None
+              chat, sender = message.get("chat"), message.get("from")
+              if not isinstance(chat, dict) or not isinstance(sender, dict):
+                  return None
+              try:
+                  chat_id, sender_id = int(chat.get("id")), int(sender.get("id"))
+                  update_id = int(update["update_id"])
+                  message_id, message_date = int(message["message_id"]), int(message["date"])
+              except (KeyError, TypeError, ValueError):
+                  return None
+              if (chat_id != approved or sender_id != approved
+                      or chat.get("type") != "private" or sender.get("is_bot") is not False):
+                  return None
+              text = message.get("text")
+              if not isinstance(text, str) or text not in ALLOWED:
+                  return None
+              clean = {
+                  "update_id": update_id,
+                  "message": {
+                      "message_id": message_id,
+                      "date": message_date,
+                      "chat": {"id": approved, "type": "private"},
+                      "from": {
+                          "id": approved,
+                          "is_bot": False,
+                          "first_name": "SYNTHETIC-STAGING",
+                          "language_code": "ru",
+                      },
+                      "text": text,
+                  },
+              }
+              entities = []
+              for entity in message.get("entities", []):
+                  if (isinstance(entity, dict) and entity.get("type") == "bot_command"
+                          and entity.get("offset") == 0
+                          and isinstance(entity.get("length"), int)
+                          and 0 < entity["length"] <= len(text)):
+                      entities.append({"type": "bot_command", "offset": 0, "length": entity["length"]})
+              if entities:
+                  clean["message"]["entities"] = entities
+              return clean
+
+          def self_test():
+              cid = 123456789
+              sample = {
+                  "update_id": 1,
+                  "message": {
+                      "message_id": 2, "date": 3,
+                      "chat": {"id": cid, "type": "private", "first_name": "PRIVATE NAME"},
+                      "from": {"id": cid, "is_bot": False, "first_name": "PRIVATE NAME",
+                               "last_name": "PRIVATE", "username": "private_user"},
+                      "text": "/start",
+                      "entities": [{"type": "bot_command", "offset": 0, "length": 6}],
+                  },
+              }
+              clean = sanitize(sample, cid)
+              encoded = json.dumps(clean, ensure_ascii=False)
+              assert clean is not None
+              assert "PRIVATE" not in encoded and "private_user" not in encoded
+              assert "last_name" not in encoded and "username" not in encoded
+              assert clean["message"]["from"]["first_name"] == "SYNTHETIC-STAGING"
+              assert sanitize(sample, cid + 1) is None
+              other = json.loads(json.dumps(sample))
+              other["message"]["from"]["id"] = cid + 1
+              assert sanitize(other, cid) is None
+              group = json.loads(json.dumps(sample))
+              group["message"]["chat"]["type"] = "group"
+              assert sanitize(group, cid) is None
+              free_text = json.loads(json.dumps(sample))
+              free_text["message"]["text"] = "SYNTHETIC CHECK"
+              assert sanitize(free_text, cid) is None
+              contact = json.loads(json.dumps(sample))
+              del contact["message"]["text"]
+              contact["message"]["contact"] = {"phone_number": "0000000000"}
+              assert sanitize(contact, cid) is None
+              print("PASS: webhook recipient allowlist and identity scrubbing.")
+              return
+
+          class Handler(BaseHTTPRequestHandler):
+              protocol_version = "HTTP/1.0"
+
+              def log_message(self, _format, *_args):
+                  return
+
+              def respond(self, status, body=b'{"ok":false}'):
+                  self.send_response(status)
+                  self.send_header("Content-Type", "application/json")
+                  self.send_header("Content-Length", str(len(body)))
+                  self.send_header("Cache-Control", "no-store")
+                  self.end_headers()
+                  self.wfile.write(body)
+
+              def do_POST(self):
+                  if self.path != PATH:
+                      self.respond(404)
+                      return
+                  try:
+                      size = int(self.headers.get("Content-Length", ""))
+                  except ValueError:
+                      self.respond(400)
+                      return
+                  if not 0 < size <= LIMIT:
+                      self.respond(413)
+                      return
+                  try:
+                      request = json.loads(self.rfile.read(size))
+                  except (UnicodeDecodeError, json.JSONDecodeError):
+                      self.respond(400)
+                      return
+                  cleaned = sanitize(request, self.server.approved_chat_id)
+                  if cleaned is None:
+                      self.respond(503)
+                      return
+                  secret = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+                  if not secret or len(secret) > 256:
+                      self.respond(403)
+                      return
+                  payload = json.dumps(cleaned, separators=(",", ":"), ensure_ascii=False).encode()
+                  upstream = http.client.HTTPConnection("backend", 18000, timeout=10)
+                  try:
+                      upstream.request("POST", PATH, body=payload, headers={
+                          "Content-Type": "application/json",
+                          "X-Telegram-Bot-Api-Secret-Token": secret,
+                          "X-Forwarded-Proto": "https",
+                          "Host": "miniapp-staging.finalclinic.fyi",
+                      })
+                      result = upstream.getresponse()
+                      body = result.read(LIMIT + 1)
+                      if len(body) > LIMIT:
+                          self.respond(502)
+                      else:
+                          self.respond(result.status, body or b'{"ok":true}')
+                  except (OSError, http.client.HTTPException):
+                      self.respond(503)
+                  finally:
+                      upstream.close()
+
+              def do_GET(self):
+                  self.respond(404)
+
+              def do_PUT(self):
+                  self.respond(404)
+
+              def do_DELETE(self):
+                  self.respond(404)
+
+          def main():
+              if sys.argv[1:] == ["--self-test"]:
+                  self_test()
+                  return
+              try:
+                  value = CHAT_FILE.read_text(encoding="ascii").strip()
+                  if not value.isdecimal():
+                      raise ValueError
+                  approved = int(value)
+                  if not 0 < approved < 2**52:
+                      raise ValueError
+              except (OSError, UnicodeError, ValueError):
+                  raise SystemExit("private staging chat is unavailable")
+              server = HTTPServer(("0.0.0.0", 18087), Handler)
+              server.approved_chat_id = approved
+              server.serve_forever()
+
+          if __name__ == "__main__":
+              main()
+          PY
+            chmod 444 "$d/telegram-relay.py" "$d/menu-webhook-proxy.py"
+            python3 "$d/menu-webhook-proxy.py" --self-test
+            cat > "$d/menu.yml" <<YAML
+          services:
+            backend:
+              networks:
+                default: {}
+                menu-egress: {}
+              extra_hosts:
+                - "api.telegram.org:172.30.242.2"
+            telegram-relay:
+              image: $project-backend
+              build: !reset null
+              entrypoint: [python, /telegram-relay.py, 172.30.242.2, "$upstream"]
+              command: []
+              user: "65534:65534"
+              read_only: true
+              environment:
+                PYTHONDONTWRITEBYTECODE: "1"
+              volumes:
+                - $d/telegram-relay.py:/telegram-relay.py:ro
+              cap_drop: [ALL]
+              security_opt: [no-new-privileges:true]
+              sysctls:
+                net.ipv4.ip_unprivileged_port_start: 443
+              networks:
+                menu-egress:
+                  ipv4_address: 172.30.242.2
+                ingress: {}
+            menu-webhook-proxy:
+              image: $project-backend
+              build: !reset null
+              entrypoint: [python, /menu-webhook-proxy.py]
+              command: []
+              user: "$runner_uid:$runner_gid"
+              read_only: true
+              environment:
+                PYTHONDONTWRITEBYTECODE: "1"
+              volumes:
+                - $d/menu-webhook-proxy.py:/menu-webhook-proxy.py:ro
+                - $d/approved-chat-id:/run/secrets/approved-chat-id:ro
+              cap_drop: [ALL]
+              security_opt: [no-new-privileges:true]
+              networks:
+                default: {}
+          networks:
+            menu-egress:
+              internal: true
+              ipam:
+                config:
+                  - subnet: 172.30.242.0/28
+          YAML
+            chmod 600 "$d/menu.yml"
+          fi
           touch "$d/ingress.conf"
           TELEGRAM_BOT_TOKEN=synthetic-marker "$d/compose" config --format json | python3 -c '
           import json, sys
           c = json.load(sys.stdin)
           s = c["services"]
-          assert set(c["networks"]) == {"default", "ingress"}
+          menu = sys.argv[1] == "true"
+          networks = {"default", "ingress", "menu-egress"} if menu else {"default", "ingress"}
+          assert set(c["networks"]) == networks
           assert c["networks"]["default"]["internal"] is True
+          if menu:
+              assert c["networks"]["menu-egress"]["internal"] is True
           assert not any(x.get("external") for x in c["networks"].values())
           assert all(not v.get("network_mode") and not v.get("privileged") for v in s.values())
           assert s["backend"]["environment"]["TELEGRAM_BOT_TOKEN"] == "synthetic-marker"
@@ -989,35 +1354,87 @@ jobs:
           ports = s["gateway"]["ports"]
           assert len(ports) == 1
           assert (ports[0].get("host_ip"), ports[0].get("target"), str(ports[0].get("published")), ports[0].get("protocol")) == ("127.0.0.1", 80, "18086", "tcp")
-          assert set(s["gateway"]["networks"]) == {"default","ingress"}
+          assert set(s["gateway"]["networks"]) == {"default", "ingress"}
           assert len(s["gateway"]["volumes"]) == 1
           assert s["gateway"]["volumes"][0]["read_only"] is True
           assert s["gateway"]["volumes"][0]["target"] == "/etc/nginx/conf.d/default.conf"
-          for k in {"backend","frontend","redis","postgres"}:
-              assert not s[k].get("ports")
-              assert set(s[k]["networks"]) == {"default"}
-              assert all(v["type"] == "volume" for v in s[k].get("volumes", []))
-              assert set(s[k].get("depends_on", {})) <= {"backend","frontend","redis","postgres"}
-          assert all("synthetic-marker" not in json.dumps(v) for k, v in s.items() if k != "backend")
-          print("PASS: only the gateway is published on loopback; token is backend-only.")
-          '
+          for name in {"backend", "frontend", "redis", "postgres"}:
+              assert not s[name].get("ports")
+              expected = {"default", "menu-egress"} if menu and name == "backend" else {"default"}
+              assert set(s[name]["networks"]) == expected
+              assert all(v["type"] == "volume" for v in s[name].get("volumes", []))
+          if menu:
+              relay, proxy = s["telegram-relay"], s["menu-webhook-proxy"]
+              assert set(s["backend"]["networks"]) == {"default", "menu-egress"}
+              hosts = json.dumps(s["backend"].get("extra_hosts", {}))
+              assert "api.telegram.org" in hosts and "172.30.242.2" in hosts
+              assert set(relay["networks"]) == {"menu-egress", "ingress"}
+              assert set(proxy["networks"]) == {"default"}
+              assert not relay.get("build") and not proxy.get("build")
+              assert relay["read_only"] is True and proxy["read_only"] is True
+              assert relay["cap_drop"] == ["ALL"] and proxy["cap_drop"] == ["ALL"]
+              assert relay["security_opt"] == ["no-new-privileges:true"]
+              assert proxy["security_opt"] == ["no-new-privileges:true"]
+              assert not relay.get("ports") and not proxy.get("ports")
+              assert all(v["read_only"] is True for v in proxy["volumes"])
+              assert proxy["volumes"][1]["target"] == "/run/secrets/approved-chat-id"
+              assert "TELEGRAM_BOT_TOKEN" not in relay.get("environment", {})
+              assert "TELEGRAM_BOT_TOKEN" not in proxy.get("environment", {})
+              assert s["worker"]["environment"]["TELEGRAM_BOT_TOKEN"] == ""
+              assert all("synthetic-marker" not in json.dumps(v) for k, v in s.items() if k != "backend")
+          else:
+              assert all("synthetic-marker" not in json.dumps(v) for k, v in s.items() if k != "backend")
+          print("PASS: loopback gateway only; token remains backend-only.")
+          ' "$RUN_MENU_ACCEPTANCE"
           "$d/compose" pull postgres redis
           "$d/compose" build backend frontend
       - name: Start protected synthetic stack with token only in sealed backend
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.native-protected || inputs.native-live || inputs.native-arq)
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          ((github.ref == 'refs/heads/main' && !inputs.native-menu) ||
+           (github.ref == 'refs/heads/codex/telegram-patient-menu' && inputs.native-menu)) &&
+          (inputs.native-protected || inputs.native-live || inputs.native-arq || inputs.native-menu)
         shell: bash
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.STAGING_TELEGRAM_BOT_TOKEN }}
+          STAGING_TELEGRAM_CHAT_ID: ${{ inputs.native-menu && secrets.STAGING_TELEGRAM_CHAT_ID || '' }}
         run: |
           set -euo pipefail
-          test -n "${TELEGRAM_BOT_TOKEN:-}" || { echo "::error::Protected staging credential unavailable."; exit 1; }
-          d="$RUNNER_TEMP/miniapp-native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test -n "$TELEGRAM_BOT_TOKEN" || { echo "::error::Protected staging credential unavailable."; exit 1; }
+          d="$RUNNER_TEMP/miniapp-native-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
+            python3 - "$d/approved-chat-id" <<'PY'
+          import os, stat, sys
+          from pathlib import Path
+          value = os.environ.get("STAGING_TELEGRAM_CHAT_ID", "")
+          if not value.isdecimal() or not 0 < int(value) < 2**52:
+              raise SystemExit("approved private staging chat is unavailable")
+          target = Path(sys.argv[1])
+          if not stat.S_ISREG(target.lstat().st_mode):
+              raise SystemExit("approved staging chat file is invalid")
+          fd = os.open(target, os.O_WRONLY | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0))
+          with os.fdopen(fd, "w", encoding="ascii") as stream:
+              stream.write(value + "\n")
+          os.chmod(target, 0o600)
+          PY
+          fi
           if ! "$d/compose" up -d --no-build --pull never --wait --wait-timeout 280 postgres redis backend frontend >/dev/null 2>&1; then
             echo "::error::Protected staging failed to start; runtime logs were not collected."
             exit 1
           fi
-          unset TELEGRAM_BOT_TOKEN
-          "$d/compose" exec -T backend sh -ec 'test -n "${TELEGRAM_BOT_TOKEN:-}"'
+          if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
+            "$d/compose" up -d --no-deps --no-build --pull never telegram-relay menu-webhook-proxy >/dev/null 2>&1
+            "$d/compose" exec -T backend python -c 'import socket,ssl,time; assert socket.gethostbyname("api.telegram.org")=="172.30.242.2"; ctx=ssl.create_default_context();
+          for attempt in range(8):
+              try:
+                  with socket.create_connection(("api.telegram.org",443),timeout=5) as tcp:
+                      with ctx.wrap_socket(tcp,server_hostname="api.telegram.org"): break
+              except OSError:
+                  if attempt == 7: raise
+                  time.sleep(1)' >/dev/null
+          fi
+          unset TELEGRAM_BOT_TOKEN STAGING_TELEGRAM_CHAT_ID
+          "$d/compose" exec -T backend sh -ec 'test -n "$TELEGRAM_BOT_TOKEN"'
       - name: Verify Mini App revision and reject out-of-scope requests
         shell: bash
         run: |
@@ -1032,7 +1449,7 @@ jobs:
           "$d/compose" exec -T backend python -c "import urllib.request,json; assert json.load(urllib.request.urlopen('http://127.0.0.1:18000/', timeout=10))['version'] == '$sha'"
           "$d/compose" exec -T frontend grep -Fq "const BUILD_VERSION = '$sha';" /usr/share/nginx/html/sw.js
           "$d/compose" exec -T frontend find /usr/share/nginx/html/assets -type f > "$d/asset-list"
-          python3 - "$d" "$RUN_ARQ_ACCEPTANCE" <<'PY'
+          python3 - "$d" "$RUN_ARQ_ACCEPTANCE" "$RUN_MENU_ACCEPTANCE" <<'PY'
           from pathlib import Path
           import re
           import sys
@@ -1059,6 +1476,8 @@ jobs:
               routes.append('    "GET:/telegram/mini-app/patient?section=appointments" static;')
           else:
               routes.append('    ~^POST:/api/v1/telegram/mini-app/sessions/[a-f0-9-][a-f0-9-]*/revoke$ api;')
+          if sys.argv[3] == "true":
+              routes.append('    "POST:/api/v1/telegram/webhook" webhook;')
           conf = r"""
           map_hash_bucket_size 256;
           map_hash_max_size 4096;
@@ -1070,6 +1489,7 @@ jobs:
               default "";
               static frontend:80;
               api backend:18000;
+              webhook menu-webhook-proxy:18087;
           }
           server {
               listen 80 default_server;
@@ -1126,10 +1546,18 @@ jobs:
           python3 -c 'import json, sys; assert json.load(open(sys.argv[1]))["reason"] == "missing_cookie"' "$d/csrf.json"
           curl -fsS --max-time 5 -H "Host: $host" "http://127.0.0.1:18086/api/v1/auth/csrf-token" -o "$d/bootstrap.json"
           python3 -c 'import json, sys; assert json.load(open(sys.argv[1]))["csrf_token"]' "$d/bootstrap.json"
-          test "$("$d/compose" ps --services --status running | sort)" = $'backend\nfrontend\ngateway\npostgres\nredis'
+          if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
+            status="$(curl -sS --max-time 5 -H "Host: $host" -H 'Content-Type: application/json' --data '{}' -o /dev/null -w '%{http_code}' "http://127.0.0.1:18086/api/v1/telegram/webhook")"
+            test "$status" = 503
+          fi
+          expected_services=$'backend\nfrontend\ngateway\npostgres\nredis'
+          if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
+            expected_services=$'backend\nfrontend\ngateway\nmenu-webhook-proxy\npostgres\nredis\ntelegram-relay'
+          fi
+          test "$("$d/compose" ps --services --status running | sort)" = "$expected_services"
           printf 'Loopback Mini App ingress and CSRF: PASS at `%s`. This step checks loopback only.\n' "$sha" >> "$GITHUB_STEP_SUMMARY"
       - name: Seed one approved synthetic Mini App identity
-        if: inputs.native-live || inputs.native-arq
+        if: inputs.native-live || inputs.native-arq || inputs.native-menu
         shell: bash
         env:
           STAGING_TELEGRAM_CHAT_ID: ${{ secrets.STAGING_TELEGRAM_CHAT_ID }}
@@ -1188,7 +1616,7 @@ jobs:
 
           from app.db.session import SessionLocal
           from app.models.patient import Patient
-          from app.models.telegram_config import TelegramUser
+          from app.models.telegram_config import TelegramMessage, TelegramUser
 
           chat_id = int(sys.stdin.readline())
           assert 0 < chat_id < 2**52
@@ -1198,7 +1626,7 @@ jobs:
               assert db.execute(text("select current_database(), current_user")).one() == (
                   "miniapp_synthetic", "miniapp_synthetic",
               )
-              for model in (Patient, TelegramUser):
+              for model in (Patient, TelegramMessage, TelegramUser):
                   assert db.scalar(select(func.count()).select_from(model)) == 0
               patient = Patient(first_name="SYNTHETIC", last_name="MINIAPP-STAGING")
               db.add(patient)
@@ -1206,6 +1634,7 @@ jobs:
               db.add(TelegramUser(
                   patient_id=patient.id,
                   chat_id=chat_id,
+                  language_code="ru",
                   active=True,
                   blocked=False,
                   notifications_enabled=False,
@@ -1222,10 +1651,11 @@ jobs:
           fi
 
       - name: Expose only the verified Mini App gateway and await session evidence
-        if: inputs.native-live || inputs.native-arq
+        if: inputs.native-live || inputs.native-arq || inputs.native-menu
         shell: bash
         env:
           TUNNEL_TOKEN: ${{ secrets.STAGING_MINIAPP_TUNNEL_TOKEN }}
+          STAGING_TELEGRAM_CHAT_ID: ${{ inputs.native-menu && secrets.STAGING_TELEGRAM_CHAT_ID || '' }}
         run: |
           set -euo pipefail
           umask 077
@@ -1254,10 +1684,180 @@ jobs:
           (cd "$d"; printf '%s  cloudflared\n' 1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872 | sha256sum --check -)
           chmod 700 "$d/cloudflared"
 
+          if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
+            cat > "$d/menu-webhook.py" <<'PY'
+          import asyncio
+          import secrets
+          import sys
+
+          from sqlalchemy import func, select
+
+          from app.crud import telegram_config as crud_telegram
+          from app.db.session import SessionLocal
+          from app.models.telegram_config import TelegramMessage, TelegramUser
+          from app.services.telegram.bot import telegram_bot
+
+          mode = sys.argv[1]
+          webhook_url = sys.argv[2]
+          bot = telegram_bot.bot
+          if bot is None:
+              raise SystemExit("staging Telegram backend is unavailable")
+
+          def chat_id_from_stdin():
+              value = sys.stdin.readline().strip()
+              if not value.isdecimal():
+                  raise SystemExit("approved private staging chat is unavailable")
+              chat_id = int(value)
+              if not 0 < chat_id < 2**52:
+                  raise SystemExit("approved private staging chat is invalid")
+              return chat_id
+
+          async def run():
+              if mode == "setup":
+                  chat_id = chat_id_from_stdin()
+                  info = await bot.get_webhook_info()
+                  if info.url or int(info.pending_update_count or 0) != 0:
+                      raise SystemExit("staging bot webhook or pending queue is not empty")
+                  me = await bot.get_me()
+                  chat = await bot.get_chat(chat_id)
+                  chat_type = getattr(chat.type, "value", str(chat.type))
+                  if (not me.username or me.username.lower() != "kosmed_staging_bot"
+                          or int(chat.id) != chat_id or chat_type != "private"):
+                      raise SystemExit("staging bot or private chat verification failed")
+                  secret = secrets.token_urlsafe(32)
+                  with SessionLocal() as db:
+                      config = crud_telegram.get_telegram_config(db)
+                      if config and (config.webhook_url or config.webhook_secret or config.bot_token):
+                          raise SystemExit("isolated staging Telegram configuration is not empty")
+                      payload = {
+                          "webhook_url": webhook_url,
+                          "webhook_secret": secret,
+                          "bot_username": me.username,
+                      }
+                      if config is None:
+                          crud_telegram.create_telegram_config(db, payload)
+                      else:
+                          crud_telegram.update_telegram_config(db, payload)
+                  if not await bot.set_webhook(
+                      webhook_url,
+                      secret_token=secret,
+                      allowed_updates=["message"],
+                      drop_pending_updates=False,
+                      max_connections=1,
+                  ):
+                      raise SystemExit("Telegram did not confirm the task-owned webhook")
+                  info = await bot.get_webhook_info()
+                  if info.url != webhook_url or int(info.pending_update_count or 0) != 0:
+                      raise SystemExit("task-owned webhook failed post-install verification")
+                  print("PASS: staging bot, private chat, empty prior webhook and isolated secret verified.")
+                  return
+
+              if mode == "cleanup":
+                  info = await bot.get_webhook_info()
+                  if info.url not in ("", webhook_url):
+                      raise SystemExit("refusing to remove a webhook not owned by this run")
+                  owned = info.url == webhook_url
+                  with SessionLocal() as db:
+                      config = crud_telegram.get_telegram_config(db)
+                      if config and config.webhook_url not in (None, "", webhook_url):
+                          raise SystemExit("refusing to clear another webhook configuration")
+                      owned = owned or bool(config and config.webhook_url == webhook_url)
+                  if info.url == webhook_url:
+                      await bot.delete_webhook(drop_pending_updates=False)
+                      info = await bot.get_webhook_info()
+                  if info.url:
+                      raise SystemExit("task-owned webhook was not removed")
+                  if owned:
+                      with SessionLocal() as db:
+                          config = crud_telegram.get_telegram_config(db)
+                          if config and config.webhook_url == webhook_url:
+                              crud_telegram.update_telegram_config(
+                                  db, {"webhook_url": None, "webhook_secret": None}
+                              )
+                  if owned and int(info.pending_update_count or 0) != 0:
+                      raise SystemExit("webhook removed; pending updates preserved for investigation")
+                  print("PASS: no foreign webhook changed; task-owned webhook restored if present.")
+                  return
+
+              if mode == "checkpoint":
+                  chat_id = chat_id_from_stdin()
+                  with SessionLocal() as db:
+                      latest_id = db.scalar(select(func.max(TelegramMessage.id)).where(
+                          TelegramMessage.chat_id == chat_id
+                      )) or 0
+                  print(latest_id)
+                  return
+
+              if mode in {"start", "uz", "ru"}:
+                  chat_id = chat_id_from_stdin()
+                  try:
+                      baseline_id = int(sys.argv[3])
+                  except (IndexError, ValueError):
+                      raise SystemExit("phase checkpoint unavailable")
+                  expected = {"start": "ru", "uz": "uz-Latn", "ru": "ru"}[mode]
+                  template = {
+                      "start": "telegram_patient_start_menu",
+                      "uz": "telegram_patient_settings_language_selected",
+                      "ru": "telegram_patient_settings_language_selected",
+                  }[mode]
+                  with SessionLocal() as db:
+                      user = db.scalar(
+                          select(TelegramUser).where(TelegramUser.chat_id == chat_id)
+                      )
+                      reply_id = db.scalar(
+                          select(TelegramMessage.id).where(
+                              TelegramMessage.chat_id == chat_id,
+                              TelegramMessage.message_type == "patient_bot_reply",
+                              TelegramMessage.template_key == template,
+                              TelegramMessage.status == "sent",
+                              TelegramMessage.id > baseline_id,
+                          )
+                      )
+                      ok = bool(
+                          user is not None and user.patient_id is not None
+                          and user.last_activity is not None
+                          and user.language_code == expected and reply_id is not None
+                      )
+                  if not ok:
+                      raise SystemExit(3)
+                  info = await bot.get_webhook_info()
+                  if info.url != webhook_url:
+                      raise SystemExit("task-owned webhook changed during acceptance")
+                  print("PASS: synthetic patient menu update acknowledged for requested language phase.")
+                  return
+
+              if mode == "empty-queue":
+                  info = await bot.get_webhook_info()
+                  if info.url != webhook_url:
+                      raise SystemExit("task-owned webhook changed during acceptance")
+                  if int(info.pending_update_count or 0) != 0:
+                      raise SystemExit(3)
+                  print("PASS: Telegram pending update queue is empty.")
+                  return
+
+              raise SystemExit("unknown staging menu acceptance phase")
+
+          asyncio.run(run())
+          PY
+            chmod 600 "$d/menu-webhook.py"
+          fi
+
           connector=
+          webhook_url="$origin/api/v1/telegram/webhook"
+          cleanup_menu_webhook() {
+            [[ "$RUN_MENU_ACCEPTANCE" == true && -f "$d/menu-webhook-owned" ]] || return 0
+            if [[ ! -s "$d/menu-webhook.py" ]] ||
+              ! "$d/compose" exec -T backend python -c "$(cat "$d/menu-webhook.py")" cleanup "$webhook_url" >/dev/null 2>&1; then
+              echo '::error::Could not restore the task-owned staging webhook; pending updates were not discarded.'
+              return 1
+            fi
+            rm -f -- "$d/menu-webhook-owned"
+            printf 'Task-owned Telegram webhook restored to its preflight unset state.\n' >> "$GITHUB_STEP_SUMMARY"
+          }
           cleanup_connector() {
             local result=$? stopped=false
             trap - EXIT
+            cleanup_menu_webhook || result=1
             if [[ -n "$connector" ]]; then
               kill -TERM "$connector" 2>/dev/null || true
               for _ in {1..10}; do
@@ -1302,6 +1902,56 @@ jobs:
           grep -iE '^content-security-policy:.*https://telegram\.org/js/telegram-web-app\.js' "$d/public.headers" >/dev/null
           grep -qiE '^cross-origin-embedder-policy: require-corp' "$d/public.headers"
           grep -qiE '^cache-control:.*no-store' "$d/public.headers"
+          if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
+            if [[ ! "$STAGING_TELEGRAM_CHAT_ID" =~ ^[1-9][0-9]{0,15}$ ]]; then
+              echo '::error::A verified private STAGING_TELEGRAM_CHAT_ID is required in staging-integrations.'
+              exit 1
+            fi
+            touch "$d/menu-webhook-owned"
+            if ! printf '%s\n' "$STAGING_TELEGRAM_CHAT_ID" | \
+              "$d/compose" exec -T backend python -c "$(cat "$d/menu-webhook.py")" setup "$webhook_url" >/dev/null 2>&1; then
+              echo '::error::Staging bot, private chat, webhook preflight or exact webhook setup failed; cleanup will preserve unrelated state.'
+              exit 1
+            fi
+            printf '### Native Telegram patient menu ready\n\nOpen `@kosmed_staging_bot` in the approved private staging chat and send `/start`. Confirm the Russian main menu. Open Settings, select `O\047zbekcha`, confirm the Uzbek menu, then return to Settings and select `Русский` to restore Russian. Do not send contact details or clinical information. The acceptance window is 20 minutes.\n' >> "$GITHUB_STEP_SUMMARY"
+            printf 'Verified HTTPS and task-owned webhook are ready; waiting for three synthetic menu phases.\n'
+            deadline=$((SECONDS + 1200))
+            for phase in start uz ru; do
+              phase_baseline=$(printf '%s\n' "$STAGING_TELEGRAM_CHAT_ID" | \
+                "$d/compose" exec -T backend python -c "$(cat "$d/menu-webhook.py")" checkpoint "$webhook_url")
+              while :; do
+                set +e
+                printf '%s\n' "$STAGING_TELEGRAM_CHAT_ID" | \
+                  "$d/compose" exec -T backend python -c "$(cat "$d/menu-webhook.py")" "$phase" "$webhook_url" "$phase_baseline" >/dev/null 2>&1
+                phase_status=$?
+                set -e
+                if [[ "$phase_status" == 0 ]]; then
+                  break
+                fi
+                if [[ "$phase_status" != 3 ]] || (( SECONDS >= deadline )); then
+                  echo "::error::Native Telegram menu phase '$phase' did not pass before the bounded window expired."
+                  exit 1
+                fi
+                sleep 5
+              done
+            done
+            queue_ready=false
+            for _ in {1..30}; do
+              set +e
+              "$d/compose" exec -T backend python -c "$(cat "$d/menu-webhook.py")" empty-queue "$webhook_url" >/dev/null 2>&1
+              queue_status=$?
+              set -e
+              if [[ "$queue_status" == 0 ]]; then queue_ready=true; break; fi
+              if [[ "$queue_status" != 3 ]]; then
+                echo '::error::Could not verify the task-owned Telegram queue state.'
+                exit 1
+              fi
+              sleep 2
+            done
+            [[ "$queue_ready" == true ]] || { echo '::error::Telegram still reports pending staging updates; cleanup will preserve them.'; exit 1; }
+            printf 'Telegram /start and RU → UZ → RU webhook phases acknowledged on exact PR #4271 SHA `%s`; pending queue empty. Visual menu labels require operator confirmation.\n' "$REVIEWED_SHA" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           if [[ "$RUN_ARQ_ACCEPTANCE" == true ]]; then
             for staff_route in /api/v1/telegram/onboarding/requests /api/v1/telegram/onboarding/requests/1/link-existing; do
               test "$(http_status "$staff_route")" = 404

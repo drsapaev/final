@@ -93,16 +93,15 @@ The preflight checks Compose configuration with a
 synthetic marker and does not start containers or use GitHub Environment
 secrets, HTTPS or the Telegram API. It cannot produce native acceptance.
 
-The separate GitHub Environment `staging-miniapp-pr` is for a future
-reviewed live job scoped to the explicitly allowed branch. Do not add or
-use a real token until the exact credential-consuming workflow, isolated
-runner and staging HTTPS endpoint have been reviewed. The host-only Codex
-Cloud Bot API secret cannot verify Mini App signatures locally. In a live
-run, supply the staging credential only to the isolated backend from the
-approved secret store. Do not start the worker: the base Compose file
-also maps `TELEGRAM_BOT_TOKEN` into that service. Use a fresh synthetic
-patient and record the exact tested SHA, native result and teardown.
-Do not reuse the reminder workflow or production credentials.
+The reviewed live job uses the protected GitHub Environment
+`staging-integrations`. Do not add or use a real token until the exact
+credential-consuming workflow, isolated runner and staging HTTPS endpoint
+have been reviewed. The host-only Codex Cloud Bot API secret cannot verify
+Mini App signatures locally. In a live run, supply the staging credential only
+to the isolated backend from the approved secret store. Do not start the
+worker: the base Compose file also maps `TELEGRAM_BOT_TOKEN` into that service.
+Use a fresh synthetic patient and record the exact tested SHA, native result
+and teardown. Do not reuse the reminder workflow or production credentials.
 
 For PR #4195, the reviewed **Mini App native staging acceptance**
 workflow can supplement an exact-SHA Cloud run that is otherwise complete.
@@ -137,13 +136,41 @@ Dispatch only with explicit authorization for the approved private test
 recipient and the single reminder. The result supplements the exact-SHA
 Cloud run with the Telegram evidence described below.
 
-When the run summary says native onboarding is ready, use the approved
-Telegram identity in the staging bot's Mini App. In Appointments submit the
-synthetic contact `SYNTHETIC staging`, phone `+998000000000` and tomorrow's
-date with the default `09:30` time. Leave the other optional fields empty.
-Once the review links the synthetic patient, return to Cabinet in the same
-Mini App and confirm it renders. Do not submit real patient information or
-paste Telegram authentication data.
+For PR #4271 patient-menu acceptance, use the bounded
+`pr-4271-patient-menu` mode from the exact `codex/telegram-patient-menu` head.
+The workflow verifies that PR #4271 is open, Ready for review, same-repository,
+and at the dispatched SHA; it also verifies the feature head includes the
+current `main`. The protected `staging-integrations` environment currently
+allows `main` only. For this one run, add only `codex/telegram-patient-menu`
+alongside `main`, then remove that exact temporary branch policy and verify
+that `main` is the sole allowed branch again. Never replace the allowlist with
+`*`, a pattern, or a pull-request rule, and do not change repository branch
+protection. If the current environment policy cannot be read back or restored,
+stop before dispatch or report the failed restoration and keep the environment
+blocked.
+
+The native menu job builds only the exact PR SHA in a fresh synthetic stack.
+It checks the Telegram bot and approved private chat from the backend process,
+then reads getWebhookInfo; it stops unless the webhook URL is empty and the
+pending-update count is zero. The bot token remains in the backend container.
+No worker or polling process starts, and this check never calls getUpdates.
+The backend reaches only api.telegram.org:443 through a fixed-IP TLS relay;
+the webhook proxy has no Telegram token or public port and forwards only
+allowlisted menu commands from the approved private chat. It replaces Telegram
+profile fields with a synthetic name and removes usernames before forwarding.
+Messages from any other chat, unsupported buttons, contacts and free text are
+not forwarded; the proxy returns a retryable error and cleanup preserves any
+pending updates. The public HTTPS route allows only the exact webhook POST.
+After the route is verified, the backend sets a task-owned webhook with
+allowed_updates limited to messages, one connection, and
+drop_pending_updates=false. The isolated database stores the matching secret.
+The operator sends /start in the approved private staging chat, verifies the
+Russian menu, opens Settings, changes language to Uzbek, verifies the Uzbek
+menu, and switches back to Russian. The workflow requires a newly recorded
+successful bot reply after each action and checks the synthetic profile's
+language transition. Do not share a phone number, contact, medical detail,
+free-text response, or real patient record. Telegram's pending queue must be
+empty; the visible menu labels still require the operator's confirmation.
 
 The test checks canonical linkage and a signed cabinet access audit, closes
 the HTTPS ingress, and processes one versioned synthetic reminder through

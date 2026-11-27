@@ -10,9 +10,10 @@ on:
           - pr-4118-sessions
           - pr-4195-arq-reminder
           - pr-4251-arq-reminder
+          - pr-4271-patient-menu
         default: pr-4118-sessions
       source-sha:
-        description: Full reviewed PR HEAD SHA for the selected ARQ acceptance
+        description: Full reviewed PR HEAD SHA for the selected acceptance
         type: string
         required: false
 
@@ -24,7 +25,10 @@ concurrency:
 
 jobs:
   native-acceptance:
-    if: github.repository == 'drsapaev/final' && github.ref == 'refs/heads/main'
+    if: >-
+      github.repository == 'drsapaev/final' &&
+      ((github.ref == 'refs/heads/main' && inputs.acceptance != 'pr-4271-patient-menu') ||
+       (github.ref == 'refs/heads/codex/telegram-patient-menu' && inputs.acceptance == 'pr-4271-patient-menu'))
     permissions:
       pull-requests: read
     uses: ./.github/workflows/staging-miniapp-pr.yml
@@ -33,6 +37,7 @@ jobs:
       native-live: ${{ inputs.acceptance == 'pr-4118-sessions' }}
       native-arq: ${{ inputs.acceptance == 'pr-4195-arq-reminder' || inputs.acceptance == 'pr-4251-arq-reminder' }}
       native-lab-arq: ${{ inputs.acceptance == 'pr-4251-arq-reminder' }}
+      native-menu: ${{ inputs.acceptance == 'pr-4271-patient-menu' }}
     secrets:
       STAGING_TELEGRAM_BOT_TOKEN: ${{ secrets.STAGING_TELEGRAM_BOT_TOKEN }}
       STAGING_TELEGRAM_CHAT_ID: ${{ secrets.STAGING_TELEGRAM_CHAT_ID }}
