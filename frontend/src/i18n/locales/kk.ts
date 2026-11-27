@@ -6857,6 +6857,7 @@ const kk = {
     visit_completion_call_next_option: 'Қабылдау аяқталған соң келесі пациентті шақыру',
     visit_completed_next_patient_called: 'Келесі пациент шақырылды.',
     visit_completed_no_next_patient: 'Қабылдау аяқталды. Шақыратын пациент жоқ.',
+    queue_called_display_unconfirmed: 'Науқас шақырылды. Хабарландыру барлық таблода расталмады.',
     visit_completed_call_next_unconfirmed: 'Қабылдау аяқталды. Келесі пациенттің шақырылғаны расталмады. Қайта шақырмас бұрын кезекті тексеріңіз.',
     delete: 'Удалить',
     cancel: 'Отмена',

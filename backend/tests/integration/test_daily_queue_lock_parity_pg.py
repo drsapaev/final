@@ -64,10 +64,12 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import Mock
+from functools import partial
+from unittest.mock import AsyncMock, Mock
 
+import anyio
 import pytest
-from fastapi import BackgroundTasks, HTTPException
+from fastapi import HTTPException
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
@@ -876,7 +878,7 @@ def test_graphql_v1_last_slot_is_serialized_and_duplicate_does_not_respend(
 
 
 @pytest.mark.integration
-def test_direct_call_schedules_one_display_delivery(lock_parity_engine, monkeypatch):
+def test_direct_call_sends_once_after_commit(lock_parity_engine, monkeypatch):
     engine = lock_parity_engine
     doctor_id = _seed_doctor(engine)
     suffix = uuid.uuid4().hex
@@ -907,8 +909,24 @@ def test_direct_call_schedules_one_display_delivery(lock_parity_engine, monkeypa
         setup.commit()
 
     prepare = Mock(return_value=({"type": "synthetic"}, ["synthetic-display"]))
-    monkeypatch.setattr(get_display_manager(), "prepare_patient_call", prepare)
+    manager = get_display_manager()
+    monkeypatch.setattr(manager, "prepare_patient_call", prepare)
+
+    async def verify_committed_before_send(message, *, board_ids):
+        with Session(engine) as observer:
+            committed = observer.get(OnlineQueueEntry, entry_id)
+            assert committed.status == "called"
+            assert committed.called_by_user_id == caller_ids[0]
+        return {board_ids[0]: "published_only"}
+
+    send = AsyncMock(side_effect=verify_committed_before_send)
+    monkeypatch.setattr(manager, "broadcast_patient_call_data", send)
     standby_name = f"test-doctor-call-{suffix}"
+
+    async def call_on_worker(db, caller):
+        return await anyio.to_thread.run_sync(
+            partial(call_patient, entry_id, db=db, current_user=caller)
+        )
 
     def call_again():
         with Session(engine) as db:
@@ -917,13 +935,8 @@ def test_direct_call_schedules_one_display_delivery(lock_parity_engine, monkeypa
                 {"name": standby_name},
             )
             assert db.get(OnlineQueueEntry, entry_id).status == "waiting"
-            tasks = BackgroundTasks()
             with pytest.raises(HTTPException) as denied:
-                call_patient(
-                    entry_id, db=db, current_user=db.get(User, caller_ids[1]),
-                    background_tasks=tasks,
-                )
-            assert tasks.tasks == []
+                anyio.run(call_on_worker, db, db.get(User, caller_ids[1]))
             return denied.value.status_code
 
     with ThreadPoolExecutor(max_workers=1) as pool, Session(engine) as first:
@@ -948,16 +961,13 @@ def test_direct_call_schedules_one_display_delivery(lock_parity_engine, monkeypa
             else:
                 pytest.fail("The second call did not reach the entry lock")
 
-        tasks = BackgroundTasks()
-        result = call_patient(
-            entry_id, db=first, current_user=first.get(User, caller_ids[0]),
-            background_tasks=tasks,
-        )
+        result = anyio.run(call_on_worker, first, first.get(User, caller_ids[0]))
         assert result["success"]
-        assert len(tasks.tasks) == 1
+        assert result["display_delivery"] == "published_only"
         assert pending.result(timeout=8) == 400
 
     assert prepare.call_count == 1
+    send.assert_awaited_once_with({"type": "synthetic"}, board_ids=["synthetic-display"])
     with Session(engine) as check:
         entry = check.get(OnlineQueueEntry, entry_id)
         assert entry.status == "called"

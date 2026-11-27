@@ -416,3 +416,114 @@ async def test_boards_status_zero_local_sockets_is_unknown_not_offline(
     assert by_name["other_board"]["websocket_connections"] == 0
     assert by_name["other_board"]["online_scope"] == "worker_local"
     assert result["connections_scope"] == "worker_local"
+
+
+@pytest.mark.asyncio
+async def test_stalled_socket_does_not_block_another_socket_in_the_same_room(
+    monkeypatch,
+):
+    delivered = asyncio.Event()
+    trace = []
+    recovered = False
+
+    class Stalled:
+        async def send_text(self, _payload):
+            if recovered:
+                trace.append("recovered")
+                return
+            try:
+                await asyncio.wait_for(delivered.wait(), 0.4)
+                await asyncio.sleep(0.8)
+            finally:
+                trace.append("stall-ended")
+
+    class Healthy:
+        async def send_text(self, _payload):
+            trace.append("healthy")
+            delivered.set()
+
+    class OrderedRoom(set):
+        def __iter__(self):
+            yield stalled
+            yield healthy
+
+        def copy(self):
+            return list(self)
+
+    stalled, healthy = Stalled(), Healthy()
+    manager = DisplayWebSocketManager(pubsub=_SilentBridge())
+    manager.connections["synthetic-board"] = OrderedRoom((stalled, healthy))
+    monkeypatch.setattr(
+        service_module, "DISPLAY_SOCKET_SEND_TIMEOUT_SECONDS", 0.06, raising=False
+    )
+    assert (
+        await manager._broadcast_to_board_local("synthetic-board", {"type": "ping"})
+        == 1
+    )
+    assert trace == ["healthy", "stall-ended"]
+    recovered = True
+    assert (
+        await manager._broadcast_to_board_local("synthetic-board", {"type": "next"})
+        == 2
+    )
+    assert trace.count("recovered") == 1
+
+
+@pytest.mark.asyncio
+async def test_cancelled_control_subscribe_does_not_leave_phantom_registration():
+    entered = asyncio.Event()
+
+    class Bridge:
+        def __init__(self):
+            self.handlers = set()
+            self.attempts = 0
+
+        async def subscribe(self, _channel, handler):
+            if handler in self.handlers:
+                return True  # bridge deduplicates the same handler
+            self.handlers.add(handler)
+            self.attempts += 1
+            if self.attempts == 1:
+                entered.set()
+                await asyncio.Event().wait()
+            return True
+
+        async def unsubscribe(self, _channel, handler):
+            self.handlers.discard(handler)
+
+    bridge = Bridge()
+    manager = DisplayWebSocketManager(pubsub=bridge)
+    first = asyncio.create_task(manager._ensure_nameformat_ctl_subscription())
+    await asyncio.wait_for(entered.wait(), 0.5)
+    second = asyncio.create_task(manager._ensure_nameformat_ctl_subscription())
+    await asyncio.sleep(0)
+    first.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await first
+    await asyncio.wait_for(second, 0.5)
+    assert bridge.attempts == 2
+    assert len(bridge.handlers) == 1
+    assert manager._nameformat_ctl_ok is True
+
+
+@pytest.mark.asyncio
+async def test_call_target_deadline_preserves_other_target_and_does_not_retry(
+    monkeypatch,
+):
+    manager = DisplayWebSocketManager(pubsub=_SilentBridge())
+    sends = []
+
+    async def send(target, _message):
+        sends.append(target)
+        if target == "slow-relay":
+            await asyncio.sleep(0.8)
+        return "delivered_local"
+
+    monkeypatch.setattr(manager, "broadcast_to_board", send)
+    monkeypatch.setattr(
+        service_module, "DISPLAY_CALL_TARGET_TIMEOUT_SECONDS", 0.06, raising=False
+    )
+    assert await manager.broadcast_patient_call_data(
+        {"type": "patient_call"}, ["slow-relay", "healthy", "slow-relay"]
+    ) == {"slow-relay": "failed", "healthy": "delivered_local"}
+    assert sends == ["slow-relay", "healthy"]

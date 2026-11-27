@@ -5,7 +5,9 @@ Split from doctor_integration.py (1900 LOC god file → modular).
 
 from __future__ import annotations
 
-from fastapi import BackgroundTasks
+from functools import partial
+
+from anyio import from_thread
 
 from app.api.v1.endpoints.doctor_integration._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
@@ -27,6 +29,7 @@ from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     _visit_filter_doctor_id,
     router,
 )
+from app.crud.queue_call_order import waiting_call_order
 from app.crud.visit_appointment_pairing import (
     AmbiguousAppointmentPairingError,
     move_paired_appointment_to_day,
@@ -206,14 +209,25 @@ def get_doctor_queue_today(
                 "next_call_entry_id": None,
             }
 
-        # Получаем записи очереди
         queue_ids = [queue.id for queue in daily_queues]
+        callable_queue_ids = {queue.id for queue in daily_queues if queue.active}
         entries = (
             db.query(OnlineQueueEntry)
             .filter(OnlineQueueEntry.queue_id.in_(queue_ids))
-            .order_by(OnlineQueueEntry.queue_id.asc(), OnlineQueueEntry.number.asc())
+            .order_by(*waiting_call_order())
             .all()
         )
+        # The candidate belongs to the same snapshot as the entries. Keep
+        # the visible table grouped by queue and printed ticket as before.
+        next_call_entry_id = next(
+            (
+                entry.id
+                for entry in entries
+                if entry.status == "waiting" and entry.queue_id in callable_queue_ids
+            ),
+            None,
+        )
+        entries.sort(key=lambda entry: (entry.queue_id, entry.number, entry.id))
 
         requires_emr = requires_saved_emr(normalized_specialty)
         saved_emr_pairs: set[tuple[int, int]] = set()
@@ -228,9 +242,7 @@ def get_doctor_queue_today(
             )
 
         # Формируем данные для врача
-        active_queue_ids = {queue.id for queue in daily_queues if queue.active}
         queue_entries = []
-        next_call_entry_id = None
         for entry in entries:
             available_actions = _doctor_queue_available_actions(entry)
             action_flags = _doctor_queue_action_flags(entry)
@@ -242,11 +254,9 @@ def get_doctor_queue_today(
                     action for action in available_actions if action != "complete"
                 ]
                 action_flags["can_complete"] = False
-            if entry.queue_id not in active_queue_ids:
+            if entry.queue_id not in callable_queue_ids and action_flags["can_call"]:
                 available_actions = [action for action in available_actions if action != "call"]
                 action_flags["can_call"] = False
-            if next_call_entry_id is None and action_flags["can_call"]:
-                next_call_entry_id = entry.id
 
             patient_data = None
             if entry.patient:
@@ -577,8 +587,6 @@ def call_patient(
             "Lab",
         )
     ),
-    *,
-    background_tasks: BackgroundTasks = None,
 ):
     """
     Вызвать пациента в кабинет
@@ -669,7 +677,6 @@ def call_patient(
                 detail="Очередь неактивна — вызов недоступен",
             )
 
-        # Обновляем статус на "вызван"
         if "call" not in _doctor_queue_available_actions(queue_entry):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -677,64 +684,104 @@ def call_patient(
             )
 
         changed_at = datetime.now(UTC)
-        queue_entry.status = "called"
-        queue_entry.called_at = changed_at
-        # QF-1 (operator attribution): the doctor-panel call surface keeps
-        # the caller identity, same as the canonical call-next service.
-        queue_entry.called_by_user_id = current_user.id
-        queue_entry.updated_at = changed_at
-
+        ticket_number = queue_entry.number
+        # A read-then-write is not enough: two workers may both see waiting.
+        # Compete atomically before any announcement or successful reply.
+        changed = (
+            db.query(OnlineQueueEntry)
+            .filter(
+                OnlineQueueEntry.id == entry_id,
+                OnlineQueueEntry.queue_id == daily_queue.id,
+                OnlineQueueEntry.status == "waiting",
+                OnlineQueueEntry.queue.has(DailyQueue.active.is_(True)),
+            )
+            .update(
+                {
+                    OnlineQueueEntry.status: "called",
+                    OnlineQueueEntry.called_at: changed_at,
+                    OnlineQueueEntry.called_by_user_id: current_user.id,
+                    OnlineQueueEntry.updated_at: changed_at,
+                },
+                synchronize_session=False,
+            )
+        )
+        if changed != 1:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Состояние очереди уже изменилось",
+            )
         db.commit()
-        db.refresh(queue_entry)
 
-        # FastAPI supplies the task runner for HTTP requests.
-        if background_tasks is not None:
-            try:
-                from app.services.display_websocket import get_display_manager
+        # FastAPI runs this sync endpoint in an AnyIO worker. Build the
+        # masked payload while ORM data and board policy are readable here,
+        # then cross to the app event loop with only the plain payload.
+        display_delivery = "unconfirmed"
+        called_at_iso = changed_at.isoformat()
+        updated_at_iso = called_at_iso
+        try:
+            from app.services.display_websocket import get_display_manager
 
-                manager = get_display_manager()
-                if doctor is not None:
-                    doctor_name = (
-                        doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
-                    )
-                    cabinet = doctor.cabinet
+            db.refresh(queue_entry)
+            # Reuse the persisted representation used by the board payload.
+            # Legacy database columns may return timezone-naive UTC values.
+            called_at_iso = (
+                queue_entry.called_at.isoformat() if queue_entry.called_at else called_at_iso
+            )
+            updated_at_iso = (
+                queue_entry.updated_at.isoformat() if queue_entry.updated_at else None
+            )
+            manager = get_display_manager()
+            if doctor is not None:
+                doctor_name = (
+                    doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
+                )
+                cabinet = doctor.cabinet
+            else:
+                resource = daily_queue.queue_resource
+                doctor_name = (
+                    resource.display_name if resource is not None else "Ресурс очереди"
+                )
+                cabinet = daily_queue.cabinet_number or (
+                    resource.default_cabinet if resource is not None else None
+                )
+
+            call_message, board_ids = manager.prepare_patient_call(
+                queue_entry, doctor_name, cabinet
+            )
+            statuses = from_thread.run(
+                partial(
+                    manager.broadcast_patient_call_data, call_message, board_ids=board_ids
+                )
+            )
+            target_outcomes = {statuses.get(board) for board in board_ids}
+            accepted = {"delivered_local", "published_only"}
+            if target_outcomes & accepted:
+                if target_outcomes - accepted:
+                    display_delivery = "partial"
+                elif "delivered_local" in target_outcomes:
+                    # At least one local socket accepted it; no screen ACK.
+                    display_delivery = "delivered_local"
                 else:
-                    # Resource-owned queues use the registry name and cabinet.
-                    resource = daily_queue.queue_resource
-                    doctor_name = (
-                        resource.display_name if resource is not None else "Ресурс очереди"
-                    )
-                    cabinet = daily_queue.cabinet_number or (
-                        resource.default_cabinet if resource is not None else None
-                    )
-
-                # Load queue relations while the request session is still open.
-                message, board_ids = manager.prepare_patient_call(
-                    queue_entry, doctor_name, cabinet
-                )
-                background_tasks.add_task(
-                    manager.broadcast_patient_call_data, message, board_ids=board_ids
-                )
-
-            except Exception as ws_error:
-                logger.warning(
-                    "Не удалось подготовить вызов для табло, тип ошибки %s",
-                    type(ws_error).__name__,
-                )
+                    display_delivery = "published_only"
+        except Exception as ws_error:
+            # A failed announcement never reverses the committed call or
+            # invites an unsafe retry. Do not log patient or board details.
+            logger.warning(
+                "Doctor queue display announcement unconfirmed (%s)",
+                type(ws_error).__name__,
+            )
 
         return {
             "success": True,
-            "message": f"Пациент #{queue_entry.number} вызван в кабинет",
+            "message": f"Пациент #{ticket_number} вызван в кабинет",
+            "display_delivery": display_delivery,
             "entry": {
-                "id": queue_entry.id,
-                "number": queue_entry.number,
-                "status": queue_entry.status,
-                "called_at": queue_entry.called_at.isoformat(),
-                "updated_at": (
-                    queue_entry.updated_at.isoformat()
-                    if queue_entry.updated_at
-                    else None
-                ),
+                "id": entry_id,
+                "number": ticket_number,
+                "status": "called",
+                "called_at": called_at_iso,
+                "updated_at": updated_at_iso,
             },
         }
 

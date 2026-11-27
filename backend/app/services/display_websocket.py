@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 # invalidation still clears entries immediately; resolver failures are never
 # cached and resolve fail-closed to 'none' (DISPLAYPRIVACY-BE-002).
 NAME_FORMAT_CACHE_TTL_SECONDS = 30.0
+DISPLAY_SOCKET_SEND_TIMEOUT_SECONDS = 1.0
+DISPLAY_CALL_TARGET_TIMEOUT_SECONDS = 2.0
+DISPLAY_CONTROL_ROLLBACK_TIMEOUT_SECONDS = 0.25
 
 
 class DisplayWebSocketManager:
@@ -135,20 +138,25 @@ class DisplayWebSocketManager:
         # broadcast-путей — кэш-записи без подписки не должны терять
         # control-сообщения инвалидации).
         await self._ensure_nameformat_ctl_subscription()
+        had_local_targets = bool(self.connections.get(board_id))
         try:
             sent = await self._broadcast_to_board_local(board_id, message)
             if not isinstance(sent, int):
                 sent = int(sent or 0)
         except Exception as e:
-            logger.error(f"Ошибка локальной отправки для табло {board_id}: {e}")
+            logger.warning("Display local broadcast failed: %s", type(e).__name__)
             return "failed"
         try:
-            await self._pubsub.publish(self._board_channel(board_id), message)
+            published = await self._pubsub.publish(
+                self._board_channel(board_id), message
+            )
         except Exception as e:
-            logger.error(f"Ошибка publish для табло {board_id}: {e}")
+            logger.warning("Display relay publish failed: %s", type(e).__name__)
             return "failed"
         if sent > 0:
             return "delivered_local"
+        if had_local_targets and not published:
+            return "failed"
         return "published_only"
 
     def _board_channel(self, board_id: str) -> str:
@@ -201,26 +209,28 @@ class DisplayWebSocketManager:
             "last_update": datetime.now(UTC).isoformat(),
         }
 
-        # Отправляем всем подключенным
-        disconnected = set()
-        sent = 0
-        for websocket in self.connections[board_id].copy():
+        payload = json.dumps(message, ensure_ascii=False)
+
+        async def send_one(websocket: WebSocket) -> bool:
             try:
-                await websocket.send_text(json.dumps(message, ensure_ascii=False))
-                sent += 1
+                async with asyncio.timeout(DISPLAY_SOCKET_SEND_TIMEOUT_SECONDS):
+                    await websocket.send_text(payload)
+                return True
+            except TimeoutError:
+                # Do not retry this ambiguous send. A later event may use
+                # the same socket if it recovered without disconnecting.
+                return False
             except WebSocketDisconnect:
-                disconnected.add(websocket)
-            except Exception as e:
-                logger.error(f"Ошибка отправки WebSocket сообщения: {e}")
-                disconnected.add(websocket)
+                pass
+            except Exception as exc:
+                logger.warning("Display socket send failed: %s", type(exc).__name__)
+            room = self.connections.get(board_id)
+            if room is not None:
+                room.discard(websocket)
+            return False
 
-        # Удаляем отключенные соединения
-        for ws in disconnected:
-            self.connections[board_id].discard(ws)
-
-        if disconnected:
-            logger.info(f"Удалено {len(disconnected)} отключенных соединений")
-        return sent
+        sockets = self.connections[board_id].copy()
+        return sum(await asyncio.gather(*(send_one(ws) for ws in sockets)))
 
     def build_patient_call_message(
         self,
@@ -349,19 +359,26 @@ class DisplayWebSocketManager:
             if board_ids is None:
                 board_ids = self._resolve_untargeted_board_ids()
 
-            # Отправляем на указанные табло
-            for board_id in board_ids:
-                statuses[board_id] = await self.broadcast_to_board(
-                    board_id, call_message
-                )
+            targets = list(dict.fromkeys(board_ids))
 
-            logger.info(
-                f"Вызов пациента #{call_message['data']['queue_number']} "
-                f"отправлен на {len(board_ids)} табло"
+            async def deliver(board_id: str) -> str:
+                try:
+                    async with asyncio.timeout(DISPLAY_CALL_TARGET_TIMEOUT_SECONDS):
+                        return await self.broadcast_to_board(board_id, call_message)
+                except Exception as exc:
+                    # No retry: delivery may already have reached a socket.
+                    logger.warning(
+                        "Display call target unconfirmed: %s", type(exc).__name__
+                    )
+                    return "failed"
+
+            outcomes = await asyncio.gather(
+                *(deliver(board_id) for board_id in targets)
             )
+            statuses = dict(zip(targets, outcomes, strict=True))
 
         except Exception as e:
-            logger.error(f"Ошибка трансляции вызова пациента: {e}")
+            logger.warning("Display call broadcast failed: %s", type(e).__name__)
         return statuses
 
     async def broadcast_patient_call(
@@ -856,28 +873,42 @@ class DisplayWebSocketManager:
         """
         if getattr(self, "_nameformat_ctl_ok", False):
             return
-        handler = getattr(self, "_nameformat_ctl_handler", None)
-        if handler is None:
-            handler = self._handle_nameformat_ctl
-            self._nameformat_ctl_handler = handler
-        try:
-            ok = bool(
-                await self._pubsub.subscribe(self.NAMEFORMAT_CTL_CHANNEL, handler)
-            )
-        except Exception as e:
-            logger.error(
-                "DISPLAYPRIVACY-BE-001: подписка control-канала формата "
-                f"имён не удалась: {e}"
-            )
+        lock = getattr(self, "_nameformat_ctl_lock", None)
+        if lock is None:
+            lock = self._nameformat_ctl_lock = asyncio.Lock()
+        async with lock:
+            if getattr(self, "_nameformat_ctl_ok", False):
+                return
+            handler = getattr(self, "_nameformat_ctl_handler", None)
+            if handler is None:
+                handler = self._handle_nameformat_ctl
+                self._nameformat_ctl_handler = handler
             ok = False
-        if not ok:
-            # Откат bridge-level регистрации (если мост не сделал это сам):
-            # без него повторная попытка того же обработчика — ложный успех.
             try:
-                await self._pubsub.unsubscribe(self.NAMEFORMAT_CTL_CHANNEL, handler)
-            except Exception:
-                pass
-        self._nameformat_ctl_ok = ok
+                ok = bool(
+                    await self._pubsub.subscribe(self.NAMEFORMAT_CTL_CHANNEL, handler)
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Display privacy control subscribe failed: %s", type(exc).__name__
+                )
+            finally:
+                if not ok:
+                    # subscribe() can register the handler before its first
+                    # network await. Roll it back before a waiter may retry.
+                    try:
+                        async with asyncio.timeout(
+                            DISPLAY_CONTROL_ROLLBACK_TIMEOUT_SECONDS
+                        ):
+                            await self._pubsub.unsubscribe(
+                                self.NAMEFORMAT_CTL_CHANNEL, handler
+                            )
+                    except Exception as exc:
+                        logger.warning(
+                            "Display privacy control rollback failed: %s",
+                            type(exc).__name__,
+                        )
+            self._nameformat_ctl_ok = ok
 
     async def _handle_nameformat_ctl(self, payload: dict) -> None:
         """Обработчик control-сообщений инвалидации кэша формата имён."""

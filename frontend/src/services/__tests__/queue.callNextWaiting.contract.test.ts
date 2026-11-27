@@ -91,6 +91,25 @@ describe('QAPI-FE-001: the server null choice is not second-guessed', () => {
     expect(postedCallUrls()).toEqual([]);
   });
 
+  it.each(['unconfirmed', 'partial', 'published_only', 'delivered_local'] as const)(
+    'retains %s display transport without retrying a committed call',
+    async (delivery) => {
+      fetchMock.mockImplementation(async (input) => {
+        if (String(input).includes('/queue/today')) {
+          return queueResponse({ next_call_entry_id: 17, entries: [CALLABLE_ENTRY] });
+        }
+        return queueResponse({
+          success: true, display_delivery: delivery,
+          entry: { id: 17, number: 'A017', status: 'called' },
+        });
+      });
+      await expect(queueService.callNextWaiting('cardiology')).resolves.toMatchObject({
+        success: true, displayDelivery: delivery, entry: { id: 17, status: 'called' },
+      });
+      expect(postedCallUrls()).toHaveLength(1);
+    },
+  );
+
   it('a valid canonical id is the only entry called', async () => {
     fetchMock.mockImplementation(async (input) => {
       const url = String(input);

@@ -6857,6 +6857,7 @@ const uzLatn = {
     visit_completion_call_next_option: 'Qabul tugagach, keyingi bemorni chaqirish',
     visit_completed_next_patient_called: 'Keyingi bemor chaqirildi.',
     visit_completed_no_next_patient: 'Qabul yakunlandi. Chaqirish mumkin bo‘lgan bemor yo‘q.',
+    queue_called_display_unconfirmed: 'Bemor chaqirildi. E’lon barcha tablolarda tasdiqlanmadi.',
     visit_completed_call_next_unconfirmed: 'Qabul yakunlandi. Keyingi bemor chaqirilgani tasdiqlanmadi. Qayta chaqirishdan oldin navbatni tekshiring.',
     delete: 'Удалить',
     cancel: 'Отмена',

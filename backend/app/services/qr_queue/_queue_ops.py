@@ -13,6 +13,7 @@ from app.crud.daily_queue_creation_policy import (
     evaluate_online_admission_window,
     online_admission_window,
 )
+from app.crud.queue_call_order import waiting_call_order
 from app.crud.queue_resource_routing import (
     find_inactive_daily_queue_for_specialist,
     prefer_registry_surface,
@@ -238,14 +239,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     OnlineQueueEntry.queue_id.in_([q.id for q in candidate_queues]),
                     OnlineQueueEntry.status == "waiting",
                 )
-                .order_by(
-                    OnlineQueueEntry.priority.desc(),
-                    func.coalesce(
-                        OnlineQueueEntry.queue_time,
-                        OnlineQueueEntry.created_at,
-                    ).asc(),
-                    OnlineQueueEntry.id.asc(),
-                )
+                .order_by(*waiting_call_order())
                 .with_for_update()
                 .first()
             )
@@ -271,14 +265,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 OnlineQueueEntry.queue_id == daily_queue.id,
                 OnlineQueueEntry.status == "waiting",
             )
-            .order_by(
-                OnlineQueueEntry.priority.desc(),
-                func.coalesce(
-                    OnlineQueueEntry.queue_time,
-                    OnlineQueueEntry.created_at,
-                ).asc(),
-                OnlineQueueEntry.id.asc(),
-            )
+            .order_by(*waiting_call_order())
             .with_for_update()
             .first()
         )

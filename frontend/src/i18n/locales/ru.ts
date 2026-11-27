@@ -6988,6 +6988,7 @@ const ru = {
     visit_completion_call_next_option: 'Позвать следующего пациента после завершения',
     visit_completed_next_patient_called: 'Следующий пациент вызван.',
     visit_completed_no_next_patient: 'Приём завершён. Нет пациента, доступного для вызова.',
+    queue_called_display_unconfirmed: 'Пациент вызван. Объявление на табло подтверждено не полностью.',
     visit_completed_call_next_unconfirmed: 'Приём завершён. Вызов следующего не подтверждён. Проверьте очередь перед повторным вызовом.',
     delete: 'Удалить',
     cancel: 'Отмена',

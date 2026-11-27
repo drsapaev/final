@@ -1,7 +1,7 @@
 /*  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 const { apiGet, apiPost, loggerInfo, loggerError, tokenGetAccessToken } = vi.hoisted(() => ({
@@ -168,6 +168,24 @@ describe('DoctorQueuePanel', () => {
       '/doctor/cardiology/queue/today',
     ]);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('labels diagnosis, no-show and unknown queue states without treating them as waiting', async () => {
+    apiGet.mockImplementation(async (url: string) => {
+      if (url.endsWith('/my-info')) return { data: { id: 7, specialty: 'cardiology' } };
+      return { data: {
+        queue_exists: true,
+        entries: ['diagnostics', 'no_show', 'incomplete', 'future_status', 'constructor'].map((status, index) => ({
+          id: index + 101, number: index + 1, patient_name: 'SYNTHETIC', status,
+        })),
+      } };
+    });
+    render(<DoctorQueuePanel specialty="cardiology" />);
+    expect(await screen.findByText('На обследовании')).toBeInTheDocument();
+    expect(screen.getByText('Не явился')).toBeInTheDocument();
+    expect(screen.getByText('Не завершён')).toBeInTheDocument();
+    expect(screen.getAllByText('Неизвестно')).toHaveLength(2);
+    expect(screen.queryByText('Ожидает')).not.toBeInTheDocument();
   });
 
   it('does not render queue command buttons from status alone', async () => {

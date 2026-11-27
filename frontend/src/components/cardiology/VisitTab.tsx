@@ -161,7 +161,7 @@ export function VisitTab({
       <Card className="cardio-card-padded">
         <div className="flex justify-end" style={{ gap: 'var(--mac-spacing-3)' }}>
           <Button variant="outline" onClick={onCancel} disabled={loading}>
-            {t(isCompleted ? 'cardio.cardio_visit_back_to_queue' : 'cardio.cardio_visit_cancel')}
+            {t('cardio.cardio_visit_back_to_queue')}
           </Button>
         </div>
       </Card>

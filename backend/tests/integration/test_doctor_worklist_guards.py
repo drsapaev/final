@@ -204,6 +204,7 @@ class TestDoctorWorklistGuards:
         async def record_send(message, board_ids):
             assert asyncio.get_running_loop().is_running()
             effects.append("send")
+            return dict.fromkeys(board_ids, "published_only")
 
         sender = AsyncMock(side_effect=record_send)
         monkeypatch.setattr(manager, "broadcast_patient_call_data", sender)
@@ -218,11 +219,13 @@ class TestDoctorWorklistGuards:
         assert entry.status == "called", entry.status
         assert entry.called_by_user_id == test_doctor_user.id
         assert effects == ["commit", "send"]
+        assert response.json()["display_delivery"] == "published_only"
         name_format.assert_called_once_with(boards)
         assert sender.await_count == 1
         message, = sender.await_args.args
         assert sender.await_args.kwargs == {"board_ids": boards}
         assert message["data"]["queue_entry_id"] == entry.id
         assert message["data"]["called_at"] == response.json()["entry"]["called_at"]
+        assert message["data"]["called_at"] == entry.called_at.isoformat()
         assert message["data"]["patient_name"] == "Пациент"
         assert message["data"]["cabinet"] == doctor.cabinet
