@@ -199,7 +199,10 @@ def assign_specimen(
     responses={
         **WRITE_ERRORS,
         200: {
-            "description": "Issued Code 128 label",
+            "description": (
+                "Issued label using the selected clinic profile (Code128, QR, or "
+                "DataMatrix), or the legacy Code128 stock default"
+            ),
             "content": {
                 "application/pdf": {"schema": {"type": "string", "format": "binary"}}
             },

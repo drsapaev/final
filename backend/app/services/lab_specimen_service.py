@@ -11,9 +11,15 @@ from io import BytesIO
 
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.lab import LabOrder, LabReportInstance
+from app.models.lab import (
+    LabEquipmentIntegrationProfile,
+    LabEquipmentIntegrationProfileVersion,
+    LabOrder,
+    LabReportInstance,
+)
 from app.models.lab_specimen import (
     LabSpecimen,
     LabSpecimenAssignment,
@@ -190,6 +196,7 @@ class LabSpecimenService:
         reason: str | None = None,
         reason_code: LabSpecimenRejectionReasonCode | None = None,
         targets: LabSpecimenTargets | None = None,
+        integration_profile_version_id: int | None = None,
     ) -> None:
         specimen.revision += 1
         self.db.add(
@@ -210,8 +217,61 @@ class LabSpecimenService:
                 report_instance_ids=sorted(set(targets.report_instance_ids))
                 if targets
                 else [],
+                integration_profile_version_id=integration_profile_version_id,
             )
         )
+
+    def _selected_label_profile_version(
+        self,
+    ) -> LabEquipmentIntegrationProfileVersion | None:
+        versions = self.db.scalars(
+            select(LabEquipmentIntegrationProfileVersion)
+            .join(
+                LabEquipmentIntegrationProfile,
+                LabEquipmentIntegrationProfile.id
+                == LabEquipmentIntegrationProfileVersion.profile_id,
+            )
+            .where(
+                LabEquipmentIntegrationProfile.device_role == "label_printer",
+                LabEquipmentIntegrationProfileVersion.status == "ACTIVE",
+            )
+            .order_by(LabEquipmentIntegrationProfileVersion.id)
+        ).all()
+        defaults: list[LabEquipmentIntegrationProfileVersion] = []
+        for version in versions:
+            settings = version.device_settings
+            if not isinstance(settings, dict):
+                raise LabReportingDomainError(409, "Label printer profile is invalid")
+            selected = settings.get("default_for_lab_labels", False)
+            if type(selected) is not bool:
+                raise LabReportingDomainError(409, "Label printer selection is invalid")
+            if selected:
+                defaults.append(version)
+        if len(defaults) > 1:
+            raise LabReportingDomainError(
+                409, "Multiple active label printer profiles are selected"
+            )
+        return defaults[0] if defaults else None
+
+    def _profile_version_for_event(
+        self, event: LabSpecimenEvent
+    ) -> LabEquipmentIntegrationProfileVersion | None:
+        if event.integration_profile_version_id is None:
+            return None
+        version = self.db.get(
+            LabEquipmentIntegrationProfileVersion,
+            event.integration_profile_version_id,
+        )
+        if version is None:
+            raise LabReportingDomainError(
+                409, "Original label printer profile is unavailable"
+            )
+        profile = self.db.get(LabEquipmentIntegrationProfile, version.profile_id)
+        if profile is None or profile.device_role != "label_printer":
+            raise LabReportingDomainError(
+                409, "Original label printer profile is invalid"
+            )
+        return version
 
     def _commit(self) -> None:
         try:
@@ -482,7 +542,13 @@ class LabSpecimenService:
         order = self._get_order(specimen.order_id)
         request_id = str(command.request_id)
         fingerprint = _fingerprint("print_label", command)
-        replayed = self._is_replay(specimen, actor_user_id, request_id, fingerprint)
+        event = self.repository.find_event(specimen.id, request_id)
+        replayed = event is not None
+        if event is not None and (
+            event.actor_user_id != actor_user_id
+            or event.request_fingerprint != fingerprint
+        ):
+            raise LabReportingDomainError(409, "Specimen request already used")
         if not replayed:
             self._check_order_editable(order)
             self._check_revision(specimen, command)
@@ -490,8 +556,15 @@ class LabSpecimenService:
                 raise LabReportingDomainError(
                     409, "Rejected specimen cannot be labeled"
                 )
+        # A request replay uses the immutable printer version captured when its
+        # event was written. A new print pins the clinic's current selection.
+        profile_version = (
+            self._profile_version_for_event(event)
+            if event is not None
+            else self._selected_label_profile_version()
+        )
         # Render before committing that the label was issued.
-        pdf = _render_label(specimen)
+        pdf = _render_label(specimen, profile_version)
         if not replayed:
             self._append_event(
                 specimen,
@@ -500,6 +573,9 @@ class LabSpecimenService:
                 happened_at=datetime.now(UTC),
                 request_id=request_id,
                 fingerprint=fingerprint,
+                integration_profile_version_id=(
+                    profile_version.id if profile_version is not None else None
+                ),
             )
             self._commit()
         return pdf
@@ -563,27 +639,85 @@ class LabSpecimenService:
         return output
 
 
-def _render_label(specimen: LabSpecimen) -> bytes:
+def _render_label(
+    specimen: LabSpecimen,
+    profile_version: LabEquipmentIntegrationProfileVersion | None = None,
+) -> bytes:
     from reportlab.graphics.barcode.code128 import Code128
+    from reportlab.graphics.barcode.ecc200datamatrix import ECC200DataMatrix
+    from reportlab.graphics.barcode.qr import QrCodeWidget
+    from reportlab.graphics.shapes import Drawing
+    from reportlab.graphics import renderPDF
     from reportlab.lib.units import mm
     from reportlab.pdfgen.canvas import Canvas
 
+    settings = profile_version.device_settings if profile_version is not None else {}
+    if not isinstance(settings, dict):
+        raise LabReportingDomainError(409, "Label printer profile is invalid")
+    width_mm = settings.get("label_width_mm", 100)
+    height_mm = settings.get("label_height_mm", 40)
+    symbology = settings.get("barcode_symbology", "Code128")
+    if (
+        type(width_mm) not in {int, float}
+        or type(height_mm) not in {int, float}
+        or not 1 <= width_mm <= 500
+        or not 1 <= height_mm <= 500
+        or symbology not in {"Code128", "QR", "DataMatrix"}
+    ):
+        raise LabReportingDomainError(409, "Label printer output settings are invalid")
+
     buffer = BytesIO()
-    page_width = 100 * mm
-    canvas = Canvas(buffer, pagesize=(page_width, 40 * mm), invariant=True)
+    page_width = float(width_mm) * mm
+    page_height = float(height_mm) * mm
+    canvas = Canvas(buffer, pagesize=(page_width, page_height), invariant=True)
     canvas.setTitle("Specimen label")
-    barcode = Code128(specimen.barcode, barWidth=0.28 * mm, barHeight=14 * mm)
-    barcode.drawOn(canvas, (page_width - barcode.width) / 2, 17 * mm)
+    barcode_height = min(14 * mm, page_height * 0.35)
+    barcode_bottom = page_height * 0.44
+    if symbology == "Code128":
+        barcode = Code128(
+            specimen.barcode, barWidth=0.28 * mm, barHeight=barcode_height
+        )
+        if barcode.width > page_width - 8 * mm:
+            raise LabReportingDomainError(
+                409, "Specimen barcode does not fit the selected label profile"
+            )
+        barcode.drawOn(canvas, (page_width - barcode.width) / 2, barcode_bottom)
+    else:
+        matrix_size = min(20 * mm, page_width - 8 * mm, page_height * 0.35)
+        if matrix_size <= 0:
+            raise LabReportingDomainError(
+                409, "Specimen barcode does not fit the selected label profile"
+            )
+        barcode_y = barcode_bottom
+        if symbology == "QR":
+            barcode = QrCodeWidget(
+                specimen.barcode,
+                barWidth=matrix_size,
+                barHeight=matrix_size,
+                barBorder=2,
+            )
+            drawing = Drawing(matrix_size, matrix_size, barcode)
+            renderPDF.draw(drawing, canvas, (page_width - matrix_size) / 2, barcode_y)
+        elif symbology == "DataMatrix":
+            barcode = ECC200DataMatrix(value=specimen.barcode, x=0, y=0)
+            scale = min(matrix_size / barcode.width, matrix_size / barcode.height)
+            canvas.saveState()
+            canvas.translate((page_width - barcode.width * scale) / 2, barcode_y)
+            canvas.scale(scale, scale)
+            barcode.drawOn(canvas, 0, 0)
+            canvas.restoreState()
     canvas.setFont("Helvetica-Bold", 11)
-    canvas.drawCentredString(page_width / 2, 12 * mm, specimen.barcode)
+    canvas.drawCentredString(page_width / 2, page_height * 0.30, specimen.barcode)
     canvas.setFont("Helvetica", 8)
     canvas.drawCentredString(
-        page_width / 2, 8.5 * mm, f"Specimen {specimen.id} / Order {specimen.order_id}"
+        page_width / 2,
+        page_height * 0.21,
+        f"Specimen {specimen.id} / Order {specimen.order_id}",
     )
     # Each allowed 32-character code fits on its own line.
     canvas.setFont("Helvetica", 6)
-    canvas.drawCentredString(page_width / 2, 5.25 * mm, specimen.material_code)
-    canvas.drawCentredString(page_width / 2, 2 * mm, specimen.container_code)
+    canvas.drawCentredString(page_width / 2, page_height * 0.13, specimen.material_code)
+    canvas.drawCentredString(page_width / 2, page_height * 0.05, specimen.container_code)
     canvas.showPage()
     canvas.save()
     return buffer.getvalue()

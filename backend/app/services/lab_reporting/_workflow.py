@@ -8,7 +8,12 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.crud import audit as audit_crud
 from app.models.audit import AuditLog
-from app.models.lab import FINAL_INSTANCE_STATUSES, LabOrderTest, LabReportInstance
+from app.models.lab import (
+    FINAL_INSTANCE_STATUSES,
+    LabClinicalConfigurationVersion,
+    LabOrderTest,
+    LabReportInstance,
+)
 from app.models.lab_release import LabReportWorkflowEvent
 from app.models.lab_specimen import LabSpecimen
 from app.models.role_permission import Permission
@@ -67,6 +72,52 @@ class WorkflowMixin(LabReportingServiceMixinBase):
             raise LabReportingDomainError(
                 403, "Laboratory workflow permission required"
             )
+
+    def _require_assigned_clinical_reviewer(
+        self, instance: LabReportInstance, actor: User
+    ) -> None:
+        """Require the pinned clinic's assigned Lab physician for clinical sign-off.
+
+        A report keeps the authority assignments from the configuration version
+        it was created with, even after that version is archived. Managed reports
+        without an approved, pinned configuration cannot be reviewed or released.
+        """
+        configuration_id = instance.clinical_configuration_version_id
+        if configuration_id is None:
+            raise LabReportingDomainError(
+                409, "Approved clinic clinical configuration required for sign-off"
+            )
+        configuration = self.db.get(LabClinicalConfigurationVersion, configuration_id)
+        if (
+            configuration is None
+            or configuration.status not in {"APPROVED", "ARCHIVED"}
+            or configuration.approved_at is None
+            or configuration.primary_lab_physician_user_id is None
+        ):
+            raise LabReportingDomainError(
+                409, "Pinned clinical configuration is unavailable for sign-off"
+            )
+        assigned_ids = {
+            configuration.primary_lab_physician_user_id,
+            configuration.substitute_lab_physician_user_id,
+        }
+        if (
+            not actor.is_active
+            or actor.role != "Lab"
+            or actor.id not in assigned_ids
+        ):
+            raise LabReportingDomainError(
+                403, "Assigned active laboratory physician required for clinical sign-off"
+            )
+
+    def _can_sign_off_clinically(
+        self, instance: LabReportInstance, actor: User
+    ) -> bool:
+        try:
+            self._require_assigned_clinical_reviewer(instance, actor)
+        except LabReportingDomainError:
+            return False
+        return True
 
     def _assert_instance_mutable_draft(self, instance: LabReportInstance) -> None:
         self._assert_instance_editable(instance)
@@ -221,13 +272,16 @@ class WorkflowMixin(LabReportingServiceMixinBase):
                 actions.append("record_qc")
         if instance.status in {"IN_REVIEW", "REVIEWED"} and "lab:review" in permissions:
             actions.append("return_to_draft")
-            if instance.status == "IN_REVIEW" and self._reviewer_has_separation(
-                instance.id, actor
+            if (
+                instance.status == "IN_REVIEW"
+                and self._can_sign_off_clinically(instance, actor)
+                and self._reviewer_has_separation(instance.id, actor)
             ):
                 actions.append("review")
         if (
             instance.status == "REVIEWED"
             and "lab:release" in permissions
+            and self._can_sign_off_clinically(instance, actor)
             and self._reviewer_has_separation(instance.id, actor)
         ):
             actions.append("finalize")
@@ -240,6 +294,8 @@ class WorkflowMixin(LabReportingServiceMixinBase):
         lock_specimens: bool,
     ) -> tuple[list[str], dict[str, Any]]:
         holds = []
+        if instance.clinical_configuration_version_id is None:
+            holds.append("clinical_configuration_required")
         if not self._has_published_template(instance):
             holds.append("published_template_required")
 
@@ -420,6 +476,7 @@ class WorkflowMixin(LabReportingServiceMixinBase):
         actor = self._workflow_actor(actor_user_id)
         self._require_workflow_permission(actor, "lab:review")
         instance = self._get_locked_instance(instance_id)
+        self._require_assigned_clinical_reviewer(instance, actor)
         expected_version = self._workflow_expected_version(expected_updated_at)
         reason = self._workflow_reason(reason) if reason is not None else None
         if self._workflow_request_replayed(

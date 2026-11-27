@@ -13,6 +13,7 @@ from uuid import UUID
 from sqlalchemy import select
 
 from app.core.config import settings
+from app.models.lab import LabClinicalConfigurationVersion
 from app.models.lab_release import LabDraftMutationReceipt, LabReportCreationReceipt
 from app.services.lab_reporting._base import *  # noqa: F401, F403
 from app.services.lab_reporting._base import LabReportingServiceMixinBase
@@ -152,14 +153,28 @@ class InstancesMixin(LabReportingServiceMixinBase):
 
         signer_overrides = payload.get("signer_overrides") or {}
         branding_overrides = payload.get("branding_overrides") or {}
+        clinical_configuration_version_id = self.db.scalar(
+            select(LabClinicalConfigurationVersion.id).where(
+                LabClinicalConfigurationVersion.status == "APPROVED"
+            )
+        )
         instance = LabReportInstance(
             order_id=order.id if order else None,
             visit_id=visit_id,
             patient_id=patient.id,
             template_id=template.id,
             template_version_id=version.id,
+            clinical_configuration_version_id=clinical_configuration_version_id,
             status="DRAFT",
-            managed_release=settings.LAB_MANAGED_RELEASE_ENABLED,
+            # A clinic-approved configuration turns on the assigned Lab
+            # physician workflow for this report even when the rollout flag
+            # remains at its legacy default. Interactive API drafts created
+            # before clinic setup stay unreleasable until a configuration is
+            # approved; the API response exposes that hold to the workbench.
+            managed_release=(
+                clinical_configuration_version_id is not None
+                or settings.LAB_MANAGED_RELEASE_ENABLED
+            ),
             patient_snapshot=self._build_patient_snapshot(patient, study_date=payload.get("study_date")),
             branding_snapshot=self._build_branding_snapshot(version, branding_overrides),
             signer_snapshot=self._build_signer_snapshot(
@@ -279,6 +294,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
         *, actor_user_id: int | None = None, commit: bool = True,
         source_specimen_id: int | None = None,
         import_origins: dict[str, dict[str, Any]] | None = None,
+        source_integration_profile_version_id: int | None = None,
         draft_request_id: UUID | None = None,
     ) -> tuple[LabReportInstance, list[LabReportValue]]:
         logger.info(
@@ -295,7 +311,13 @@ class InstancesMixin(LabReportingServiceMixinBase):
         )
         receipt, replay = self._prepare_draft_write(
             instance, actor, "values", draft_request_id, expected_updated_at,
-            {"values": values_payload, "source_specimen_id": source_specimen_id},
+            {
+                "values": values_payload,
+                "source_specimen_id": source_specimen_id,
+                "source_integration_profile_version_id": (
+                    source_integration_profile_version_id
+                ),
+            },
         )
         existing_by_key = {value.field_key: value for value in instance.values}
         if replay:
@@ -376,6 +398,12 @@ class InstancesMixin(LabReportingServiceMixinBase):
             lab_value.value_numeric = normalized["value_numeric"]
             lab_value.comment = normalized["comment"]
             lab_value.result_payload = result
+            if source_integration_profile_version_id is not None:
+                lab_value.source_integration_profile_version_id = (
+                    source_integration_profile_version_id
+                )
+            elif import_origins is not None or not same_measurement:
+                lab_value.source_integration_profile_version_id = None
             updated_values.append(lab_value)
 
         self._refresh_result_evaluation(instance)
@@ -510,7 +538,19 @@ class InstancesMixin(LabReportingServiceMixinBase):
         source = self._get_locked_instance(instance_id)
         if source.status not in FINAL_INSTANCE_STATUSES:
             raise LabReportingDomainError(409, "Only finalized instances can be revised")
-        managed = source.managed_release or settings.LAB_MANAGED_RELEASE_ENABLED
+        clinical_configuration_version_id = (
+            source.clinical_configuration_version_id
+            or self.db.scalar(
+                select(LabClinicalConfigurationVersion.id).where(
+                    LabClinicalConfigurationVersion.status == "APPROVED"
+                )
+            )
+        )
+        managed = (
+            source.managed_release
+            or clinical_configuration_version_id is not None
+            or settings.LAB_MANAGED_RELEASE_ENABLED
+        )
         actor = self._workflow_actor(actor_user_id) if managed or actor_user_id is not None else None
         expected_version = None
         if managed:
@@ -540,6 +580,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
             patient_id=source.patient_id,
             template_id=source.template_id,
             template_version_id=source.template_version_id,
+            clinical_configuration_version_id=clinical_configuration_version_id,
             status="DRAFT",
             managed_release=managed,
             patient_snapshot=deepcopy(source.patient_snapshot),

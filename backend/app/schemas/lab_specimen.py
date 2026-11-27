@@ -126,6 +126,7 @@ class LabSpecimenEventOut(BaseModel):
     reason_code: LabSpecimenRejectionReasonCode | None = None
     visit_service_ids: list[int]
     report_instance_ids: list[int]
+    integration_profile_version_id: int | None = None
 
 
 class LabSpecimenOut(BaseModel):

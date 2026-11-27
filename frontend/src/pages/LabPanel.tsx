@@ -11,6 +11,7 @@ import LabReportWorkbench, {
   type LabReportOperationContext,
 } from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
+import LabClinicalConfigurationPanel from '../components/laboratory/LabClinicalConfigurationPanel';
 import type { DirtyGuardTransitionOptions } from '../components/laboratory/hooks/useDirtyTransitionGuard';
 import { useLabDirtyGuard } from '../components/laboratory/LabDirtyGuardContext';
 import { LAB_OPERATION_PENDING_ALL, type LabOperationPendingState } from '../components/laboratory/operationPending';
@@ -25,7 +26,7 @@ import { useLabHotkeys } from '../hooks/useLabHotkeys';
 import notifyService from '../services/notify';
 import './lab.css';
 import { useTranslation } from '../i18n/useTranslation';
-import { BriefcaseMedical, FileText, ListChecks, RotateCw, SquareStack, TestTube2, X } from 'lucide-react';
+import { BriefcaseMedical, FileText, ListChecks, RotateCw, Settings2, SquareStack, TestTube2, X } from 'lucide-react';
 
 // P-03 fix: API_V1_BASE и tokenManager больше не нужны — loadLabAppointments
 // использует labReportingApi.listQueueToday() с собственным auth-токеном.
@@ -224,6 +225,7 @@ export default function LabPanel() {
 
   const [activeTab, setActiveTab] = useState(() => resolveLabTabId(searchParams.get('tab')));
   const [operationsOpened, setOperationsOpened] = useState(false);
+  const [clinicalConfigOpen, setClinicalConfigOpen] = useState(false);
   useEffect(() => {
     if (activeTab === 'operations') setOperationsOpened(true);
   }, [activeTab]);
@@ -1808,38 +1810,50 @@ export default function LabPanel() {
               <BriefcaseMedical size={22} aria-hidden="true" />
               <span>{t('misc.lp_panel_laboratorii')}</span>
             </h1>
-            <div
-              id={LAB_PANEL_TABLIST_ID}
-              role="tablist"
-              aria-labelledby={LAB_PANEL_TITLE_ID}
-              className="lab-tablist"
-            >
-              {tabs.map((tab) => (
-                <Button
-                  key={tab.id}
-                  id={getLabPanelTabId(tab.id)}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === tab.id}
-                  aria-controls={getLabPanelTabPanelId(tab.id)}
-                  aria-label={statusCounters[tab.id] == null ? tab.label : t('misc.lp_tab_label_statuscounters_tab', {
-                    label: tab.label, id: statusCounters[tab.id],
-                  })}
-                  tabIndex={activeTab === tab.id ? 0 : -1}
-                  variant={activeTab === tab.id ? 'primary' : 'outline'}
-                  onClick={() => switchTab(tab.id)}
-                  onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleTabKeyDown(event, tab.id)}
-                >
-                  <tab.icon size={16} aria-hidden="true" />
-                  {tab.label}
-                  {statusCounters[tab.id] != null && <Badge
-                    aria-hidden="true"
-                    variant={activeTab === tab.id ? 'success' : 'info'}
+            <div className="lab-flex-center-8">
+              <div
+                id={LAB_PANEL_TABLIST_ID}
+                role="tablist"
+                aria-labelledby={LAB_PANEL_TITLE_ID}
+                className="lab-tablist"
+              >
+                {tabs.map((tab) => (
+                  <Button
+                    key={tab.id}
+                    id={getLabPanelTabId(tab.id)}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === tab.id}
+                    aria-controls={getLabPanelTabPanelId(tab.id)}
+                    aria-label={statusCounters[tab.id] == null ? tab.label : t('misc.lp_tab_label_statuscounters_tab', {
+                      label: tab.label, id: statusCounters[tab.id],
+                    })}
+                    tabIndex={activeTab === tab.id ? 0 : -1}
+                    variant={activeTab === tab.id ? 'primary' : 'outline'}
+                    onClick={() => switchTab(tab.id)}
+                    onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleTabKeyDown(event, tab.id)}
                   >
-                    {statusCounters[tab.id]}
-                  </Badge>}
-                </Button>
-              ))}
+                    <tab.icon size={16} aria-hidden="true" />
+                    {tab.label}
+                    {statusCounters[tab.id] != null && <Badge
+                      aria-hidden="true"
+                      variant={activeTab === tab.id ? 'success' : 'info'}
+                    >
+                      {statusCounters[tab.id]}
+                    </Badge>}
+                  </Button>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant={clinicalConfigOpen ? 'primary' : 'outline'}
+                aria-expanded={clinicalConfigOpen}
+                aria-controls="lab-clinical-config-panel"
+                onClick={() => setClinicalConfigOpen((open) => !open)}
+              >
+                <Settings2 size={16} aria-hidden="true" />
+                {t('labClinicalConfig.open')}
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -1886,6 +1900,12 @@ export default function LabPanel() {
           </CardContent>
         )}
       </Card>
+
+      {clinicalConfigOpen && (
+        <section id="lab-clinical-config-panel" aria-label={t('labClinicalConfig.title')}>
+          <LabClinicalConfigurationPanel onClose={() => setClinicalConfigOpen(false)} />
+        </section>
+      )}
 
       <div className={`lab-workspace lab-workspace--${activeTab}`} hidden={activeTab !== 'queue' && activeTab !== 'reports'}>
       <section

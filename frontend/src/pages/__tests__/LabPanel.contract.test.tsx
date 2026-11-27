@@ -80,6 +80,13 @@ describe('LabPanel queue/report status contract', () => {
     expect(source).toContain('queueTotal={queueTotal}');
   });
 
+  it('exposes clinic clinical configuration without changing the workbench tab contract', () => {
+    const source = readLabPanelSource();
+    expect(source).toContain("const LAB_TAB_IDS = ['queue', 'templates', 'reports', 'operations'] as const");
+    expect(source).toContain('aria-controls="lab-clinical-config-panel"');
+    expect(source).toContain('<LabClinicalConfigurationPanel');
+  });
+
   it('STRAT#16: AbortController in loadLabAppointments and loadMoreAppointments', () => {
     const source = readLabPanelSource();
 

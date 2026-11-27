@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import delete
@@ -11,6 +12,7 @@ from sqlalchemy import delete
 import app.services.lab_reporting_service as lab_reporting_service_module
 from app.models.appointment import Appointment
 from app.models.lab import (
+    LabClinicalConfigurationVersion,
     LabCatalogReferenceRange,
     LabOrder,
     LabReportFieldDef,
@@ -1322,3 +1324,177 @@ class TestLabReportingService:
             ),
         )
         service.update_template_version(draft.id, _payload(None))
+
+
+def _insert_approved_synthetic_clinical_configuration(db_session, *, sex: str):
+    lab_physician = User(
+        username=f"synthetic_clinical_{uuid4().hex[:10]}",
+        hashed_password="not-used-by-test",
+        role="Lab",
+        is_active=True,
+    )
+    db_session.add(lab_physician)
+    db_session.flush()
+    version = LabClinicalConfigurationVersion(
+        version_no=987654,
+        status="APPROVED",
+        configuration_schema_version=1,
+        configuration_snapshot={
+            "method_instructions": [],
+            "reference_intervals": [
+                {
+                    "rule_code": "SYNTHETIC-HGB-RANGE",
+                    "analyte_code": "hgb",
+                    "method_code": "synthetic_method",
+                    "unit_code": "g_per_l",
+                    "sex": sex,
+                    "low": 5.0,
+                    "high": 10.0,
+                    "source_ref": "clinic-document://synthetic/hgb-range",
+                }
+            ],
+            "critical_values": [
+                {
+                    "rule_code": "SYNTHETIC-HGB-CRITICAL-LOW",
+                    "analyte_code": "hgb",
+                    "method_code": "synthetic_method",
+                    "unit_code": "g_per_l",
+                    "sex": sex,
+                    "direction": "below",
+                    "threshold": 2.0,
+                    "source_ref": "clinic-document://synthetic/hgb-critical-low",
+                }
+            ],
+            "qc_rules": [],
+            "not_applicable_reasons": {"qc_rules": "Synthetic test leaves QC settings for clinic setup."},
+        },
+        primary_lab_physician_user_id=lab_physician.id,
+        substitute_lab_physician_user_id=None,
+        approved_by_user_id=lab_physician.id,
+        approved_role_code="Lab",
+        approval_authority_snapshot={"assignment": "primary", "actor_user_id": lab_physician.id},
+        created_by_user_id=lab_physician.id,
+        created_at=datetime.now(UTC),
+        approved_at=datetime.now(UTC),
+    )
+    db_session.add(version)
+    db_session.commit()
+    return version
+
+
+def _create_synthetic_catalog_reference_report(service, test_patient):
+    template = service.create_template(
+        {
+            "code": f"synthetic_clinical_config_{uuid4().hex[:8]}",
+            "name": "SYNTHETIC Clinical Configuration Test",
+            "family": "hematology",
+            "description": "Synthetic test fixture",
+            "initial_version": {
+                "layout_preset": "lab_table_classic_v1",
+                "page_settings": {"paper_size": "A4", "orientation": "portrait"},
+                "branding_overrides": {},
+                "signer_defaults": {},
+                "footer_notes": "",
+                "sections": [
+                    {
+                        "key": "synthetic",
+                        "title": "Synthetic",
+                        "sort_order": 1,
+                        "fields": [
+                            {
+                                "analyte_code": "hgb",
+                                "unit_code": "g_per_l",
+                                "field_key": "hgb_synthetic",
+                                "label": "Synthetic HGB",
+                                "value_type": "numeric",
+                                "reference_mode": "catalog",
+                                "reference_text": "unused fallback",
+                                "highlight_rule": {"mode": "rule_based_reference"},
+                                "sort_order": 1,
+                            }
+                        ],
+                    }
+                ],
+            },
+        }
+    )
+    published = service.publish_template_version(template.versions[0].id)
+    instance = service.create_instance(
+        {
+            "patient_id": test_patient.id,
+            "template_id": template.id,
+            "template_version_id": published.id,
+        }
+    )
+    # These tests exercise version-pinned rule evaluation only. Keep the report
+    # outside the separate reviewer workflow so no synthetic sign-off is implied.
+    instance.managed_release = False
+    service.repository.commit()
+    return instance
+
+
+@pytest.mark.unit
+def test_approved_clinical_ranges_and_critical_values_are_snapshotted_on_result(
+    db_session, test_patient
+):
+    test_patient.sex = "M"
+    test_patient.birth_date = date(1990, 1, 1)
+    db_session.commit()
+    clinical_version = _insert_approved_synthetic_clinical_configuration(
+        db_session, sex="M"
+    )
+    service = LabReportingService(db_session)
+    instance = _create_synthetic_catalog_reference_report(service, test_patient)
+
+    updated, values = service.bulk_upsert_values(
+        instance.id,
+        [
+            {
+                "field_key": "hgb_synthetic",
+                "value_text": "1",
+                "method_code": "synthetic_method",
+            }
+        ],
+    )
+
+    value = values[0]
+    assert updated.clinical_configuration_version_id == clinical_version.id
+    assert value.resolved_reference_text == "5.0 - 10.0"
+    assert value.resolved_flag == "critical"
+    assert value.evaluation_snapshot["clinical_configuration_version_id"] == clinical_version.id
+    assert value.evaluation_snapshot["reference"]["rule_code"] == "SYNTHETIC-HGB-RANGE"
+    assert value.evaluation_snapshot["reference"]["critical_rule_codes"] == [
+        "SYNTHETIC-HGB-CRITICAL-LOW"
+    ]
+
+
+@pytest.mark.unit
+def test_clinic_configured_demographic_scope_does_not_fall_back_to_other_reference(
+    db_session, test_patient
+):
+    test_patient.sex = "F"
+    test_patient.birth_date = date(1990, 1, 1)
+    db_session.commit()
+    _insert_approved_synthetic_clinical_configuration(db_session, sex="M")
+    service = LabReportingService(db_session)
+    instance = _create_synthetic_catalog_reference_report(service, test_patient)
+
+    _, values = service.bulk_upsert_values(
+        instance.id,
+        [
+            {
+                "field_key": "hgb_synthetic",
+                "value_text": "1",
+                "method_code": "synthetic_method",
+            }
+        ],
+    )
+
+    value = values[0]
+    assert value.resolved_reference_text == ""
+    assert value.resolved_flag != "critical"
+    assert value.evaluation_snapshot["reference"]["status"] == "no_demographic_match"
+    assert value.evaluation_snapshot["reference"]["clinical_configuration_version_id"] == instance.clinical_configuration_version_id
+    assert value.evaluation_snapshot["reference"]["configured_scope_rule_codes"] == [
+        "SYNTHETIC-HGB-RANGE"
+    ]

@@ -22,8 +22,8 @@ export default function ReportWorkflowPanel({
   onPrompt: (action: LabWorkflowPrompt, trigger: HTMLButtonElement) => void;
 }) {
   const { t, language } = useTranslation();
-  if (!report.managed_release) return null;
   const holds = (report.release_holds as string[] | undefined) || [];
+  if (!report.managed_release && !holds.includes('clinical_configuration_required')) return null;
   const events = (report.workflow_events as LabWorkflowEvent[] | undefined) || [];
   const qc = events.filter((event) => event.kind === 'qc_recorded').at(-1)?.evidence?.qc;
   const canReview = hasLabReportAction(report, 'review');

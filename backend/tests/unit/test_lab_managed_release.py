@@ -8,7 +8,7 @@ import pytest
 
 from app.core.config import settings
 from app.crud import audit as audit_crud
-from app.models.lab import LabOrderTest
+from app.models.lab import LabClinicalConfigurationVersion, LabOrderTest
 from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment
 from app.models.role_permission import Permission, Role, user_roles_table
 from app.models.service import Service
@@ -79,6 +79,163 @@ def _accepted_specimen(
     return specimen
 
 
+def _approved_clinical_configuration(db, primary, substitute):
+    approved_at = datetime.now(UTC)
+    version = LabClinicalConfigurationVersion(
+        version_no=1,
+        status="APPROVED",
+        configuration_schema_version=1,
+        configuration_snapshot={},
+        primary_lab_physician_user_id=primary.id,
+        substitute_lab_physician_user_id=substitute.id,
+        approved_by_user_id=primary.id,
+        approved_role_code="Lab",
+        approval_authority_snapshot={
+            "actor_user_id": primary.id,
+            "actor_role_code": "Lab",
+            "assignment": "primary",
+        },
+        created_by_user_id=primary.id,
+        approved_at=approved_at,
+    )
+    db.add(version)
+    db.commit()
+    return version
+
+
+@pytest.mark.unit
+def test_configuration_bound_review_and_release_require_assigned_active_lab_physician(
+    db_session, test_patient, monkeypatch
+):
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", True)
+    monkeypatch.setattr(settings, "LAB_RELEASE_REQUIRE_DISTINCT_REVIEWER", True)
+    review_permission = Permission(name="lab:review", codename="lab:review")
+    release_permission = Permission(name="lab:release", codename="lab:release")
+    qc_permission = Permission(name="lab:qc", codename="lab:qc")
+    entrant = _staff(db_session, "configured-entry", [])
+    primary = _staff(
+        db_session,
+        "configured-primary",
+        [review_permission, release_permission, qc_permission],
+    )
+    substitute = _staff(
+        db_session,
+        "configured-substitute",
+        [review_permission, release_permission],
+    )
+    unassigned = _staff(
+        db_session,
+        "configured-unassigned",
+        [review_permission, release_permission],
+    )
+    db_session.commit()
+    configuration = _approved_clinical_configuration(db_session, primary, substitute)
+
+    service = LabReportingService(db_session)
+    template = next(item for item in service.list_templates() if item.code == "cbc_oak")
+    report = service.create_instance(
+        {"patient_id": test_patient.id, "template_id": template.id},
+        actor_name=entrant.full_name,
+        actor_user_id=entrant.id,
+    )
+    assert report.clinical_configuration_version_id == configuration.id
+    specimen = _accepted_specimen(db_session, report, "SYNTHETIC-AUTHORITY")
+    report, _ = service.bulk_upsert_values(
+        report.id,
+        [
+            {"field_key": "hgb", "value_text": "135"},
+            {"field_key": "wbc", "value_text": "5.2"},
+        ],
+        expected_updated_at=report.updated_at.isoformat(),
+        actor_user_id=entrant.id,
+    )
+    report = service.record_report_qc(
+        report.id,
+        actor_user_id=primary.id,
+        command=LabReportQCIn(
+            expected_updated_at=report.updated_at.isoformat(),
+            status="accepted",
+            method="SYNTHETIC-QC",
+            series_ref="SYNTHETIC-AUTHORITY-QC",
+        ),
+    )
+    report = service.submit_for_review(
+        report.id,
+        actor_user_id=entrant.id,
+        expected_updated_at=report.updated_at.isoformat(),
+    )
+
+    assert "review" not in service.instance_available_actions(report, unassigned.id)
+    assert "review" in service.instance_available_actions(report, primary.id)
+    with pytest.raises(
+        LabReportingDomainError, match="Assigned active laboratory physician"
+    ):
+        service.review_report(
+            report.id,
+            actor_user_id=unassigned.id,
+            expected_updated_at=report.updated_at.isoformat(),
+        )
+
+    primary.is_active = False
+    db_session.commit()
+    assert "review" not in service.instance_available_actions(report, primary.id)
+    with pytest.raises(
+        LabReportingDomainError, match="workflow access denied"
+    ):
+        service.review_report(
+            report.id,
+            actor_user_id=primary.id,
+            expected_updated_at=report.updated_at.isoformat(),
+        )
+    primary.is_active = True
+    db_session.commit()
+
+    report = service.review_report(
+        report.id,
+        actor_user_id=primary.id,
+        expected_updated_at=report.updated_at.isoformat(),
+    )
+    assert "finalize" not in service.instance_available_actions(report, unassigned.id)
+    assert "finalize" in service.instance_available_actions(report, substitute.id)
+    with pytest.raises(
+        LabReportingDomainError, match="Assigned active laboratory physician"
+    ):
+        service.finalize(
+            report.id,
+            actor_user_id=unassigned.id,
+            expected_updated_at=report.updated_at.isoformat(),
+        )
+    released = service.finalize(
+        report.id,
+        actor_user_id=substitute.id,
+        expected_updated_at=report.updated_at.isoformat(),
+    )
+    assert released.status == "FINALIZED"
+    assert released.signer_snapshot["approver_name"] == substitute.full_name
+    assert specimen.status == "accepted"
+
+
+@pytest.mark.unit
+def test_clinic_configuration_automatically_enables_managed_release(
+    db_session, test_patient, monkeypatch
+):
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", False)
+    primary = _staff(db_session, "legacy-config-primary", [])
+    substitute = _staff(db_session, "legacy-config-substitute", [])
+    db_session.commit()
+    _approved_clinical_configuration(db_session, primary, substitute)
+
+    service = LabReportingService(db_session)
+    template = next(item for item in service.list_templates() if item.code == "cbc_oak")
+    report = service.create_instance(
+        {"patient_id": test_patient.id, "template_id": template.id},
+        actor_user_id=primary.id,
+    )
+    assert report.clinical_configuration_version_id is not None
+    assert report.managed_release is True
+    assert "finalize" not in service.instance_available_actions(report, primary.id)
+
+
 @pytest.mark.unit
 def test_managed_release_versions_permissions_and_correction_history(
     db_session, test_patient, monkeypatch
@@ -94,6 +251,7 @@ def test_managed_release_versions_permissions_and_correction_history(
     reviewer = _staff(db_session, "lab-reviewed", permissions)
     no_grant = _staff(db_session, "lab-no-grant", [])
     db_session.commit()
+    _approved_clinical_configuration(db_session, reviewer, entrant)
 
     service = LabReportingService(db_session)
     template = next(item for item in service.list_templates() if item.code == "cbc_oak")
@@ -303,6 +461,7 @@ def test_managed_review_surfaces_qc_and_material_holds(
         db_session, "managed-qc-review",
         [Permission(name=code, codename=code) for code in ("lab:review", "lab:qc")],
     )
+    _approved_clinical_configuration(db_session, reviewer, entrant)
     service = LabReportingService(db_session)
     template = next(item for item in service.list_templates() if item.code == "cbc_oak")
     report = service.create_instance(
@@ -386,6 +545,7 @@ def test_managed_review_requires_a_recorded_disposition_for_manual_findings(
     reviewer = _staff(db_session, "finding-review", [
         Permission(name=code, codename=code) for code in ("lab:review", "lab:qc")
     ])
+    _approved_clinical_configuration(db_session, reviewer, entered_by)
     service = LabReportingService(db_session)
     template = next(item for item in service.list_templates() if item.code == "cbc_oak")
     report = service.create_instance(
@@ -703,6 +863,9 @@ def test_managed_draft_is_hidden_from_assigned_doctor(
     )
     db_session.add(ordered_line)
     db_session.commit()
+    substitute = _staff(db_session, "lab-access-substitute", [])
+    db_session.commit()
+    _approved_clinical_configuration(db_session, operator, substitute)
 
     service = LabReportingService(db_session)
     template = next(item for item in service.list_templates() if item.code == "cbc_oak")
@@ -719,12 +882,8 @@ def test_managed_draft_is_hidden_from_assigned_doctor(
     assert response.status_code == 200, response.json()
     report = response.json()
     assert report["managed_release"] is True
-    assert report["available_actions"] == [
-        "preview",
-        "edit",
-        "save_draft",
-        "submit_review",
-    ]
+    assert report["available_actions"] == ["preview", "edit", "save_draft"]
+    assert {"specimen_required", "qc_missing"} <= set(report["release_holds"])
     allocation = (
         db_session.query(LabOrderTest).filter_by(visit_service_id=ordered_line.id).one()
     )

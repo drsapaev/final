@@ -193,10 +193,17 @@ def _instance_out(
     critical_findings = service.summarize_critical_findings(sections)
     available_actions = service.instance_available_actions(instance, actor_user_id)
     release_holds = service.report_release_holds(instance)
+    if (
+        actor_user_id is not None
+        and instance.clinical_configuration_version_id is None
+        and instance.status not in FINAL_INSTANCE_STATUSES
+        and "clinical_configuration_required" not in release_holds
+    ):
+        release_holds.append("clinical_configuration_required")
     if release_holds:
         blocked_actions = {"finalize"}
         if any(hold not in MANUAL_REVIEW_HOLDS for hold in release_holds):
-            blocked_actions.add("review")
+            blocked_actions.update({"review", "submit_review"})
         available_actions = [action for action in available_actions if action not in blocked_actions]
     return LabReportInstanceOut(
         id=instance.id,
@@ -247,6 +254,16 @@ def _instance_summary_out(
     sections = service.materialize_instance(instance)
     severity_metrics = service.summarize_instance_severity(sections)
     available_actions = service.instance_available_actions(instance, actor_user_id)
+    if (
+        actor_user_id is not None
+        and instance.clinical_configuration_version_id is None
+        and instance.status not in FINAL_INSTANCE_STATUSES
+    ):
+        available_actions = [
+            action
+            for action in available_actions
+            if action not in {"finalize", "review", "submit_review"}
+        ]
     return LabReportInstanceSummaryOut(
         id=instance.id,
         patient_id=instance.patient_id,

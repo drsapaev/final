@@ -161,3 +161,10 @@ class LabSpecimenEvent(Base):
     report_instance_ids: Mapped[list[int]] = mapped_column(
         JSON, nullable=False, default=list
     )
+    integration_profile_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "lab_equipment_integration_profile_versions.id", ondelete="RESTRICT"
+        ),
+        nullable=True,
+        index=True,
+    )

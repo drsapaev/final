@@ -8,6 +8,7 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    PrivateAttr,
     ValidationError,
     field_validator,
 )
@@ -26,6 +27,9 @@ ReportInstanceId = Annotated[int, Field(ge=1, le=MAX_REPORT_INSTANCE_ID)]
 
 class LabImportValue(LabReportValueIn):
     model_config = ConfigDict(extra="forbid")
+
+    _source_analyte_code: str | None = PrivateAttr(default=None)
+    _source_instrument_flags: tuple[str, ...] = PrivateAttr(default=())
 
     # Stable catalog analyte code rather than a template field key or label.
     field_key: Code = Field(validation_alias="analyte_code")
@@ -93,7 +97,7 @@ BatchImportRow = Annotated[
 class LabImportBatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    source: Literal["manual", "csv"]
+    source: Literal["manual", "csv", "analyzer"]
     rows: list[BatchImportRow] = Field(
         min_length=1,
         max_length=MAX_IMPORT_BATCH_ROWS,

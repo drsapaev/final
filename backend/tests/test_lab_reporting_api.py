@@ -314,13 +314,13 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
         "edit",
         "save_draft",
         "mark_ready",
-        "finalize",
         "preview",
     }
     assert instance["can_edit"] is True
     assert instance["can_save_draft"] is True
     assert instance["can_mark_ready"] is True
-    assert instance["can_finalize"] is True
+    assert instance["can_finalize"] is False
+    assert "clinical_configuration_required" in instance["release_holds"]
     assert instance["can_revise"] is False
     assert instance["can_print"] is False
     assert instance["can_preview"] is True
@@ -365,7 +365,7 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert summary["critical_findings_count"] == 0
     assert summary["max_flag_severity"] is None
     assert summary["can_edit"] is True
-    assert summary["can_finalize"] is True
+    assert summary["can_finalize"] is False
     assert summary["can_revise"] is False
     assert summary["can_print"] is False
 
@@ -426,45 +426,32 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert ige_field["evaluation_status"] == "evaluated"
     assert ige_field["interpretation"] == "high"
 
-    # /mark-ready endpoint was removed (L-2 fix: it was functionally empty —
-    # backend allows the same actions for DRAFT/IN_PROGRESS/READY statuses).
-    # Skip directly to /finalize, which is permitted from any non-FINALIZED status.
+    # The clinic has not approved a clinical configuration, so the report
+    # remains editable but cannot be submitted or released.
 
     finalize_response = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/finalize",
         headers=auth_headers,
     )
-    assert finalize_response.status_code == 200
-    finalized = finalize_response.json()
-    assert finalized["status"] == "FINALIZED"
-    assert set(finalized["available_actions"]) == {"revise", "print"}
-    assert finalized["can_edit"] is False
-    assert finalized["can_save_draft"] is False
-    assert finalized["can_mark_ready"] is False
-    assert finalized["can_finalize"] is False
-    assert finalized["can_revise"] is True
-    assert finalized["can_print"] is True
-    assert finalized["can_preview"] is False
+    assert finalize_response.status_code == 409
+    assert "Approved clinic clinical configuration" in finalize_response.json()["detail"]
+    blocked_detail = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}", headers=auth_headers
+    )
+    assert blocked_detail.status_code == 200
+    assert blocked_detail.json()["status"] == "IN_PROGRESS"
+    assert blocked_detail.json()["can_finalize"] is False
 
-    print_once_response = client.post(
+    print_blocked = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/mark-printed",
         headers=auth_headers,
     )
-    assert print_once_response.status_code == 200
-    printed = print_once_response.json()
-    assert printed["status"] == "PRINTED"
-    assert set(printed["available_actions"]) == {"revise", "print"}
-    assert printed["can_edit"] is False
-    assert printed["can_revise"] is True
-    assert printed["can_print"] is True
-    assert printed["can_preview"] is False
-
-    print_twice_response = client.post(
-        f"/api/v1/lab/report-instances/{instance['id']}/mark-printed",
-        headers=auth_headers,
+    assert print_blocked.status_code == 409
+    assert print_blocked.json()["detail"] == "Only finalized reports can be printed"
+    still_draft = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}", headers=auth_headers
     )
-    assert print_twice_response.status_code == 200
-    assert print_twice_response.json()["status"] == "PRINTED"
+    assert still_draft.json()["status"] == "IN_PROGRESS"
 
 
 @pytest.fixture
@@ -511,7 +498,7 @@ def legacy_release_side_effects(monkeypatch):
 
 
 @pytest.mark.integration
-def test_versioned_legacy_finalize_replays_only_the_same_actor_and_release_version(
+def test_versioned_finalize_blocks_unconfigured_clinic_draft(
     client, auth_headers, admin_user, db_session, legacy_release_draft,
     legacy_release_side_effects,
 ):
@@ -540,55 +527,22 @@ def test_versioned_legacy_finalize_replays_only_the_same_actor_and_release_versi
     notification.assert_not_called()
     projection.assert_not_called()
 
-    first = finalize_request(command)
-    assert first.status_code == 200, first.text
-    released = first.json()
-    assert released["status"] == "FINALIZED"
-    replay = finalize_request(command)
-    assert replay.status_code == 200, replay.text
-    assert replay.json() == released
-
-    events = db_session.query(LabReportWorkflowEvent).filter_by(
-        instance_id=draft["id"], kind="finalized",
-    )
-    event = events.one()
-    assert event.actor_user_id == admin_user.id
-    # SQLite stores naive UTC, while the HTTP command may carry a UTC suffix.
-    submitted = datetime.fromisoformat(command["expected_updated_at"]).replace(tzinfo=UTC)
-    assert event.expected_version.replace(tzinfo=UTC) == submitted
-    assert event.report_version.replace(tzinfo=UTC) == datetime.fromisoformat(
-        released["updated_at"],
-    ).replace(tzinfo=UTC)
-
-    other_actor = _create_lab_user(db_session, label="legacy_release_replay")
-    other_headers = {"Authorization": f"Bearer {_mint_access_token(other_actor)}"}
-    assert finalize_request(command, other_headers).status_code == 409
+    blocked = finalize_request(command)
+    assert blocked.status_code == 409, blocked.text
+    assert "Approved clinic clinical configuration" in blocked.json()["detail"]
     assert finalize_request().status_code == 409
-    malformed_replay = finalize_request(malformed)
-    assert malformed_replay.status_code == 409, malformed_replay.text
-    assert malformed_replay.json()["detail"] == "Finalized reports are immutable; use revise"
-    assert finalize_request(stale).status_code == 409
-    assert finalize_request({"expected_updated_at": released["updated_at"]}).status_code == 409
-
-    printed = client.post(f"{route}/mark-printed", headers=auth_headers)
-    assert printed.status_code == 200, printed.text
-    assert printed.json()["status"] == "PRINTED"
-    assert finalize_request(command).status_code == 409
-
-    notification.assert_called_once()
-    projection.assert_called_once()
-    assert events.count() == 1
-    rows = db_session.query(LabResult).filter_by(
-        source_root_instance_id=draft["id"],
-    ).order_by(LabResult.test_code).all()
-    assert [(row.test_code, row.value, row.source_instance_id) for row in rows] == [
-        ("hgb", "140", draft["id"]),
-        ("wbc", "5.2", draft["id"]),
-    ]
+    notification.assert_not_called()
+    projection.assert_not_called()
+    assert db_session.query(LabReportWorkflowEvent).filter_by(
+        instance_id=draft["id"], kind="finalized",
+    ).count() == 0
+    stored = db_session.get(LabReportInstance, draft["id"])
+    db_session.refresh(stored)
+    assert stored.status == "IN_PROGRESS"
 
 
 @pytest.mark.integration
-def test_unversioned_legacy_finalize_is_compatible_but_cannot_replay(
+def test_unversioned_finalize_blocks_unconfigured_clinic_draft(
     client, auth_headers, db_session, legacy_release_draft, legacy_release_side_effects,
 ):
     route, _, draft = legacy_release_draft
@@ -596,24 +550,19 @@ def test_unversioned_legacy_finalize_is_compatible_but_cannot_replay(
     finalize_url = f"{route}/finalize"
 
     first = client.post(finalize_url, headers=auth_headers)
-    assert first.status_code == 200, first.text
-    assert first.json()["status"] == "FINALIZED"
-
-    event = db_session.query(LabReportWorkflowEvent).filter_by(
-        instance_id=draft["id"], kind="finalized",
-    ).one()
-    assert event.expected_version is None
-    assert client.post(finalize_url, headers=auth_headers).status_code == 409
-    versioned_replay = client.post(
-        finalize_url, headers=auth_headers,
+    assert first.status_code == 409, first.text
+    assert "Approved clinic clinical configuration" in first.json()["detail"]
+    versioned = client.post(
+        finalize_url,
+        headers=auth_headers,
         json={"expected_updated_at": draft["updated_at"]},
     )
-    assert versioned_replay.status_code == 409, versioned_replay.text
-    notification.assert_called_once()
-    projection.assert_called_once()
+    assert versioned.status_code == 409, versioned.text
+    notification.assert_not_called()
+    projection.assert_not_called()
     assert db_session.query(LabReportWorkflowEvent).filter_by(
         instance_id=draft["id"], kind="finalized",
-    ).count() == 1
+    ).count() == 0
 
 
 # PR 3351 (review round 9, P1): report CREATE идемпотентен по операции.
@@ -2560,13 +2509,12 @@ def test_draft_report_preview_passes_watermark_and_saved_values(
     assert rendered_values and rendered_values[0]["value_display"] == "≥135.25"
     assert rendered_values[0]["comparator"] == "gte"
 
-    # FINALIZED instance preview: watermark не ставится (утверждённый
-    # результат уже имеет финальный вид; печать — отдельное действие).
-    finalize_response = client.post(
-        f"/api/v1/lab/report-instances/{instance['id']}/finalize",
-        headers=lab_headers,
-    )
-    assert finalize_response.status_code == 200
+    # The PDF contract needs an immutable synthetic source state. Clinical
+    # release authorization is covered by the managed workflow tests.
+    report = db_session.get(LabReportInstance, instance["id"])
+    report.status = "FINALIZED"
+    report.finalized_at = datetime.now(UTC)
+    db_session.commit()
     captured.clear()
     service, original = _patch_render_spy(captured)
     try:

@@ -74,7 +74,9 @@ from app.api.v1.endpoints import (
     force_majeure,
     global_search,
     group_permissions,
+    lab_clinical_configurations,
     lab_critical_communication,
+    lab_equipment_integrations,
     lab_imports,
     lab_reporting,
     lab_specimens,
@@ -504,6 +506,16 @@ api_router.include_router(lab_specimens.router)
 api_router.include_router(lab_worklist.router)
 api_router.include_router(lab_critical_communication.router)
 api_router.include_router(lab_imports.router)
+api_router.include_router(
+    lab_clinical_configurations.router,
+    prefix="/clinic",
+    tags=["clinic-management", "lab-clinical-configuration"],
+)
+api_router.include_router(
+    lab_equipment_integrations.router,
+    prefix="/clinic",
+    tags=["clinic-management", "lab-equipment-integrations"],
+)
 # Legacy /lab CRUD and placeholder routers are intentionally not published.
 # The supported lab contract lives in these lab reporting workflow routers.
 api_router.include_router(

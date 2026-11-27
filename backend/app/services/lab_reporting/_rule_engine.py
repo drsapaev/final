@@ -136,12 +136,19 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
     def _resolve_reference(
         self, field_def: LabReportFieldDef, context: dict[str, Any]
     ) -> dict[str, Any]:
+        clinical_reference = self._resolve_clinical_configuration_reference(
+            field_def, context
+        )
+        if clinical_reference is not None:
+            return clinical_reference
+
         if field_def.reference_mode == "catalog":
-            return self._resolve_catalog_reference(field_def, context)
+            reference = self._resolve_catalog_reference(field_def, context)
+            return self._apply_clinical_critical_values(reference, field_def, context)
         if field_def.reference_mode == "rule_based":
             payload = self._resolve_rule_payload(field_def.reference_rule, context)
             fallback_text = (field_def.reference_text or "") if payload or not context.get("patient") else ""
-            return {
+            reference = {
                 "text": payload.get("text") or fallback_text,
                 "low": payload.get("low"),
                 "high": payload.get("high"),
@@ -158,7 +165,8 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
                 "flag": payload.get("flag"),
                 "provenance": {"mode": "template_rule", "rule": self._json_safe_value(payload)},
             }
-        return {
+            return self._apply_clinical_critical_values(reference, field_def, context)
+        reference = {
             "text": field_def.reference_text or "",
             "low": None,
             "high": None,
@@ -174,6 +182,7 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
             "critical_high_flag": None,
             "flag": None,
         }
+        return self._apply_clinical_critical_values(reference, field_def, context)
 
 
     def _is_visible(self, rule: dict[str, Any] | None, context: dict[str, Any]) -> bool:
@@ -465,7 +474,21 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
         context: dict[str, Any],
     ) -> None:
         result = value.result_payload or {}
-        field_context = {**context, "method_code": result.get("method_code")}
+        clinical_version = instance.clinical_configuration_version
+        clinical_configuration = (
+            {
+                "version_id": clinical_version.id,
+                "version_no": clinical_version.version_no,
+                "configuration_snapshot": clinical_version.configuration_snapshot,
+            }
+            if clinical_version is not None
+            else None
+        )
+        field_context = {
+            **context,
+            "method_code": result.get("method_code"),
+            "clinical_configuration": clinical_configuration,
+        }
         visible = self._is_visible(field_def.visibility_rule, field_context)
         reference = self._resolve_reference(field_def, field_context) if visible else {}
         effective_value = field_context["field"].get(value.field_key)
@@ -487,6 +510,12 @@ class RuleEngineMixin(LabReportingServiceMixinBase):
             "interpretation": interpretation,
             "visible": visible,
             "template_version_id": instance.template_version_id,
+            "clinical_configuration_version_id": (
+                clinical_version.id if clinical_version is not None else None
+            ),
+            "clinical_configuration_version_no": (
+                clinical_version.version_no if clinical_version is not None else None
+            ),
             "analyte_code": field_def.analyte_code,
             "unit": self._resolve_field_unit(field_def),
             "unit_code": self._resolve_field_unit_code(field_def),

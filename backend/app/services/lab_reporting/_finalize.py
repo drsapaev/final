@@ -19,11 +19,42 @@ class FinalizeMixin(LabReportingServiceMixinBase):
         # Draft writers, review and release serialize on the parent row first.
         instance = self._get_locked_instance(instance_id)
         actor = self._workflow_actor(actor_user_id) if actor_user_id is not None else None
+        if actor_user_id is not None:
+            # Every user-facing release must have an exact clinic-approved
+            # configuration pinned at report creation/revision. Check the
+            # version first so a stale client still receives the concurrency
+            # conflict when release is blocked for missing clinic setup.
+            # Configured managed reports validate their token after replay
+            # detection so an acknowledged retry remains idempotent.
+            if (
+                instance.clinical_configuration_version_id is None
+                and expected_updated_at is not None
+            ):
+                self._assert_not_concurrently_modified(instance, expected_updated_at)
+            if instance.clinical_configuration_version_id is None:
+                raise LabReportingDomainError(
+                    409,
+                    "Approved clinic clinical configuration and assigned Lab physician required",
+                )
+        if (
+            instance.clinical_configuration_version_id is not None
+            and not instance.managed_release
+        ):
+            if actor is None:
+                raise LabReportingDomainError(
+                    403,
+                    "Assigned active laboratory physician required for clinical sign-off",
+                )
+            self._require_assigned_clinical_reviewer(instance, actor)
+            raise LabReportingDomainError(
+                409, "Clinical configuration requires the managed review workflow"
+            )
         expected_version = None
         evidence = None
         if instance.managed_release:
             actor = actor or self._workflow_actor(actor_user_id)
             self._require_workflow_permission(actor, "lab:release")
+            self._require_assigned_clinical_reviewer(instance, actor)
             expected_version = self._workflow_expected_version(expected_updated_at)
             if self._workflow_request_replayed(
                 instance, kind="finalized", actor=actor, expected_version=expected_version,
@@ -120,6 +151,7 @@ class FinalizeMixin(LabReportingServiceMixinBase):
         ))
 
     def _assert_reviewed_release(self, instance, actor, expected_updated_at):
+        self._require_assigned_clinical_reviewer(instance, actor)
         if instance.status != "REVIEWED":
             raise LabReportingDomainError(409, "Release requires a reviewed report")
         self._assert_not_concurrently_modified(instance, expected_updated_at)

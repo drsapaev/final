@@ -6,7 +6,10 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import func, select
 
+from app.models.clinic import Branch, Equipment, EquipmentStatus, EquipmentType
 from app.models.lab import (
+    LabEquipmentIntegrationProfile,
+    LabEquipmentIntegrationProfileVersion,
     LabOrder,
     LabReportInstance,
     LabReportTemplate,
@@ -96,6 +99,55 @@ def _report(db, order: LabOrder, status: str = "DRAFT") -> LabReportInstance:
     db.add(report)
     db.flush()
     return report
+
+
+def _draft_label_profile_version(
+    db, actor: User, *, width: int, height: int, symbology: str
+) -> LabEquipmentIntegrationProfileVersion:
+    """Create synthetic config only; this does not represent device validation."""
+    suffix = uuid4().hex[:12]
+    branch = Branch(name="SYNTHETIC Label Profile", code=f"SYN-LBL-{suffix}")
+    db.add(branch)
+    db.flush()
+    equipment = Equipment(
+        name="SYNTHETIC Label Printer",
+        model="SYNTHETIC MODEL",
+        serial_number=f"SYN-LBL-{suffix}",
+        equipment_type=EquipmentType.LABORATORY,
+        branch_id=branch.id,
+        status=EquipmentStatus.ACTIVE,
+    )
+    db.add(equipment)
+    db.flush()
+    profile = LabEquipmentIntegrationProfile(
+        equipment_id=equipment.id,
+        device_role="label_printer",
+        created_by_user_id=actor.id,
+    )
+    db.add(profile)
+    db.flush()
+    version = LabEquipmentIntegrationProfileVersion(
+        profile_id=profile.id,
+        version_no=1,
+        status="DRAFT",
+        adapter_key="synthetic-label-renderer",
+        protocol_code="pdf",
+        transport_code="manual",
+        mapping_profile={},
+        transport_settings={},
+        device_settings={
+            "label_width_mm": width,
+            "label_height_mm": height,
+            "barcode_symbology": symbology,
+            "default_for_lab_labels": True,
+        },
+        simulator_validation_status="NOT_RUN",
+        physical_validation_status="NOT_RUN",
+        created_by_user_id=actor.id,
+    )
+    db.add(version)
+    db.flush()
+    return version
 
 
 @pytest.fixture
@@ -426,6 +478,130 @@ def test_specimen_label_keeps_full_material_and_container_codes_on_stock(
         assert 0 <= center - width / 2 < center + width / 2 <= 100 * mm, text
 
 
+@pytest.mark.parametrize("symbology", ["Code128", "QR", "DataMatrix"])
+def test_versioned_label_renderer_accepts_supported_synthetic_symbols(symbology):
+    from types import SimpleNamespace
+
+    from app.services.lab_specimen_service import _render_label
+
+    specimen = SimpleNamespace(
+        id=1,
+        order_id=1,
+        barcode="SYNTHETIC-SPECIMEN-1",
+        material_code="blood",
+        container_code="tube",
+    )
+    profile = SimpleNamespace(
+        device_settings={
+            "label_width_mm": 100,
+            "label_height_mm": 40,
+            "barcode_symbology": symbology,
+        }
+    )
+    assert _render_label(specimen, profile).startswith(b"%PDF")
+
+
+def test_versioned_label_renderer_rejects_unsupported_output_symbol():
+    from types import SimpleNamespace
+
+    from app.services.lab_reporting_service import LabReportingDomainError
+    from app.services.lab_specimen_service import _render_label
+
+    specimen = SimpleNamespace(
+        id=1,
+        order_id=1,
+        barcode="SYNTHETIC-SPECIMEN-1",
+        material_code="blood",
+        container_code="tube",
+    )
+    profile = SimpleNamespace(
+        device_settings={
+            "label_width_mm": 60,
+            "label_height_mm": 40,
+            "barcode_symbology": "PDF417",
+        }
+    )
+    with pytest.raises(LabReportingDomainError) as error:
+        _render_label(specimen, profile)
+    assert error.value.status_code == 409
+
+
+def test_label_print_event_pins_profile_version_across_replay_and_change(
+    client, db_session, specimen_context, monkeypatch
+):
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen.canvas import Canvas
+
+    from app.services.lab_specimen_service import LabSpecimenService
+
+    actor, _, _, visit, test, _, _ = specimen_context
+    first_profile = _draft_label_profile_version(
+        db_session, actor, width=100, height=40, symbology="Code128"
+    )
+    second_profile = _draft_label_profile_version(
+        db_session, actor, width=75, height=45, symbology="QR"
+    )
+    db_session.commit()
+    selected_profiles = iter([first_profile, second_profile])
+    monkeypatch.setattr(
+        LabSpecimenService,
+        "_selected_label_profile_version",
+        lambda _service: next(selected_profiles),
+    )
+
+    actor_headers = _headers(actor)
+    created = client.post(
+        f"{LAB_API}/visits/{visit.id}/specimens",
+        json=_create(test.id),
+        headers=actor_headers,
+    )
+    assert created.status_code == 201, created.text
+    specimen = created.json()
+    label_url = f"{LAB_API}/specimens/{specimen['id']}/label"
+    first_request = {
+        "request_id": str(uuid4()),
+        "expected_revision": specimen["revision"],
+    }
+    page_sizes = []
+    original_init = Canvas.__init__
+
+    def capture_page_size(canvas, filename, *args, **kwargs):
+        page_sizes.append(kwargs.get("pagesize", args[0] if args else None))
+        return original_init(canvas, filename, *args, **kwargs)
+
+    monkeypatch.setattr(Canvas, "__init__", capture_page_size)
+    first = client.post(label_url, json=first_request, headers=actor_headers)
+    assert first.status_code == 200, first.text
+    assert page_sizes[-1] == (100 * mm, 40 * mm)
+    first_replay = client.post(label_url, json=first_request, headers=actor_headers)
+    assert first_replay.status_code == 200, first_replay.text
+    assert first_replay.content == first.content
+    assert page_sizes[-1] == (100 * mm, 40 * mm)
+
+    listed = client.get(
+        f"{LAB_API}/orders/{specimen['order_id']}/specimens", headers=actor_headers
+    ).json()["items"][0]
+    first_event = next(event for event in listed["events"] if event["action"] == "print_label")
+    assert first_event["integration_profile_version_id"] == first_profile.id
+    second = client.post(
+        label_url,
+        json={"request_id": str(uuid4()), "expected_revision": listed["revision"]},
+        headers=actor_headers,
+    )
+    assert second.status_code == 200, second.text
+    assert page_sizes[-1] == (75 * mm, 45 * mm)
+    assert second.content != first.content
+    listed_after_change = client.get(
+        f"{LAB_API}/orders/{specimen['order_id']}/specimens",
+        headers=actor_headers,
+    ).json()["items"][0]
+    assert [
+        event["integration_profile_version_id"]
+        for event in listed_after_change["events"]
+        if event["action"] == "print_label"
+    ] == [first_profile.id, second_profile.id]
+
+
 def test_specimen_openapi_documents_context_and_binary_labels(client):
     paths = client.get("/openapi.json").json()["paths"]
     order_path = paths[f"{LAB_API}/orders/{{order_id}}/specimens"]
@@ -436,6 +612,23 @@ def test_specimen_openapi_documents_context_and_binary_labels(client):
         "type": "string",
         "format": "binary",
     }
+    assert "Code128, QR, or DataMatrix" in issue_label["responses"]["200"][
+        "description"
+    ]
+    event_contract = client.get("/openapi.json").json()["components"]["schemas"][
+        "LabSpecimenEventOut"
+    ]
+    assert "integration_profile_version_id" in event_contract["properties"]
+
+
+def test_specimen_print_event_preserves_profile_version_by_restrictive_reference():
+    from app.models.lab_specimen import LabSpecimenEvent
+
+    column = LabSpecimenEvent.__table__.c.integration_profile_version_id
+    foreign_key = next(iter(column.foreign_keys))
+    assert column.nullable is True
+    assert foreign_key.target_fullname == "lab_equipment_integration_profile_versions.id"
+    assert foreign_key.ondelete == "RESTRICT"
 
 
 def test_assignment_correction_is_audited_and_aliquot_requires_its_source(

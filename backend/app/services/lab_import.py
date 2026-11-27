@@ -9,10 +9,21 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.models.lab import (
+    LabEquipmentIntegrationProfile,
+    LabEquipmentIntegrationProfileVersion,
+    LabReportInstance,
+)
 from app.models.lab_import import LabImportReceipt
 from app.repositories.lab_specimen_repository import SpecimenRepository
 from app.schemas.lab_import import LabImportBatch, LabImportRow, LabImportRowOut
 from app.services.audit_service import log_audit_event
+from app.services.lab_import_adapters import (
+    ANALYZER_ADAPTERS,
+    AnalyzerAdapterError,
+    AnalyzerMappingProfile,
+    to_lab_import_row,
+)
 from app.services.lab_reporting import LabReportingDomainError, LabReportingService
 
 
@@ -21,6 +32,14 @@ class RowRejected(Exception):
         super().__init__(code)
         self.code = code
         self.unmapped_analyte_code = unmapped_analyte_code
+
+
+class AnalyzerIntegrationError(ValueError):
+    """Safe integration error code; source message data is never included."""
+
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(code)
 
 
 @dataclass(frozen=True)
@@ -48,6 +67,12 @@ def _digest(row: LabImportRow) -> str:
         if not value["instrument_flags"]:
             # Keep the existing receipt digest for requests without codes.
             del value["instrument_flags"]
+    for value_model, value_payload in zip(row.values, payload["values"], strict=True):
+        if value_model._source_analyte_code:
+            value_payload["source_analyte_code"] = value_model._source_analyte_code
+            value_payload["source_instrument_flags"] = list(
+                value_model._source_instrument_flags
+            )
     payload["values"].sort(key=lambda value: value["field_key"])
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
@@ -97,7 +122,9 @@ def _map_values(
         unit_code = service._resolve_field_unit_code(field)
         legacy_unit = service._resolve_field_unit(field) if unit_code is None else None
         expected_unit = unit_code or (legacy_unit if source == "manual" else None)
-        if value.unit_code != expected_unit or (source == "csv" and legacy_unit):
+        if value.unit_code != expected_unit or (
+            source in {"csv", "analyzer"} and legacy_unit
+        ):
             raise RowRejected("unit_mismatch")
         if (
             value.value_text is None
@@ -131,6 +158,7 @@ def _process_row(
     row_index: int,
     preview: bool,
     report_writes: dict[int, _BatchReportWrite],
+    source_integration_profile_version_id: int | None = None,
 ) -> LabImportRowOut:
     digest = _digest(row)
     message_id = str(row.message_id)
@@ -224,15 +252,21 @@ def _process_row(
         raise RowRejected("values_exist")
     if existing_values and not row.replace_existing:
         raise RowRejected("values_exist")
-    import_origins = {
-        mapped_value["field_key"]: {
+    import_origins = {}
+    for mapped_value, submitted in zip(mapped, row.values, strict=True):
+        origin = {
             "source": source,
             "message_id": message_id,
-            "submitted_analyte_code": submitted.field_key,
+            "submitted_analyte_code": (
+                submitted._source_analyte_code or submitted.field_key
+            ),
             "instrument_flags": submitted.instrument_flags,
         }
-        for mapped_value, submitted in zip(mapped, row.values, strict=True)
-    }
+        if submitted._source_analyte_code:
+            origin["source_instrument_flags"] = list(
+                submitted._source_instrument_flags
+            )
+        import_origins[mapped_value["field_key"]] = origin
     try:
         saved, updated = service.bulk_upsert_values(
             instance.id,
@@ -241,6 +275,9 @@ def _process_row(
             actor_user_id=actor_id,
             source_specimen_id=specimen.id,
             import_origins=import_origins,
+            source_integration_profile_version_id=(
+                source_integration_profile_version_id
+            ),
             commit=False,
         )
     except LabReportingDomainError as exc:
@@ -292,7 +329,12 @@ def process_import_batch(
     *,
     actor_id: int,
     preview: bool = False,
+    source_integration_profile_version_id: int | None = None,
 ) -> list[LabImportRowOut]:
+    if batch.source == "analyzer" and source_integration_profile_version_id is None:
+        raise ValueError("analyzer_profile_version_required")
+    if batch.source != "analyzer" and source_integration_profile_version_id is not None:
+        raise ValueError("analyzer_profile_version_not_allowed")
     responses = []
     report_writes: dict[int, _BatchReportWrite] = {}
     for row_index, row in enumerate(batch.rows):
@@ -308,6 +350,9 @@ def process_import_batch(
                     row_index=row_index,
                     preview=preview,
                     report_writes=report_writes,
+                    source_integration_profile_version_id=(
+                        source_integration_profile_version_id
+                    ),
                 )
             )
         except RowRejected as exc:
@@ -341,3 +386,117 @@ def process_import_batch(
             if db.in_transaction():
                 db.rollback()
     return responses
+
+
+def _mapping_profile(profile_data: object) -> AnalyzerMappingProfile:
+    if not isinstance(profile_data, dict):
+        raise AnalyzerIntegrationError("invalid_mapping_profile")
+    analyte_codes = profile_data.get("analyte_codes")
+    unit_codes = profile_data.get("unit_codes")
+    flag_codes = profile_data.get("flag_codes", {})
+    specimen_id_source = profile_data.get("specimen_id_source", "specimen_id")
+    if not isinstance(analyte_codes, dict) or not isinstance(unit_codes, dict):
+        raise AnalyzerIntegrationError("invalid_mapping_profile")
+    if not isinstance(flag_codes, dict):
+        raise AnalyzerIntegrationError("invalid_mapping_profile")
+    if not isinstance(specimen_id_source, str) or specimen_id_source not in {
+        "specimen_id", "accession_id"
+    }:
+        raise AnalyzerIntegrationError("invalid_mapping_profile")
+    flattened_units = {}
+    for source_code, units in unit_codes.items():
+        if not isinstance(source_code, str) or not isinstance(units, dict):
+            raise AnalyzerIntegrationError("invalid_mapping_profile")
+        for source_unit, target_unit in units.items():
+            if not isinstance(source_unit, str) or not (
+                target_unit is None or isinstance(target_unit, str)
+            ):
+                raise AnalyzerIntegrationError("invalid_mapping_profile")
+            flattened_units[(source_code, source_unit)] = target_unit
+    if any(
+        not isinstance(source, str) or not isinstance(target, str)
+        for source, target in analyte_codes.items()
+    ) or any(
+        not isinstance(source, str) or not isinstance(target, str)
+        for source, target in flag_codes.items()
+    ):
+        raise AnalyzerIntegrationError("invalid_mapping_profile")
+    try:
+        return AnalyzerMappingProfile(
+            analyte_codes=analyte_codes,
+            unit_codes=flattened_units,
+            flag_codes=flag_codes,
+            specimen_id_source=specimen_id_source,
+        )
+    except (TypeError, ValueError) as exc:
+        raise AnalyzerIntegrationError("invalid_mapping_profile") from exc
+
+
+def import_analyzer_message(
+    db: Session,
+    *,
+    profile_version_id: int,
+    report_instance_id: int,
+    payload: str | bytes,
+    actor_id: int,
+    expected_updated_at: datetime | None = None,
+    preview: bool = False,
+) -> list[LabImportRowOut]:
+    """Parse one analyzer message and hand it to the established safe importer.
+
+    Target reports are selected by the authenticated operator. Analyzer-supplied
+    patient identifiers and accessions are never used to select a report; the
+    canonical importer verifies the exact accepted specimen belongs to it.
+    """
+    profile_version = db.scalar(
+        select(LabEquipmentIntegrationProfileVersion)
+        .join(
+            LabEquipmentIntegrationProfile,
+            LabEquipmentIntegrationProfile.id
+            == LabEquipmentIntegrationProfileVersion.profile_id,
+        )
+        .where(
+            LabEquipmentIntegrationProfileVersion.id == profile_version_id,
+            LabEquipmentIntegrationProfileVersion.status == "ACTIVE",
+            LabEquipmentIntegrationProfile.device_role == "analyzer",
+        )
+    )
+    if (
+        profile_version is None
+        or profile_version.simulator_validation_status != "PASS"
+        or profile_version.physical_validation_status != "PASS"
+    ):
+        raise AnalyzerIntegrationError("analyzer_profile_not_ready")
+    try:
+        adapter = ANALYZER_ADAPTERS.get(profile_version.adapter_key)
+        parsed = adapter.parse(payload)
+        mapping = _mapping_profile(profile_version.mapping_profile)
+    except AnalyzerAdapterError as exc:
+        raise AnalyzerIntegrationError(exc.code) from exc
+
+    report = db.get(LabReportInstance, report_instance_id)
+    if report is None:
+        raise AnalyzerIntegrationError("report_not_found")
+    method_code = (report.patient_snapshot or {}).get("method_code")
+    try:
+        row = to_lab_import_row(
+            parsed,
+            mapping,
+            report_instance_id=report_instance_id,
+            method_code=method_code,
+            expected_updated_at=expected_updated_at,
+            profile_version_id=profile_version.id,
+        )
+    except (AnalyzerAdapterError, ValueError) as exc:
+        code = exc.code if isinstance(exc, AnalyzerAdapterError) else "invalid_mapping_profile"
+        raise AnalyzerIntegrationError(code) from exc
+    from app.schemas.lab_import import LabImportBatch
+
+    batch = LabImportBatch(source="analyzer", rows=[row])
+    return process_import_batch(
+        db,
+        batch,
+        actor_id=actor_id,
+        preview=preview,
+        source_integration_profile_version_id=profile_version.id,
+    )
