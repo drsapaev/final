@@ -127,8 +127,15 @@ export const useRegistrarWizard = ({
       editMode: wasEditMode,
       success: wizardDataObj.success === true,
     });
+    // A pending All Free response carries the provisional invoice, not an
+    // amount that can be collected. The saved state takes precedence over it.
+    const createdVisits = wizardDataObj.created_visits;
+    const approvalPending = Array.isArray(createdVisits) && createdVisits.some(
+      (visit: unknown) => visit !== null && typeof visit === 'object' &&
+        (visit as { approval_status?: unknown }).approval_status === 'pending',
+    );
     const postWizardPaymentRow = (!wasEditMode || Number(wizardDataObj.total_amount ?? 0) > 0) &&
-      wizardDataObj.payment_dialog_deferred !== true
+      wizardDataObj.payment_dialog_deferred !== true && !approvalPending
       ? buildPostWizardPaymentRow(wizardDataObj)
       : null;
 
@@ -145,7 +152,11 @@ export const useRegistrarWizard = ({
       const message = wasEditMode ?
         tI18n('registrarPanel.rp_notify_appointment_updated') :
         tI18n('registrarPanel.rp_notify_appointment_created');
-      notify.success(message);
+      if (approvalPending) {
+        notify.info(tI18n('admin2.af_status_pending'));
+      } else {
+        notify.success(message);
+      }
 
       // Open payment/print dialog immediately — user can act while data refreshes
       if (postWizardPaymentRow) {

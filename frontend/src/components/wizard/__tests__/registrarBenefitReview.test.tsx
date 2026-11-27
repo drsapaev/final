@@ -12,11 +12,15 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   openPayment: vi.fn(),
   openPrint: vi.fn(),
+  notifyInfo: vi.fn(),
   reload: vi.fn(),
   reloadIntegrated: vi.fn(),
   role: 'Admin',
 }));
 
+vi.mock('../../../services/notify', () => ({
+  default: { success: vi.fn(), info: mocks.notifyInfo },
+}));
 vi.mock('../../../api/client', () => ({ api: { get: mocks.get, post: mocks.post } }));
 vi.mock('../../../api/registrar', () => ({
   fetchRegistrarDoctors: async () => ({ doctors: [] }),
@@ -48,9 +52,14 @@ vi.mock('../PatientStepV2', () => ({
 }));
 vi.mock('../CartStepV2', () => ({
   default: ({ onUpdateCart }: { onUpdateCart: (field: string, value: unknown) => void }) => (
-    <button onClick={() => onUpdateCart('items', [{ service_id: 4, quantity: 1, service_price: 120 }])}>
-      Add test service
-    </button>
+    <>
+      <button onClick={() => onUpdateCart('items', [{ service_id: 4, quantity: 1, service_price: 120 }])}>
+        Add test service
+      </button>
+      <label><input type="checkbox" aria-label="All Free" onChange={(event) => onUpdateCart('all_free', event.currentTarget.checked)} />
+        All Free
+      </label>
+    </>
   ),
 }));
 
@@ -256,5 +265,45 @@ describe('registrar benefit review and payment handoff', () => {
     })));
     expect(mocks.get).not.toHaveBeenCalled();
     expect(mocks.post).not.toHaveBeenCalledWith(decisionPath, expect.anything());
+  });
+
+  it.each(['pending', 'approved'] as const)('respects the saved %s All Free decision', async (status) => {
+    mocks.role = 'Registrar';
+    const pending = status === 'pending';
+    const total = pending ? '120.00' : '0.00';
+    const assignment = { queue_id: 19, queue_tag: 'lab', number: 3, service_price: '0.00' };
+    mocks.post.mockImplementation((url: string, body?: { discount_mode?: string; all_free?: boolean }) => {
+      if (url !== quotePath || (!body?.all_free && body?.discount_mode !== 'all_free')) return postWithoutDecision(url);
+      return Promise.resolve({ data: {
+        items: [{ service_id: 4, service_name: 'Synthetic laboratory test', quantity: 1, final_price: Number(total) }],
+        total_amount: total, currency: 'UZS', approval_status: status, quote_token: 'synthetic-all-free-quote',
+      } });
+    });
+    mocks.createCart.mockResolvedValue({
+      ...savedCart, total_amount: total, visit_ids: [71], print_tickets: [],
+      created_visits: [{ visit_id: 71, approval_status: status, status: pending ? 'pending_confirmation' : 'confirmed' }],
+      queue_numbers: pending ? {} : { 71: [assignment] },
+    });
+    await prepareCart();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'All Free' }));
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith(quotePath, expect.objectContaining({ all_free: true })));
+    fireEvent.click(await screen.findByRole('button', { name: 'misc.aw_finish' }));
+    await waitFor(() => expect(mocks.reload).toHaveBeenCalledTimes(1));
+    expect(mocks.createCart).toHaveBeenCalledWith(
+      expect.objectContaining({ all_free: true, quote_token: 'synthetic-all-free-quote' }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) }),
+    );
+    expect(mocks.openPayment).not.toHaveBeenCalled();
+    if (pending) {
+      expect(mocks.openPrint).not.toHaveBeenCalled();
+      expect(mocks.notifyInfo).toHaveBeenCalledWith('admin2.af_status_pending');
+    } else {
+      expect(mocks.openPrint).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'ticket', data: expect.objectContaining({
+          cost: 0, queue_numbers: [expect.objectContaining({ ...assignment, visit_id: 71 })],
+        }),
+      }));
+      expect(mocks.notifyInfo).not.toHaveBeenCalled();
+    }
   });
 });
