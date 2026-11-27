@@ -1414,9 +1414,20 @@ jobs:
               printf '%s\n' 'No task-owned containers were created.' | tee -a "$GITHUB_STEP_SUMMARY"
             else
               for container_id in "${container_ids[@]}"; do
-                if state_line="$(docker inspect --format 'service={{index .Config.Labels "com.docker.compose.service"}} state={{.State.Status}} exit_code={{.State.ExitCode}} oom_killed={{.State.OOMKilled}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id" 2>/dev/null)"; then
-                  if [[ "$state_line" =~ ^service=(postgres|redis|backend|frontend|telegram-relay|menu-webhook-proxy)[[:space:]]state=([a-z_]+)[[:space:]]exit_code=(-?[0-9]+)[[:space:]]oom_killed=(true|false)[[:space:]]health=(none|starting|healthy|unhealthy)$ ]]; then
-                    printf 'service=%s state=%s exit_code=%s oom_killed=%s health=%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}" "${BASH_REMATCH[5]}" | tee -a "$GITHUB_STEP_SUMMARY"
+                if state_line="$(docker inspect --format 'service={{index .Config.Labels "com.docker.compose.service"}} state={{.State.Status}} exit_code={{.State.ExitCode}} oom_killed={{.State.OOMKilled}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} error={{json .State.Error}}' "$container_id" 2>/dev/null)"; then
+                  if [[ "$state_line" =~ ^service=(postgres|redis|backend|frontend|telegram-relay|menu-webhook-proxy)[[:space:]]state=([a-z_]+)[[:space:]]exit_code=(-?[0-9]+)[[:space:]]oom_killed=(true|false)[[:space:]]health=(none|starting|healthy|unhealthy)[[:space:]]error=(.*)$ ]]; then
+                    state_error="${BASH_REMATCH[6]}"
+                    case "$state_error" in
+                      ''|'""') error_class=none ;;
+                      *sysctl*|*'sysctl value'*) error_class=sysctl ;;
+                      *'permission denied'*|*'operation not permitted'*) error_class=permission ;;
+                      *mount*|*'bind source path'*) error_class=mount ;;
+                      *network*|*'no route to host'*) error_class=network ;;
+                      *'address already in use'*) error_class=address_conflict ;;
+                      *'no such file'*|*'not found'*) error_class=missing_resource ;;
+                      *) error_class=other ;;
+                    esac
+                    printf 'service=%s state=%s exit_code=%s oom_killed=%s health=%s error_class=%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}" "${BASH_REMATCH[5]}" "$error_class" | tee -a "$GITHUB_STEP_SUMMARY"
                   else
                     printf '%s\n' 'A task-owned container state was unavailable or outside the approved diagnostic format.' | tee -a "$GITHUB_STEP_SUMMARY"
                   fi
