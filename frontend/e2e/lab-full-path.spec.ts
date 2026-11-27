@@ -618,6 +618,100 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     expect(requestedCursor).toBe(false);
   });
 
+  test('records synthetic browser timings for a 602-order queue and 52-report history', async ({ page }) => {
+    const firstPage = Array.from({ length: 8 }, (_, index) => ({
+      ...QUEUE_ENTRY,
+      id: `visit:${1000 + index}`,
+      appointment_id: 1000 + index,
+      visit_id: 1000 + index,
+      patient_id: 2000 + index,
+      patient_fio: `SYNTHETIC-LAB-QUEUE-${String(index).padStart(3, '0')}`,
+    }));
+    const target = {
+      ...QUEUE_ENTRY,
+      id: 'visit:1602',
+      appointment_id: 1602,
+      visit_id: 1602,
+      patient_fio: 'SYNTHETIC-LAB-TARGET-602',
+    };
+    state.instances = Array.from({ length: 52 }, (_, index) => makeInstanceRecord(
+      500 + index,
+      'PRINTED',
+      {
+        wbcValue: String(index + 1),
+        supersedesInstanceId: null,
+        createdAt: `2026-10-${String((index % 28) + 1).padStart(2, '0')}T08:00:00.000000+00:00`,
+      },
+    ));
+    let longHistoryResponseStartedAt: number | null = null;
+    await page.route('**/api/v1/lab/report-instances?**', (route) => {
+      const patientId = new URL(route.request().url()).searchParams.get('patient_id');
+      if (patientId) historyPatientRequests.push(patientId);
+      if (patientId && state.instances.length === 53) {
+        longHistoryResponseStartedAt = performance.now();
+      }
+      const summaries = state.instances
+        .filter((record) => !patientId || record.patient_id === Number(patientId))
+        .map(makeHistorySummary);
+      return json(route, summaries);
+    });
+    await page.route('**/api/v1/lab/worklist/search', (route) => {
+      const request = route.request();
+      if (request.method() !== 'POST') return route.fallback();
+      const query = String(request.postDataJSON()?.q ?? '').trim();
+      return json(route, {
+        entries: query ? (query === target.patient_fio ? [target] : []) : firstPage,
+        total: query ? (query === target.patient_fio ? 1 : 0) : 602,
+        counts: { actionable: query ? 1 : 602, today: 0, overdue: 0, awaiting_specimen: 0, in_review: 0, ready: 0 },
+        next_cursor: query ? null : 'synthetic-next-page',
+        date: '2026-11-27',
+        timezone: 'Asia/Tashkent',
+      });
+    });
+
+    const timings: Record<string, number> = {};
+    let started = performance.now();
+    await page.goto('/lab');
+    const firstRow = page.getByRole('button', { name: /SYNTHETIC-LAB-QUEUE-000/ });
+    await expect(firstRow).toBeVisible();
+    await expect(page.getByRole('button', { name: /SYNTHETIC-LAB-QUEUE-/ })).toHaveCount(8);
+    timings.coldFirstVisiblePageMs = performance.now() - started;
+
+    started = performance.now();
+    await page.getByRole('searchbox').fill(target.patient_fio);
+    const targetOrder = page.getByRole('button', { name: new RegExp(target.patient_fio) });
+    await expect(targetOrder).toBeVisible();
+    timings.searchToTargetMs = performance.now() - started;
+
+    started = performance.now();
+    await targetOrder.click();
+    await expect(page.getByRole('button', { name: 'Создать отчёт' })).toBeVisible();
+    timings.orderNavigationMs = performance.now() - started;
+
+    started = performance.now();
+    await page.getByRole('button', { name: 'Создать отчёт' }).click();
+    const resultInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(resultInput).toBeVisible();
+    timings.createToInputReadyMs = performance.now() - started;
+
+    started = performance.now();
+    await resultInput.fill('6.5');
+    await expect(resultInput).toHaveValue('6.5');
+    timings.inputToVisibleValueMs = performance.now() - started;
+
+    const historyCards = page.getByRole('button', { name: /Отчёт Rule Demo,/ });
+    await expect(historyCards).toHaveCount(53);
+    expect(longHistoryResponseStartedAt).not.toBeNull();
+    timings.history52ResponseToRenderMs = performance.now() - longHistoryResponseStartedAt!;
+
+    // eslint-disable-next-line no-console -- The timing record is evidence emitted into the CI job log.
+    console.log(`LAB_SYNTHETIC_PERFORMANCE ${JSON.stringify({
+      workload: { renderedInitialRows: 8, totalOrders: 602, priorReports: 52 },
+      timings: Object.fromEntries(Object.entries(timings).map(([key, value]) => [key, Math.round(value * 100) / 100])),
+      scope: 'mocked browser rendering and interaction only; server/database latency is recorded separately in the plan',
+    })}`);
+  });
+
   test('keeps the selected order visible across the wide and narrow workspace layouts', async ({ page }) => {
     await page.goto('/lab');
     await page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) }).click();
