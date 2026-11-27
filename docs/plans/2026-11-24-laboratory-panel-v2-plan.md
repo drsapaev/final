@@ -642,6 +642,16 @@ ALLOW_SQLITE_DATABASE_URL=1 DATABASE_URL=sqlite:////dev/shm/labv2-universal/.scr
 
 Gate для исправления locale parity · 27 ноября: подтверждённая причина — `frontend/src/i18n/locales/kk.ts`, куда добавлены пропущенные казахские переводы. Повторный штатный launcher охватил 47 изменённых/новых файлов, включая этот файл; результат `narrow_override`, `mode=execute`, `handoff_required=true`, `gate_misroute=false`, `override_used=true`, execution prompt прочитан. Его validation targets выполнены: `scripts/i18n/validate_locales.py --strict` — 11,566 ключей в каждом из ru, uz-Latn, uz-Cyrl, en и kk; `py_compile` — exit 0; три handoff frontend test suites — 42/42; TypeScript type-check — exit 0; Vite build — 24.11 s; `git diff --check` — exit 0. Fix и это evidence вошли в следующий коммит; full CI должен подтвердить parity на его exact head.
 
+#### DevBrain gate · синтетический V25 benchmark · 27 ноября
+
+На implementation SHA `bebfef7eb317984e55c5543b87c128e20855a6c6` штатный launcher проверил только `frontend/e2e/lab-full-path.spec.ts` и этот план. Результат: exit `0`, `narrow_override`, `mode=execute`, `handoff_required=true`, `gate_misroute=false`, `override_used=true`; execution prompt прочитан. Это явный handoff, не `gate_ok`. Его validation target `cd frontend; npm.cmd run build` выполнен как `TMPDIR=/dev/shm/labv2-build-tmp npm run build`: `vite build` завершился success за `22.83 s`. Дополнительно E2E повторён `3/3` с Chromium `156.0.8078.79` (local config использовал системный браузер, так как Playwright bundle не был установлен); `npx tsc -p e2e/tsconfig.json --noEmit`, `npx eslint e2e/lab-full-path.spec.ts` и `git diff --check` прошли.
+
+```bash
+/dev/shm/pwsh-7.7.0/pwsh -NoLogo -NoProfile -File scripts/run_agent_gate.ps1 "Add synthetic browser performance evidence for laboratory panel v2 using the existing Playwright harness and update the original 137-item plan without changing runtime product behavior. Preserve clinic-specific staging and physical validation as open; do not touch main or staging." --known-root-cause frontend/e2e/lab-full-path.spec.ts --scope frontend/e2e/lab-full-path.spec.ts --scope docs/plans/2026-11-24-laboratory-panel-v2-plan.md --format json
+```
+
+Следующий exact-head CI должен включить этот E2E case и обновлённый evidence; staging, физическая проверка оборудования и merge не запускались.
+
 ### Локальная приёмка 25 ноября · исторические проверки
 
 Ниже приведены результаты на их исходных SHA. Позднее ужесточение выпуска и новая конфигурация в разделе 0 являются актуальным поведением.
