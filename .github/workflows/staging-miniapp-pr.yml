@@ -729,7 +729,7 @@ jobs:
        (github.workflow_ref == 'drsapaev/final/.github/workflows/staging-miniapp-native-live.yml@refs/heads/main' &&
         !inputs.native-protected &&
         ((inputs.native-live && !inputs.native-arq && inputs.source-sha == '33f35996a1f86726b17f8caa819d1ed99aa1729a') ||
-         (inputs.native-arq && !inputs.native-live))) &&
+         (inputs.native-arq && !inputs.native-live)))) &&
       (!inputs.native-menu ||
        (github.workflow_ref == 'drsapaev/final/.github/workflows/staging-miniapp-native-live.yml@refs/heads/codex/telegram-patient-menu' &&
         !inputs.native-protected && !inputs.native-live && !inputs.native-arq &&
