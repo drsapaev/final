@@ -1402,6 +1402,7 @@ jobs:
           set -euo pipefail
           test -n "$TELEGRAM_BOT_TOKEN" || { echo "::error::Protected staging credential unavailable."; exit 1; }
           d="$RUNNER_TEMP/miniapp-native-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          project="miniapp-native-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
             python3 - "$d/approved-chat-id" <<'PY'
           import os, stat, sys
@@ -1420,6 +1421,20 @@ jobs:
           fi
           if ! "$d/compose" up -d --no-build --pull never --wait --wait-timeout 280 postgres redis backend frontend >/dev/null 2>&1; then
             echo "::error::Protected staging failed to start; runtime logs were not collected."
+            {
+              echo '### Sanitized staging startup state'
+              mapfile -t container_ids < <(docker ps -a -q --filter "label=com.docker.compose.project=$project")
+              if [[ ${#container_ids[@]} -eq 0 ]]; then
+                echo 'No task-owned containers were created.'
+              else
+                for container_id in "${container_ids[@]}"; do
+                  if ! docker inspect --format '{{.Name}} service={{index .Config.Labels "com.docker.compose.service"}} state={{.State.Status}} exit_code={{.State.ExitCode}} oom_killed={{.State.OOMKilled}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id" 2>/dev/null; then
+                    echo 'A task-owned container state could not be inspected.'
+                  fi
+                done
+              fi
+              echo 'Container logs and environment values were not collected.'
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
           if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
