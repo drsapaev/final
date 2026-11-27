@@ -8,6 +8,8 @@ import uzLatn from '@/i18n/locales/uz-Latn';
 const locales = { ru, en, kk, uzLatn, uzCyrl };
 const workspaceKeys = [
   'patient_age',
+  'history_details',
+  'complaints',
   'specialty',
   'specialty_general',
   'specialty_cardiology',

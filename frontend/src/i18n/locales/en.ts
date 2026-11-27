@@ -149,6 +149,7 @@ const en = {
     conflict: 'The information has changed. Refresh the summary and reopen the entry.',
     save_error: 'The entry was not saved. Check the information and retry.',
     patient_history: 'Patient history',
+    history_details: 'Visit details',
     no_history: 'No signed records available yet',
     previous_plan: 'Previous visit plan',
     more_history: 'Show more visits',

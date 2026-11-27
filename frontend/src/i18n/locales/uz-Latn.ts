@@ -149,6 +149,7 @@ const uzLatn = {
     conflict: "Ma’lumot o‘zgargan. Xulosani yangilang va yozuvni qayta oching.",
     save_error: "Yozuv saqlanmadi. Ma’lumotni tekshirib, qayta urining.",
     patient_history: "Bemor tarixi",
+    history_details: "Qabullar tafsilotlari",
     no_history: "Imzolangan yozuvlar hali yo‘q",
     previous_plan: "Oldingi qabul rejasi",
     more_history: "Yana tashriflarni ko‘rsatish",

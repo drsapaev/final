@@ -305,61 +305,60 @@ export function WorkspaceSidePanel({
           <section className="emr-workspace-group">
             <h3>{t('emr_workspace.patient_history')}</h3>
             {labDownloadFailed && <p role="alert">{t('emr_workspace.load_error')}</p>}
-            {workspace.history.length === 0 && <p>{t('emr_workspace.no_history')}</p>}
-            <ol className="emr-workspace-list">
-              {history.map((item, index) => (
-                <li key={item.id} className="emr-workspace-entry">
-                  <Button type="button" variant="ghost" size="small" onClick={() => void openHistory(item)}>
-                    {item.visit_date ?? t('emr_workspace.visit_number', { id: item.visit_id })}
-                  </Button>
-                  {item.complaints && <span>{item.complaints}</span>}
-                  {item.diagnosis && <strong>{item.diagnosis}</strong>}
-                  {Boolean(item.laboratory?.length) && <details>
-                    <summary>{t('emr_workspace.previous_labs')}</summary>
-                    <ul>
-                      {item.laboratory.map((value, index) => <li key={`${value.instance_id}:${index}`}>
-                        <span>{value.name} {value.value} {value.unit} {value.abnormal && t('emr_workspace.lab_abnormal')}
-                          {value.finalized_at && ` · ${new Date(value.finalized_at).toLocaleDateString(language)}`}</span>
-                        <Button type="button" size="small" variant="ghost" onClick={() => void openLabReport(value.instance_id)}>
-                          {t('emr_workspace.lab_report', { id: value.instance_id })}
-                        </Button>
-                      </li>)}
-                    </ul>
-                  </details>}
-                  {index === 0 && (item.treatment || item.recommendations) && <details open>
-                    <summary>{t('emr_workspace.previous_plan')}</summary>
-                    {item.treatment && <p className="emr-workspace-document-text">{item.treatment}</p>}
-                    {item.recommendations && <p className="emr-workspace-document-text">{item.recommendations}</p>}
-                  </details>}
-                </li>
-              ))}
-            </ol>
-            {(hasExtra ?? workspace.has_more_history) && <Button type="button" size="small" variant="outline"
-              disabled={pagination === 'loading'} onClick={() => void loadMore()}>
-              {t(pagination === 'loading' ? 'emr_workspace.loading' : 'emr_workspace.more_history')}
-            </Button>}
-            {pagination === 'error' && <p role="alert">{t('emr_workspace.load_error')}</p>}
-            {source && (
-              <div className="emr-workspace-group">
-                <h4 tabIndex={-1} ref={headingRef}>{t('emr_workspace.source_document')}</h4>
-                <form onSubmit={event => { event.preventDefault(); void openHistory(source, Number(version)); }}>
-                  <label className="emr-workspace-field">{t('emr_workspace.document_version')}
-                    <Input type="number" aria-label={t('emr_workspace.document_version')} min={1} max={source.version} required
-                      value={version} onChange={event => setVersion(event.target.value)} />
-                  </label>
-                  <Button type="submit" size="small" variant="outline">{t('emr_workspace.open_version')}</Button>
-                  <Button type="button" size="small" variant="ghost" onClick={() => {
-                    selectionRequest.current += 1;
-                    setSource(undefined);
-                    setDocument(undefined);
-                  }}>{t('misc.cancel')}</Button>
-                </form>
-                {historyStatus === 'loading' && <p role="status">{t('emr_workspace.loading')}</p>}
-                {historyStatus === 'error' && <p role="alert">{t('emr_workspace.history_error')}</p>}
-                {transferLimit && <p role="alert">{t('emr_workspace.transfer_limit')}</p>}
-                {document && <HistoryDetails key={`${document.id}:${document.version}`} document={document} patient={workspace.patient}
-                  disabled={readOnly} accept={transfer} />}
-              </div>
+            {history.length === 0 ? <p>{t('emr_workspace.no_history')}</p> : (
+              <details className="emr-workspace-history-details">
+                <summary>{t('emr_workspace.history_details')}</summary>
+                <ol className="emr-workspace-list">
+                  {history.map(item => (
+                    <li key={item.id} className="emr-workspace-entry">
+                      <Button type="button" variant="ghost" size="small" onClick={() => void openHistory(item)}>
+                        {item.visit_date ?? t('emr_workspace.visit_number', { id: item.visit_id })}
+                      </Button>
+                      {item.complaints && <span>{item.complaints}</span>}
+                      {item.diagnosis && <strong>{item.diagnosis}</strong>}
+                      {Boolean(item.laboratory?.length) && <details>
+                        <summary>{t('emr_workspace.previous_labs')}</summary>
+                        <ul>
+                          {item.laboratory.map((value, index) => <li key={`${value.instance_id}:${index}`}>
+                            <span>{value.name} {value.value} {value.unit} {value.abnormal && t('emr_workspace.lab_abnormal')}
+                              {value.finalized_at && ` · ${new Date(value.finalized_at).toLocaleDateString(language)}`}</span>
+                            <Button type="button" size="small" variant="ghost" onClick={() => void openLabReport(value.instance_id)}>
+                              {t('emr_workspace.lab_report', { id: value.instance_id })}
+                            </Button>
+                          </li>)}
+                        </ul>
+                      </details>}
+                    </li>
+                  ))}
+                </ol>
+                {(hasExtra ?? workspace.has_more_history) && <Button type="button" size="small" variant="outline"
+                  disabled={pagination === 'loading'} onClick={() => void loadMore()}>
+                  {t(pagination === 'loading' ? 'emr_workspace.loading' : 'emr_workspace.more_history')}
+                </Button>}
+                {pagination === 'error' && <p role="alert">{t('emr_workspace.load_error')}</p>}
+                {source && (
+                  <div className="emr-workspace-group">
+                    <h4 tabIndex={-1} ref={headingRef}>{t('emr_workspace.source_document')}</h4>
+                    <form onSubmit={event => { event.preventDefault(); void openHistory(source, Number(version)); }}>
+                      <label className="emr-workspace-field">{t('emr_workspace.document_version')}
+                        <Input type="number" aria-label={t('emr_workspace.document_version')} min={1} max={source.version} required
+                          value={version} onChange={event => setVersion(event.target.value)} />
+                      </label>
+                      <Button type="submit" size="small" variant="outline">{t('emr_workspace.open_version')}</Button>
+                      <Button type="button" size="small" variant="ghost" onClick={() => {
+                        selectionRequest.current += 1;
+                        setSource(undefined);
+                        setDocument(undefined);
+                      }}>{t('misc.cancel')}</Button>
+                    </form>
+                    {historyStatus === 'loading' && <p role="status">{t('emr_workspace.loading')}</p>}
+                    {historyStatus === 'error' && <p role="alert">{t('emr_workspace.history_error')}</p>}
+                    {transferLimit && <p role="alert">{t('emr_workspace.transfer_limit')}</p>}
+                    {document && <HistoryDetails key={`${document.id}:${document.version}`} document={document} patient={workspace.patient}
+                      disabled={readOnly} accept={transfer} />}
+                  </div>
+                )}
+              </details>
             )}
             <details className="emr-workspace-group">
               <summary>{t('emr_workspace.measurement_history')}</summary>

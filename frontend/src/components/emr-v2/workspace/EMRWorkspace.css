@@ -236,6 +236,25 @@
     overflow-wrap: anywhere;
 }
 
+.emr-workspace-previous-plan {
+    margin-block: var(--mac-spacing-3, 12px);
+    padding: var(--mac-spacing-3, 12px);
+    border-inline-start: 3px solid var(--mac-accent-blue, Highlight);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary, Canvas));
+}
+
+.emr-workspace-previous-plan h4 {
+    margin: 0;
+}
+
+.emr-workspace-previous-plan p {
+    margin-block: var(--mac-spacing-2, 8px) 0;
+}
+
+.emr-workspace-history-details {
+    margin-top: var(--mac-spacing-3, 12px);
+}
+
 .emr-workspace-sidebar summary {
     cursor: pointer;
 }

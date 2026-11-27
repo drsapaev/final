@@ -931,7 +931,28 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
           visit: { id: 501, date: '2026-08-29', status: 'open' },
           allergy_state: 'not_checked',
           clinical_entries: [],
-          history: [],
+          history: [{
+            id: 499,
+            visit_id: 499,
+            version: 2,
+            visit_date: '2026-08-01',
+            signed_at: '2026-08-01T08:00:00+05:00',
+            status: 'signed',
+            complaints: 'SYNTHETIC-PRIOR-COMPLAINT',
+            diagnosis: 'SYNTHETIC-PRIOR-DIAGNOSIS',
+            treatment: 'SYNTHETIC-PRIOR-PLAN',
+            recommendations: 'SYNTHETIC-PRIOR-RECOMMENDATION',
+            vitals: {},
+            echo: {},
+            laboratory: [{
+              instance_id: 9001,
+              name: 'SYNTHETIC-LAB-RESULT',
+              value: '4.8',
+              unit: 'mmol/L',
+              finalized_at: '2026-08-01T08:30:00+05:00',
+              abnormal: false,
+            }],
+          }],
           has_more_history: false,
         }));
         return;
@@ -999,12 +1020,46 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     await refresh;
     await expect(actionMenu).not.toHaveAttribute('open');
 
+    const allergyNotice = editor.getByText('Аллергии. Сведения ещё не сверены', { exact: true });
+    const previousPlan = editor.getByRole('region', { name: 'План предыдущего приёма' });
+    await expect(allergyNotice).toBeVisible();
+    await expect(previousPlan).toContainText('2026-08-01');
+    await expect(previousPlan).toContainText('SYNTHETIC-PRIOR-PLAN');
+    const historyDetails = editor.locator('.emr-workspace-history-details');
+    await expect(historyDetails).not.toHaveAttribute('open', '');
+    await expect(editor.getByText('SYNTHETIC-PRIOR-COMPLAINT', { exact: true })).not.toBeVisible();
+    const historySummary = historyDetails.locator(':scope > summary');
+    await historySummary.focus();
+    await page.keyboard.press('Space');
+    await expect(historyDetails).toHaveAttribute('open', '');
+    await expect(editor.getByText('SYNTHETIC-PRIOR-COMPLAINT', { exact: true })).toBeVisible();
+    const previousLabs = historyDetails.locator('details').first();
+    await expect(previousLabs).not.toHaveAttribute('open', '');
+    await expect(previousLabs.locator('li').first()).not.toBeVisible();
+    await previousLabs.locator(':scope > summary').focus();
+    await page.keyboard.press('Space');
+    await expect(previousLabs).toHaveAttribute('open', '');
+    await expect(previousLabs.locator('li').first()).toContainText('SYNTHETIC-LAB-RESULT');
+    await historySummary.focus();
+    await page.keyboard.press('Space');
+    await expect(historyDetails).not.toHaveAttribute('open', '');
+
     const repeatVisit = editor.getByRole('button', { name: 'Повторный', exact: true });
-    await repeatVisit.click();
+    await repeatVisit.focus();
+    await page.keyboard.press('Space');
     await expect(repeatVisit).toHaveAttribute('aria-pressed', 'true');
     const newComplaint = editor.getByRole('checkbox', { name: 'Новая жалоба', exact: true });
-    await newComplaint.check();
+    await page.keyboard.press('Tab');
+    await expect(newComplaint).toBeFocused();
+    await page.keyboard.press('Space');
     await expect(newComplaint).toBeChecked();
+    const firstEditorSection = editor.locator('.emr-v2-sections .emr-section__header').first();
+    await page.keyboard.press('Tab');
+    await expect(firstEditorSection).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(editor.locator('.emr-v2-sections .emr-section__header-action button').first()).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(editor.getByRole('textbox', { name: 'Жалобы', exact: true })).toBeFocused();
 
     for (const viewport of [
       { width: 375, height: 812 },
@@ -1034,10 +1089,10 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     }
 
     const localeCases = [
-      { name: /O'zbek/, initial: 'Birlamchi', repeat: 'Takroriy', complaint: 'Yangi shikoyat' },
-      { name: 'Ўзбекча', initial: 'Бирламчи', repeat: 'Такрорий', complaint: 'Янги шикоят' },
-      { name: 'English', initial: 'Initial', repeat: 'Follow-up', complaint: 'New complaint' },
-      { name: 'Қазақ', initial: 'Бастапқы', repeat: 'Қайталама', complaint: 'Жаңа шағым' },
+      { name: /O'zbek/, initial: 'Birlamchi', repeat: 'Takroriy', complaint: 'Yangi shikoyat', fieldLabel: 'Shikoyatlar' },
+      { name: 'Ўзбекча', initial: 'Бирламчи', repeat: 'Такрорий', complaint: 'Янги шикоят', fieldLabel: 'Шикоятлар' },
+      { name: 'English', initial: 'Initial', repeat: 'Follow-up', complaint: 'New complaint', fieldLabel: 'Complaints' },
+      { name: 'Қазақ', initial: 'Бастапқы', repeat: 'Қайталама', complaint: 'Жаңа шағым', fieldLabel: 'Шағымдар' },
     ];
     for (const locale of localeCases) {
       await page.locator('button[aria-haspopup="listbox"]').first().click();
@@ -1045,6 +1100,7 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
       await expect(editor.getByRole('button', { name: locale.initial, exact: true })).toBeVisible();
       await expect(editor.getByRole('button', { name: locale.repeat, exact: true })).toBeVisible();
       await expect(editor.getByRole('checkbox', { name: locale.complaint, exact: true })).toBeVisible();
+      await expect(editor.getByRole('textbox', { name: locale.fieldLabel, exact: true })).toBeVisible();
 
       for (const viewport of [
         { width: 375, height: 812 },

@@ -51,6 +51,7 @@ export function ComplaintsSection({
     doctorId,
     specialty = 'general',
 }: ComplaintsSectionProps) {
+    const { t } = useTranslation();
     const [showMyExperience, setShowMyExperience] = useState(false);
 
     // Get section templates (NO icd10 for complaints)
@@ -110,7 +111,7 @@ export function ComplaintsSection({
 
     return (
         <EMRSection
-            title="Жалобы"
+            title={t('emr_workspace.complaints')}
             icon="📋"
             required={required}
             disabled={disabled}

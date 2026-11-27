@@ -85,6 +85,9 @@ export function ClinicalSummary({
   const [history, setHistory] = useState<{ id: string; rows?: ClinicalEntry[]; error?: boolean }>();
   const historyRequest = useRef(0);
   const { visit, patient, clinical_entries: entries } = workspace;
+  const previousPlan = workspace.history[0]
+    && (workspace.history[0].treatment || workspace.history[0].recommendations)
+    ? workspace.history[0] : undefined;
   const priorCheck = entries.find(entry => entry.clinical_details.kind === 'allergy_check');
   const fact = editor?.current?.clinical_details;
 
@@ -198,6 +201,15 @@ export function ClinicalSummary({
     <section aria-label={t('emr_workspace.summary')}>
       <h3>{t('emr_workspace.summary')}</h3>
       <p className="emr-workspace-allergy">{t('emr_workspace.allergy')}. {t(`emr_workspace.${workspace.allergy_state}`)}</p>
+      {previousPlan && <section className="emr-workspace-previous-plan" aria-label={t('emr_workspace.previous_plan')}>
+        <div className="emr-workspace-line">
+          <h4>{t('emr_workspace.previous_plan')}</h4>
+          <small>{previousPlan.visit_date ?? t('emr_workspace.visit_number', { id: previousPlan.visit_id })}
+            {' · '}{t('emr_workspace.version', { version: previousPlan.version })}</small>
+        </div>
+        {previousPlan.treatment && <p className="emr-workspace-document-text">{previousPlan.treatment}</p>}
+        {previousPlan.recommendations && <p className="emr-workspace-document-text">{previousPlan.recommendations}</p>}
+      </section>}
       {groups.map(kind => {
         const rows = entries.filter(entry => entry.clinical_details.kind === kind);
         const active = rows.filter(entry => !['resolved', 'inactive', 'stopped'].includes(entry.clinical_details.status));
