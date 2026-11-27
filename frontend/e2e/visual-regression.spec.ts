@@ -956,9 +956,17 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     const editor = page.locator('.emr-v2-container');
     const identity = editor.getByRole('heading', { name: 'SYNTHETIC-EMR', exact: true });
     await expect(identity).toBeVisible({ timeout: 20000 });
+    await expect(editor.getByText('Возраст: 36')).toBeVisible();
+    await expect(editor.getByText('Специальность: Дерматология')).toBeVisible();
     await editor.evaluate(element => element.scrollIntoView({ block: 'start', inline: 'nearest' }));
     await expect(identity).toBeInViewport();
     await expect(editor.getByRole('heading', { name: 'Клиническая сводка', exact: true })).toBeInViewport();
+    const summaryBox = await editor.locator('.emr-workspace-sidebar').boundingBox();
+    const sectionsBox = await editor.locator('.emr-v2-sections').boundingBox();
+    if (!summaryBox || !sectionsBox) throw new Error('EMR columns have no layout bounds');
+    expect(summaryBox.x + summaryBox.width).toBeLessThanOrEqual(sectionsBox.x + 1);
+    await expect(editor.getByRole('button', { name: 'Первичный', exact: true })).toBeVisible();
+    await expect(editor.getByRole('button', { name: 'Повторный', exact: true })).toBeVisible();
     const vitals = editor.getByRole('region', { name: 'Показатели текущего приёма' });
     await expect(vitals).toBeInViewport();
     await expect(vitals.getByRole('spinbutton', { name: 'Пульс', exact: true })).toHaveValue('');
@@ -982,8 +990,112 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     const refresh = page.waitForResponse(response =>
       new URL(response.url()).pathname === '/api/v1/v2/emr/501/workspace' && response.ok(),
     );
+    const actionMenu = editor.locator('.emr-v2-action-menu');
+    const actionMenuSummary = actionMenu.locator(':scope > summary');
+    await actionMenuSummary.focus();
+    await page.keyboard.press('Space');
+    await expect(actionMenu).toHaveAttribute('open', '');
     await editor.getByRole('button', { name: 'Обновить EMR', exact: true }).click();
     await refresh;
+    await expect(actionMenu).not.toHaveAttribute('open');
+
+    const repeatVisit = editor.getByRole('button', { name: 'Повторный', exact: true });
+    await repeatVisit.click();
+    await expect(repeatVisit).toHaveAttribute('aria-pressed', 'true');
+    const newComplaint = editor.getByRole('checkbox', { name: 'Новая жалоба', exact: true });
+    await newComplaint.check();
+    await expect(newComplaint).toBeChecked();
+
+    for (const viewport of [
+      { width: 375, height: 812 },
+      { width: 768, height: 1024 },
+      { width: 1280, height: 800 },
+      { width: 1920, height: 1080 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
+      const layout = await editor.evaluate(element => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
+      expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+      const summary = await editor.locator('.emr-workspace-sidebar').boundingBox();
+      const content = await editor.locator('.emr-v2-sections').boundingBox();
+      const root = await editor.boundingBox();
+      if (!summary || !content || !root) throw new Error(`EMR columns have no bounds at ${viewport.width}px`);
+      expect(summary.x).toBeGreaterThanOrEqual(0);
+      expect(content.x).toBeGreaterThanOrEqual(0);
+      expect(summary.x + summary.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(content.x + content.width).toBeLessThanOrEqual(viewport.width + 1);
+      if (viewport.width >= 1120) {
+        expect(summary.x + summary.width).toBeLessThanOrEqual(content.x + 1);
+      } else {
+        expect(summary.y + summary.height).toBeLessThanOrEqual(content.y + 1);
+      }
+      await page.screenshot({ path: `../.scratch/emr-m15-${viewport.width}.png`, animations: 'disabled' });
+    }
+
+    const localeCases = [
+      { name: /O'zbek/, initial: 'Birlamchi', repeat: 'Takroriy', complaint: 'Yangi shikoyat' },
+      { name: 'Ўзбекча', initial: 'Бирламчи', repeat: 'Такрорий', complaint: 'Янги шикоят' },
+      { name: 'English', initial: 'Initial', repeat: 'Follow-up', complaint: 'New complaint' },
+      { name: 'Қазақ', initial: 'Бастапқы', repeat: 'Қайталама', complaint: 'Жаңа шағым' },
+    ];
+    for (const locale of localeCases) {
+      await page.locator('button[aria-haspopup="listbox"]').first().click();
+      await page.getByRole('option', { name: new RegExp(locale.name) }).click();
+      await expect(editor.getByRole('button', { name: locale.initial, exact: true })).toBeVisible();
+      await expect(editor.getByRole('button', { name: locale.repeat, exact: true })).toBeVisible();
+      await expect(editor.getByRole('checkbox', { name: locale.complaint, exact: true })).toBeVisible();
+
+      for (const viewport of [
+        { width: 375, height: 812 },
+        { width: 768, height: 1024 },
+        { width: 1280, height: 800 },
+        { width: 1920, height: 1080 },
+      ]) {
+        await page.setViewportSize(viewport);
+        await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
+        const layout = await editor.evaluate(element => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
+        expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+        const summary = await editor.locator('.emr-workspace-sidebar').boundingBox();
+        const content = await editor.locator('.emr-v2-sections').boundingBox();
+        if (!summary || !content) throw new Error(`EMR columns have no bounds for ${locale.name} at ${viewport.width}px`);
+        expect(summary.x).toBeGreaterThanOrEqual(0);
+        expect(content.x).toBeGreaterThanOrEqual(0);
+        expect(summary.x + summary.width).toBeLessThanOrEqual(viewport.width + 1);
+        expect(content.x + content.width).toBeLessThanOrEqual(viewport.width + 1);
+        if (viewport.width >= 1120) {
+          expect(summary.x + summary.width).toBeLessThanOrEqual(content.x + 1);
+        } else {
+          expect(summary.y + summary.height).toBeLessThanOrEqual(content.y + 1);
+        }
+      }
+    }
+
+    await page.locator('button[aria-haspopup="listbox"]').first().click();
+    await page.getByRole('option', { name: /Русский/ }).click();
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
+    const lightSurface = await editor.locator('.emr-v2-main').evaluate(element => getComputedStyle(element).backgroundColor);
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.style.colorScheme = 'dark';
+      document.documentElement.classList.remove('light-theme', 'theme-light');
+      document.documentElement.classList.add('dark-theme', 'theme-dark');
+      document.body.style.colorScheme = 'dark';
+      document.body.classList.remove('light-theme', 'theme-light');
+      document.body.classList.add('dark-theme', 'theme-dark');
+    });
+    const darkSurface = await editor.locator('.emr-v2-main').evaluate(element => getComputedStyle(element).backgroundColor);
+    expect(darkSurface).not.toBe(lightSurface);
+    await page.screenshot({ path: '../.scratch/emr-m15-dark-1280.png', animations: 'disabled' });
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.documentElement.style.colorScheme = 'light';
+      document.documentElement.classList.remove('dark-theme', 'theme-dark');
+      document.documentElement.classList.add('light-theme', 'theme-light');
+      document.body.style.colorScheme = 'light';
+      document.body.classList.remove('dark-theme', 'theme-dark');
+      document.body.classList.add('light-theme', 'theme-light');
+    });
   });
 });
 

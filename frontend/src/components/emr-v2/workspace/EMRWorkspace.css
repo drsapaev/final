@@ -1,6 +1,6 @@
 .emr-v2-main {
     min-width: 0;
-    max-width: 1200px;
+    max-width: 1560px;
 }
 
 .emr-v2-header {
@@ -18,7 +18,6 @@
 }
 
 .emr-v2-header__right,
-.emr-v2-toolbar,
 .emr-v2-actions {
     flex-wrap: wrap;
 }
@@ -41,10 +40,12 @@
 .emr-workspace-identity {
     color: var(--mac-text-secondary, GrayText);
     font-size: var(--mac-font-size-sm, 0.875rem);
+    column-gap: var(--mac-spacing-3, 12px);
 }
 
 .emr-workspace-layout {
     display: grid;
+    grid-template-areas: "summary" "editor";
     grid-template-columns: minmax(0, 1fr);
 }
 
@@ -53,15 +54,21 @@
 }
 
 .emr-workspace-sidebar {
+    grid-area: summary;
     padding: var(--mac-spacing-4, 16px);
     background: var(--mac-bg-secondary, Canvas);
-    border-top: 1px solid var(--mac-separator, currentColor);
+    border-bottom: 1px solid var(--mac-separator, currentColor);
     overflow-wrap: anywhere;
 }
 
+.emr-v2-sections {
+    grid-area: editor;
+    min-width: 0;
+}
+
 .emr-workspace-visit-section {
-    margin: 0 0 var(--mac-spacing-4, 16px);
-    padding: var(--mac-spacing-3, 12px);
+    margin: 0 0 var(--mac-spacing-3, 12px);
+    padding: var(--mac-spacing-2, 8px) var(--mac-spacing-3, 12px);
     border-bottom: 1px solid var(--mac-separator, currentColor);
 }
 
@@ -138,6 +145,77 @@
     padding: var(--mac-spacing-1, 4px) var(--mac-spacing-2, 8px);
 }
 
+.emr-workspace-visit-mode {
+    display: inline-flex;
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-sm);
+}
+
+.emr-workspace-visit-mode > button {
+    min-height: 34px;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.emr-workspace-visit-mode > button + button {
+    border-inline-start: 1px solid var(--mac-border);
+}
+
+.emr-workspace-mode-option[aria-pressed="true"] {
+    color: var(--mac-text-primary);
+    background: var(--mac-bg-tertiary);
+    font-weight: var(--mac-font-weight-semibold);
+}
+
+.emr-workspace-mode-hint {
+    margin: var(--mac-spacing-1, 4px) 0 0;
+    color: var(--mac-text-secondary);
+    font-size: var(--mac-font-size-sm);
+}
+
+.emr-workspace-new-complaint {
+    display: inline-flex;
+    width: fit-content;
+    max-width: 100%;
+    align-items: center;
+    gap: var(--mac-spacing-2, 8px);
+    margin-top: var(--mac-spacing-2, 8px);
+    color: var(--mac-text-primary);
+}
+
+.emr-workspace-new-complaint input {
+    min-width: 18px;
+    min-height: 18px;
+    accent-color: var(--mac-accent-blue);
+}
+
+.emr-workspace-vitals {
+    padding-block: var(--mac-spacing-2, 8px);
+}
+
+.emr-workspace-vitals .emr-vitals {
+    gap: var(--mac-spacing-1, 4px);
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+}
+
+.emr-workspace-vitals .emr-vitals__row {
+    gap: var(--mac-spacing-1, 4px);
+}
+
+.emr-workspace-vitals .emr-vitals__field {
+    min-width: 64px;
+}
+
+.emr-workspace-vitals .emr-vitals__field input {
+    min-height: 34px;
+    padding-block: 3px;
+}
+
 .emr-workspace-follow-up {
     margin-top: var(--mac-spacing-3, 12px);
 }
@@ -168,38 +246,19 @@
     outline-offset: 2px;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1120px) {
     .emr-workspace-layout {
-        grid-template-columns: minmax(0, 1fr) minmax(275px, 32%);
+        grid-template-areas: "summary editor";
+        grid-template-columns: minmax(260px, 28%) minmax(0, 1fr);
     }
 
     .emr-workspace-sidebar {
-        border-top: 0;
-        border-inline-start: 1px solid var(--mac-separator, currentColor);
+        border-bottom: 0;
+        border-inline-end: 1px solid var(--mac-separator, currentColor);
     }
 }
 
-@media (max-width: 640px) {
-    .emr-v2-container {
-        overflow-x: clip;
-    }
-
-    .emr-v2-container,
-    .emr-v2-sections,
-    .emr-v2-header,
-    .emr-v2-toolbar,
-    .emr-v2-actions {
-        padding-inline: var(--mac-spacing-2, 8px);
-    }
-
-    .emr-v2-container--with-sidebar .emr-v2-main {
-        max-width: 100%;
-    }
-
-    .emr-v2-header__left h2 {
-        font-size: var(--mac-font-size-lg, 1.125rem);
-    }
-
+@media (max-width: 900px) {
     .emr-v2-sections .emr-section__header-wrapper,
     .emr-v2-sections .emr-section__header-action > div,
     .emr-v2-sections .cardiology-tabs {
@@ -214,6 +273,27 @@
     .emr-v2-sections .emr-section__header,
     .emr-v2-sections .emr-section__content {
         padding-inline: var(--mac-spacing-2, 8px);
+    }
+}
+
+@media (max-width: 640px) {
+    .emr-v2-container {
+        overflow-x: clip;
+    }
+
+    .emr-v2-container,
+    .emr-v2-sections,
+    .emr-v2-header,
+    .emr-v2-actions {
+        padding-inline: var(--mac-spacing-2, 8px);
+    }
+
+    .emr-v2-container--with-sidebar .emr-v2-main {
+        max-width: 100%;
+    }
+
+    .emr-v2-header__left h2 {
+        font-size: var(--mac-font-size-lg, 1.125rem);
     }
 
     .emr-v2-sections :is(button, input, select, textarea, summary) {

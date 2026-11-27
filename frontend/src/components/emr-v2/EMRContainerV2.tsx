@@ -82,7 +82,6 @@ import logger from '../../utils/logger';
 // (consistent with the rest of the app + screen-reader friendly via aria-label).
 import {
     HelpCircle,
-    Ghost, // UX Audit Doctor M-19: kept for backward compat, replaced by PanelTopOpen
     PanelTopOpen,
     History,
     Undo2,
@@ -279,6 +278,27 @@ interface EMRHookResult {
     reloadFromServer: () => Promise<unknown>;
 }
 
+function ageAtVisit(birthDate: unknown, visitDate: unknown): number | null {
+    const dateParts = (value: unknown): [number, number, number] | null => {
+        const raw = String(value ?? '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+        const parts = raw.split('-').map(Number) as [number, number, number];
+        const [year, month, day] = parts;
+        const date = new Date(Date.UTC(year, month - 1, day));
+        if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+        return parts;
+    };
+    const birth = dateParts(birthDate);
+    if (!birth) return null;
+    const reference = dateParts(visitDate) ?? (() => {
+        const today = new Date();
+        return [today.getFullYear(), today.getMonth() + 1, today.getDate()] as [number, number, number];
+    })();
+    let age = reference[0] - birth[0];
+    if (reference[1] < birth[1] || (reference[1] === birth[1] && reference[2] < birth[2])) age -= 1;
+    return age >= 0 ? age : null;
+}
+
 export function EMRContainerV2({
     visitId,
     patientId = null,
@@ -331,6 +351,10 @@ export function EMRContainerV2({
         redo,
         reloadFromServer,
     } = useEMR(visitId, { specialty: canonicalSpecialty, patientId }) as EMRHookResult;
+    const savedPatientAge = data?.patient_age;
+    const patientAge = savedPatientAge !== undefined && savedPatientAge !== null && String(savedPatientAge).trim()
+        ? String(savedPatientAge).trim()
+        : ageAtVisit(workspace?.patient.birth_date, workspace?.visit.date);
     const identityBlocked = patientContextChanged || (emr?.patient_id != null && patientId != null
         && String(emr.patient_id) !== String(patientId));
     const storedMedications = data?.medications;
@@ -1060,6 +1084,12 @@ export function EMRContainerV2({
         }
     };
 
+    const onActionMenuClick = (action: () => unknown) => (event: React.MouseEvent<HTMLButtonElement>) => {
+        action();
+        const menu = event.currentTarget.closest('details') as HTMLDetailsElement | null;
+        if (menu) menu.open = false;
+    };
+
     // Conflict handlers
     const handleCompareConflict = () => {
         const conflictData = (conflict ?? null) as { serverVersion?: string | number | null } | null;
@@ -1095,7 +1125,8 @@ export function EMRContainerV2({
                         <h2>{workspace?.patient.full_name || patientName || t('misc.emr_title')}</h2>
                         <span className="emr-workspace-identity">
                             {(workspace?.patient.id ?? patientId) && t('misc.emr_patient', { id: workspace?.patient.id ?? patientId })}
-                            {workspace?.patient.birth_date && <span>{t('emr_workspace.birth_date')} <time dateTime={workspace.patient.birth_date}>{workspace.patient.birth_date}</time></span>}
+                            {patientAge !== null && <span>{t('emr_workspace.patient_age', { age: patientAge })}</span>}
+                            <span>{t('emr_workspace.specialty')}: {t(`emr_workspace.specialty_${canonicalSpecialty}`)}</span>
                             <span>{t('emr_workspace.visit_number', { id: visitId })} {workspace?.visit.date}</span>
                         </span>
                         {workspace?.allergy_state === 'specific' && (
@@ -1117,65 +1148,70 @@ export function EMRContainerV2({
                             autosaveConfig={autosaveConfig}
                         />
 
-                        <Button
-                            variant="ghost"
-                            size="small"
-                            onClick={() => setShowHelp(true)}
-                            title={t('misc.emr_help_title')}
-                            aria-label={t('misc.emr_help_title')}
-                        >
-                            <HelpCircle size={16} aria-hidden="true" />
-                        </Button>
-
-                        {/* UX Audit Doctor M-19: «Ghost Mode» → «Расширенный режим», Ghost icon → PanelTopOpen. */}
-                        <Button
-                            variant={experimentalGhostMode ? 'primary' : 'ghost'}
-                            size="small"
-                            onClick={toggleGhostMode}
-                            disabled={editingDisabled || isAmended}
-                            title={isSigned ? t('misc.emr_ghost_unavailable_title') : t('misc.emr_ghost_title')}
-                            aria-label={isSigned ? t('misc.emr_ghost_unavailable_aria') : t('misc.emr_ghost_aria')}
-                            aria-pressed={experimentalGhostMode}
-                        >
-                            <PanelTopOpen size={16} aria-hidden="true" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="small"
-                            onClick={() => setShowHistory(!showHistory)}
-                            title={t('misc.emr_history_title')}
-                            aria-label={t('misc.emr_history_title')}
-                            aria-expanded={showHistory}
-                        >
-                            <History size={16} aria-hidden="true" />
-                        </Button>
+                        <details className="emr-v2-action-menu">
+                            <summary>{t('emr_workspace.more_actions')}</summary>
+                            <div className="emr-v2-action-menu__items" role="group" aria-label={t('emr_workspace.more_actions')}>
+                                <Button variant="ghost" size="small" onClick={onActionMenuClick(undo)} disabled={!canUndo || editingDisabled}
+                                    title={t('misc.emr_undo_title')} aria-label={t('misc.emr_undo_title')}>
+                                    <Undo2 size={14} aria-hidden="true" /> {t('misc.emr_undo')}
+                                </Button>
+                                <Button variant="ghost" size="small" onClick={onActionMenuClick(redo)} disabled={!canRedo || editingDisabled}
+                                    title={t('misc.emr_redo_title')} aria-label={t('misc.emr_redo_title')}>
+                                    <Redo2 size={14} aria-hidden="true" /> {t('misc.emr_redo')}
+                                </Button>
+                                <Button variant="ghost" size="small" onClick={onActionMenuClick(() => { void handleToolbarRefresh(); })} disabled={isSaving}
+                                    title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
+                                    <RefreshCw size={14} aria-hidden="true" /> {t('misc.emr_refresh')}
+                                </Button>
+                                <Button type="button" variant="ghost" size="small" disabled={!data || accessDenied}
+                                    onClick={onActionMenuClick(() => setShowPreview(true))}>{t('emr_workspace.preview')}</Button>
+                                <Button variant="ghost" size="small" onClick={onActionMenuClick(() => setShowHelp(true))}
+                                    title={t('misc.emr_help_title')} aria-label={t('misc.emr_help_title')}>
+                                    <HelpCircle size={16} aria-hidden="true" /> {t('misc.emr_help_title')}
+                                </Button>
+                                {/* UX Audit Doctor M-19: «Ghost Mode» → «Расширенный режим». */}
+                                <Button variant={experimentalGhostMode ? 'primary' : 'ghost'} size="small" onClick={onActionMenuClick(toggleGhostMode)}
+                                    disabled={editingDisabled || isAmended}
+                                    title={isSigned ? t('misc.emr_ghost_unavailable_title') : t('misc.emr_ghost_title')}
+                                    aria-label={isSigned ? t('misc.emr_ghost_unavailable_aria') : t('misc.emr_ghost_aria')}
+                                    aria-pressed={experimentalGhostMode}>
+                                    <PanelTopOpen size={16} aria-hidden="true" /> {t('misc.emr_ghost_title')}
+                                </Button>
+                                <Button variant="ghost" size="small" onClick={onActionMenuClick(() => setShowHistory(!showHistory))}
+                                    title={t('misc.emr_history_title')} aria-label={t('misc.emr_history_title')}
+                                    aria-expanded={showHistory}>
+                                    <History size={16} aria-hidden="true" /> {t('misc.emr_history_title')}
+                                </Button>
+                            </div>
+                        </details>
                     </div>
                 </header>
 
-                {/* Toolbar */}
-                <div className="emr-v2-toolbar">
-                    <Button variant="ghost" size="small" onClick={undo} disabled={!canUndo || editingDisabled} title={t('misc.emr_undo_title')} aria-label={t('misc.emr_undo_title')}>
-                        <Undo2 size={14} aria-hidden="true" /> {t('misc.emr_undo')}
-                    </Button>
-                    <Button variant="ghost" size="small" onClick={redo} disabled={!canRedo || editingDisabled} title={t('misc.emr_redo_title')} aria-label={t('misc.emr_redo_title')}>
-                        <Redo2 size={14} aria-hidden="true" /> {t('misc.emr_redo')}
-                    </Button>
-                    <Button variant="ghost" size="small" onClick={() => { void handleToolbarRefresh(); }} disabled={isSaving} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
-                        <RefreshCw size={14} aria-hidden="true" /> {t('misc.emr_refresh')}
-                    </Button>
-                    <Button type="button" variant="outline" size="small" disabled={!data || accessDenied}
-                      onClick={() => setShowPreview(true)}>{t('emr_workspace.preview')}</Button>
-                </div>
-
                 <div className="emr-workspace-layout">
+                <WorkspaceSidePanel key={workspaceState.scope} workspace={workspace}
+                    status={workspaceState.status} reload={workspaceState.reload}
+                    currentVitals={data?.vitals} currentEcho={data?.specialty_data?.echo as Record<string, unknown> | undefined}
+                    readOnly={editingDisabled || accessDenied} followUp={followUp}
+                    onFollowUpChange={handleFieldChange('follow_up')} />
                 <div className="emr-v2-sections">
-                    <section className="emr-workspace-visit-section" aria-label={t('emr_workspace.today_vitals')}>
+                    <FollowUpEditor value={followUp} disabled={editingDisabled}
+                        onChange={handleFieldChange('follow_up')} />
+                    <ComplaintsSection
+                        value={data?.complaints}
+                        onChange={handleFieldChange('complaints')}
+                        disabled={editingDisabled}
+                        doctorId={doctorId}
+                        specialty={canonicalSpecialty}
+                    />
+                    <FieldDictation key={`dictation:${workspaceState.scope}`} disabled={editingDisabled || accessDenied}
+                        onInsert={text => handleFieldChange('complaints')(
+                            [emrTextValue(data?.complaints).trimEnd(), text].filter(Boolean).join('\n'),
+                        )} />
+                    <section className="emr-workspace-visit-section emr-workspace-vitals" aria-label={t('emr_workspace.today_vitals')}>
                         <h3>{t('emr_workspace.today_vitals')}</h3>
                         <VitalsWidget vitals={data?.vitals || {}} onChange={handleFieldChange('vitals')}
                             disabled={editingDisabled} collapseAdditional />
                     </section>
-                    <FollowUpEditor value={followUp} disabled={editingDisabled}
-                        onChange={handleFieldChange('follow_up')} />
                     {onComplete && !isReadOnly && (
                       <section className="emr-workspace-visit-section" aria-label={t('emr_workspace.readiness')}>
                         <h3>{t('emr_workspace.readiness')}</h3>
@@ -1194,18 +1230,6 @@ export function EMRContainerV2({
                         Default-closed: AnamnesisVitae, Treatment, Recommendations,
                         Notes (filled only when clinically relevant — collapsing
                         them removes visual noise from the default visit screen). */}
-                    <ComplaintsSection
-                        value={data?.complaints}
-                        onChange={handleFieldChange('complaints')}
-                        disabled={editingDisabled}
-                        doctorId={doctorId}
-                        specialty={canonicalSpecialty}
-                    />
-                    <FieldDictation key={`dictation:${workspaceState.scope}`} disabled={editingDisabled || accessDenied}
-                        onInsert={text => handleFieldChange('complaints')(
-                            [emrTextValue(data?.complaints).trimEnd(), text].filter(Boolean).join('\n'),
-                        )} />
-
                     <AnamnesisMorbiSection
                         value={data?.anamnesis_morbi}
                         onChange={handleFieldChange('anamnesis_morbi')}
@@ -1385,11 +1409,6 @@ export function EMRContainerV2({
                         reviewerId={accessDenied ? null : doctorId}
                     />
                 </div>
-                <WorkspaceSidePanel key={workspaceState.scope} workspace={workspace}
-                    status={workspaceState.status} reload={workspaceState.reload}
-                    currentVitals={data?.vitals} currentEcho={data?.specialty_data?.echo as Record<string, unknown> | undefined}
-                    readOnly={editingDisabled || accessDenied} followUp={followUp}
-                    onFollowUpChange={handleFieldChange('follow_up')} />
                 </div>
 
                 {/* Actions */}

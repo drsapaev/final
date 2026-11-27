@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   getEMRWorkspace, getWorkspaceHistoryDocument,
   type EMRWorkspaceData, type FollowUp, type HistoryDocument, type HistorySummary, type TransferField,
@@ -19,18 +19,30 @@ export function FollowUpEditor({
   value, disabled, onChange,
 }: { value: FollowUp; disabled: boolean; onChange: (value: FollowUp) => void }) {
   const { t } = useTranslation();
+  const newComplaintId = useId();
+  const isRepeatVisit = value.mode === 'follow_up' || value.mode === 'new_complaint';
   return (
     <section className="emr-workspace-visit-section" aria-label={t('emr_workspace.visit_type')}>
-      <label>{t('emr_workspace.visit_type')}
-        <select value={value.mode ?? ''} disabled={disabled} onChange={event => {
-          onChange({ ...value, mode: (event.target.value || null) as FollowUp['mode'] });
-        }}>
-          <option value="">{t('emr_workspace.unselected')}</option>
-          {['initial', 'follow_up', 'new_complaint'].map(mode => (
-            <option key={mode} value={mode}>{t(`emr_workspace.${mode}`)}</option>
-          ))}
-        </select>
-      </label>
+      <h3>{t('emr_workspace.visit_type')}</h3>
+      <div className="emr-workspace-visit-mode" role="group" aria-label={t('emr_workspace.visit_type')}>
+        <Button type="button" size="small" variant="ghost" className="emr-workspace-mode-option"
+          disabled={disabled} aria-pressed={value.mode === 'initial'}
+          onClick={() => onChange({ ...value, mode: 'initial' })}>
+          {t('emr_workspace.initial_visit')}
+        </Button>
+        <Button type="button" size="small" variant="ghost" className="emr-workspace-mode-option"
+          disabled={disabled} aria-pressed={isRepeatVisit}
+          onClick={() => onChange({ ...value, mode: value.mode === 'new_complaint' ? 'new_complaint' : 'follow_up' })}>
+          {t('emr_workspace.repeat_visit')}
+        </Button>
+      </div>
+      {!value.mode && <p className="emr-workspace-mode-hint">{t('emr_workspace.unselected')}</p>}
+      {isRepeatVisit && <label className="emr-workspace-new-complaint" htmlFor={newComplaintId}>
+        <input id={newComplaintId} type="checkbox" aria-label={t('emr_workspace.new_complaint_toggle')}
+          checked={value.mode === 'new_complaint'} disabled={disabled}
+          onChange={event => onChange({ ...value, mode: event.target.checked ? 'new_complaint' : 'follow_up' })} />
+        {t('emr_workspace.new_complaint_toggle')}
+      </label>}
       {(value.mode === 'follow_up' || followUpNotes.some(field => value[field])) && (
         <div className="emr-workspace-follow-up">
           {followUpNotes.map(field => <label key={field} className="emr-workspace-field">
