@@ -362,13 +362,13 @@ Desktop: список и редактор рядом; контекст раск�
 
 Этот этап выполняется после завершения P00–P09 на изолированной ветке. Исправления по результатам остаются в том же PR реализации.
 
-- [ ] **P10.01** Сверить все обязательные чекбоксы, scope и актуальный `main`; устранить конфликты, зафиксировать точный release-candidate SHA и список изменений. Новый candidate SHA ещё не создан.
+- [ ] **P10.01** Сверить все обязательные чекбоксы, scope и актуальный `main`; устранить конфликты, зафиксировать точный release-candidate SHA и список изменений. Текущая реализация опубликована fast-forward коммитом `11863f284505f2e1668fa445faf5e7f0ebe3eca6` поверх прежнего PR head `589b944`; точные required checks этого SHA запущены, финальную приёмку и статус нового head записать после получения результатов.
 - [x] **P10.02** В проверенном checkout выполнить реальный `ai/langgraph/scripts/run_agent_gate.ps1` из `ai/langgraph`. Сформировать команды по текущим владельцам и полному diff; сохранить реальные результаты, execution prompts и требуемые действия.
 - [x] **P10.03** Разделить при необходимости migration и прочие маршруты gate: текущий migration routing не допускает замену владельца через `--scope`. Не выдавать общий пример команды за полный успешно выполненный gate; не подбирать формулировку для обхода stop.
 - [x] **P10.04** Сохранить доказательство gate: точная команда, полный SHA, дата/время, exit code, обезличенный результат, scope, обязательные checks и решение по handoff. После значимого изменения кода обновить применимое доказательство.
 - [ ] **P10.05** Выполнить матрицу V01–V26 ниже и релевантные backend/frontend/API/OpenAPI/PDF тесты; затем весь обязательный проектный набор, определённый действующими правилами и diff.
 - [x] **P10.06** На одноразовом PostgreSQL выполнить upgrade миграций, сценарии совместимости/backfill, RLS/RBAC и реальные двухсоединечные гонки; пропущенный из-за среды тест не считать PASS.
-- [ ] **P10.07** Выполнить TypeScript/lint/build, `git diff --check`, релевантные accessibility/Playwright проверки и весь required CI для точного head. Исправить красные проверки в том же PR. Локальные проверки текущего diff выполнены; full CI ожидается после публикации нового SHA.
+- [ ] **P10.07** Выполнить TypeScript/lint/build, `git diff --check`, релевантные accessibility/Playwright проверки и весь required CI для точного head. Исправить красные проверки в том же PR. Локальные проверки кода из `11863f284505f2e1668fa445faf5e7f0ebe3eca6` прошли; exact-head workflows для него были `queued` после публикации. Проверить итог на финальном head после обновления этого плана.
 - [ ] **P10.08** Выполнить полный pre-release staging по действующему `docs/runbooks/STAGING_VALIDATION.md` в свежей задаче опубликованной Codex Cloud среды `final`, на точном SHA, с синтетическими данными. WSL на клиническом компьютере — только при предусмотренном runbook разрешении. **BLOCKED текущей паузой владельца; не запускать до её снятия.**
 - [x] **P10.09** Проверить авторизованные сценарии Lab/проверяющего/Doctor, RU/UZ, keyboard, 375/768/1280/1920 px, PDF, связи с ЭМК, изоляцию пациентов, сеть и ошибки. Сохранить обезличенные доказательства.
 - [ ] **P10.10** Проверить применимые интеграции по runbook; использовать только разрешённые staging-адресаты и provisioning. Не запрашивать/коммитить raw secrets; не отправлять данные пациентам для доказательства работы.
@@ -582,7 +582,7 @@ Gate handoff ограничил изменения четырьмя перечи
 | Группа | Выполнено | Открыто | Статус |
 |---|---:|---:|---|
 | P00–P09 | 87/87 | 0 | Универсальная продуктовая функциональность реализована в текущем локальном diff. |
-| P10 | 7/14 | 7 | Открыты P10.01 (зафиксировать новый exact candidate SHA), P10.05 (полная матрица/required набор), P10.07 (exact-head CI), P10.08 (staging на паузе), P10.10 (разрешённые внешние интеграции), P10.11 (review текущего exact head), P10.14 (Draft сохраняется). Проверки прежнего SHA не заменяют CI после публикации нового diff. |
+| P10 | 7/14 | 7 | Открыты P10.01 (итоговая сверка exact candidate SHA), P10.05 (полная матрица/required набор), P10.07 (exact-head CI), P10.08 (staging на паузе), P10.10 (разрешённые внешние интеграции), P10.11 (review текущего exact head), P10.14 (Draft сохраняется). Реализация опубликована в `11863f284505f2e1668fa445faf5e7f0ebe3eca6`; его checks были queued. Следующий plan-only commit создаст новый head, который также требуется проверить. |
 | V01–V26 | 24/26 | 2 | V25 производительность и локализация, V26 полный регресс/final acceptance остаются открытыми. |
 | D01–D10 | 5/10 | 5 | D02, D03, D05, D06 и D10 остаются открытыми до применимых проверок и отдельного go/no-go. |
 
@@ -598,7 +598,7 @@ CL-01–CL-12 — отдельный deployment checklist для каждой к
 | Принтеры, этикетки, сканеры | Версионные профили media/label size и barcode symbology, форматный simulator probe и отдельные статусы simulator/physical validation. | Программные проверки синтетические; выбранные клиникой принтер, носитель и сканер остаются CL-08. |
 | Проверки на текущем локальном diff | Backend: **170 passed**; frontend Vitest: **57 passed** (включая 42 passed по точным компонентам handoff); TypeScript type-check и Vite build прошли (последний build 30.24 s); py_compile и git diff --check прошли. Alembic graph имеет единственный head `0112_lab_universal_configuration`. | Полный collector собрал **8,438 тестов**, 46 исключены настройкой проекта. WebAuthn test dependencies устанавливались только в scratch target. Полный suite и PostgreSQL upgrade ожидают exact-head CI. |
 | Gate · 27 ноября | Реальный launcher: первый полный запуск остановлен с просьбой указать подтверждённую root cause; один повтор с `--known-root-cause backend/app/services/lab_reporting/_finalize.py` прошёл как `narrow_override`, `mode=execute`, `handoff_required=true`, `gate_misroute=false`, `override_used=true`. Execution prompt прочитан. Gate scope включал 46 изменённых/новых файлов реализации, migration, tests и плана; все edits входят в first-touch scope. | Это не `gate_ok`. Результат разрешил выполнение exact reviewed scope, но PR остаётся Draft до green exact-head CI, review и обязательных release gates. |
-| Scope | Рабочая ветка остаётся существующим PR #4251. Production, staging, main, branch protection и workflows не изменялись; merge и staging не запускались. | Опубликовать коммит в существующую PR-ветку, затем ждать exact-head CI. PR оставить Draft. |
+| Публикация и scope | Коммит реализации `11863f284505f2e1668fa445faf5e7f0ebe3eca6` fast-forward опубликован из `589b944` в существующую ветку `codex/laboratory-panel-v2` PR #4251; head и Draft проверены через GitHub API. Production, staging, main, branch protection и workflows не изменялись; merge и staging не запускались. | Required CI на `11863f2` был запущен; после plan-only обновления проверить итоговые статусы на новом head. PR остаётся Draft. |
 
 #### Команды текущей локальной проверки · synthetic-only
 
@@ -630,6 +630,8 @@ ALLOW_SQLITE_DATABASE_URL=1 DATABASE_URL=sqlite:////dev/shm/labv2-universal/.scr
 ```
 
 Эта запись не помечает gate как `gate_ok`; она фиксирует фактический handoff и выполнение его в пределах списка. Итоговый exact-head status CI публикуется после commit в PR #4251.
+
+Повторная проверка после публикации кода · 27 ноября, 06:33:41 UTC: тот же полный first-touch scope из 46 файлов включал implementation commit `11863f284505f2e1668fa445faf5e7f0ebe3eca6` и последующую только-документную сверку плана. Launcher снова вернул `narrow_override`, `mode=execute`, `handoff_required=true`, `gate_misroute=false`, `override_used=true`; execution prompt прочитан. `py_compile` для всех 33 Python-файлов прошёл; exact handoff frontend unit tests — `42/42`; Vite build — `22.80 s`; `git diff --check` прошёл. Required workflows на `11863f2` были queued. Следующий commit меняет только план, поэтому его exact-head CI и review всё равно должны завершиться до закрытия P10.
 
 ### Локальная приёмка 25 ноября · исторические проверки
 
