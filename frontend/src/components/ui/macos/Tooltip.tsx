@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, type ReactNode, type CSSProperties, type PointerEvent, type RefObject } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, type ReactNode, type CSSProperties, type PointerEvent, type FocusEvent, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -38,6 +38,8 @@ interface TooltipProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'child
   delay?: number;
   disabled?: boolean;
   followCursor?: boolean;
+  /** Visual hint for controls that already have an equivalent accessible name. */
+  decorativeHint?: boolean;
   className?: string;
   style?: CSSProperties;
 }
@@ -62,6 +64,7 @@ const Tooltip = ({
   delay = 700,
   disabled = false,
   followCursor = false,
+  decorativeHint = false,
   className = '',
   style = {},
   ...props
@@ -80,6 +83,8 @@ const Tooltip = ({
   const showTimeoutRef: RefObject<ReturnType<typeof setTimeout> | null> = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimeoutRef: RefObject<ReturnType<typeof setTimeout> | null> = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRenderedRef = useRef(false);
+  const hintFocusedRef = useRef(false);
+  const hintHoveredRef = useRef(false);
 
   // Position calculations
   const positionMap: Record<TooltipPosition, TooltipPositionMap> = {
@@ -100,6 +105,11 @@ const Tooltip = ({
       setMouseCoords({ x: e.clientX, y: e.clientY });
     }
 
+    if (decorativeHint) hintHoveredRef.current = true;
+    scheduleShow();
+  };
+
+  const scheduleShow = () => {
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
@@ -135,6 +145,14 @@ const Tooltip = ({
   };
 
   const handleMouseLeave = () => {
+    if (decorativeHint) {
+      hintHoveredRef.current = false;
+      if (hintFocusedRef.current) return;
+    }
+    scheduleHide();
+  };
+
+  const scheduleHide = () => {
     if (showTimeoutRef.current) {
       clearTimeout(showTimeoutRef.current);
       showTimeoutRef.current = null;
@@ -152,6 +170,43 @@ const Tooltip = ({
     }, 200);
   };
 
+  const handleHintFocus = () => {
+    if (disabled) return;
+    hintFocusedRef.current = true;
+    scheduleShow();
+  };
+
+  const handleHintBlur = (e: FocusEvent<HTMLDivElement>) => {
+    if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
+    hintFocusedRef.current = false;
+    if (!hintHoveredRef.current) scheduleHide();
+  };
+
+  useEffect(() => {
+    if (!decorativeHint || !shouldRender) return;
+    const dismissHint = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !isRenderedRef.current) return;
+      event.stopPropagation();
+      hintHoveredRef.current = false;
+      if (showTimeoutRef.current) clearTimeout(showTimeoutRef.current);
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+      showTimeoutRef.current = null;
+      hideTimeoutRef.current = null;
+      isRenderedRef.current = false;
+      setIsVisible(false);
+      setShouldRender(false);
+    };
+    const bubble = tooltipRef.current;
+    // This portaled visual hint must not forward clicks to a file row or card.
+    const stopHintClick = (event: MouseEvent) => event.stopPropagation();
+    bubble?.addEventListener('click', stopHintClick);
+    document.addEventListener('keydown', dismissHint, true);
+    return () => {
+      bubble?.removeEventListener('click', stopHintClick);
+      document.removeEventListener('keydown', dismissHint, true);
+    };
+  }, [decorativeHint, shouldRender]);
+
   useEffect(() => {
     return () => {
       if (showTimeoutRef.current) {
@@ -167,7 +222,9 @@ const Tooltip = ({
     if (shouldRender && tooltipRef.current) {
       const rect = tooltipRef.current.getBoundingClientRect();
       setTooltipSize({ width: rect.width, height: rect.height });
-      requestAnimationFrame(() => setIsVisible(true));
+      requestAnimationFrame(() => {
+        if (isRenderedRef.current) setIsVisible(true);
+      });
     } else if (!shouldRender) {
       setTooltipSize(null);
       setIsVisible(false);
@@ -181,7 +238,7 @@ const Tooltip = ({
     top: 0,
     left: 0,
     zIndex: 9999,
-    pointerEvents: 'none',
+    pointerEvents: decorativeHint ? 'auto' : 'none',
     opacity: isVisible && tooltipSize ? 1 : 0,
     transform: isVisible && tooltipSize ? 'scale(1)' : 'scale(0.95)',
     transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
@@ -287,10 +344,13 @@ const Tooltip = ({
     <>
       <div
         ref={triggerRef}
+        role="presentation"
         className={`mac-tooltip-trigger ${className}`}
         onPointerEnter={handleMouseEnter}
         onPointerMove={followCursor ? handleMouseMove : undefined}
         onPointerLeave={handleMouseLeave}
+        onFocus={decorativeHint ? handleHintFocus : undefined}
+        onBlur={decorativeHint ? handleHintBlur : undefined}
         style={{ display: 'inline-block', ...style }}
         {...props}>
 
@@ -305,7 +365,10 @@ const Tooltip = ({
             ...tooltipStyles,
             ...getPositionedStyles()
           }}
-          role="tooltip">
+          role={decorativeHint ? undefined : 'tooltip'}
+          aria-hidden={decorativeHint || undefined}
+          onPointerEnter={decorativeHint ? handleMouseEnter : undefined}
+          onPointerLeave={decorativeHint ? handleMouseLeave : undefined}>
 
           <div className="mac-tooltip-content" style={contentStyles}>
             {content}
