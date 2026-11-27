@@ -287,7 +287,7 @@ const Modal = ({
             justifyContent: 'center'
           }}>
 
-            ✕
+            <span aria-hidden="true">✕</span>
           </Button>
         }
       </div>
