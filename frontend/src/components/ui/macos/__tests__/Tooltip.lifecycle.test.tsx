@@ -143,4 +143,28 @@ describe('Tooltip hover lifecycle', () => {
     expect(screen.queryByText('Preview hint')).not.toBeInTheDocument();
   });
 
+  it.each([[100, 74], [12, 44]])('places a decorative hint flush outside a button at y=%s', (top, expectedTop) => {
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('mac-tooltip')
+        ? new DOMRect(0, 0, 80, 26)
+        : new DOMRect(100, top, 32, 32);
+    });
+    try {
+      render(
+        <ThemeProvider>
+          <Tooltip content="Hint" delay={50} decorativeHint>
+            <button type="button" aria-label="Action">⌕</button>
+          </Tooltip>
+        </ThemeProvider>,
+      );
+      act(() => screen.getByRole('button', { name: 'Action' }).focus());
+      act(() => vi.advanceTimersByTime(50));
+      const bubble = screen.getByText('Hint').closest('.mac-tooltip');
+      expect(bubble).toHaveStyle({ top: `${expectedTop}px`, transform: 'scale(1)' });
+      expect(bubble?.querySelector('.mac-tooltip-arrow')).toBeNull();
+    } finally {
+      rect.mockRestore();
+    }
+  });
+
 });

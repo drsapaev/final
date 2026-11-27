@@ -21,6 +21,11 @@ interface Coords {
   y: number;
 }
 
+interface TriggerCoords extends Coords {
+  top: number;
+  bottom: number;
+}
+
 interface TooltipSize {
   width: number;
   height: number;
@@ -74,7 +79,7 @@ const Tooltip = ({
   void t;
   const [isVisible, setIsVisible] = useState<boolean>(false);
   const [shouldRender, setShouldRender] = useState<boolean>(false);
-  const [coords, setCoords] = useState<Coords>({ x: 0, y: 0 });
+  const [coords, setCoords] = useState<TriggerCoords>({ x: 0, y: 0, top: 0, bottom: 0 });
   const [mouseCoords, setMouseCoords] = useState<Coords>({ x: 0, y: 0 });
   const [tooltipSize, setTooltipSize] = useState<TooltipSize | null>(null);
 
@@ -130,7 +135,9 @@ const Tooltip = ({
       if (rect) {
         setCoords({
           x: rect.left + rect.width / 2,
-          y: rect.top + rect.height / 2
+          y: rect.top + rect.height / 2,
+          top: rect.top,
+          bottom: rect.bottom
         });
         isRenderedRef.current = true;
         setShouldRender(true);
@@ -184,9 +191,7 @@ const Tooltip = ({
 
   useEffect(() => {
     if (!decorativeHint || !shouldRender) return;
-    const dismissHint = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !isRenderedRef.current) return;
-      event.stopPropagation();
+    const dismiss = () => {
       hintHoveredRef.current = false;
       if (showTimeoutRef.current) clearTimeout(showTimeoutRef.current);
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
@@ -196,14 +201,23 @@ const Tooltip = ({
       setIsVisible(false);
       setShouldRender(false);
     };
+    const dismissHint = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !isRenderedRef.current) return;
+      event.stopPropagation();
+      dismiss();
+    };
     const bubble = tooltipRef.current;
     // This portaled visual hint must not forward clicks to a file row or card.
     const stopHintClick = (event: MouseEvent) => event.stopPropagation();
     bubble?.addEventListener('click', stopHintClick);
     document.addEventListener('keydown', dismissHint, true);
+    window.addEventListener('scroll', dismiss, true);
+    window.addEventListener('resize', dismiss);
     return () => {
       bubble?.removeEventListener('click', stopHintClick);
       document.removeEventListener('keydown', dismissHint, true);
+      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('resize', dismiss);
     };
   }, [decorativeHint, shouldRender]);
 
@@ -240,7 +254,7 @@ const Tooltip = ({
     zIndex: 9999,
     pointerEvents: decorativeHint ? 'auto' : 'none',
     opacity: isVisible && tooltipSize ? 1 : 0,
-    transform: isVisible && tooltipSize ? 'scale(1)' : 'scale(0.95)',
+    transform: decorativeHint || (isVisible && tooltipSize) ? 'scale(1)' : 'scale(0.95)',
     transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
     transformOrigin: `${tooltipPosition.x === 'center' ? 'center' : tooltipPosition.x === 'left' ? 'right' : 'left'} ${tooltipPosition.y === 'center' ? 'center' : tooltipPosition.y === 'top' ? 'bottom' : 'top'}`
   };
@@ -266,6 +280,14 @@ const Tooltip = ({
 
     let top = 0;
     let left = 0;
+
+    if (decorativeHint) {
+      // Keep the full control clickable and leave no dead strip for the pointer.
+      // Visual button hints sit immediately above the control, or below near the viewport top.
+      const hintLeft = Math.max(8, Math.min(coords.x - tooltipSize.width / 2, window.innerWidth - tooltipSize.width - 8));
+      const hintTop = coords.top - tooltipSize.height >= 8 ? coords.top - tooltipSize.height : coords.bottom;
+      return { top: `${hintTop}px`, left: `${hintLeft}px` };
+    }
 
     if (followCursor) {
       const tooltipWidth = tooltipSize.width;
@@ -374,7 +396,7 @@ const Tooltip = ({
             {content}
           </div>
 
-          {!followCursor &&
+          {!followCursor && !decorativeHint &&
           <div
             className="mac-tooltip-arrow"
             style={{
