@@ -103,6 +103,9 @@ export default function NurseTabletPage() {
 
   const nextWaiting = stationBoard?.waiting?.[0] ?? null;
   const waitingCount = stationBoard?.counts?.waiting ?? 0;
+  const lateWork = (stationBoard?.late_pending ?? [])
+    .map((entry) => ({ entry, pending: (entry.services ?? []).filter((service) => service.pending === true) }))
+    .filter(({ pending }) => pending.length > 0);
 
   const stationLabel =
     selectedWorkplace?.resource_display_name ||
@@ -337,6 +340,33 @@ export default function NurseTabletPage() {
                 setDialog({ mode: 'execution', executionId })
               }
             />
+          )}
+          {lateWork.length > 0 && (
+            <section className="nurse-card nurse-card--others" aria-labelledby="nurse-late-work-title">
+              <h2 className="nurse-card__caption" id="nurse-late-work-title">
+                {t('nurse.late_work_title')}
+              </h2>
+              <p className="nurse-hint">{t('nurse.late_work_hint')}</p>
+              <ul className="nurse-others__list">
+                {lateWork.map(({ entry, pending }) => (
+                  <li key={entry.id}>
+                    <div className="nurse-others__row">
+                      <span className="nurse-next__number">
+                        {t('nurse.queue_number', { number: String(entry.number) })}
+                      </span>
+                      <span className="nurse-next__name">
+                        {entry.patient_name || t('nurse.patient_unnamed')}
+                      </span>
+                    </div>
+                    <ul>
+                      {pending.map((service) => (
+                        <li key={service.visit_service_id}>{service.name}</li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
           {board.boardLoading && stationBoard == null && (
             <p className="nurse-hint" aria-live="polite">

@@ -11630,6 +11630,8 @@ const uzLatn = {
     workplace_select: 'Ish joyini tanlang',
     workplace_change: 'Almashtirish',
     station_cabinet: 'Xona {cabinet}',
+    late_work_title: 'Talon yopilgandan keyingi yangi tayinlovlar',
+    late_work_hint: 'Avvalgi talon yopilgan. Keyingi qadamni registraturadan aniqlang.',
     board_current: 'Joriy bemor',
     board_no_current: 'Hozir sizda bemor yo‘q',
     board_next: 'Keyingi',

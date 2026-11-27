@@ -11635,6 +11635,8 @@ const en = {
     workplace_select: 'Select a workstation',
     workplace_change: 'Switch',
     station_cabinet: 'Room {cabinet}',
+    late_work_title: 'New orders after ticket closure',
+    late_work_hint: 'The old ticket is closed. Check with reception for the next step.',
     board_current: 'Current patient',
     board_no_current: 'Nobody is with you right now',
     board_next: 'Next',

@@ -11630,6 +11630,8 @@ const kk = {
     workplace_select: 'Жұмыс орнын таңдаңыз',
     workplace_change: 'Ауыстыру',
     station_cabinet: 'Кабинет {cabinet}',
+    late_work_title: 'Талон жабылғаннан кейінгі жаңа тағайындаулар',
+    late_work_hint: 'Бұрынғы талон жабылды. Келесі әрекетті тіркеу бөлімінен нақтылаңыз.',
     board_current: 'Қазіргі пациент',
     board_no_current: 'Қазір сізде ешкім жоқ',
     board_next: 'Келесі',

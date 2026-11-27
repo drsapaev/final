@@ -11780,6 +11780,8 @@ const ru = {
     workplace_select: 'Выберите рабочее место',
     workplace_change: 'Сменить',
     station_cabinet: 'Кабинет {cabinet}',
+    late_work_title: 'Новые назначения после закрытия талона',
+    late_work_hint: 'Старый талон закрыт. Уточните дальнейшие действия в регистратуре.',
     board_current: 'Текущий пациент',
     board_no_current: 'Сейчас у вас никого нет',
     board_next: 'Следующий',
