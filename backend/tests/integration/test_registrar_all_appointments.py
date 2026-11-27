@@ -937,6 +937,65 @@ class TestRegistrarAllAppointments:
         assert entry.status == "in_progress"
         assert unrelated_visit.status == "pending_confirmation"
 
+    @pytest.mark.parametrize(
+        ("initial_status", "expected_http_status"),
+        [
+            ("waiting", 200),
+            ("queued", 200),
+            ("canceled", 409),
+            ("cancelled", 409),
+            ("served", 409),
+            ("no_show", 409),
+            ("completed", 409),
+            ("done", 409),
+            ("incomplete", 409),
+            ("diagnostics", 409),
+            ("in_progress", 409),
+            ("called", 409),
+            ("unknown_state", 409),
+        ],
+    )
+    def test_start_queue_visit_checks_unlinked_status(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        initial_status,
+        expected_http_status,
+    ):
+        queue = DailyQueue(
+            day=_clinic_today(db_session),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            visit_id=None,
+            source="desk",
+            status=initial_status,
+        )
+        db_session.add(entry)
+        db_session.commit()
+
+        response = client.post(
+            f"/api/v1/registrar/queue/{entry.id}/start-visit",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == expected_http_status, response.text
+        db_session.refresh(entry)
+        assert entry.status == ("in_progress" if expected_http_status == 200 else initial_status)
+        assert entry.visit_id is None
+
     def test_start_queue_visit_rejects_entry_linked_to_other_patient_visit(
         self,
         client,
