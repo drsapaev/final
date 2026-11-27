@@ -261,6 +261,16 @@ def list_versions(db: Session) -> list[LabClinicalConfigurationVersion]:
     )
 
 
+def _get_locked_version(
+    db: Session, version_id: int
+) -> LabClinicalConfigurationVersion | None:
+    return db.scalar(
+        select(LabClinicalConfigurationVersion)
+        .where(LabClinicalConfigurationVersion.id == version_id)
+        .with_for_update()
+    )
+
+
 def get_current_approved_configuration(
     db: Session,
 ) -> LabClinicalConfigurationVersion | None:
@@ -312,7 +322,7 @@ def update_draft(
     substitute_lab_physician_user_id: int | None,
     actor: User,
 ) -> LabClinicalConfigurationVersion:
-    version = db.get(LabClinicalConfigurationVersion, version_id)
+    version = _get_locked_version(db, version_id)
     if version is None:
         raise ClinicalConfigurationError("configuration_version_not_found", 404)
     if version.status != "DRAFT":
@@ -331,7 +341,7 @@ def update_draft(
 def submit_for_approval(
     db: Session, *, version_id: int, actor: User
 ) -> LabClinicalConfigurationVersion:
-    version = db.get(LabClinicalConfigurationVersion, version_id)
+    version = _get_locked_version(db, version_id)
     if version is None:
         raise ClinicalConfigurationError("configuration_version_not_found", 404)
     if version.status != "DRAFT":

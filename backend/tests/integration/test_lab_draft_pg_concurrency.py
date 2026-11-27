@@ -31,6 +31,7 @@ from app.api.v1.endpoints.lab_reporting import (
 from app.core.config import settings
 from app.db.base_class import Base
 from app.models.lab import (
+    LabClinicalConfigurationVersion,
     LabReportFieldDef,
     LabReportInstance,
     LabReportSection,
@@ -44,6 +45,10 @@ from app.models.user import User
 from app.repositories.lab_reporting_api_repository import LabReportingApiRepository
 from app.schemas.lab_release import LabReportVersionCommand
 from app.schemas.lab_reporting import LabReportInstanceUpdate, LabReportValueIn
+from app.services.lab_clinical_configuration_service import (
+    submit_for_approval,
+    update_draft,
+)
 from app.services.lab_reporting_service import (
     LabReportingDomainError,
     LabReportingService,
@@ -236,6 +241,183 @@ def _wait_for_blocker(engine, pid: int, finished: threading.Event) -> bool:
             if finished.wait(0.01):
                 return False
     return False
+
+
+class _PausingClinicalConfigurationSession(Session):
+    def __init__(
+        self,
+        bind,
+        *,
+        lock_acquired: threading.Event,
+        release: threading.Event,
+    ):
+        super().__init__(bind=bind)
+        self._lock_acquired = lock_acquired
+        self._release = release
+        self._paused = False
+
+    def scalar(self, statement, *args, **kwargs):  # type: ignore[no-untyped-def]
+        result = super().scalar(statement, *args, **kwargs)
+        if getattr(statement, "_for_update_arg", None) is not None and not self._paused:
+            self._paused = True
+            self._lock_acquired.set()
+            if not self._release.wait(8):
+                raise AssertionError(
+                    "clinical configuration lock holder was not released"
+                )
+        return result
+
+
+def test_clinical_draft_update_and_submit_serialize_the_approved_snapshot(
+    lab_lock_engine,
+):
+    now = datetime.now(UTC)
+    initial_instruction = "Synthetic instruction version one."
+    updated_instruction = "Synthetic instruction version two."
+    snapshot = {
+        "method_instructions": [
+            {
+                "method_code": "SYNTHETIC-METHOD",
+                "method_version": "SYNTHETIC-1",
+                "instruction_text": initial_instruction,
+                "source_ref": "clinic-document://synthetic/method-1",
+            }
+        ],
+        "reference_intervals": [
+            {
+                "rule_code": "SYNTHETIC-RANGE-1",
+                "analyte_code": "SYNTHETIC-ANALYTE",
+                "method_code": "SYNTHETIC-METHOD",
+                "unit_code": "synthetic_unit",
+                "low": 1.0,
+                "high": 10.0,
+                "source_ref": "clinic-document://synthetic/reference-1",
+            }
+        ],
+        "critical_values": [],
+        "qc_rules": [],
+        "not_applicable_reasons": {
+            "critical_values": "No separate critical threshold in this synthetic profile.",
+            "qc_rules": "No instrument-specific QC rule in this synthetic profile.",
+        },
+    }
+    with Session(lab_lock_engine) as setup:
+        admin = User(
+            username=f"synthetic_config_admin_{uuid4().hex[:8]}",
+            full_name="SYNTHETIC Configuration Admin",
+            hashed_password="synthetic-unused",
+            role="Admin",
+            is_active=True,
+        )
+        physician = User(
+            username=f"synthetic_config_lab_{uuid4().hex[:8]}",
+            full_name="SYNTHETIC Lab Physician",
+            hashed_password="synthetic-unused",
+            role="Lab",
+            is_active=True,
+        )
+        setup.add_all([admin, physician])
+        setup.flush()
+        version = LabClinicalConfigurationVersion(
+            version_no=1,
+            status="DRAFT",
+            configuration_schema_version=1,
+            configuration_snapshot=snapshot,
+            primary_lab_physician_user_id=physician.id,
+            created_by_user_id=admin.id,
+            created_at=now,
+            updated_at=now,
+        )
+        setup.add(version)
+        setup.commit()
+        version_id = version.id
+        admin_id = admin.id
+        physician_id = physician.id
+
+    lock_acquired = threading.Event()
+    release = threading.Event()
+    submit_ready = threading.Event()
+    submit_finished = threading.Event()
+    outcome: dict[str, object] = {}
+    updated_snapshot = {
+        **snapshot,
+        "method_instructions": [
+            {
+                **snapshot["method_instructions"][0],
+                "instruction_text": updated_instruction,
+            }
+        ],
+    }
+
+    def edit_draft() -> None:
+        try:
+            with _PausingClinicalConfigurationSession(
+                lab_lock_engine,
+                lock_acquired=lock_acquired,
+                release=release,
+            ) as session:
+                actor = session.get(User, admin_id)
+                assert actor is not None
+                update_draft(
+                    session,
+                    version_id=version_id,
+                    configuration_snapshot=updated_snapshot,
+                    primary_lab_physician_user_id=physician_id,
+                    substitute_lab_physician_user_id=None,
+                    actor=actor,
+                )
+        except Exception as exc:  # noqa: BLE001 - surfaced in parent assertion
+            outcome["edit_error"] = repr(exc)
+
+    def submit_draft() -> None:
+        try:
+            with Session(lab_lock_engine) as session:
+                actor = session.get(User, admin_id)
+                assert actor is not None
+                outcome["submit_pid"] = session.scalar(
+                    text("SELECT pg_backend_pid()")
+                )
+                submit_ready.set()
+                submitted = submit_for_approval(
+                    session, version_id=version_id, actor=actor
+                )
+                outcome["submitted_status"] = submitted.status
+                outcome["submitted_instruction"] = submitted.configuration_snapshot[
+                    "method_instructions"
+                ][0]["instruction_text"]
+        except Exception as exc:  # noqa: BLE001 - surfaced in parent assertion
+            outcome["submit_error"] = repr(exc)
+        finally:
+            submit_finished.set()
+
+    editor = threading.Thread(target=edit_draft, daemon=True)
+    submitter = threading.Thread(target=submit_draft, daemon=True)
+    editor.start()
+    try:
+        assert lock_acquired.wait(5), outcome
+        submitter.start()
+        assert submit_ready.wait(5), outcome
+        blocked = _wait_for_blocker(
+            lab_lock_engine, int(outcome["submit_pid"]), submit_finished
+        )
+    finally:
+        release.set()
+        editor.join(timeout=10)
+        if submitter.ident is not None:
+            submitter.join(timeout=10)
+
+    assert blocked, "submission returned before the locked draft edit committed"
+    assert not editor.is_alive() and not submitter.is_alive(), outcome
+    assert "edit_error" not in outcome and "submit_error" not in outcome, outcome
+    assert outcome["submitted_status"] == "PENDING_APPROVAL", outcome
+    assert outcome["submitted_instruction"] == updated_instruction, outcome
+    with Session(lab_lock_engine) as verification:
+        stored = verification.get(LabClinicalConfigurationVersion, version_id)
+        assert stored is not None
+        assert stored.status == "PENDING_APPROVAL"
+        assert stored.configuration_snapshot["method_instructions"][0][
+            "instruction_text"
+        ] == updated_instruction
 
 
 class _PausingLockRepository(LabReportingApiRepository):
