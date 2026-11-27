@@ -849,3 +849,108 @@ describe('Codex R12 PR 3118 (P1): per-detail queue entry identity through aggreg
     expect(items.find((i) => i.service_id === 4)?.original_queue_id).toBe(502);
   });
 });
+
+// REGAGG-FE-001/002 (owner group100, 2026-11-16): unverified identity collision
+// and truthful mixed per-record status in «Все отделения» aggregation.
+describe('REGAGG group100 — registrar aggregation integrity', () => {
+  const makeUnknownEntry = (overrides: Record<string, unknown> = {}) => ({
+    ...makeAppointment({
+      id: overrides.id,
+      record_type: overrides.record_type ?? 'online_queue',
+      canonical_record_id: overrides.canonical_record_id,
+      queue_entry_id: overrides.queue_entry_id ?? overrides.id,
+      patient_fio: overrides.patient_fio ?? 'Неизвестный пациент',
+      patient_phone: overrides.patient_phone ?? 'Не указан',
+      patient_birth_year: overrides.patient_birth_year ?? null,
+    }),
+    // makeAppointment coalesces null ?? 10, so explicit re-stamp after spread:
+    patient_id: null,
+    status: overrides.status ?? 'waiting',
+    queue_time: overrides.queue_time ?? '2026-04-15T09:45:00+05:00',
+  });
+
+  it('REGAGG-FE-001: two distinct unknown-identity entries stay separate cards', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeUnknownEntry({ id: 101, canonical_record_id: 101 }),
+      makeUnknownEntry({ id: 202, canonical_record_id: 202 }),
+    ]);
+
+    expect(result).toHaveLength(2);
+    expect(result.map((row) => row.grouped_record_refs)).toEqual([
+      [{ record_kind: 'online_queue', record_id: 101 }],
+      [{ record_kind: 'online_queue', record_id: 202 }],
+    ]);
+  });
+
+  it('REGAGG-FE-001: same real-looking FIO/shared phone without patient_id does not infer a link', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeUnknownEntry({ id: 11, patient_fio: 'Каримов Алишер', patient_phone: '+998901234567', canonical_record_id: 11 }),
+      makeUnknownEntry({ id: 22, patient_fio: 'Каримов Алишер', patient_phone: '+998901234567', canonical_record_id: 22 }),
+    ]);
+
+    expect(result).toHaveLength(2);
+    expect(result.map((row) => row.patient_id)).toEqual([null, null]);
+  });
+
+  it('REGAGG-FE-001: same verified patient_id across services still aggregates into one card', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({ id: 1, patient_id: 77, canonical_record_id: 301, record_type: 'visit', visit_id: 301, appointment_id: null }),
+      makeAppointment({ id: 2, patient_id: 77, canonical_record_id: 402, record_type: 'online_queue', visit_id: null, appointment_id: null, queue_entry_id: 402 }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].patient_id).toBe(77);
+    expect(result[0].grouped_record_refs).toEqual([
+      { record_kind: 'visit', record_id: 301 },
+      { record_kind: 'online_queue', record_id: 402 },
+    ]);
+  });
+
+  it('REGAGG-FE-002: mixed done/waiting statuses surface as mixed regardless of input order', () => {
+    const first = aggregatePatientsForAllDepartments([
+      makeAppointment({ id: 1, patient_id: 77, canonical_record_id: 301, record_type: 'visit', visit_id: 301, appointment_id: null, status: 'done' }),
+      makeAppointment({ id: 2, patient_id: 77, canonical_record_id: 402, record_type: 'online_queue', visit_id: null, appointment_id: null, queue_entry_id: 402, status: 'waiting' }),
+    ]);
+    const second = aggregatePatientsForAllDepartments([
+      makeAppointment({ id: 2, patient_id: 77, canonical_record_id: 402, record_type: 'online_queue', visit_id: null, appointment_id: null, queue_entry_id: 402, status: 'waiting' }),
+      makeAppointment({ id: 1, patient_id: 77, canonical_record_id: 301, record_type: 'visit', visit_id: 301, appointment_id: null, status: 'done' }),
+    ]);
+
+    for (const result of [first, second]) {
+      expect(result).toHaveLength(1);
+      expect(result[0].status).toBe('mixed');
+      expect(new Set(result[0].grouped_record_statuses as string[])).toEqual(new Set(['done', 'waiting']));
+    }
+  });
+
+  it('REGAGG-FE-002: uniform status group keeps its canonical status', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({ id: 1, patient_id: 77, canonical_record_id: 301, record_type: 'visit', visit_id: 301, appointment_id: null, status: 'waiting' }),
+      makeAppointment({ id: 2, patient_id: 77, canonical_record_id: 402, record_type: 'online_queue', visit_id: null, appointment_id: null, queue_entry_id: 402, status: 'waiting' }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe('waiting');
+    expect(result[0].grouped_record_statuses).toEqual(['waiting', 'waiting']);
+  });
+
+  it('REGAGG-FE-002: no_show plus waiting is mixed, not silently completed', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({ id: 1, patient_id: 77, canonical_record_id: 301, record_type: 'visit', visit_id: 301, appointment_id: null, status: 'no_show' }),
+      makeAppointment({ id: 2, patient_id: 77, canonical_record_id: 402, record_type: 'online_queue', visit_id: null, appointment_id: null, queue_entry_id: 402, status: 'waiting' }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe('mixed');
+  });
+
+  it('REGAGG-FE-002: grouped_records carry per-record status breakdown', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({ id: 1, patient_id: 77, canonical_record_id: 301, record_type: 'visit', visit_id: 301, appointment_id: null, status: 'done' }),
+      makeAppointment({ id: 2, patient_id: 77, canonical_record_id: 402, record_type: 'online_queue', visit_id: null, appointment_id: null, queue_entry_id: 402, status: 'waiting' }),
+    ]);
+
+    const records = result[0].grouped_records as Array<Record<string, unknown>>;
+    expect(records.map((r) => r.status)).toEqual(['done', 'waiting']);
+  });
+});

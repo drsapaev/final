@@ -438,9 +438,9 @@ def _build_queue_result(
     seen_entry_keys = set()
     user_role = str(getattr(current_user, "role", "")).strip().lower()
     can_include_patient_gender = user_role in {"admin", "registrar"}
-    cached_patients = getattr(db, "info", {}).get(_REGISTRAR_QUEUE_CACHE_KEY, {}).get(
-        "patients", {}
-    )
+    queue_cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY, {})
+    cached_patients = queue_cache.get("patients", {})
+    cached_visits = queue_cache.get("visits", {})
     latest_lab_reports_by_visit, include_lab_report_summary = (
         _collect_lab_report_summaries(
             db=db,
@@ -650,6 +650,8 @@ def _build_queue_result(
                 queue_status=canonical_status,
                 visit_id=entry_visit_id,
                 patient_id=patient_id,
+                visit=cached_visits.get(entry_visit_id),
+                record_kind=entry_type,
             )
             queue_owner_kind, queue_owner_id, daily_queue_id = (
                 _resolve_registrar_row_owner(

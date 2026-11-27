@@ -20,6 +20,7 @@ import ForceMajeureModal from '../../../components/registrar/ForceMajeureModal';
 import logger from '../../../utils/logger';
 import notify from '../../../services/notify';
 import { printPanelTicketInBrowserAsync } from '../../../services/panelPrint';
+import { describeRegistrarRecord, getRegistrarCancelTargets } from '../registrarHelpers';
 import type { Appointment } from '../../../types/domain/clinic';
 import type { RegistrarPaymentInput, RegistrarPaymentSummary } from '../../../api/registrarPayments';
 import RecordPreview from './RecordPreview';
@@ -71,7 +72,6 @@ interface RegistrarDialogsLayerProps {
   setWizardInitialData: (data: Record<string, unknown> | null) => void;
   setIsProcessing: (value: boolean) => void;
   // data + actions
-  appointments: Appointment[];
   loadAppointments: (options?: unknown) => Promise<RegistrarWorklistLoadOutcome | void> | void;
   loadIntegratedData: () => Promise<void> | void;
   openRecordEditor: (row: unknown) => void;
@@ -118,7 +118,6 @@ const RegistrarDialogsLayer = ({
   setWizardEditMode,
   setWizardInitialData,
   setIsProcessing,
-  appointments,
   loadAppointments,
   loadIntegratedData,
   openRecordEditor,
@@ -131,7 +130,12 @@ const RegistrarDialogsLayer = ({
   removeRescheduledAppointmentFromView,
   confirm,
   tI18n,
-}: RegistrarDialogsLayerProps) => (
+}: RegistrarDialogsLayerProps) => {
+  const cancelTargets = cancelDialog.row
+    ? getRegistrarCancelTargets(cancelDialog.row as Record<string, unknown>)
+    : [];
+
+  return (
   <>
     <RecordPreview
       isOpen={recordPreviewDialog.open}
@@ -148,15 +152,27 @@ const RegistrarDialogsLayer = ({
       isOpen={cancelDialog.open}
       onClose={() => setCancelDialog({ open: false, row: null, reason: '' })}
       appointment={cancelDialog.row}
-      onCancel={async (appointmentId, reason): Promise<CancelCommandOutcome> => {
+      targets={cancelTargets.map(({ key, ref, record }) => {
+        const details = describeRegistrarRecord(record);
+        return {
+          value: key,
+          label: details ? `${details} · #${ref.record_id}` : `#${ref.record_id}`,
+          appointment: record as Appointment,
+        };
+      })}
+      onCancel={async (targetKey, reason): Promise<CancelCommandOutcome> => {
         // REG-FE-017 (ledger PR 3803): колбэк возвращает типизированный результат
         // команды; тосты и закрытие — ответственность диалога. Рефреш
         // ворклиста — best-effort реконсиляция: его сбой не превращает
         // реальный результат отмены в противоположный.
-        const data = appointmentId === cancelDialog.row?.id
-          ? cancelDialog.row
-          : appointments.find((a) => a.id === appointmentId);
-        const result = await runRegistrarRecordAction(data as Record<string, unknown>, 'cancel', { reason });
+        const target = cancelTargets.find(({ key }) => key === targetKey);
+        if (!target) return { outcome: 'no_op' };
+        const result = await runRegistrarRecordAction({
+          ...target.ref,
+          canonical_record_id: target.ref.record_id,
+          available_actions: target.record.available_actions,
+          can_cancel: target.record.can_cancel,
+        }, 'cancel', { reason });
         if (!result) return { outcome: 'no_op' };
         if (!result.success) {
           const successCount = Number(result.success_count || 0);
@@ -329,6 +345,7 @@ const RegistrarDialogsLayer = ({
         loadAppointments({ source: 'force_majeure' });
       }} />
   </>
-);
+  );
+};
 
 export default RegistrarDialogsLayer;

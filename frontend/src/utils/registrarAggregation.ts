@@ -234,9 +234,15 @@ const buildPatientGroupKey = (appointment: Record<string, unknown>, index: numbe
     appointment?.patient_birth_year ||
     ''
   ).trim();
-  if (fio || phone || birth) {
-    return `identity:${fio}|${phone}|${birth}`;
-  }
+  void fio; void phone; void birth;
+  // REGAGG-FE-001 (owner group100, 2026-11-16): демографическая эвристика
+  // identity:{fio}|{phone}|{birth} удалена. Без канонического backend
+  // patient_id два РАЗНЫХ пациента с одинаковыми unknown/fallback-полями
+  // («Неизвестный пациент» + «Не указан» или совпадающие ФИО/телефон без
+  // карты) слипались в одну карточку и получали общий grouped command
+  // selection — недоказуемая ссылка на пациента. Записи без patient_id
+  // всегда живут в своей per-record карточке; один verified patient_id
+  // по-прежнему агрегируется в одну.
 
   const recordRef = buildRecordRef(appointment);
   if (recordRef) {
@@ -376,6 +382,10 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
         grouped_discount_modes: [],
         grouped_payment_statuses: [],
         grouped_payment_types: [],
+        // REGAGG-FE-002 (owner group100, 2026-11-16): per-record статусы
+        // собираются для честного агрегата — push ниже кладёт по одному
+        // статусу на каждую входную запись (конвенция как у grouped_payment_statuses).
+        grouped_record_statuses: [],
         grouped_records: [],
         grouped_record_refs: [],
         // audit/phase-6, BS-60: arrays kept in sync with Sets for backward
@@ -484,6 +494,9 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
     patientGroups[patientKey].cost += appointmentCost;
     patientGroups[patientKey].grouped_discount_modes.push(normalizedDiscountMode);
     patientGroups[patientKey].grouped_payment_statuses.push(normalizedPayment);
+    // REGAGG-FE-002: статус каждой записи попадает в группу (init кладёт
+    // первый, merge — последующие) независимо от порядка ввода.
+    patientGroups[patientKey].grouped_record_statuses.push(String(appointment.status ?? ''));
     if (appointment.payment_type) {
       patientGroups[patientKey].grouped_payment_types.push(appointment.payment_type);
     }
@@ -504,15 +517,18 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
       // visit_ids строки (выбор целевого визита при переносе), обязаны
       // использовать это поле, а не record_id.
       visit_id: pickCanonicalVisitId(appointment),
-      available_actions: Array.isArray(appointment.available_actions) ? [...appointment.available_actions] : [],
+      available_actions: Array.isArray(appointment.available_actions) ? [...appointment.available_actions] : undefined,
       can_mark_paid: Boolean(appointment.can_mark_paid),
       can_start_visit: Boolean(appointment.can_start_visit),
-      can_cancel: Boolean(appointment.can_cancel),
+      can_cancel: appointment.can_cancel,
+      can_reschedule: appointment.can_reschedule,
       can_print_ticket: Boolean(appointment.can_print_ticket),
       can_complete: Boolean(appointment.can_complete),
       discount_mode: normalizedDiscountMode,
       approval_status: appointment.approval_status,
       payment_status: normalizedPayment,
+      // REGAGG-FE-002: per-record статус для honest breakdown карточки.
+      status: appointment.status ?? null,
       payment_type: appointment.payment_type || null,
       cost: appointmentCost,
       // REG-FE-064 (audit ledger 3803): per-record факты для честного
@@ -617,6 +633,15 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
     const uniquePaymentStatuses = [...new Set(groupedPaymentStatuses.filter(Boolean))];
     const groupedPaymentTypes: unknown[] = Array.isArray(group.grouped_payment_types) ? group.grouped_payment_types as unknown[] : [];
     const uniquePaymentTypes = [...new Set(groupedPaymentTypes.filter(Boolean))];
+    // REGAGG-FE-002 (owner group100, 2026-11-16): агрегатный статус больше
+    // НЕ «статус первой записи». Единственный per-record статус остаётся
+    // каноническим; разные статусы дают честную mixed-пометку (рендерится
+    // бейджем в appointmentsTableColumns), полный per-record breakdown —
+    // в grouped_records[].status и grouped_record_statuses.
+    const groupedRecordStatuses: string[] = Array.isArray(group.grouped_record_statuses)
+      ? (group.grouped_record_statuses as unknown[]).map((s) => String(s ?? ''))
+      : [String(group.status ?? '')];
+    const uniqueRecordStatuses = [...new Set(groupedRecordStatuses.filter((s) => s !== ''))];
 
     const allApprovedZeroCostRegistrations = records.length > 0 && (records as Record<string, unknown>[]).every((record: Record<string, unknown>) => (
       Number(record.cost) <= 0 &&
@@ -662,6 +687,13 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
       discount_mode: uniqueRegistrationModes.length === 1 ? uniqueRegistrationModes[0] : 'mixed',
       payment_type: aggregatePaymentType,
       payment_status: uniquePaymentStatuses.length === 1 ? uniquePaymentStatuses[0] : 'mixed',
+      // REGAGG-FE-002: единственный per-record статус — канонический; разные
+      // — 'mixed' (не клиническое состояние, а честная агрегатная пометка,
+      // как payment_status='mixed'); пустой список — legacy first-status.
+      status: uniqueRecordStatuses.length === 1
+        ? uniqueRecordStatuses[0]
+        : (uniqueRecordStatuses.length === 0 ? group.status : 'mixed'),
+      grouped_record_statuses: groupedRecordStatuses,
       cost: Number(group.cost as number | string | undefined || 0),
       cost_display: Number(group.cost as number | string | undefined || 0) <= 0 ? 'free' : null,
     };

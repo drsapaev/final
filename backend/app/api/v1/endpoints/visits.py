@@ -21,8 +21,10 @@ from app.services.patient_access_audit import (
 )
 from app.services.visit_state_checks import (
     ACCEPTED_VISIT_STATUSES,
+    RESCHEDULE_VISIT_ROLES,
     force_reopen_target_allowed,
     is_valid_visit_transition,
+    visit_reschedule_conflict,
 )
 from app.services.visits_api_service import VisitsApiService
 
@@ -689,13 +691,13 @@ def force_reopen_visit(
 #
 @router.post(
     "/visits/{visit_id}/reschedule",
-    dependencies=[Depends(require_roles("Admin", "Registrar"))],
+    dependencies=[Depends(require_roles(*RESCHEDULE_VISIT_ROLES))],
     summary="Перенести визит на конкретную дату (new_date в формате YYYY-MM-DD)",
     response_model=VisitOut,
 )
 @router.post(
     "/{visit_id}/reschedule",
-    dependencies=[Depends(require_roles("Admin", "Registrar"))],
+    dependencies=[Depends(require_roles(*RESCHEDULE_VISIT_ROLES))],
     summary="Перенести визит на конкретную дату (legacy alias)",
     response_model=VisitOut,
 )
@@ -723,15 +725,8 @@ def reschedule_visit(
     if not vrow:
         raise HTTPException(404, "Visit not found")
 
-    # Запретим перенос, если визит завершён/отменён или уже начат
-    if vrow.get("status") in {"closed", "canceled"}:
-        raise HTTPException(
-            status_code=409, detail="Cannot reschedule closed or canceled visit"
-        )
-    if vrow.get("started_at"):
-        raise HTTPException(
-            status_code=409, detail="Cannot reschedule a visit that has been started"
-        )
+    if conflict := visit_reschedule_conflict(vrow.get("status"), vrow.get("started_at")):
+        raise HTTPException(status_code=409, detail=conflict)
 
     # R-27 fix: обновляем и дату, и опционально время
     new_time_str = new_time.strip() if new_time is not None else None
@@ -874,13 +869,13 @@ def reschedule_visit(
 
 @router.post(
     "/visits/{visit_id}/reschedule/tomorrow",
-    dependencies=[Depends(require_roles("Admin", "Registrar"))],
+    dependencies=[Depends(require_roles(*RESCHEDULE_VISIT_ROLES))],
     summary="Перенести визит на завтра (planned_date = today + 1)",
     response_model=VisitOut,
 )
 @router.post(
     "/{visit_id}/reschedule/tomorrow",
-    dependencies=[Depends(require_roles("Admin", "Registrar"))],
+    dependencies=[Depends(require_roles(*RESCHEDULE_VISIT_ROLES))],
     summary="Перенести визит на завтра (legacy alias)",
     response_model=VisitOut,
 )
@@ -896,14 +891,8 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
     if not vrow:
         raise HTTPException(404, "Visit not found")
 
-    if vrow.get("status") in {"closed", "canceled"}:
-        raise HTTPException(
-            status_code=409, detail="Cannot reschedule closed or canceled visit"
-        )
-    if vrow.get("started_at"):
-        raise HTTPException(
-            status_code=409, detail="Cannot reschedule a visit that has been started"
-        )
+    if conflict := visit_reschedule_conflict(vrow.get("status"), vrow.get("started_at")):
+        raise HTTPException(status_code=409, detail=conflict)
 
     tomorrow = date.today() + timedelta(days=1)
     # PR-1 (Codex rounds 2+5): invalidate the reminder state only when the

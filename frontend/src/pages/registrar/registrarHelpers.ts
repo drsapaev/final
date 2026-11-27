@@ -34,6 +34,7 @@ export interface RegistrarRecordLike {
   can_print_ticket?: boolean;
   can_complete?: boolean;
   can_cancel?: boolean;
+  can_reschedule?: boolean;
   [k: string]: unknown;
 }
 
@@ -263,6 +264,7 @@ export const hasBackendAction = (record: RegistrarRecordLike | null | undefined,
     print_ticket: 'can_print_ticket',
     complete: 'can_complete',
     cancel: 'can_cancel',
+    reschedule: 'can_reschedule',
   };
   const flagName = actionFlagByName[normalizedAction.replace('-', '_')];
   if (flagName && record[flagName] !== undefined) {
@@ -527,3 +529,50 @@ export const isMultiRecordAggregateRow = (row: Record<string, unknown>) => (
   hasMultipleRecordRefs(row?.grouped_records) ||
   hasMultipleRecordRefs(row?.aggregated_ids)
 );
+
+const getRegistrarActionRecords = (row: RegistrarRecordLike): RegistrarRecordLike[] => {
+  if (Array.isArray(row.grouped_records) && row.grouped_records.length) return row.grouped_records;
+  if (isMultiRecordAggregateRow(row) || hasMultipleRecordRefs(row.visit_ids)) return [];
+  return [row];
+};
+
+export const getRegistrarCancelTargets = (row: RegistrarRecordLike) => {
+  const targets = new Map<string, { key: string; ref: RegistrarRecordRef; record: RegistrarRecordLike }>();
+  for (const record of getRegistrarActionRecords(row)) {
+    if (record.can_cancel === false || !hasBackendAction(record, 'cancel')) continue;
+    const refs = record === row
+      ? getRegistrarRecordRefs(record)
+      : getRegistrarRecordRefs({ grouped_record_refs: [record.record_ref] });
+    if (refs.length !== 1) continue;
+    const [ref] = refs;
+    const key = `${ref.record_kind}:${ref.record_id}`;
+    if (!targets.has(key)) targets.set(key, { key, ref, record });
+  }
+  return [...targets.values()];
+};
+
+export const getRegistrarRescheduleVisitIds = (row: RegistrarRecordLike): number[] => {
+  const ids = new Set<number>();
+  for (const record of getRegistrarActionRecords(row)) {
+    if (record.can_reschedule === false || !hasBackendAction(record, 'reschedule')) continue;
+    const id = record.visit_id ?? record.visitId;
+    if (typeof id !== 'number' && typeof id !== 'string') continue;
+    const visitId = Number(id);
+    if (Number.isSafeInteger(visitId) && visitId > 0) ids.add(visitId);
+  }
+  return [...ids];
+};
+
+export const describeRegistrarRecord = (record: RegistrarRecordLike) => {
+  const services = Array.isArray(record.services) ? record.services : [];
+  const names = services.map((service: unknown) => {
+    if (typeof service === 'string') return service;
+    const details = service as { name?: string; code?: string } | null;
+    return details?.name ?? details?.code ?? '';
+  }).filter(Boolean).join(', ');
+  return [
+    record.doctor_name || record.specialist_name,
+    names,
+    [record.record_date || record.date, record.appointment_time || record.time].filter(Boolean).join(' '),
+  ].filter(Boolean).join(' · ');
+};

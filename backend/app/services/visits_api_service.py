@@ -16,6 +16,7 @@ from app.core.audit import extract_model_changes
 from app.models.visit import Visit
 from app.repositories.visits_api_repository import VisitsApiRepository
 from app.services.service_mapping import normalize_service_code
+from app.services.visit_state_checks import visit_reschedule_conflict
 
 # PR-1 (Codex round 11+13, P1): shared lease-coordination refusal detail
 # (mirrors the reschedule routes' constant in app/api/v1/endpoints/visits.py).
@@ -389,16 +390,10 @@ class VisitsApiService:
         if not visit_row:
             raise HTTPException(404, "Visit not found")
 
-        if visit_row.get("status") in {"closed", "canceled"}:
-            raise HTTPException(
-                status_code=409,
-                detail="Cannot reschedule closed or canceled visit",
-            )
-        if visit_row.get("started_at"):
-            raise HTTPException(
-                status_code=409,
-                detail="Cannot reschedule a visit that has been started",
-            )
+        if conflict := visit_reschedule_conflict(
+            visit_row.get("status"), visit_row.get("started_at")
+        ):
+            raise HTTPException(status_code=409, detail=conflict)
 
         # PR-1 (Codex rounds 2+5): the reminder state is only valid for the
         # CURRENT schedule — rescheduling must invalidate it, otherwise the

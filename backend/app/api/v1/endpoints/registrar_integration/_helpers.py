@@ -11,7 +11,7 @@ API endpoints для интеграции регистратуры с админ
 
 import logging  # noqa: F401
 from datetime import UTC, date, datetime  # noqa: F401
-from typing import Any  # noqa: F401
+from typing import TYPE_CHECKING, Any  # noqa: F401
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
 from pydantic import BaseModel, Field  # noqa: F401
@@ -33,6 +33,14 @@ from app.services.service_mapping import (  # noqa: F401
     get_service_code,
     resolve_queue_group_key,
 )
+from app.services.visit_state_checks import (
+    RESCHEDULE_VISIT_ROLES,
+    is_valid_visit_transition,
+    visit_reschedule_conflict,
+)
+
+if TYPE_CHECKING:
+    from app.models.visit import Visit
 
 # [OK] Используем прямой SQL вместо импорта модели для избежания конфликта DailyQueue
 # Проблема: DailyQueue определен в двух местах (queue_old.py и online_queue.py)
@@ -70,6 +78,9 @@ REGISTRAR_START_STATUSES = {"waiting", "queued"}
 REGISTRAR_PRINT_STATUSES = {"waiting", "queued"}
 REGISTRAR_COMPLETE_STATUSES = {"called", "in_cabinet", "in_progress"}
 REGISTRAR_CANCEL_BLOCKED_STATUSES = {"canceled", "cancelled", "completed", "done", "served"}
+REGISTRAR_RESCHEDULE_QUEUE_STATUSES = {"waiting", "queued", "pending", "confirmed"}
+REGISTRAR_RESCHEDULE_VISIT_STATUSES = {"open", "waiting", "pending", "pending_confirmation", "confirmed"}
+REGISTRAR_RESCHEDULE_ROLES = frozenset(role.lower() for role in RESCHEDULE_VISIT_ROLES)
 REGISTRAR_HIDDEN_QUEUE_STATUSES = {"canceled", "cancelled", "no_show"}
 REGISTRAR_VIEW_EMR_STATUSES = {"completed", "done", "served"}
 REGISTRAR_SCHEDULE_NEXT_STATUSES = {"completed", "done", "served"}
@@ -128,11 +139,30 @@ def _registrar_can_complete(user: User | None, queue_status: str | None) -> bool
     )
 
 
-def _registrar_can_cancel(user: User | None, queue_status: str | None) -> bool:
+def _registrar_can_cancel(
+    user: User | None, queue_status: str | None, visit: Visit | None
+) -> bool:
     normalized_status = str(queue_status or "").strip().lower()
     return (
         normalized_status not in REGISTRAR_CANCEL_BLOCKED_STATUSES
         and bool(_registrar_user_role_names(user) & REGISTRAR_CANCEL_ROLES)
+        and (visit is None or is_valid_visit_transition(visit.status, "canceled")[0])
+    )
+
+
+def _registrar_can_reschedule(
+    user: User | None, queue_status: str | None, visit: Visit | None
+) -> bool:
+    primary_role = str(getattr(user, "role", "") or "").strip().lower()
+    return (
+        visit is not None
+        and str(queue_status or "").strip().lower() in REGISTRAR_RESCHEDULE_QUEUE_STATUSES
+        and visit.status in REGISTRAR_RESCHEDULE_VISIT_STATUSES
+        and visit_reschedule_conflict(visit.status, getattr(visit, "started_at", None)) is None
+        and (
+            bool(getattr(user, "is_superuser", False))
+            or primary_role in REGISTRAR_RESCHEDULE_ROLES
+        )
     )
 
 
@@ -183,6 +213,8 @@ def _registrar_available_actions(
     queue_status: str | None,
     visit_id: int | None = None,
     patient_id: int | None = None,
+    visit: Visit | None = None,
+    record_kind: str | None = None,
 ) -> list[str]:
     actions: list[str] = []
     if visit_id is not None and _registrar_can_mark_paid(user, payment_status):
@@ -197,8 +229,10 @@ def _registrar_available_actions(
         actions.append("print_ticket")
     if _registrar_can_complete(user, queue_status):
         actions.append("complete")
-    if _registrar_can_cancel(user, queue_status):
+    if _registrar_can_cancel(user, queue_status, visit if record_kind != "appointment" else None):
         actions.append("cancel")
+    if _registrar_can_reschedule(user, queue_status, visit):
+        actions.append("reschedule")
     if _registrar_can_view_emr(
         user,
         payment_status=payment_status,

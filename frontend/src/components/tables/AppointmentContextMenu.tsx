@@ -2,6 +2,7 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useEffect, useRef, useState } from 'react';
 import { getBackendActionAvailability } from './appointmentsTableContracts';
+import { getRegistrarCancelTargets, getRegistrarRescheduleVisitIds } from '../../pages/registrar/registrarHelpers';
 import {
   User,
   Calendar,
@@ -23,8 +24,6 @@ const ACTION_ALIASES = {
   complete: ['complete', 'complete_visit', 'complete-visit'],
   payment: ['payment', 'mark_paid', 'mark-paid'],
   print: ['print', 'print_ticket', 'print-ticket'],
-  reschedule: ['reschedule', 'move', 'transfer'],
-  cancel: ['cancel', 'cancel_visit', 'cancel-visit']
 };
 
 const hasBackendAction = (
@@ -164,14 +163,14 @@ const AppointmentContextMenu = ({
     label: t('misc.acm_perenesti'),
     icon: Calendar,
     color: colors.warning,
-    visible: hasBackendAction(row, 'reschedule', 'can_reschedule')
+    visible: getRegistrarRescheduleVisitIds(row).length > 0
   },
   {
     id: 'cancel',
     label: t('misc.acm_otmenit'),
     icon: X,
     color: colors.error,
-    visible: hasBackendAction(row, 'cancel', 'can_cancel')
+    visible: getRegistrarCancelTargets(row).length > 0
   },
   { type: 'divider' },
   {

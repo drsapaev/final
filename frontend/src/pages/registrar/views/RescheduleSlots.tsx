@@ -24,6 +24,7 @@ import notify from '../../../services/notify';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import { rescheduleTomorrow, rescheduleVisit } from '../../../api/visits';
 import { getErrorMessage } from '../../../utils/errorHandler';
+import { describeRegistrarRecord } from '../registrarHelpers';
 import type { RegistrarWorklistLoadOutcome } from '../useRegistrarWorklistData';
 
 interface RescheduleSlotsDialogProps {
@@ -113,23 +114,10 @@ const RescheduleSlotsDialog = ({
       }
       const ref = rec?.record_ref as Record<string, unknown> | undefined;
       return Boolean(ref && ref.record_kind === 'visit' && String(ref.record_id) === String(visitId));
-    }) ?? {};
-    const doctor = record.doctor_name || row.doctor_name || row.specialist_name || '';
-    const services = Array.isArray(record.services) && record.services.length > 0
-      ? record.services
-      : (Array.isArray(row.services) ? row.services : []);
-    const serviceNames = (services as unknown[])
-      .map((svc) => (typeof svc === 'string' ? svc : ((svc as Record<string, unknown>)?.name ?? (svc as Record<string, unknown>)?.code ?? '')))
-      .filter(Boolean)
-      .join(', ');
-    const date = record.record_date || row.record_date || row.date || '';
-    const time = record.appointment_time || row.appointment_time || row.time || '';
-    const parts = [doctor, serviceNames, [date, time].filter(Boolean).join(' ')]
-      .map((part) => String(part).trim())
-      .filter(Boolean);
-    return parts.length > 0
-      ? `${tI18n('registrar.reschedule_visit_option', { id: String(visitId) })} — ${parts.join(' · ')}`
-      : tI18n('registrar.reschedule_visit_option', { id: String(visitId) });
+    });
+    const details = describeRegistrarRecord(record ?? (records.length === 0 ? row : {}));
+    const label = tI18n('registrar.reschedule_visit_option', { id: String(visitId) });
+    return details ? `${label} — ${details}` : label;
   };
 
   return (
@@ -311,9 +299,11 @@ const RescheduleSlotsDialog = ({
                 </option>
               ))}
             </select>
-            <div className="registrar-reschedule-hint registrar-reschedule-hint-text">
-              {tI18n('registrar.reschedule_select_visit_label')}
-            </div>
+          </div>
+        )}
+        {!isGroupedRow && candidateVisitIds.length === 1 && Array.isArray(rescheduleData?.grouped_records) && (
+          <div className="registrar-reschedule-card registrar-reschedule-card-neutral">
+            {describeVisitOption(candidateVisitIds[0])}
           </div>
         )}
 

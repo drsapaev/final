@@ -1600,7 +1600,7 @@ def test_registrar_lab_queue_page_bounds_enrichment_after_global_dedup(monkeypat
     )
 
     result, total = today_queues._build_queue_result_page(
-        db=object(),
+        db=SimpleNamespace(info={}),
         current_user=SimpleNamespace(role="Lab", roles=[]),
         queues_by_specialty=queues_by_specialty,
         department_filter={"lab", "laboratory"},
