@@ -1113,6 +1113,7 @@ const ru = {
     cardio_queue_call: 'Вызвать',
     cardio_queue_start_visit: 'Начать приём',
     cardio_queue_open_visit: 'Открыть приём',
+    cardio_queue_resume_visit: 'Продолжить приём',
     cardio_queue_view_emr: 'Просмотреть EMR',
     cardio_queue_status_waiting: 'Ожидает',
     cardio_queue_status_called: 'Вызван',

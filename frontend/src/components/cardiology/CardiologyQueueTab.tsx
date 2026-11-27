@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, RotateCw, UserRound } from 'lucide-react';
 
+import { api } from '../../api/client';
 import { useTranslation } from '../../i18n/useTranslation';
 import { queueService } from '../../services/queue';
 import { AppEmpty, AppError, AppLoading, Badge, Button, Card } from '../ui/macos';
@@ -56,6 +57,7 @@ export function CardiologyQueueTab({ onStartVisit, onOpenVisit }: CardiologyQueu
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [busyEntryId, setBusyEntryId] = useState<number | string | null>(null);
+  const actionBusy = useRef(false);
   // CARDQ-FE-001 (audit 3886): loadQueue is triggered on mount, on every
   // queueUpdated event and by the 30s interval — every request must be
   // bound to a monotonically increasing load id; a LATE response of an
@@ -106,22 +108,39 @@ export function CardiologyQueueTab({ onStartVisit, onOpenVisit }: CardiologyQueu
     };
   }, [loadQueue]);
 
-  const runAction = async (entry: CardiologyQueueEntry, action: 'call' | 'start_visit') => {
+  const runAction = async (entry: CardiologyQueueEntry, action: 'call' | 'start_visit' | 'send_to_diagnostics') => {
+    if (actionBusy.current) return;
+    actionBusy.current = true;
     setBusyEntryId(entry.id);
     setError(false);
     try {
       if (action === 'call') {
         await queueService.callPatient(entry.id);
+      } else if (action === 'send_to_diagnostics') {
+        const response = await api.post(`/queue/entry/${entry.id}/diagnostics`);
+        const result = response.data as { success?: boolean; entry_id?: number; new_status?: string } | null;
+        if (result?.success !== true || String(result.entry_id) !== String(entry.id)
+          || result.new_status !== 'diagnostics') {
+          throw new Error('Diagnostics transition was not confirmed');
+        }
+        await loadQueue();
       } else {
         const result = await queueService.startVisit(entry.id) as StartVisitResponse | null;
         if (!result?.success || result.patient_id == null || result.visit_id == null) {
           throw new Error('Start visit response did not include canonical ids');
+        }
+        if (entry.status === 'diagnostics' && (
+          String(result.entry_id) !== String(entry.id)
+          || result.patient_id !== entry.patient_id || result.visit_id !== entry.visit_id
+        )) {
+          throw new Error('Resumed visit did not match the queue entry');
         }
         onStartVisit(entry, result);
       }
     } catch {
       setError(true);
     } finally {
+      actionBusy.current = false;
       setBusyEntryId(null);
     }
   };
@@ -171,7 +190,8 @@ export function CardiologyQueueTab({ onStartVisit, onOpenVisit }: CardiologyQueu
             const status = String(entry.status || '').toLowerCase();
             const currentVisit = isCurrentVisit(entry);
             const completedVisit = isCompletedVisit(entry);
-            const openable = (currentVisit || completedVisit) && entry.visit_id != null;
+            const canResume = status === 'diagnostics' && hasAction(entry, 'start_visit');
+            const openable = !canResume && (currentVisit || completedVisit) && entry.visit_id != null;
             const name = entry.patient_name || t('cardio.cardio_queue_unknown_patient');
 
             return (
@@ -207,7 +227,12 @@ export function CardiologyQueueTab({ onStartVisit, onOpenVisit }: CardiologyQueu
                   )}
                   {hasAction(entry, 'start_visit') && !error && (
                     <Button variant="primary" loading={busyEntryId === entry.id} disabled={busyEntryId !== null} onClick={() => void runAction(entry, 'start_visit')}>
-                      {t('cardio.cardio_queue_start_visit')}
+                      {t(canResume ? 'cardio.cardio_queue_resume_visit' : 'cardio.cardio_queue_start_visit')}
+                    </Button>
+                  )}
+                  {status === 'in_progress' && hasAction(entry, 'send_to_diagnostics') && !error && (
+                    <Button variant="outline" loading={busyEntryId === entry.id} disabled={busyEntryId !== null} onClick={() => void runAction(entry, 'send_to_diagnostics')}>
+                      {t('misc.qmc_to_diagnostics')}
                     </Button>
                   )}
                   {openable && (

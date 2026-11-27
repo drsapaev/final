@@ -134,7 +134,9 @@ def _serialize_queue_doctor(doctor: Doctor | None, current_user: User, specialty
 # ===================== МОДЕЛИ ДАННЫХ =====================
 
 
-def _doctor_queue_available_actions(entry: OnlineQueueEntry) -> list[str]:
+def _doctor_queue_available_actions(
+    entry: OnlineQueueEntry, *, exact_diagnostic_visit: bool = False,
+) -> list[str]:
     status_value = (entry.status or "").strip().lower()
     actions_by_status = {
         "waiting": ["call", "no_show"],
@@ -147,11 +149,22 @@ def _doctor_queue_available_actions(entry: OnlineQueueEntry) -> list[str]:
         ],
         "no_show": ["restore_next"],
     }
-    return actions_by_status.get(status_value, [])
+    actions = actions_by_status.get(status_value, [])
+    if exact_diagnostic_visit:
+        if status_value == "in_progress":
+            return [*actions, "send_to_diagnostics"]
+        if status_value == "diagnostics":
+            # A live clinical visit must not be stranded by legacy queue-only closure.
+            return [*(action for action in actions if action != "mark_incomplete"), "start_visit"]
+    return actions
 
 
-def _doctor_queue_action_flags(entry: OnlineQueueEntry) -> dict[str, bool]:
-    actions = set(_doctor_queue_available_actions(entry))
+def _doctor_queue_action_flags(
+    entry: OnlineQueueEntry, *, exact_diagnostic_visit: bool = False,
+) -> dict[str, bool]:
+    actions = set(_doctor_queue_available_actions(
+        entry, exact_diagnostic_visit=exact_diagnostic_visit,
+    ))
     return {
         "can_call": "call" in actions,
         "can_start_visit": "start_visit" in actions,

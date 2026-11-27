@@ -11,6 +11,10 @@ from app.api.v1.endpoints.qr_queue._tokens import (
     RestoreToNextRequest,  # noqa: F401
     SetIncompleteRequest,  # noqa: F401
 )
+from app.services.doctor_queue_diagnostics import (
+    change_diagnostic_queue_status,
+    lock_active_doctor_visit,
+)
 
 
 @router.post("/entry/{entry_id}/restore-next", response_model=dict[str, Any])
@@ -224,14 +228,24 @@ def send_entry_to_diagnostics(
         current_user=current_user,
     )
 
-    if entry.status not in ["called", "in_service"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"На обследование можно отправить только called или in_service, текущий: {entry.status}"
+    if entry.status == "in_progress":
+        linked_visit = lock_active_doctor_visit(db, entry, entry.queue)
+        if linked_visit is None:
+            raise HTTPException(status_code=409, detail="Нет связанного активного приёма")
+        started_at = change_diagnostic_queue_status(
+            db, entry, linked_visit, from_status="in_progress", to_status="diagnostics",
         )
-
-    entry.status = "diagnostics"
-    entry.diagnostics_started_at = datetime.now(UTC)
+        if started_at is None:
+            raise HTTPException(status_code=409, detail="Состояние очереди уже изменилось")
+    else:
+        if entry.status not in {"called", "in_service"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Отправка на обследование недоступна из статуса {entry.status}",
+            )
+        started_at = datetime.now(UTC)
+        entry.status = "diagnostics"
+        entry.diagnostics_started_at = started_at
     db.commit()
 
     logger.info(
@@ -245,7 +259,7 @@ def send_entry_to_diagnostics(
         "message": "Пациент отправлен на обследование",
         "entry_id": entry_id,
         "new_status": "diagnostics",
-        "started_at": entry.diagnostics_started_at.isoformat() + "Z"
+        "started_at": started_at.isoformat().replace("+00:00", "Z")
     }
 
 
@@ -280,14 +294,40 @@ def mark_entry_incomplete(
             detail=f"Incomplete можно установить только для called/in_service/diagnostics, текущий: {entry.status}"
         )
 
-    entry.status = "incomplete"
-    entry.incomplete_reason = request.reason
+    # The legacy command closes only the queue row. With a resumable
+    # clinical visit, that would leave the doctor's visit active but stranded.
+    # Pause/resume locks the same Visit before changing the queue row.
+    if entry.status == "diagnostics" and lock_active_doctor_visit(db, entry, entry.queue) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="У пациента активный приём. Возобновите и завершите его в карточке приёма.",
+        )
+
+    changed = (
+        db.query(OnlineQueueEntry)
+        .filter(
+            OnlineQueueEntry.id == entry_id,
+            OnlineQueueEntry.queue_id == entry.queue_id,
+            OnlineQueueEntry.visit_id == entry.visit_id,
+            OnlineQueueEntry.patient_id == entry.patient_id,
+            OnlineQueueEntry.status == entry.status,
+            OnlineQueueEntry.diagnostics_started_at == entry.diagnostics_started_at,
+        )
+        .update(
+            {
+                OnlineQueueEntry.status: "incomplete",
+                OnlineQueueEntry.incomplete_reason: request.reason,
+            },
+            synchronize_session=False,
+        )
+    )
+    if changed != 1:
+        raise HTTPException(status_code=409, detail="Состояние очереди уже изменилось")
     db.commit()
 
     logger.info(
-        "[mark_entry_incomplete] Запись %d отмечена как incomplete (причина: %s) пользователем %d",
+        "[mark_entry_incomplete] Запись %d отмечена как incomplete пользователем %d",
         entry_id,
-        request.reason,
         current_user.id
     )
 

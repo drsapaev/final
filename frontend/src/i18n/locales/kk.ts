@@ -1033,6 +1033,7 @@ const kk = {
     cardio_queue_call: 'Шақыру',
     cardio_queue_start_visit: 'Қабылдауды бастау',
     cardio_queue_open_visit: 'Қабылдауды ашу',
+    cardio_queue_resume_visit: 'Қабылдауды жалғастыру',
     cardio_queue_view_emr: 'EMR қарау',
     cardio_queue_status_waiting: 'Күтуде',
     cardio_queue_status_called: 'Шақырылды',
