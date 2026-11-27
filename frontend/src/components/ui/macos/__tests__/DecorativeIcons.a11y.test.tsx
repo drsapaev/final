@@ -35,13 +35,14 @@ it('keeps the select arrow hidden and out of focus while allowing selection', ()
   expect(onValueChange).toHaveBeenCalledWith('First');
 });
 
-it('uses a localized fullscreen close button with a hidden glyph and keeps its hover hint', () => {
+it('uses a localized fullscreen close button with a hidden glyph and no duplicate accessible description', () => {
   const onClose = vi.fn();
   render(<Modal isOpen onClose={onClose} size="fullscreen" closeOnBackdrop={false} title="Synthetic dialog">Content</Modal>);
   const dialog = screen.getByRole('dialog', { name: 'Synthetic dialog' });
   const close = within(dialog).getAllByRole('button', { name: 'Закрыть' }).find((control) => control.tagName === 'BUTTON');
   if (!close) throw new Error('Fullscreen close button not found');
-  expect(close).toHaveAttribute('title', 'Закрыть');
+  expect(close).not.toHaveAccessibleDescription();
+  expect(close).not.toHaveAttribute('title');
   expect(within(close).getByText('✕')).toHaveAttribute('aria-hidden', 'true');
   fireEvent.click(close);
   expect(onClose).toHaveBeenCalledOnce();
