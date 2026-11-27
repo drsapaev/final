@@ -1,6 +1,6 @@
 /**
  * ComplaintsField Styles
- * 
+ *
  * Reference implementation - эталон для всех текстовых полей
  * Все состояния визуально различимы
  */
@@ -33,60 +33,91 @@
    TEXTAREA - Base
    ============================================ */
 .complaints-field {
+    --complaints-field-background: var(--mac-background, #ffffff);
+    --complaints-field-text: var(--mac-text-primary, #1d1d1f);
+    --complaints-field-border: var(--mac-border, #e5e5e5);
+    --complaints-field-shadow: none;
+
     width: 100%;
     min-height: 80px;
     padding: 12px 16px;
     font-family: inherit;
     font-size: 15px;
     line-height: 1.5;
-    color: var(--mac-text-primary, #1d1d1f);
-    background: var(--mac-background, #ffffff);
-    border: 1px solid var(--mac-border, #e5e5e5);
+    border: 1px solid;
     border-radius: 10px;
     resize: vertical;
     outline: none;
     transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
+/* Apply the field's state colors above the shared EMR textarea rules. */
+.complaints-field,
+.complaints-wrapper .complaints-container > .complaints-field {
+    background-color: var(--complaints-field-background);
+    color: var(--complaints-field-text);
+    border-color: var(--complaints-field-border);
+    box-shadow: var(--complaints-field-shadow);
+}
+
+@media screen {
+    /* The legacy explicit-dark stylesheet applies important textarea styles. */
+    [data-theme='dark'][data-color-scheme='dark'] .complaints-container > .complaints-field {
+        background-color: var(--complaints-field-background) !important;
+        color: var(--complaints-field-text) !important;
+        border-color: var(--complaints-field-border) !important;
+        box-shadow: var(--complaints-field-shadow) !important;
+    }
+}
+
+/* Keep theme defaults below the priority of focus and error states. */
+:where([data-theme='dark']) .complaints-field {
+    --complaints-field-background: var(--mac-background, #1c1c1e);
+    --complaints-field-text: var(--mac-text-primary, #f5f5f7);
+    --complaints-field-border: var(--mac-border, rgba(255, 255, 255, 0.1));
+}
+
 .complaints-field::placeholder {
     color: var(--mac-text-tertiary, #aeaeb2);
+    opacity: 1;
+}
+
+:where([data-theme='dark']) .complaints-wrapper .complaints-container > .complaints-field::placeholder {
+    color: var(--mac-text-secondary, #aeaeb2);
 }
 
 /* ============================================
    TEXTAREA - Focused
    ============================================ */
-.complaints-field--focused,
-.complaints-field:focus {
-    border-color: var(--mac-accent-blue, #007aff);
-    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+.complaints-field:where(.complaints-field--focused, :focus):not(:where(.complaints-field--readonly, :disabled)) {
+    --complaints-field-border: var(--mac-accent-blue, #007aff);
+    --complaints-field-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
 }
 
 /* ============================================
    TEXTAREA - Read-only (Signed)
    ============================================ */
 .complaints-field--readonly {
-    background: var(--mac-background-tertiary, #f5f5f7);
-    color: var(--mac-text-secondary, #636366);
+    --complaints-field-background: var(--mac-background-tertiary, #f5f5f7);
+    --complaints-field-text: var(--mac-text-secondary, #636366);
     cursor: default;
     resize: none;
 }
 
-.complaints-field--readonly:focus {
-    border-color: var(--mac-border, #e5e5e5);
-    box-shadow: none;
+:where([data-theme='dark']) .complaints-field--readonly {
+    --complaints-field-background: var(--mac-background-tertiary, #2c2c2e);
 }
 
 /* ============================================
    TEXTAREA - Error
    ============================================ */
 .complaints-field--error {
-    border-color: var(--mac-error);
-    background: rgba(255, 59, 48, 0.03);
+    --complaints-field-border: var(--mac-error);
+    --complaints-field-background: rgba(255, 59, 48, 0.03);
 }
 
-.complaints-field--error:focus {
-    border-color: var(--mac-error);
-    box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.15);
+.complaints-field--error:where(.complaints-field--focused, :focus):not(:where(.complaints-field--readonly, :disabled)) {
+    --complaints-field-shadow: 0 0 0 3px rgba(255, 59, 48, 0.15);
 }
 
 /* ============================================
@@ -299,20 +330,8 @@
 /* ============================================
    DARK MODE
    ============================================ */
-@media (prefers-color-scheme: dark) {
-    .complaints-field {
-        background: var(--mac-background, #1c1c1e);
-        border-color: var(--mac-border, rgba(255, 255, 255, 0.1));
-        color: var(--mac-text-primary, #f5f5f7);
-    }
-
-    .complaints-field--readonly {
-        background: var(--mac-background-tertiary, #2c2c2e);
-    }
-
-    .complaints-ai {
-        background: rgba(94, 92, 230, 0.12);
-    }
+[data-theme='dark'] .complaints-ai {
+    background: rgba(94, 92, 230, 0.12);
 }
 
 /* ============================================
@@ -327,7 +346,8 @@
         display: none !important;
     }
 
-    .complaints-field {
+    .complaints-field,
+    .complaints-wrapper .complaints-container > .complaints-field {
         border: 1px solid var(--mac-text-primary);
         box-shadow: none;
         min-height: auto;
