@@ -861,10 +861,10 @@ jobs:
               echo '::error::PR #4271 or main changed, or the requested head does not include current main.'
               exit 1
             fi
-            printf 'PR #4271 source verification: PASS at exact ready head `%s` on current main `%s`.\n' \
+            printf 'PR #4271 source verification: PASS at exact ready head %s on current main %s.\n' \
               "$sha" "$main_sha" >> "$GITHUB_STEP_SUMMARY"
           elif [[ "$RUN_LAB_ARQ_ACCEPTANCE" == true ]]; then
-            pinned_app=7a1d512e87bd052dd1ee06199fec7a82e7d27d0e
+            pinned_app=4a36df33cb810f0eb265cd91fe5ac8767569d063
             review_base=11d4a5edd1979ed167ae4acb6b75e7d72eda9239
             for revision in "$sha" "$WORKFLOW_SHA"; do
               if [[ ! "$revision" =~ ^[a-f0-9]{40}$ ]]; then

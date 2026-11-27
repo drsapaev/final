@@ -121,10 +121,13 @@ same-repository PR head and the remote `codex/laboratory-panel-v2` branch tip.
 The checkout verifies the live `refs/heads/main` against the workflow SHA.
 The PR's REST metadata identifies the base branch by name because its
 recorded `base.sha` can lag the live ref.
-The reviewed app is `7a1d512e87bd052dd1ee06199fec7a82e7d27d0e`, which descends
-from review base `11d4a5edd1979ed167ae4acb6b75e7d72eda9239`. The workflow also
-accepts an exact two-parent merge whose first parent is the reviewed app
-and whose second parent is the verified current `main` that runs the workflow.
+The source SHA pinned for this acceptance is `4a36df33cb810f0eb265cd91fe5ac8767569d063`,
+the exact current head of open same-repository PR #4251. Its exact-head PR Review
+Quality Gate (run `45993439005`), Security scan (run `45993438786`), and Unified
+CI (run `45993438923`) succeeded. It descends from review base
+`11d4a5edd1979ed167ae4acb6b75e7d72eda9239`. The workflow also accepts an exact
+two-parent merge whose first parent is this pinned app and whose second parent
+is the verified current `main` that runs the workflow.
 For that merge, the current `main` must descend from the review base and may
 differ from it only in `.github/workflows/staging-miniapp-pr.yml`,
 `.github/workflows/staging-miniapp-native-live.yml` and this runbook.
