@@ -1400,11 +1400,40 @@ jobs:
           STAGING_TELEGRAM_CHAT_ID: ${{ inputs.native-menu && secrets.STAGING_TELEGRAM_CHAT_ID || '' }}
         run: |
           set -euo pipefail
-          test -n "$TELEGRAM_BOT_TOKEN" || { echo "::error::Protected staging credential unavailable."; exit 1; }
           d="$RUNNER_TEMP/miniapp-native-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           project="miniapp-native-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          emit_startup_failure() {
+            local stage="$1"
+            case "$stage" in
+              credentials|approved_chat|base_services|menu_services|telegram_tls|backend_token) ;;
+              *) stage=unknown ;;
+            esac
+            printf 'startup_stage=%s result=failed\n' "$stage" | tee -a "$GITHUB_STEP_SUMMARY"
+            mapfile -t container_ids < <(docker ps -a -q --filter "label=com.docker.compose.project=$project")
+            if [[ ${#container_ids[@]} -eq 0 ]]; then
+              printf '%s\n' 'No task-owned containers were created.' | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              for container_id in "${container_ids[@]}"; do
+                if state_line="$(docker inspect --format 'service={{index .Config.Labels "com.docker.compose.service"}} state={{.State.Status}} exit_code={{.State.ExitCode}} oom_killed={{.State.OOMKilled}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id" 2>/dev/null)"; then
+                  if [[ "$state_line" =~ ^service=(postgres|redis|backend|frontend|telegram-relay|menu-webhook-proxy)[[:space:]]state=([a-z_]+)[[:space:]]exit_code=(-?[0-9]+)[[:space:]]oom_killed=(true|false)[[:space:]]health=(none|starting|healthy|unhealthy)$ ]]; then
+                    printf 'service=%s state=%s exit_code=%s oom_killed=%s health=%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}" "${BASH_REMATCH[5]}" | tee -a "$GITHUB_STEP_SUMMARY"
+                  else
+                    printf '%s\n' 'A task-owned container state was unavailable or outside the approved diagnostic format.' | tee -a "$GITHUB_STEP_SUMMARY"
+                  fi
+                else
+                  printf '%s\n' 'A task-owned container state could not be inspected.' | tee -a "$GITHUB_STEP_SUMMARY"
+                fi
+              done
+            fi
+            printf '%s\n' 'Container logs and environment values were not collected.' | tee -a "$GITHUB_STEP_SUMMARY"
+          }
+          if [[ -z "${TELEGRAM_BOT_TOKEN:-}" ]]; then
+            echo '::error::Protected staging credential unavailable.'
+            emit_startup_failure credentials
+            exit 1
+          fi
           if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
-            python3 - "$d/approved-chat-id" <<'PY'
+            if ! python3 - "$d/approved-chat-id" >/dev/null 2>&1 <<'PY'
           import os, stat, sys
           from pathlib import Path
           value = os.environ.get("STAGING_TELEGRAM_CHAT_ID", "")
@@ -1418,44 +1447,42 @@ jobs:
               stream.write(value + "\n")
           os.chmod(target, 0o600)
           PY
+            then
+              echo '::error::Approved private staging chat could not be prepared.'
+              emit_startup_failure approved_chat
+              exit 1
+            fi
           fi
           if ! "$d/compose" up -d --no-build --pull never --wait --wait-timeout 280 postgres redis backend frontend >/dev/null 2>&1; then
             echo "::error::Protected staging failed to start; runtime logs were not collected."
-            {
-              printf '%s\n' '### Sanitized staging startup state' | tee -a "$GITHUB_STEP_SUMMARY"
-              mapfile -t container_ids < <(docker ps -a -q --filter "label=com.docker.compose.project=$project")
-              if [[ ${#container_ids[@]} -eq 0 ]]; then
-                printf '%s\n' 'No task-owned containers were created.' | tee -a "$GITHUB_STEP_SUMMARY"
-              else
-                for container_id in "${container_ids[@]}"; do
-                  if state_line="$(docker inspect --format 'service={{index .Config.Labels "com.docker.compose.service"}} state={{.State.Status}} exit_code={{.State.ExitCode}} oom_killed={{.State.OOMKilled}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id" 2>/dev/null)"; then
-                    if [[ "$state_line" =~ ^service=(postgres|redis|backend|frontend)[[:space:]]state=([a-z_]+)[[:space:]]exit_code=(-?[0-9]+)[[:space:]]oom_killed=(true|false)[[:space:]]health=(none|starting|healthy|unhealthy)$ ]]; then
-                      printf 'service=%s state=%s exit_code=%s oom_killed=%s health=%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}" "${BASH_REMATCH[5]}" | tee -a "$GITHUB_STEP_SUMMARY"
-                    else
-                      printf '%s\n' 'A task-owned container state was unavailable or outside the approved diagnostic format.' | tee -a "$GITHUB_STEP_SUMMARY"
-                    fi
-                  else
-                    printf '%s\n' 'A task-owned container state could not be inspected.' | tee -a "$GITHUB_STEP_SUMMARY"
-                  fi
-                done
-              fi
-              printf '%s\n' 'Container logs and environment values were not collected.' | tee -a "$GITHUB_STEP_SUMMARY"
-            }
+            emit_startup_failure base_services
             exit 1
           fi
           if [[ "$RUN_MENU_ACCEPTANCE" == true ]]; then
-            "$d/compose" up -d --no-deps --no-build --pull never telegram-relay menu-webhook-proxy >/dev/null 2>&1
-            "$d/compose" exec -T backend python -c 'import socket,ssl,time; assert socket.gethostbyname("api.telegram.org")=="172.30.242.2"; ctx=ssl.create_default_context();
+            if ! "$d/compose" up -d --no-deps --no-build --pull never telegram-relay menu-webhook-proxy >/dev/null 2>&1; then
+              echo '::error::Protected menu relay services failed to start; runtime logs were not collected.'
+              emit_startup_failure menu_services
+              exit 1
+            fi
+            if ! "$d/compose" exec -T backend python -c 'import socket,ssl,time; assert socket.gethostbyname("api.telegram.org")=="172.30.242.2"; ctx=ssl.create_default_context();
           for attempt in range(8):
               try:
                   with socket.create_connection(("api.telegram.org",443),timeout=5) as tcp:
                       with ctx.wrap_socket(tcp,server_hostname="api.telegram.org"): break
               except OSError:
                   if attempt == 7: raise
-                  time.sleep(1)' >/dev/null
+                  time.sleep(1)' >/dev/null 2>&1; then
+              echo '::error::Protected backend Telegram TLS probe failed; runtime logs were not collected.'
+              emit_startup_failure telegram_tls
+              exit 1
+            fi
           fi
           unset TELEGRAM_BOT_TOKEN STAGING_TELEGRAM_CHAT_ID
-          "$d/compose" exec -T backend sh -ec 'test -n "$TELEGRAM_BOT_TOKEN"'
+          if ! "$d/compose" exec -T backend sh -ec 'test -n "$TELEGRAM_BOT_TOKEN"' >/dev/null 2>&1; then
+            echo '::error::Protected backend token binding check failed; runtime logs were not collected.'
+            emit_startup_failure backend_token
+            exit 1
+          fi
       - name: Verify Mini App revision and reject out-of-scope requests
         shell: bash
         run: |
