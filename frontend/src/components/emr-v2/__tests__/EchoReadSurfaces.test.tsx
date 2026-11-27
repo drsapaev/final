@@ -129,12 +129,19 @@ describe('Adult TTE clinical read surfaces', () => {
     expect(within(observations[1]!).getByText(/echo_tte_lavi 35 mL\/m²/)).toBeVisible();
     expect(within(observations[1]!).getByText('2026-09-04')).toBeVisible();
 
-    fireEvent.click(screen.getAllByRole('button', { name: '2026-09-05' })[0]!);
-    const version = await screen.findByRole('spinbutton', { name: 'emr_workspace.document_version' });
+    const visitDetails = screen.getByText('emr_workspace.history_details').closest('details')!;
+    const measurements = screen.getByText('emr_workspace.measurement_history').closest('details')!;
+    expect(visitDetails.open).toBe(false);
+    fireEvent.click(within(measurements).getByRole('button', { name: '2026-09-05', exact: true }));
+    expect(visitDetails.open).toBe(true);
+
+    const details = within(visitDetails);
+    expect(await details.findByText(/echo_tte_lavi 35 mL\/m²/)).toBeVisible();
+    const version = details.getByRole('spinbutton', { name: 'emr_workspace.document_version' });
     fireEvent.change(version, { target: { value: '2' } });
-    fireEvent.click(screen.getByRole('button', { name: 'emr_workspace.open_version' }));
-    expect(await screen.findByText(/echo_tte_lavi 31 mL\/m²/)).toBeVisible();
-    expect(screen.getByText('2026-09-03')).toBeVisible();
+    fireEvent.click(details.getByRole('button', { name: 'emr_workspace.open_version' }));
+    expect(await details.findByText(/echo_tte_lavi 31 mL\/m²/)).toBeVisible();
+    expect(details.getByText('2026-09-03')).toBeVisible();
     expect(vi.mocked(getWorkspaceHistoryDocument).mock.lastCall).toEqual([99, 1, 98, 2]);
   });
 });

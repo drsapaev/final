@@ -201,6 +201,7 @@ export function WorkspaceSidePanel({
   const selectionRequest = useRef(0);
   const labDownloadContext = useRef(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const historyDetailsRef = useRef<HTMLDetailsElement>(null);
   const currentMeasurements = measurements({ vitals: currentVitals ?? {}, echo: currentEcho ?? {} });
   const history = useMemo(() => {
     const firstPage = workspace?.history ?? [];
@@ -239,6 +240,9 @@ export function WorkspaceSidePanel({
 
   async function openHistory(item: HistorySummary, selectedVersion = item.version) {
     if (!workspace) return;
+    // A visit can also be opened from the separate measurement history.
+    // Reveal the destination before rendering or focusing its document.
+    if (historyDetailsRef.current) historyDetailsRef.current.open = true;
     const sequence = ++selectionRequest.current;
     setSource(item);
     setVersion(String(selectedVersion));
@@ -306,7 +310,7 @@ export function WorkspaceSidePanel({
             <h3>{t('emr_workspace.patient_history')}</h3>
             {labDownloadFailed && <p role="alert">{t('emr_workspace.load_error')}</p>}
             {history.length === 0 ? <p>{t('emr_workspace.no_history')}</p> : (
-              <details className="emr-workspace-history-details">
+              <details className="emr-workspace-history-details" ref={historyDetailsRef}>
                 <summary>{t('emr_workspace.history_details')}</summary>
                 <ol className="emr-workspace-list">
                   {history.map(item => (
