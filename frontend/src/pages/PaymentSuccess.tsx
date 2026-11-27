@@ -218,10 +218,10 @@ const PaymentSuccess = () => {
           </style>
         </head>
         <body>
-          <h1>{t('misc.ps_kvitantsiya_ob_oplate')}</h1>
+          <h1>${t('misc.ps_kvitantsiya_ob_oplate')}</h1>
           <div class="meta">
-            <div><strong>{t('misc.ps_platezh')}</strong> ${paymentId}</div>
-            <div><strong>{t('misc.ps_status')}</strong> ${getStatusText(paymentData?.status)}</div>
+            <div><strong>${t('misc.ps_platezh')}</strong> ${paymentId}</div>
+            <div><strong>${t('misc.ps_status')}</strong> ${getStatusText(paymentData?.status)}</div>
           </div>
           <pre>${receiptContent}</pre>
         </body>
@@ -248,15 +248,18 @@ const PaymentSuccess = () => {
     }
   };
 
+  // PATSUCC-FE-001: the pipeline is major-unit end to end (Payment.amount
+  // is Numeric(12,2); the tiyin conversion exists only at the provider
+  // protocol boundary), and the initiating widget formats the same value
+  // with Intl.NumberFormat and NO division — dividing UZS/KZT by 100
+  // understated the patient's receipt amount 100×.
   const formatAmount = (amount: unknown, currency: unknown) => {
-    const numAmount = parseFloat(String(amount));
-    if (currency === 'UZS') {
-      return t('misc.ps_numamount_100_tolocalestring', { RU: (numAmount / 100).toLocaleString('ru-RU') });
-    } else if (currency === 'KZT') {
-      return t('misc.ps_numamount_100_tolocalestring_2', { RU: (numAmount / 100).toLocaleString('ru-RU') });
-    } else {
-      return `${numAmount} ${currency}`;
-    }
+    const numAmount = Number(amount ?? 0);
+    return new Intl.NumberFormat('ru-RU', {
+      style: 'currency',
+      currency: currency === 'UZS' ? 'UZS' : currency === 'KZT' ? 'KZT' : 'USD',
+      minimumFractionDigits: 0,
+    }).format(numAmount);
   };
 
   const getProviderName = (provider: unknown) => {
