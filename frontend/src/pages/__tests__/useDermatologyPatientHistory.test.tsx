@@ -254,4 +254,49 @@ describe('useDermatologyPatientHistory', () => {
       { id: 23, procedure_date: '2026-01-02', procedure_type: 'SYNTHETIC-Procedure-2' },
     ]);
   });
+
+  it.each([
+    {
+      endpoint: '/derma/examinations',
+      loadMore: 'loadMoreExaminations',
+      items: 'skinExaminations',
+      total: 'skinExaminationsTotal',
+    },
+    {
+      endpoint: '/derma/procedures',
+      loadMore: 'loadMoreProcedures',
+      items: 'cosmeticProcedures',
+      total: 'cosmeticProceduresTotal',
+    },
+  ] as const)('discards an older $endpoint page after reloading the same patient', async ({
+    endpoint, loadMore, items, total,
+  }) => {
+    const oldPage = deferred<never>();
+    let firstPageCalls = 0;
+    mockedGet.mockImplementation(async (url: unknown, config?: unknown) => {
+      if (url === '/patients/42/appointments') return response([]);
+      if (url !== endpoint) return envelope([], 0, 1, 0);
+      if (paramsOf(config).page === 2) return oldPage.promise;
+      firstPageCalls += 1;
+      return firstPageCalls === 1
+        ? envelope([{ id: 'before-save' }], 2, 1, 2)
+        : envelope([{ id: 'after-save' }], 1, 1, 1);
+    });
+
+    const { result } = renderHook(() => useDermatologyPatientHistory(42));
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    act(() => result.current[loadMore]());
+    expect(mockedGet).toHaveBeenCalledWith(endpoint, expect.objectContaining({
+      params: { patient_id: '42', page: 2, size: 20 },
+    }));
+
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current[items]).toEqual([{ id: 'after-save' }]));
+    await act(async () => {
+      oldPage.resolve(envelope([{ id: 'older-page' }], 2, 2, 2));
+    });
+
+    expect(result.current[items]).toEqual([{ id: 'after-save' }]);
+    expect(result.current[total]).toBe(1);
+  });
 });
