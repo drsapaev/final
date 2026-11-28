@@ -788,14 +788,19 @@ jobs:
           origin=https://github.com/drsapaev/final.git
           git init -q "$source"
           if [[ "$RUN_LAB_ARQ_ACCEPTANCE" == true ]]; then
-            pinned_app=4a36df33cb810f0eb265cd91fe5ac8767569d063
-            review_base=11d4a5edd1979ed167ae4acb6b75e7d72eda9239
+            # One reviewed integration commit; it must also be the live PR head.
+            pinned_app=1c71e26702fb3f739364e71f6bdf45e8d790a77f
+            review_base=9ffa1f28747c26524b169bc03363464e3a2add94
             for revision in "$sha" "$WORKFLOW_SHA"; do
               if [[ ! "$revision" =~ ^[a-f0-9]{40}$ ]]; then
                 echo '::error::Full PR #4251 app and workflow commit SHAs are required.'
                 exit 1
               fi
             done
+            if [[ "$sha" != "$pinned_app" ]]; then
+              echo '::error::PR #4251 acceptance only admits the exact reviewed integration commit.'
+              exit 1
+            fi
             git -C "$source" fetch -q --no-tags --depth=64 "$origin" \
               refs/heads/main:refs/remotes/origin/main \
               refs/heads/codex/laboratory-panel-v2:refs/remotes/origin/laboratory-panel-v2 \
@@ -803,37 +808,18 @@ jobs:
             if [[ "$(git -C "$source" rev-parse refs/remotes/origin/main)" != "$WORKFLOW_SHA" ||
                   "$(git -C "$source" rev-parse refs/remotes/origin/laboratory-panel-v2)" != "$sha" ||
                   "$(git -C "$source" rev-parse refs/remotes/origin/pr-4251)" != "$sha" ]] ||
-              ! git -C "$source" merge-base --is-ancestor "$review_base" "$sha"; then
-              echo '::error::PR #4251 or main changed, or the pinned app commit lacks the reviewed base.'
+              ! git -C "$source" merge-base --is-ancestor "$review_base" "$sha" ||
+              ! git -C "$source" merge-base --is-ancestor "$review_base" "$WORKFLOW_SHA"; then
+              echo '::error::PR #4251 or main changed, or the candidate lacks the reviewed base.'
               exit 1
             fi
-            if [[ "$sha" != "$pinned_app" ]]; then
-              # Accept just the pinned app's direct merge of this workflow main.
-              if [[ "$(git -C "$source" show -s --format=%P "$sha")" != "$pinned_app $WORKFLOW_SHA" ]] ||
-                ! git -C "$source" merge-base --is-ancestor "$review_base" "$WORKFLOW_SHA"; then
-                echo '::error::PR #4251 head must be the reviewed app or its exact two-parent merge of current main.'
-                exit 1
-              fi
-
-              workflow_paths=(
-                '.github/workflows/staging-miniapp-pr.yml'
-                '.github/workflows/staging-miniapp-native-live.yml'
-                'docs/runbooks/STAGING_VALIDATION.md'
-              )
-              included=()
-              excluded=()
-              for path in "${workflow_paths[@]}"; do
-                git -C "$source" cat-file -e "$WORKFLOW_SHA:$path"
-                included+=(":(top,literal)$path")
-                excluded+=(":(top,exclude,literal)$path")
-              done
-              diff_options=(--quiet --no-ext-diff --no-textconv --no-renames --ignore-submodules=none)
-              if ! git -C "$source" diff "${diff_options[@]}" "$review_base" "$WORKFLOW_SHA" -- . "${excluded[@]}" ||
-                ! git -C "$source" diff "${diff_options[@]}" "$pinned_app" "$sha" -- . "${excluded[@]}" ||
-                ! git -C "$source" diff "${diff_options[@]}" "$WORKFLOW_SHA" "$sha" -- "${included[@]}"; then
-                echo '::error::PR #4251 merge changes the reviewed app, or main differs outside the three approved workflow and runbook paths.'
-                exit 1
-              fi
+            # Main may add this reviewed pin, but may not change the application,
+            # the entry workflow, or its trusted runtime helper after review.
+            if ! git -C "$source" diff --quiet --no-ext-diff --no-textconv --no-renames \
+              --ignore-submodules=none "$review_base" "$WORKFLOW_SHA" -- . \
+              ':(top,exclude,literal).github/workflows/staging-miniapp-pr.yml'; then
+              echo '::error::Current main differs from the reviewed base outside the single pin workflow.'
+              exit 1
             fi
             git -C "$source" show "$WORKFLOW_SHA:ops/scripts/staging_miniapp_arq_check.py" > "$d/arq-check.py"
             test -s "$d/arq-check.py"
