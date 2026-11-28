@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -34,6 +34,7 @@ from app.schemas.lab_reporting import (
     LabTemplateResolutionIn,
     LabTemplateResolutionOut,
 )
+from app.services.lab_notification_service import run_legacy_report_critical_scan
 from app.services.lab_report_pdf_service import lab_report_pdf_service
 from app.services.lab_reporting_service import (
     LabReportingDomainError,
@@ -665,12 +666,17 @@ def bulk_save_lab_report_values(
 @router.post("/report-instances/{instance_id}/finalize", response_model=LabReportInstanceOut)
 def finalize_lab_report(
     instance_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab")),
 ):
     service = LabReportingService(db)
     try:
-        return _instance_out(service, service.finalize(instance_id))
+        report = service.finalize(instance_id)
+        response = _instance_out(service, report)
+        # Pass the committed ID, not the request's ORM object or session.
+        background_tasks.add_task(run_legacy_report_critical_scan, instance_id)
+        return response
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 

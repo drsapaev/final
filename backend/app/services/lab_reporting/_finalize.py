@@ -70,36 +70,14 @@ class FinalizeMixin(LabReportingServiceMixinBase):
         self._sync_legacy_lab_results(instance, field_map)
         self.repository.commit()
 
-        # P0 fix: emit inline notifications on finalize — no cron/scheduler needed.
-        # Notifies (1) the patient via Telegram that results are ready, and
-        # (2) the ordering doctor if the instance was created from a lab order.
-        # Previously lab_notification_service.py was fully implemented but
-        # never called — patients had to manually poll for results.
-        # Now wired up: see check_critical_values() call below.
+        # The ordinary results-ready event is independent from the critical
+        # scanner triggered after the HTTP response, using its own session.
         try:
             self._emit_lab_results_ready_notification(instance)
         except Exception as notify_err:
             logger.warning(
                 "[LAB] results-ready notification failed (non-blocking): %s",
                 notify_err,
-            )
-
-        # Wire-up: check critical values on finalize. The
-        # LabNotificationService.check_critical_values() was implemented
-        # but never called. Now we invoke it inline after finalization
-        # so doctors get immediate alerts for glucose >20, potassium >6.5,
-        # hemoglobin <70, etc. (8 markers in CRITICAL_VALUES dict).
-        # Non-blocking — a failure here does not roll back the finalization.
-        try:
-            from app.services.lab_notification_service import LabNotificationService
-            lab_notif_svc = LabNotificationService(self.db)
-            asyncio.get_event_loop().create_task(
-                lab_notif_svc.check_critical_values()
-            )
-        except Exception as critical_err:
-            logger.warning(
-                "[LAB] critical values check failed (non-blocking): %s",
-                critical_err,
             )
 
         return self.get_instance(instance.id)
@@ -386,8 +364,8 @@ class FinalizeMixin(LabReportingServiceMixinBase):
 
         This replaces the old lab_notification_service.py cron
         approach with inline emission from finalize().
-        lab_notification_service.py is now wired up for critical values
-        checking (check_critical_values) — see the finalize() method.
+        The HTTP release endpoint separately schedules the critical scan
+        after finalization commits.
         """
         patient_id = instance.patient_id
         visit_id = instance.visit_id
