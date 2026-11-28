@@ -160,6 +160,7 @@ const uzLatn = {
     open_version: "Versiyani ochish",
     history_error: "Bu imzolangan versiya mavjud emas",
     visit_type: "Qabul turi",
+    current_visit: "Joriy qabul",
     unselected: "Tanlanmagan",
     initial: "Muammoni birlamchi baholash",
     follow_up: "Oldingi muammoni nazorat qilish",

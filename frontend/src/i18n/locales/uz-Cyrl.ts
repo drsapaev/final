@@ -160,6 +160,7 @@ const uzCyrl = {
     open_version: "Версияни очиш",
     history_error: "Бу имзоланган версия мавжуд эмас",
     visit_type: "Қабул тури",
+    current_visit: "Жорий қабул",
     unselected: "Танланмаган",
     initial: "Муаммони бирламчи баҳолаш",
     follow_up: "Олдинги муаммони назорат қилиш",

@@ -977,6 +977,7 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     const editor = page.locator('.emr-v2-container');
     const identity = editor.getByRole('heading', { name: 'SYNTHETIC-EMR', exact: true });
     await expect(identity).toBeVisible({ timeout: 20000 });
+    await expect(editor.getByRole('heading', { name: 'Текущий приём', exact: true })).toBeVisible();
     await expect(editor.getByText('Возраст: 36')).toBeVisible();
     await expect(editor.getByText('Специальность: Дерматология')).toBeVisible();
     await editor.evaluate(element => element.scrollIntoView({ block: 'start', inline: 'nearest' }));
@@ -986,8 +987,15 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     const sectionsBox = await editor.locator('.emr-v2-sections').boundingBox();
     if (!summaryBox || !sectionsBox) throw new Error('EMR columns have no layout bounds');
     expect(summaryBox.x + summaryBox.width).toBeLessThanOrEqual(sectionsBox.x + 1);
+    const summaryShare = summaryBox.width / (summaryBox.width + sectionsBox.width);
+    expect(summaryShare).toBeGreaterThanOrEqual(0.18);
+    expect(summaryShare).toBeLessThanOrEqual(0.25);
     await expect(editor.getByRole('button', { name: 'Первичный', exact: true })).toBeVisible();
     await expect(editor.getByRole('button', { name: 'Повторный', exact: true })).toBeVisible();
+    const visitHeadingBounds = await editor.getByRole('heading', { name: 'Текущий приём', exact: true }).boundingBox();
+    const visitModeBounds = await editor.locator('.emr-workspace-visit-mode').boundingBox();
+    if (!visitHeadingBounds || !visitModeBounds) throw new Error('Visit heading or mode selector has no layout bounds');
+    expect(Math.abs(visitHeadingBounds.y - visitModeBounds.y)).toBeLessThan(5);
     const vitals = editor.getByRole('region', { name: 'Показатели текущего приёма' });
     await expect(vitals).toBeInViewport();
     await expect(vitals.getByRole('spinbutton', { name: 'Пульс', exact: true })).toHaveValue('');
@@ -1083,7 +1091,12 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
       if (viewport.width >= 1200) {
         expect(summary.x + summary.width).toBeLessThanOrEqual(content.x + 1);
       } else {
-        expect(summary.y + summary.height).toBeLessThanOrEqual(content.y + 1);
+        await expect.poll(async () => {
+          const currentSummary = await editor.locator('.emr-workspace-sidebar').boundingBox();
+          const currentContent = await editor.locator('.emr-v2-sections').boundingBox();
+          if (!currentSummary || !currentContent) return Number.POSITIVE_INFINITY;
+          return currentSummary.y + currentSummary.height - currentContent.y;
+        }).toBeLessThanOrEqual(1);
       }
       await page.screenshot({ path: `../.scratch/emr-m15-${viewport.width}.png`, animations: 'disabled' });
     }
@@ -1123,7 +1136,12 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
         if (viewport.width >= 1200) {
           expect(summary.x + summary.width).toBeLessThanOrEqual(content.x + 1);
         } else {
-          expect(summary.y + summary.height).toBeLessThanOrEqual(content.y + 1);
+          await expect.poll(async () => {
+            const currentSummary = await editor.locator('.emr-workspace-sidebar').boundingBox();
+            const currentContent = await editor.locator('.emr-v2-sections').boundingBox();
+            if (!currentSummary || !currentContent) return Number.POSITIVE_INFINITY;
+            return currentSummary.y + currentSummary.height - currentContent.y;
+          }).toBeLessThanOrEqual(1);
         }
       }
     }

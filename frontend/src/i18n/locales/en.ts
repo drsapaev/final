@@ -160,6 +160,7 @@ const en = {
     open_version: 'Open version',
     history_error: 'This signed version is unavailable',
     visit_type: 'Visit type',
+    current_visit: 'Current visit',
     unselected: 'Unselected',
     initial: 'Initial assessment of a problem',
     follow_up: 'Follow-up on an existing problem',

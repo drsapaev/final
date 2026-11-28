@@ -160,6 +160,7 @@ const kk = {
     open_version: 'Нұсқаны ашу',
     history_error: 'Бұл қол қойылған нұсқа қолжетімсіз',
     visit_type: 'Қабылдау түрі',
+    current_visit: 'Ағымдағы қабылдау',
     unselected: 'Таңдалмаған',
     initial: 'Мәселені алғашқы бағалау',
     follow_up: 'Бұрынғы мәселені бақылау',

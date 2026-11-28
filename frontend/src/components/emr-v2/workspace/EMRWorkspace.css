@@ -72,10 +72,23 @@
     border-bottom: 1px solid var(--mac-separator, currentColor);
 }
 
+.emr-workspace-visit-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mac-spacing-2, 8px);
+    margin-bottom: var(--mac-spacing-2, 8px);
+}
+
 .emr-workspace-sidebar h3,
 .emr-workspace-sidebar h4,
 .emr-workspace-visit-section h3 {
     margin: 0 0 var(--mac-spacing-2, 8px);
+}
+
+.emr-workspace-visit-heading h3 {
+    margin: 0;
 }
 
 .emr-workspace-sidebar p {
@@ -268,7 +281,7 @@
 @media (min-width: 1200px) {
     .emr-workspace-layout {
         grid-template-areas: "summary editor";
-        grid-template-columns: minmax(260px, 28%) minmax(0, 1fr);
+        grid-template-columns: minmax(220px, 21%) minmax(0, 1fr);
     }
 
     .emr-workspace-sidebar {

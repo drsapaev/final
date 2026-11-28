@@ -197,6 +197,7 @@ const ru = {
     open_version: "Открыть версию",
     history_error: "Эта подписанная версия недоступна",
     visit_type: "Тип приёма",
+    current_visit: "Текущий приём",
     unselected: "Не выбран",
     initial: "Первичная оценка проблемы",
     follow_up: "Контроль прежней проблемы",

@@ -23,18 +23,20 @@ export function FollowUpEditor({
   const isRepeatVisit = value.mode === 'follow_up' || value.mode === 'new_complaint';
   return (
     <section className="emr-workspace-visit-section" aria-label={t('emr_workspace.visit_type')}>
-      <h3>{t('emr_workspace.visit_type')}</h3>
-      <div className="emr-workspace-visit-mode" role="group" aria-label={t('emr_workspace.visit_type')}>
-        <Button type="button" size="small" variant="ghost" className="emr-workspace-mode-option"
-          disabled={disabled} aria-pressed={value.mode === 'initial'}
-          onClick={() => onChange({ ...value, mode: 'initial' })}>
-          {t('emr_workspace.initial_visit')}
-        </Button>
-        <Button type="button" size="small" variant="ghost" className="emr-workspace-mode-option"
-          disabled={disabled} aria-pressed={isRepeatVisit}
-          onClick={() => onChange({ ...value, mode: value.mode === 'new_complaint' ? 'new_complaint' : 'follow_up' })}>
-          {t('emr_workspace.repeat_visit')}
-        </Button>
+      <div className="emr-workspace-visit-heading">
+        <h3>{t('emr_workspace.current_visit')}</h3>
+        <div className="emr-workspace-visit-mode" role="group" aria-label={t('emr_workspace.visit_type')}>
+          <Button type="button" size="small" variant="ghost" className="emr-workspace-mode-option"
+            disabled={disabled} aria-pressed={value.mode === 'initial'}
+            onClick={() => onChange({ ...value, mode: 'initial' })}>
+            {t('emr_workspace.initial_visit')}
+          </Button>
+          <Button type="button" size="small" variant="ghost" className="emr-workspace-mode-option"
+            disabled={disabled} aria-pressed={isRepeatVisit}
+            onClick={() => onChange({ ...value, mode: value.mode === 'new_complaint' ? 'new_complaint' : 'follow_up' })}>
+            {t('emr_workspace.repeat_visit')}
+          </Button>
+        </div>
       </div>
       {!value.mode && <p className="emr-workspace-mode-hint">{t('emr_workspace.unselected')}</p>}
       {isRepeatVisit && <label className="emr-workspace-new-complaint" htmlFor={newComplaintId}>
