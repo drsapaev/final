@@ -138,14 +138,13 @@ class TestResyncDermaHistoryCliArgs:
         )
         assert out_lines[1] == (
             "mode: FULL rebuild — требует остановленной записи "
-            "(runbook: окно обслуживания; под трафиком — --visit-ids)"
+            "(runbook: окно обслуживания; для выбранных визитов — --visit-ids)"
         )
         assert target.exists()
         assert not env_db.exists()  # окружение не тронуто
 
     def test_main_scoped_mode_skips_global_delete(self, tmp_path, monkeypatch, capsys):
-        """--visit-ids: scoped-режим без глобального DELETE — runbook-режим
-        для живого трафика (P2-3); визит без ЭМК — пустой no-op."""
+        """Scoped resync leaves an empty visit unchanged and calls for a write pause."""
         from sqlalchemy import create_engine
 
         from app.db.base_class import Base
@@ -177,7 +176,7 @@ class TestResyncDermaHistoryCliArgs:
         out_lines = captured.out.splitlines()
         assert out_lines[1] == (
             "mode: scoped, visit_ids=[1, 2] "
-            "(без глобального DELETE, безопасно под трафиком)"
+            "(пауза записи нужна для выбранных визитов)"
         )
         assert "  emr_records: 0" in captured.out
 
