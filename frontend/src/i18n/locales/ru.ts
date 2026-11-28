@@ -7524,6 +7524,8 @@ const ru = {
 
   // ─── Misc (file manager, queue mgmt, 2FA, settings, ECG, photos, etc.) ───
   misc: {
+    sidebar_expand: 'Развернуть боковую панель',
+    sidebar_collapse: 'Свернуть боковую панель',
     visit_completion_call_next_option: 'Позвать следующего пациента после завершения',
     visit_completed_next_patient_called: 'Следующий пациент вызван.',
     visit_completed_no_next_patient: 'Приём завершён. Нет пациента, доступного для вызова.',

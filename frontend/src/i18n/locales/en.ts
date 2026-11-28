@@ -7393,6 +7393,8 @@ const en = {
     pay_story_department_2: 'Стоматология',
   },
   misc: {
+    sidebar_expand: 'Expand sidebar',
+    sidebar_collapse: 'Collapse sidebar',
     visit_completion_call_next_option: 'Call the next patient after completing the visit',
     visit_completed_next_patient_called: 'The next patient was called.',
     visit_completed_no_next_patient: 'Visit completed. No patient is available to call.',
