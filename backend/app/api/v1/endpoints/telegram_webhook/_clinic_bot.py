@@ -7,6 +7,7 @@ from __future__ import annotations
 import hmac
 import logging
 from datetime import date, datetime
+from functools import partial
 from typing import Any, NoReturn
 
 from fastapi import HTTPException, Request, Response, status
@@ -39,33 +40,30 @@ from app.services.public_booking_settings import (
     PublicBookingSettingsError,
     PublicBookingSettingsService,
 )
+from app.services.telegram_bot import dispatch_patient_bot_update
 
 logger = logging.getLogger(__name__)
 from app.api.v1.endpoints.telegram_webhook._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._helpers import (
-    _localized_main_menu,
     _localized_services_menu,
     _localized_settings_menu,
     _localized_text,
-    _normalize_patient_button_text,
     _normalize_patient_language,
     _parse_patient_mini_app_entry_token,
     _parse_patient_onboarding_entry_token,
     _patient_text_handler_aliases,
-    _telegram_booking_entry_markup,
     _telegram_chat_language,
     _telegram_chat_menu,
     _telegram_chat_text,
-    _telegram_patient_cabinet_entry_markup,
-    _telegram_patient_doctors_entry_markup,
-    _telegram_patient_documents_entry_markup,
-    _telegram_patient_forms_entry_markup,
-    _telegram_payment_entry_markup,
-    _telegram_queue_entry_markup,
+    _telegram_clinic_message,
+    _telegram_has_pending_onboarding,
+    _telegram_onboarding_entry_markup,
+    _telegram_patient_access,
+    _telegram_service_entry_markup,
     _telegram_settings_message,
-    _telegram_visits_entry_markup,
 )  # noqa: F401
 from app.api.v1.endpoints.telegram_webhook._patient_commands import (  # noqa: F401  # noqa: F401
+    _has_patient_language_selection,
     _is_patient_settings_context_template,
     _latest_patient_bot_template_key,
     _send_patient_bot_reply,
@@ -74,24 +72,16 @@ from app.api.v1.endpoints.telegram_webhook._patient_commands import (  # noqa: F
 from app.api.v1.endpoints.telegram_webhook._staff_commands import (  # noqa: F401  # noqa: F401
     _billing_totals,
     _build_lab_report_pdf,
-    _clinic_payments_message,
-    _clinic_queue_message,
-    _clinic_status_message,
-    _clinic_visits_message,
     _format_money,
     _handle_contact_link,
     _handle_staff_link_start,
     _handle_staff_read_only_menu,
     _handle_ticket_qr_start,
     _latest_ready_lab_report_instances,
-    _message_chat_id,
     _message_from_update,
-    _message_text,
     _patient_display_name,
-    _patient_for_telegram_chat,
     _patient_recent_visits,
     _patient_today_queue_entries,
-    _send_clinic_lab_results,
     _send_language_choice,
     _set_notification_consent,
 )
@@ -105,77 +95,78 @@ async def _dispatch_clinic_bot_update(
     command_handlers: dict,
     text_handlers: dict,
 ) -> bool:
-    """Dispatch a clinic bot update to the appropriate handler."""
+    """Use the same patient dispatch for the service and its fallback."""
+    handlers = {
+        "staff_start_handler": _handle_staff_link_start,
+        "staff_menu_handler": _handle_staff_read_only_menu,
+        "ticket_start_handler": _handle_ticket_qr_start,
+        "contact_handler": _handle_contact_link,
+        "start_handler": start_handler,
+        "command_handlers": command_handlers,
+        "text_handlers": text_handlers,
+    }
     dispatch = getattr(bot_service, "process_patient_bot_update", None)
     if callable(dispatch):
-        return await dispatch(
-            update,
-            db,
-            staff_start_handler=_handle_staff_link_start,
-            staff_menu_handler=_handle_staff_read_only_menu,
-            ticket_start_handler=_handle_ticket_qr_start,
-            contact_handler=_handle_contact_link,
-            start_handler=start_handler,
-            command_handlers=command_handlers,
-            text_handlers=text_handlers,
-        )
-
-    if await _handle_staff_link_start(update, db, bot_service):
-        return True
-
-    if await _handle_staff_read_only_menu(update, db, bot_service):
-        return True
-
-    if await _handle_ticket_qr_start(update, db, bot_service):
-        return True
-
-    message = _message_from_update(update)
-    if not message:
-        return False
-
-    chat_id = _message_chat_id(message)
-    if chat_id is None:
-        return False
-
-    if await _handle_contact_link(message, db, bot_service):
-        return True
-
-    existing_telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
-    if existing_telegram_user is None:
-        _upsert_ticket_qr_telegram_user(db, message, notifications_enabled=False)
-        db.commit()
-
-    text = _message_text(message)
-    command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
-    handler = command_handlers.get(command) or text_handlers.get(
-        _normalize_patient_button_text(text)
-    )
-    if command == "/start":
-        await start_handler(chat_id, message)
-        return True
-    if handler:
-        await handler(chat_id)
-        return True
-    return False
+        return await dispatch(update, db, **handlers)
+    return await dispatch_patient_bot_update(bot_service, update, db, **handlers)
 
 
 async def _handle_clinic_bot_update(
     update: dict[str, Any], db: Session, bot_service
 ) -> bool:
+    async def reply(chat_id: int, text_key: str, template: str, markup=None) -> None:
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _telegram_chat_text(db, chat_id, text_key),
+            markup or _telegram_chat_menu(db, chat_id),
+            template,
+        )
+
+    async def clinic_handler(chat_id: int, *, unavailable: bool = False) -> None:
+        language = _telegram_chat_language(db, chat_id)
+        text = _telegram_clinic_message(db, chat_id)
+        if unavailable:
+            text = f"{_localized_text('patient_link_unavailable', language)}\n\n{text}"
+            markup = _telegram_chat_menu(db, chat_id)
+        else:
+            back = (
+                "⬅️ Asosiy menyu"
+                if language == TELEGRAM_LANGUAGE_UZ
+                else "⬅️ Главное меню"
+            )
+            markup = {"keyboard": [[{"text": back}]], "resize_keyboard": True}
+        await _send_patient_bot_reply(
+            db, bot_service, chat_id, text, markup, "telegram_patient_support"
+        )
+
+    def ensure_profile(chat_id: int, message: dict[str, Any]) -> None:
+        if crud_telegram.get_telegram_user_by_chat_id(db, chat_id) is None:
+            _upsert_ticket_qr_telegram_user(db, message, notifications_enabled=False)
+            db.commit()
+
     async def start_handler(chat_id: int, message: dict[str, Any]) -> None:
-        _upsert_ticket_qr_telegram_user(db, message, notifications_enabled=False)
-        db.commit()
-        await _send_language_choice(db, bot_service, chat_id)
+        ensure_profile(chat_id, message)
+        telegram_user, access = _telegram_patient_access(db, chat_id)
+        if access == "unavailable":
+            await clinic_handler(chat_id, unavailable=True)
+        elif access == "linked" or _telegram_has_pending_onboarding(db, telegram_user):
+            text_key = (
+                "patient_menu_intro"
+                if access == "linked"
+                else "patient_open_request_status"
+            )
+            await reply(chat_id, text_key, "telegram_patient_start_menu")
+        elif _has_patient_language_selection(db, chat_id):
+            await reply(chat_id, "share_contact", "telegram_patient_start_menu")
+        else:
+            await _send_language_choice(db, bot_service, chat_id)
 
     async def language_handler(chat_id: int, language_code: str) -> None:
-        message = _message_from_update(update)
-        telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
         previous_template_key = _latest_patient_bot_template_key(db, chat_id)
         _upsert_ticket_qr_telegram_user(
-            db,
-            message,
-            language_code=language_code,
-            notifications_enabled=False if telegram_user is None else None,
+            db, _message_from_update(update), language_code=language_code
         )
         db.commit()
         language = _normalize_patient_language(language_code)
@@ -185,59 +176,53 @@ async def _handle_clinic_bot_update(
         )
         settings_context = _is_patient_settings_context_template(previous_template_key)
         reply_text = _localized_text("language_selected", language)
-        reply_markup = _localized_main_menu(language)
+        reply_markup = _telegram_chat_menu(db, chat_id)
         template_key = "telegram_patient_language_selected"
-        linked_telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
-        if not settings_context and not getattr(
-            linked_telegram_user, "patient_id", None
-        ):
-            reply_text = f"{reply_text}\n\n{_localized_text('share_contact', language)}"
-            template_key = "telegram_patient_language_selected_needs_contact"
+        telegram_user, access = _telegram_patient_access(db, chat_id)
         if settings_context:
             reply_text = f"{reply_text}\n\n{_telegram_settings_message(db, chat_id)}"
-            reply_markup = _localized_settings_menu(language)
+            reply_markup = _localized_settings_menu(
+                language, navigation_menu=_telegram_chat_menu(db, chat_id)
+            )
             template_key = "telegram_patient_settings_language_selected"
+        elif access == "onboarding":
+            prompt = (
+                "patient_open_request_status"
+                if _telegram_has_pending_onboarding(db, telegram_user)
+                else "share_contact"
+            )
+            reply_text = f"{reply_text}\n\n{_localized_text(prompt, language)}"
+            template_key = "telegram_patient_language_selected_needs_contact"
         await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            reply_text,
-            reply_markup,
-            template_key,
+            db, bot_service, chat_id, reply_text, reply_markup, template_key
         )
 
     async def help_handler(chat_id: int) -> None:
-        language = _telegram_chat_language(db, chat_id)
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _localized_text("help", language),
-            _localized_main_menu(language),
-            "telegram_patient_help",
-        )
+        await reply(chat_id, "help", "telegram_patient_help")
 
     async def menu_handler(chat_id: int) -> None:
-        language = _telegram_chat_language(db, chat_id)
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _localized_text("main_menu_refreshed", language),
-            _localized_main_menu(language),
-            "telegram_patient_main_menu_refreshed",
+        await reply(
+            chat_id, "main_menu_refreshed", "telegram_patient_main_menu_refreshed"
         )
 
     async def services_handler(chat_id: int) -> None:
-        language = _telegram_chat_language(db, chat_id)
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _localized_text("services_menu", language),
-            _localized_services_menu(language),
-            "telegram_patient_services_menu",
-        )
+        _, access = _telegram_patient_access(db, chat_id)
+        if access == "linked":
+            language = _telegram_chat_language(db, chat_id)
+            await reply(
+                chat_id,
+                "services_menu",
+                "telegram_patient_services_menu",
+                _localized_services_menu(language),
+            )
+        else:
+            await entry_handler(
+                chat_id,
+                "booking",
+                "patient_open_booking",
+                "booking_entry_button",
+                "telegram_patient_book",
+            )
 
     async def settings_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
@@ -246,175 +231,92 @@ async def _handle_clinic_bot_update(
             bot_service,
             chat_id,
             _telegram_settings_message(db, chat_id),
-            _localized_settings_menu(language),
+            _localized_settings_menu(
+                language, navigation_menu=_telegram_chat_menu(db, chat_id)
+            ),
             "telegram_patient_settings",
         )
 
-    async def queue_handler(chat_id: int) -> None:
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _clinic_queue_message(db, chat_id),
-            _telegram_queue_entry_markup(db, chat_id)
-            or _telegram_chat_menu(db, chat_id),
-            "telegram_patient_queue",
+    async def entry_handler(
+        chat_id: int, section: str, text_key: str, button_key: str, template: str
+    ) -> None:
+        telegram_user, access = _telegram_patient_access(db, chat_id)
+        if access == "unavailable":
+            await clinic_handler(chat_id, unavailable=True)
+            return
+        if access == "linked":
+            markup = _telegram_service_entry_markup(db, chat_id, section, button_key)
+        elif _telegram_has_pending_onboarding(db, telegram_user):
+            text_key = "patient_open_request_status"
+            markup = _telegram_onboarding_entry_markup(
+                db, chat_id, "request_status_entry_button"
+            )
+        else:
+            text_key = (
+                "patient_open_onboarding"
+                if section == "booking"
+                else "patient_link_prompt"
+            )
+            markup = _telegram_onboarding_entry_markup(db, chat_id)
+        await reply(
+            chat_id, text_key if markup else "patient_app_unavailable", template, markup
         )
 
-    async def visits_handler(chat_id: int) -> None:
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _clinic_visits_message(db, chat_id),
-            _telegram_visits_entry_markup(db, chat_id)
-            or _telegram_chat_menu(db, chat_id),
-            "telegram_patient_visits",
-        )
-
-    async def payments_handler(chat_id: int) -> None:
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _clinic_payments_message(db, chat_id),
-            _telegram_payment_entry_markup(db, chat_id)
-            or _telegram_chat_menu(db, chat_id),
-            "telegram_patient_payments",
-        )
-
-    async def profile_handler(chat_id: int) -> None:
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _clinic_status_message(db, chat_id),
-            _telegram_chat_menu(db, chat_id),
-            "telegram_patient_profile",
-        )
-
-    async def results_handler(chat_id: int) -> None:
-        await _send_clinic_lab_results(db, bot_service, chat_id)
+    book_handler = partial(
+        entry_handler,
+        section="booking",
+        text_key="patient_open_booking",
+        button_key="booking_entry_button",
+        template="telegram_patient_book",
+    )
+    cabinet_handler = partial(
+        entry_handler,
+        section="cabinet",
+        text_key="patient_open_cabinet",
+        button_key="patient_cabinet_entry_button",
+        template="telegram_patient_cabinet",
+    )
+    queue_handler = partial(
+        entry_handler,
+        section="queue",
+        text_key="patient_open_queue",
+        button_key="queue_entry_button",
+        template="telegram_patient_queue",
+    )
+    visits_handler = partial(
+        entry_handler,
+        section="visits",
+        text_key="patient_open_visits",
+        button_key="visits_entry_button",
+        template="telegram_patient_visits",
+    )
+    payments_handler = partial(
+        entry_handler,
+        section="payments",
+        text_key="patient_open_payments",
+        button_key="payments_entry_button",
+        template="telegram_patient_payments",
+    )
+    results_handler = partial(
+        entry_handler,
+        section="results",
+        text_key="patient_open_results",
+        button_key="results_entry_button",
+        template="telegram_patient_results",
+    )
+    forms_handler = partial(
+        entry_handler,
+        section="forms",
+        text_key="patient_forms",
+        button_key="patient_forms_entry_button",
+        template="telegram_patient_forms",
+    )
 
     async def share_contact_handler(chat_id: int) -> None:
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _telegram_chat_text(db, chat_id, "share_contact"),
-            _telegram_chat_menu(db, chat_id),
-            "telegram_patient_share_contact",
-        )
-
-    async def book_handler(chat_id: int) -> None:
-        language = _telegram_chat_language(db, chat_id)
-        reply_markup = _telegram_booking_entry_markup(
-            db, chat_id
-        ) or _localized_main_menu(language)
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _localized_text("book", language),
-            reply_markup,
-            "telegram_patient_book",
-        )
-
-    async def patient_forms_handler(chat_id: int) -> None:
-        language = _telegram_chat_language(db, chat_id)
-        telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
-        reply_text = (
-            _localized_text("patient_forms", language)
-            if telegram_user and telegram_user.patient_id
-            else _localized_text("unlinked_protected_action", language)
-        )
-        reply_markup = _telegram_patient_forms_entry_markup(
-            db, chat_id
-        ) or _localized_services_menu(language)
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            reply_text,
-            reply_markup,
-            "telegram_patient_forms_placeholder",
-        )
-
-    async def patient_documents_handler(chat_id: int) -> None:
-        language = _telegram_chat_language(db, chat_id)
-        telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
-        reply_text = (
-            _localized_text("patient_documents", language)
-            if telegram_user and telegram_user.patient_id
-            else _localized_text("unlinked_protected_action", language)
-        )
-        reply_markup = _telegram_patient_documents_entry_markup(
-            db, chat_id
-        ) or _localized_services_menu(language)
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            reply_text,
-            reply_markup,
-            "telegram_patient_documents_placeholder",
-        )
-
-    async def doctor_schedule_handler(chat_id: int) -> None:
-        language = _telegram_chat_language(db, chat_id)
-        reply_markup = _telegram_patient_doctors_entry_markup(
-            db, chat_id
-        ) or _localized_services_menu(language)
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _localized_text("doctor_schedule", language),
-            reply_markup,
-            "telegram_patient_doctor_schedule_placeholder",
-        )
-
-    async def patient_cabinet_handler(chat_id: int) -> None:
-        language = _telegram_chat_language(db, chat_id)
-        telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
-        reply_text = (
-            _localized_text("patient_cabinet", language)
-            if telegram_user and telegram_user.patient_id
-            else _localized_text("unlinked_protected_action", language)
-        )
-        reply_markup = _telegram_patient_cabinet_entry_markup(
-            db, chat_id
-        ) or _localized_services_menu(language)
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            reply_text,
-            reply_markup,
-            "telegram_patient_cabinet_placeholder",
-        )
+        await reply(chat_id, "share_contact", "telegram_patient_share_contact")
 
     async def staff_entry_handler(chat_id: int) -> None:
-        language = _telegram_chat_language(db, chat_id)
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _localized_text("staff_entry", language),
-            _localized_main_menu(language),
-            "telegram_patient_staff_entry_placeholder",
-        )
-
-    async def support_handler(chat_id: int) -> None:
-        language = _telegram_chat_language(db, chat_id)
-        await _send_patient_bot_reply(
-            db,
-            bot_service,
-            chat_id,
-            _localized_text("support", language),
-            _localized_main_menu(language),
-            "telegram_patient_support",
-        )
+        await reply(chat_id, "staff_entry", "telegram_patient_staff_entry_placeholder")
 
     async def enable_notifications_handler(chat_id: int) -> None:
         await _set_notification_consent(db, bot_service, chat_id, True)
@@ -422,11 +324,12 @@ async def _handle_clinic_bot_update(
     async def disable_notifications_handler(chat_id: int) -> None:
         await _set_notification_consent(db, bot_service, chat_id, False)
 
-    async def russian_language_handler(chat_id: int) -> None:
-        await language_handler(chat_id, TELEGRAM_LANGUAGE_RU)
-
-    async def uzbek_language_handler(chat_id: int) -> None:
-        await language_handler(chat_id, TELEGRAM_LANGUAGE_UZ)
+    russian_language_handler = partial(
+        language_handler, language_code=TELEGRAM_LANGUAGE_RU
+    )
+    uzbek_language_handler = partial(
+        language_handler, language_code=TELEGRAM_LANGUAGE_UZ
+    )
 
     command_handlers = {
         "/help": help_handler,
@@ -434,36 +337,42 @@ async def _handle_clinic_bot_update(
         "/book": book_handler,
         "/queue": queue_handler,
         "/visits": visits_handler,
+        "/appointments": visits_handler,
         "/payments": payments_handler,
-        "/profile": profile_handler,
+        "/profile": cabinet_handler,
         "/results": results_handler,
         "/services": services_handler,
-        "/forms": patient_forms_handler,
-        "/documents": patient_documents_handler,
-        "/doctors": doctor_schedule_handler,
-        "/cabinet": patient_cabinet_handler,
+        "/forms": forms_handler,
+        "/documents": results_handler,
+        "/doctors": book_handler,
+        "/cabinet": cabinet_handler,
         "/settings": settings_handler,
-        "/support": support_handler,
+        "/support": clinic_handler,
     }
     text_handlers = _patient_text_handler_aliases(
         [
             ("🏥 Записаться на приём", book_handler),
+            ("🏥 Записаться", book_handler),
             ("❓ Помощь", help_handler),
             ("⚙️ Настройки", settings_handler),
             ("🎫 Моя очередь", queue_handler),
             ("📅 Мои визиты", visits_handler),
             ("💳 Оплаты и долг", payments_handler),
-            ("👤 Мой статус", profile_handler),
+            ("👤 Мой статус", cabinet_handler),
             ("📄 Результаты", results_handler),
             ("📱 Поделиться номером", share_contact_handler),
             ("📲 Онлайн-сервисы", services_handler),
-            ("📋 Анкеты пациента", patient_forms_handler),
-            ("🧾 Документы и чеки", patient_documents_handler),
-            ("🧑‍⚕️ Врачи и расписание", doctor_schedule_handler),
-            ("📲 Кабинет пациента", patient_cabinet_handler),
+            ("📋 Анкеты пациента", forms_handler),
+            ("🧾 Документы и чеки", results_handler),
+            ("🧑‍⚕️ Врачи и расписание", book_handler),
+            ("📲 Кабинет пациента", cabinet_handler),
+            ("📲 Мой кабинет", cabinet_handler),
+            ("📅 Записи", visits_handler),
+            ("📋 Статус заявки", cabinet_handler),
             ("👥 Режим сотрудника", staff_entry_handler),
             ("⬅️ Главное меню", menu_handler),
-            ("☎️ Связаться с клиникой", support_handler),
+            ("☎️ Связаться с клиникой", clinic_handler),
+            ("☎️ Клиника", clinic_handler),
             ("меню", menu_handler),
             ("menu", menu_handler),
             ("menyu", menu_handler),
@@ -483,31 +392,47 @@ async def _handle_clinic_bot_update(
             ("🎫 Mening navbatim", queue_handler),
             ("📅 Mening tashriflarim", visits_handler),
             ("💳 To'lovlar va qarz", payments_handler),
-            ("👤 Mening holatim", profile_handler),
+            ("👤 Mening holatim", cabinet_handler),
             ("📄 Natijalar", results_handler),
             ("📱 Telefon raqamni ulashish", share_contact_handler),
             ("📲 Onlayn xizmatlar", services_handler),
-            ("📋 Bemor anketalari", patient_forms_handler),
-            ("🧾 Hujjatlar va cheklar", patient_documents_handler),
-            ("🧑‍⚕️ Shifokorlar jadvali", doctor_schedule_handler),
-            ("📲 Bemor kabineti", patient_cabinet_handler),
+            ("📋 Bemor anketalari", forms_handler),
+            ("🧾 Hujjatlar va cheklar", results_handler),
+            ("🧑‍⚕️ Shifokorlar jadvali", book_handler),
+            ("📲 Bemor kabineti", cabinet_handler),
+            ("📲 Mening kabinetim", cabinet_handler),
+            ("📋 Ariza holati", cabinet_handler),
             ("👥 Xodim rejimi", staff_entry_handler),
             ("⬅️ Asosiy menyu", menu_handler),
-            ("☎️ Klinikaga bog'lanish", support_handler),
+            ("☎️ Klinikaga bog'lanish", clinic_handler),
+            ("☎️ Klinika", clinic_handler),
             ("Menyu", menu_handler),
             ("Asosiy menyu", menu_handler),
             ("xodim", staff_entry_handler),
         ]
     )
 
-    # Dispatch the update to the appropriate handler
+    async def handle_patient_action(chat_id: int, handler) -> None:
+        ensure_profile(chat_id, _message_from_update(update))
+        _, access = _telegram_patient_access(db, chat_id)
+        if access == "unavailable":
+            await clinic_handler(chat_id, unavailable=True)
+            return
+        await handler(chat_id)
+
     return await _dispatch_clinic_bot_update(
         update=update,
         db=db,
         bot_service=bot_service,
         start_handler=start_handler,
-        command_handlers=command_handlers,
-        text_handlers=text_handlers,
+        command_handlers={
+            key: partial(handle_patient_action, handler=handler)
+            for key, handler in command_handlers.items()
+        },
+        text_handlers={
+            key: partial(handle_patient_action, handler=handler)
+            for key, handler in text_handlers.items()
+        },
     )
 
 

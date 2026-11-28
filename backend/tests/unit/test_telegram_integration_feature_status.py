@@ -180,3 +180,40 @@ def test_patient_entry_copy_matches_protected_mini_app_flows(
     assert "hali yoqilmagan" not in cabinet
     assert archive_text in results
     assert booking_confirmation in booking
+
+
+@pytest.mark.unit
+def test_results_status_reports_only_the_protected_destination(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    status = _integration_status(
+        monkeypatch,
+        bot_token="test-bot-token",
+        frontend_url="https://clinic.example",
+    )
+    patient_bot = status["patient_bot"]
+    features = {
+        feature["key"]: feature["enabled"] for feature in patient_bot["features"]
+    }
+    assert patient_bot["results_delivery"] == "protected_mini_app"
+    assert patient_bot["max_pdf_reports_per_request"] == 0
+    assert features["patient_results_mini_app_entry"] is True
+    assert features["lab_results_pdf"] is False
+
+
+@pytest.mark.unit
+def test_invalid_frontend_origin_disables_protected_patient_entries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    status = _integration_status(
+        monkeypatch,
+        bot_token="test-bot-token",
+        frontend_url="https://clinic.example/?override=1",
+    )
+    features = {
+        feature["key"]: feature["enabled"]
+        for feature in status["patient_bot"]["features"]
+    }
+    assert features["patient_results_mini_app_entry"] is False
+    assert features["patient_cabinet_entrypoint"] is False
+    assert features["patient_booking_entrypoint"] is False

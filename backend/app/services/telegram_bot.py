@@ -49,8 +49,8 @@ PATIENT_BOT_COMMANDS_RU = [
     {"command": "results", "description": "Результаты"},
     {"command": "services", "description": "Онлайн-сервисы"},
     {"command": "forms", "description": "Анкеты пациента"},
-    {"command": "documents", "description": "Документы и чеки"},
-    {"command": "doctors", "description": "Расписание врачей"},
+    {"command": "documents", "description": "Результаты в кабинете"},
+    {"command": "doctors", "description": "Варианты записи к врачу"},
     {"command": "cabinet", "description": "Кабинет пациента"},
     {"command": "profile", "description": "Мой статус"},
     {"command": "settings", "description": "Язык и уведомления"},
@@ -67,8 +67,8 @@ PATIENT_BOT_COMMANDS_UZ = [
     {"command": "results", "description": "Natijalar"},
     {"command": "services", "description": "Onlayn xizmatlar"},
     {"command": "forms", "description": "Bemor anketalari"},
-    {"command": "documents", "description": "Hujjatlar va cheklar"},
-    {"command": "doctors", "description": "Shifokorlar jadvali"},
+    {"command": "documents", "description": "Kabinetdagi natijalar"},
+    {"command": "doctors", "description": "Qabulga yozilish imkoniyatlari"},
     {"command": "cabinet", "description": "Bemor kabineti"},
     {"command": "profile", "description": "Mening holatim"},
     {"command": "settings", "description": "Til va xabarnomalar"},
@@ -145,10 +145,84 @@ def telegram_text_corruption_reason(text: Any) -> str | None:
     return None
 
 
+async def dispatch_patient_bot_update(
+    bot_service: Any,
+    update: dict[str, Any],
+    db: Session,
+    *,
+    staff_start_handler: Callable[..., Awaitable[bool]],
+    ticket_start_handler: Callable[..., Awaitable[bool]],
+    contact_handler: Callable[..., Awaitable[bool]],
+    start_handler: Callable[[int, dict[str, Any]], Awaitable[None]],
+    command_handlers: Mapping[str, Callable[[int], Awaitable[None]]],
+    text_handlers: Mapping[str, Callable[[int], Awaitable[None]]],
+    staff_menu_handler: Callable[..., Awaitable[bool]] | None = None,
+) -> bool:
+    """Route clinic updates before the transport falls back to legacy handling."""
+    from app.api.v1.endpoints.telegram_webhook._helpers import (
+        _normalize_patient_button_text,
+    )
+    from app.api.v1.endpoints.telegram_webhook._staff_commands import (
+        _private_patient_chat_id,
+    )
+
+    message = update.get("message")
+    if "message" in update:
+        if not isinstance(message, dict):
+            return True
+        chat = message.get("chat")
+        if not isinstance(chat, dict) or type(chat.get("id")) is not int:
+            return True
+        sender = message.get("from")
+        if isinstance(sender, dict) and sender.get("is_bot") is True:
+            return True
+
+    if await staff_start_handler(update, db, bot_service):
+        return True
+    # A linked staff member's ordinary menu can also handle /start.
+    if await ticket_start_handler(update, db, bot_service):
+        return True
+    if staff_menu_handler and await staff_menu_handler(update, db, bot_service):
+        return True
+
+    if message is None:
+        return False
+
+    chat_id = _private_patient_chat_id(message)
+    if chat_id is None:
+        return True
+    if await contact_handler(message, db, bot_service):
+        return True
+
+    raw_text = message.get("text")
+    if not isinstance(raw_text, str) or not raw_text.strip():
+        return True
+    text = raw_text.strip()
+
+    command = text.split(maxsplit=1)[0].split("@", 1)[0].lower()
+    if command == "/start":
+        await start_handler(chat_id, message)
+        return True
+
+    handler = command_handlers.get(command) or text_handlers.get(
+        _normalize_patient_button_text(text)
+    )
+    if handler is None:
+        if not text.startswith("/"):
+            # The transport's private-text fallback refreshes the profile.
+            return False
+        handler = command_handlers.get("/help")
+    if handler is not None:
+        await handler(chat_id)
+    return True
+
+
 """P1-18: This is the STAFF bot (httpx-based, DB-stored token).
 Use services/telegram/bot.py:ClinicTelegramBot for the PATIENT bot
 (aiogram-based, env-var token). Do not confuse the two.
 """
+
+
 class TelegramBotService:
     def __init__(self):
         self.bot_token = None
@@ -216,41 +290,18 @@ class TelegramBotService:
         staff_menu_handler: Callable[..., Awaitable[bool]] | None = None,
     ) -> bool:
         """Dispatch clinic patient bot updates above webhook/polling transports."""
-        if await staff_start_handler(update, db, self):
-            return True
-
-        if staff_menu_handler and await staff_menu_handler(update, db, self):
-            return True
-
-        if await ticket_start_handler(update, db, self):
-            return True
-
-        message = update.get("message") or {}
-        if not message:
-            return False
-
-        chat_id = (message.get("chat") or {}).get("id")
-        if chat_id is None:
-            return False
-        chat_id = int(chat_id)
-
-        if await contact_handler(message, db, self):
-            return True
-
-        text = str(message.get("text") or "").strip()
-        command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
-        normalized_text = text.lower()
-
-        if command == "/start":
-            await start_handler(chat_id, message)
-            return True
-
-        handler = command_handlers.get(command) or text_handlers.get(normalized_text)
-        if handler:
-            await handler(chat_id)
-            return True
-
-        return False
+        return await dispatch_patient_bot_update(
+            self,
+            update,
+            db,
+            staff_start_handler=staff_start_handler,
+            ticket_start_handler=ticket_start_handler,
+            contact_handler=contact_handler,
+            start_handler=start_handler,
+            command_handlers=command_handlers,
+            text_handlers=text_handlers,
+            staff_menu_handler=staff_menu_handler,
+        )
 
     async def _handle_message(self, message: dict[str, Any], db: Session):
         """Обработка текстовых сообщений"""
@@ -287,13 +338,19 @@ class TelegramBotService:
             if text.startswith("/"):
                 await self._handle_command(text, chat_id, telegram_user, db)
             else:
+                from app.api.v1.endpoints.telegram_webhook._helpers import (
+                    _localized_text,
+                )
+
                 await self.send_plain_message(
                     chat_id,
-                    "Откройте меню командой /start, чтобы выбрать нужный раздел.",
+                    _localized_text("private_start_hint", telegram_user.language_code),
                 )
 
         except Exception as e:
-            logger.error("Telegram legacy message failed error_type=%s", type(e).__name__)
+            logger.error(
+                "Telegram legacy message failed error_type=%s", type(e).__name__
+            )
 
     async def _handle_callback_query(self, callback_query: dict[str, Any], db: Session):
         """Обработка callback запросов (кнопки)"""
@@ -305,10 +362,17 @@ class TelegramBotService:
             # This handler is reached only after webhook-secret validation or
             # polling Telegram's getUpdates, never from the public visit API.
             # A shared/group message or another sender is not a patient actor.
-            if data.startswith(("view_visit:", "confirm_visit:", "cancel_visit:", "ar:")):
+            if data.startswith(
+                ("view_visit:", "confirm_visit:", "cancel_visit:", "ar:")
+            ):
                 chat = callback_query["message"]["chat"]
-                if (chat.get("type") != "private" or isinstance(user_id, bool)
-                    or not isinstance(user_id, int) or user_id <= 0 or chat_id != user_id):
+                if (
+                    chat.get("type") != "private"
+                    or isinstance(user_id, bool)
+                    or not isinstance(user_id, int)
+                    or user_id <= 0
+                    or chat_id != user_id
+                ):
                     await self._answer_callback_query(
                         callback_query["id"], "Действие доступно только в личном чате"
                     )
@@ -325,27 +389,54 @@ class TelegramBotService:
                     if data.startswith("ar:v:"):
                         try:
                             preview = await run_in_threadpool(
-                                lambda: preview_appointment_decision(db, callback_data=data, chat_id=user_id)
+                                lambda: preview_appointment_decision(
+                                    db, callback_data=data, chat_id=user_id
+                                )
                             )
                             if not preview:
                                 raise ValueError("Preview unavailable")
-                            rows = [[{"text": "✅ Подтвердить", "callback_data": preview["confirm_data"]}]]
+                            rows = [
+                                [
+                                    {
+                                        "text": "✅ Подтвердить",
+                                        "callback_data": preview["confirm_data"],
+                                    }
+                                ]
+                            ]
                             if preview.get("cancel_data"):
-                                rows.append([{"text": "❌ Отменить", "callback_data": preview["cancel_data"]}])
+                                rows.append(
+                                    [
+                                        {
+                                            "text": "❌ Отменить",
+                                            "callback_data": preview["cancel_data"],
+                                        }
+                                    ]
+                                )
                             response = await self._httpx_post(
                                 f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
-                                json={"chat_id": chat_id, "text": preview["text"], "reply_markup": {"inline_keyboard": rows}},
+                                json={
+                                    "chat_id": chat_id,
+                                    "text": preview["text"],
+                                    "reply_markup": {"inline_keyboard": rows},
+                                },
                                 timeout=5,
                             )
-                            sent = response.status_code == 200 and response.json().get("ok", False)
+                            sent = response.status_code == 200 and response.json().get(
+                                "ok", False
+                            )
                         except Exception:
                             sent = False
-                        await self._answer_callback_query(callback_query["id"], "" if sent else "Запись недоступна. Обратитесь в клинику.")
+                        await self._answer_callback_query(
+                            callback_query["id"],
+                            "" if sent else "Запись недоступна. Обратитесь в клинику.",
+                        )
                         return
 
                     try:
                         result = await run_in_threadpool(
-                            lambda: apply_appointment_decision(db, callback_data=data, chat_id=user_id)
+                            lambda: apply_appointment_decision(
+                                db, callback_data=data, chat_id=user_id
+                            )
                         )
                     except Exception:
                         result = "unavailable"
@@ -363,6 +454,7 @@ class TelegramBotService:
 
                 token = data.split(":", 1)[1]
                 if data.startswith("view_visit:"):
+
                     def _preview_visit():
                         try:
                             return VisitConfirmationService(db).preview_by_telegram(
@@ -373,27 +465,52 @@ class TelegramBotService:
 
                     try:
                         preview = await run_in_threadpool(_preview_visit)
-                        keyboard = {"inline_keyboard": [
-                            [{"text": "✅ Подтвердить", "callback_data": f"confirm_visit:{preview['action_token']}"}],
-                            [{"text": "❌ Отменить", "callback_data": f"cancel_visit:{preview['action_token']}"}],
-                        ]}
+                        keyboard = {
+                            "inline_keyboard": [
+                                [
+                                    {
+                                        "text": "✅ Подтвердить",
+                                        "callback_data": f"confirm_visit:{preview['action_token']}",
+                                    }
+                                ],
+                                [
+                                    {
+                                        "text": "❌ Отменить",
+                                        "callback_data": f"cancel_visit:{preview['action_token']}",
+                                    }
+                                ],
+                            ]
+                        }
                         # Revocation can race after the final DB check and
                         # before provider delivery; no lock is held over I/O.
                         response = await self._httpx_post(
                             f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
-                            json={"chat_id": chat_id, "text": preview["text"], "reply_markup": keyboard},
+                            json={
+                                "chat_id": chat_id,
+                                "text": preview["text"],
+                                "reply_markup": keyboard,
+                            },
                             timeout=5,
                         )
-                        sent = response.status_code == 200 and response.json().get("ok", False)
+                        sent = response.status_code == 200 and response.json().get(
+                            "ok", False
+                        )
                     except Exception:
                         sent = False
-                    await self._answer_callback_query(callback_query["id"], "" if sent else "Визит недоступен. Обратитесь в клинику.")
+                    await self._answer_callback_query(
+                        callback_query["id"],
+                        "" if sent else "Визит недоступен. Обратитесь в клинику.",
+                    )
                     return
                 confirm = data.startswith("confirm_visit:")
 
                 def _apply_visit_action() -> dict[str, Any]:
                     service = VisitConfirmationService(db)
-                    operation = service.confirm_by_telegram if confirm else service.cancel_by_telegram
+                    operation = (
+                        service.confirm_by_telegram
+                        if confirm
+                        else service.cancel_by_telegram
+                    )
                     return operation(
                         token=token,
                         telegram_user_id=str(user_id),
@@ -405,13 +522,19 @@ class TelegramBotService:
                     result = await run_in_threadpool(_apply_visit_action)
                 except Exception:
                     await self._answer_callback_query(
-                        callback_query["id"], "Не удалось обработать визит. Обратитесь в клинику."
+                        callback_query["id"],
+                        "Не удалось обработать визит. Обратитесь в клинику.",
                     )
                     return
                 message = (
-                    "Визит подтверждён. Номера очереди уточните в приложении."
-                    if confirm else "Визит отменён."
-                ) if result.get("success") else "Не удалось обработать визит. Обратитесь в клинику."
+                    (
+                        "Визит подтверждён. Номера очереди уточните в приложении."
+                        if confirm
+                        else "Визит отменён."
+                    )
+                    if result.get("success")
+                    else "Не удалось обработать визит. Обратитесь в клинику."
+                )
                 await self._answer_callback_query(callback_query["id"], message)
                 return
 
@@ -497,13 +620,17 @@ class TelegramBotService:
                 "username": username,
                 "first_name": first_name,
                 "last_name": last_name,
-                "language_code": language_code or "ru",
                 "last_activity": datetime.now(UTC),
             }
             if telegram_user is None:
                 return crud_telegram.create_telegram_user(
                     db,
-                    {**profile, "chat_id": chat_id, "notifications_enabled": False},
+                    {
+                        **profile,
+                        "chat_id": chat_id,
+                        "language_code": language_code or "ru",
+                        "notifications_enabled": False,
+                    },
                 )
             if not telegram_user.active or telegram_user.blocked:
                 return None
@@ -511,7 +638,10 @@ class TelegramBotService:
             # Telegram sender ID or a clinic User ID.
             return crud_telegram.update_telegram_user(db, telegram_user.id, profile)
         except Exception as e:
-            logger.error("Telegram private profile refresh failed error_type=%s", type(e).__name__)
+            logger.error(
+                "Telegram private profile refresh failed error_type=%s",
+                type(e).__name__,
+            )
             return None
 
     async def _send_welcome_message(self, chat_id: int, telegram_user):
@@ -699,17 +829,21 @@ class TelegramBotService:
             else:
                 logger.error(f"Ошибка отправки сообщения: {response.status_code}")
             # P1-8: detect bot blocked by user (HTTP 403)
-            if response.status_code == 403 and hasattr(self, 'db') and self.db:
+            if response.status_code == 403 and hasattr(self, "db") and self.db:
                 try:
                     chat_id = data.get("chat_id") if isinstance(data, dict) else None
                     if chat_id:
-                        user = self.db.query(TelegramUser).filter(
-                            TelegramUser.chat_id == str(chat_id)
-                        ).first()
+                        user = (
+                            self.db.query(TelegramUser)
+                            .filter(TelegramUser.chat_id == str(chat_id))
+                            .first()
+                        )
                         if user:
                             user.notifications_enabled = False
                             self.db.commit()
-                            logger.info("Telegram user blocked bot: chat_id=%s", chat_id)
+                            logger.info(
+                                "Telegram user blocked bot: chat_id=%s", chat_id
+                            )
                 except Exception:
                     pass
                 return False
@@ -790,7 +924,9 @@ class TelegramBotService:
         self, bot_token: str | None, payloads: list[dict[str, Any]]
     ) -> tuple[bool, str | None]:
         if not bot_token:
-            logger.error("Bot token is not configured for Telegram command registration")
+            logger.error(
+                "Bot token is not configured for Telegram command registration"
+            )
             return False, "bot_token_not_configured"
 
         url = f"https://api.telegram.org/bot{bot_token}/setMyCommands"
@@ -838,9 +974,7 @@ class TelegramBotService:
             # Используем ``requests.post`` (синхронный), чтобы тесты могли
             # monkeypatch-ить ``telegram_bot.requests.post`` и подменять
             # исходящий HTTP-запрос к Telegram API.
-            response = requests.post(
-                url, json={"menu_button": menu_button}, timeout=10
-            )
+            response = requests.post(url, json={"menu_button": menu_button}, timeout=10)
         except requests.RequestException as exc:
             logger.warning(
                 "Telegram menu button setup request failed error_type=%s",

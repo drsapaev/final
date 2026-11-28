@@ -43,7 +43,9 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
     _telegram_chat_language,
     _telegram_chat_menu,
     _telegram_chat_text,
+    _telegram_clinic_message,
     _telegram_onboarding_entry_markup,
+    _telegram_patient_access,
     _telegram_settings_message,
 )  # noqa: F401
 from app.api.v1.endpoints.telegram_webhook._patient_commands import (  # noqa: F401  # noqa: F401
@@ -99,6 +101,9 @@ async def _handle_staff_read_only_menu(
         return False
 
     _telegram_user, user, role_menu = _linked_staff_for_chat(db, chat_id)
+    if command in {"/start", "/menu"} and getattr(_telegram_user, "patient_id", None):
+        # Mixed profiles use the patient entry; explicit staff commands stay above it.
+        return False
     if not user:
         if command == "/staff":
             _record_staff_command_audit(
@@ -321,7 +326,7 @@ async def _handle_ticket_qr_start(
         await bot_service._send_message(
             chat_id,
             _localized_text("ticket_qr_link_failed", language),
-            _localized_main_menu(language),
+            _telegram_chat_menu(db, chat_id),
         )
         return True
 
@@ -331,7 +336,7 @@ async def _handle_ticket_qr_start(
         await bot_service._send_message(
             chat_id,
             _localized_text("ticket_qr_expired", language),
-            _localized_main_menu(language),
+            _telegram_chat_menu(db, chat_id),
         )
         return True
 
@@ -1139,11 +1144,13 @@ async def _set_notification_consent(
     result_key = "notifications_enabled" if enabled else "notifications_disabled"
     settings_context = _is_patient_settings_context_template(previous_template_key)
     reply_text = _localized_text(result_key, language)
-    reply_markup = _localized_main_menu(language)
+    reply_markup = _telegram_chat_menu(db, chat_id)
     template_key = f"telegram_patient_{result_key}"
     if settings_context:
         reply_text = f"{reply_text}\n\n{_telegram_settings_message(db, chat_id)}"
-        reply_markup = _localized_settings_menu(language)
+        reply_markup = _localized_settings_menu(
+            language, navigation_menu=_telegram_chat_menu(db, chat_id)
+        )
         template_key = f"telegram_patient_settings_{result_key}"
     await _send_patient_bot_reply(
         db,
@@ -1198,6 +1205,29 @@ async def _handle_contact_link(
             if crud_telegram.get_telegram_user_by_chat_id(db, chat_id) is None:
                 raise
 
+    _, access = _telegram_patient_access(db, chat_id)
+    if access == "unavailable":
+        text = _telegram_chat_text(db, chat_id, "patient_link_unavailable")
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            f"{text}\n\n{_telegram_clinic_message(db, chat_id)}",
+            _telegram_chat_menu(db, chat_id),
+            "telegram_patient_support",
+        )
+        return True
+
+    if access == "linked":
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _telegram_chat_text(db, chat_id, "patient_menu_intro"),
+            _telegram_chat_menu(db, chat_id),
+            "telegram_patient_start_menu",
+        )
+        return True
     await _send_patient_bot_reply(
         db,
         bot_service,

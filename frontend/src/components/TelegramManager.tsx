@@ -842,7 +842,9 @@ const TelegramManager = () => {
       menu: t('misc.tg_cmd_results_menu'),
       command: '/results',
       label: patientCommandLabel('/results', t('misc.tg_cmd_results_label')),
-      detail: t('misc.tg_cmd_results_detail', { count: patientBot.max_pdf_reports_per_request || 3 })
+      detail: patientBot.results_delivery === 'protected_mini_app' ?
+      t('misc.tg_results_mini_app') :
+      t('misc.tg_cmd_results_detail', { count: patientBot.max_pdf_reports_per_request || 3 })
     },
     {
       key: 'forms',
@@ -943,7 +945,7 @@ const TelegramManager = () => {
   const getOnboardingValue = (request: Record<string, unknown>, camelKey: string, snakeKey: string, fallback: string = ''): string => {
     const value = request?.[camelKey] ?? request?.[snakeKey] ?? fallback;
     return typeof value === 'string' ? value : (value == null ? fallback : String(value));
-  }
+  };
   const splitOnboardingContactName = (value: unknown) => {
     const parts = String(value || '').trim().split(/\s+/).filter(Boolean);
     return {
@@ -988,7 +990,7 @@ const TelegramManager = () => {
   const getCandidateValue = <T = string>(candidate: Record<string, unknown>, camelKey: string, snakeKey: string, fallback: T): T => {
     const value = candidate?.[camelKey] ?? candidate?.[snakeKey] ?? fallback;
     return (value == null ? fallback : value) as T;
-  }
+  };
   const getCandidateTopScore = (request: OnboardingRequest): number => {
     const duplicateCandidates = Array.isArray(request?.duplicateCandidates) ? request.duplicateCandidates : [];
     const snapshotCandidates = Array.isArray(request?.duplicateReviewSnapshot?.topCandidates) ? request.duplicateReviewSnapshot.topCandidates : [];
@@ -1094,7 +1096,7 @@ const TelegramManager = () => {
     onboardingRequests.filter((item) => getOnboardingAgeBadge(getOnboardingValue(item, 'createdAt', 'created_at', '')).label === 'Overdue').length
   },
   {
-    label: "Today's submitted",
+    label: 'Today\'s submitted',
     value: onboardingAnalytics?.dashboard?.todaySubmitted ?? 0
   },
   {
@@ -1331,16 +1333,16 @@ const TelegramManager = () => {
                       style={{
                         color: botStatus?.bot_active ? 'var(--mac-success, #28a745)' : 'var(--mac-error, #dc3545)'
                       }} />
-                    
+
                   </ListItemIcon>
                   <ListItemText
                     primary={t('misc.tg_bot_active')}
                     secondary={botStatus?.bot_active ? t('misc.tg_yes') : t('misc.tg_no')} />
-                  
+
                   <Badge
                     variant={botStatus?.bot_active ? 'success' : 'error'}
                     size="small">
-                    
+
                     {botStatus?.bot_active ? t('misc.tg_active') : t('misc.tg_inactive')}
                   </Badge>
                 </ListItem>
@@ -1351,11 +1353,11 @@ const TelegramManager = () => {
                   <ListItemText
                     primary={t('misc.tg_webhook_configured')}
                     secondary={botStatus?.webhook_configured ? t('misc.tg_yes') : t('misc.tg_no')} />
-                  
+
                   <Badge
                     variant={botStatus?.webhook_configured ? 'success' : 'warning'}
                     size="small">
-                    
+
                     {botStatus?.webhook_configured ? t('misc.tg_webhook_set') : t('misc.tg_webhook_not_set')}
                   </Badge>
                 </ListItem>
@@ -1366,7 +1368,7 @@ const TelegramManager = () => {
                   <ListItemText
                     primary={t('misc.tg_subscribers')}
                     secondary={t('misc.tg_subscribers_count', { linked: botStatus?.subscribers_count || 0, total: botStatus?.total_users || 0 })} />
-                  
+
                 </ListItem>
                 <ListItem>
                   <ListItemIcon>
@@ -1695,7 +1697,8 @@ const TelegramManager = () => {
                     primary={t('misc.tg_results_title')}
                     secondary={patientBot.results_delivery === 'telegram_pdf' ?
                     t('misc.tg_results_pdf', { count: patientBot.max_pdf_reports_per_request || 3 }) :
-                    t('misc.tg_results_notification')} />
+                    patientBot.results_delivery === 'protected_mini_app' ?
+                    t('misc.tg_results_mini_app') : t('misc.tg_results_notification')} />
 
                 </ListItem>
                 {Boolean(botStatus?.webhook_error) &&
@@ -2214,7 +2217,7 @@ const TelegramManager = () => {
                           <Badge
                           variant="primary"
                           size="small">
-                          
+
                             {template?.message_type}
                           </Badge>
                         </TableCell>
@@ -2222,7 +2225,7 @@ const TelegramManager = () => {
                           <Badge
                           variant={template.is_active ? 'success' : 'default'}
                           size="small">
-                          
+
                             {template.is_active ? t('misc.tg_active') : t('misc.tg_inactive')}
                           </Badge>
                         </TableCell>

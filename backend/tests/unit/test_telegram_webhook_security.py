@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from datetime import UTC, date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -61,7 +61,7 @@ def _signed_mini_app_init_data(
     bot_token: str = MINI_APP_BOT_TOKEN,
     auth_date: datetime | None = None,
 ) -> str:
-    checked_at = auth_date or datetime.now(timezone.utc)
+    checked_at = auth_date or datetime.now(UTC)
     params = {
         "auth_date": str(int(checked_at.timestamp())),
         "query_id": "AAEAAAE",
@@ -250,6 +250,19 @@ def _reply_keyboard_texts(reply_markup):
     ]
 
 
+def _expected_onboarding_menu(language: str) -> dict:
+    contact, clinic = (
+        ("📱 Telefon raqamni ulashish", "☎️ Klinika")
+        if language == "uz-Latn"
+        else ("📱 Поделиться номером", "☎️ Клиника")
+    )
+    return {
+        "keyboard": [[{"text": contact, "request_contact": True}], [{"text": clinic}]],
+        "resize_keyboard": True,
+        "one_time_keyboard": False,
+    }
+
+
 def _create_lab_report_instance(
     db_session,
     *,
@@ -412,7 +425,10 @@ class TestTelegramWebhookSecurity:
             AsyncMock(return_value=fake_service),
         )
 
-        update_payload = {"update_id": 2, "message": {"message_id": 11}}
+        update_payload = {
+            "update_id": 2,
+            "callback_query": {"id": "synthetic-callback"},
+        }
 
         response = client.post(
             "/api/v1/telegram/webhook",
@@ -1862,12 +1878,11 @@ class TestMiniAppClinicCalendarDateValidation:
             (
                 "ru",
                 [
-                    "📲 Онлайн-сервисы",
-                    "📋 Анкеты пациента",
-                    "🧾 Документы и чеки",
-                    "🧑‍⚕️ Врачи и расписание",
-                    "📲 Кабинет пациента",
-                    "👥 Режим сотрудника",
+                    "🏥 Записаться",
+                    "📲 Мой кабинет",
+                    "📄 Результаты",
+                    "☎️ Клиника",
+                    "⚙️ Настройки",
                 ],
                 [
                     "📋 Анкеты пациента",
@@ -1881,12 +1896,11 @@ class TestMiniAppClinicCalendarDateValidation:
             (
                 "uz-Latn",
                 [
-                    "📲 Onlayn xizmatlar",
-                    "📋 Bemor anketalari",
-                    "🧾 Hujjatlar va cheklar",
-                    "🧑‍⚕️ Shifokorlar jadvali",
-                    "📲 Bemor kabineti",
-                    "👥 Xodim rejimi",
+                    "🏥 Qabulga yozilish",
+                    "📲 Mening kabinetim",
+                    "📄 Natijalar",
+                    "☎️ Klinika",
+                    "⚙️ Sozlamalar",
                 ],
                 [
                     "📋 Bemor anketalari",
@@ -1899,7 +1913,7 @@ class TestMiniAppClinicCalendarDateValidation:
             ),
         ],
     )
-    def test_patient_visible_reply_menus_expose_service_buttons(
+    def test_patient_menus_offer_primary_actions_and_legacy_services(
         self, language_code, main_expected, services_expected
     ):
         main_texts = _reply_keyboard_texts(
@@ -1909,8 +1923,7 @@ class TestMiniAppClinicCalendarDateValidation:
             telegram_webhook._localized_services_menu(language_code)
         )
 
-        for expected in main_expected:
-            assert expected in main_texts
+        assert main_texts == main_expected
         for expected in services_expected:
             assert expected in service_texts
 
@@ -1921,8 +1934,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 102,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7006},
-                "from": {"id": 111, "language_code": "uz"},
+                "chat": {"id": 7006, "type": "private"},
+                "from": {"id": 7006, "language_code": "uz"},
                 "text": "🇺🇿 O'zbekcha",
             },
         }
@@ -1941,9 +1954,7 @@ class TestMiniAppClinicCalendarDateValidation:
         assert telegram_user.lab_notifications is False
         assert "O'zbekchaga" in fake_service._send_message.await_args.args[1]
         reply_markup = fake_service._send_message.await_args.args[2]
-        assert reply_markup["keyboard"][0][0]["text"].startswith("📱")
-        assert reply_markup["keyboard"][1][0]["text"].startswith("🏥")
-        assert reply_markup["keyboard"][2][0]["text"].startswith("🎫")
+        assert reply_markup == _expected_onboarding_menu("uz-Latn")
         log = (
             db_session.query(TelegramMessage)
             .filter(TelegramMessage.chat_id == 7006)
@@ -1963,7 +1974,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 119,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7018},
+                "chat": {"id": 7018, "type": "private"},
                 "from": {"id": 7018, "username": "first_start"},
                 "text": "/start",
             },
@@ -2004,8 +2015,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 120,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7020},
-                "from": {"id": 111, "language_code": "ru"},
+                "chat": {"id": 7020, "type": "private"},
+                "from": {"id": 7020, "language_code": "ru"},
                 "text": "O'zbekcha",
             },
         }
@@ -2027,17 +2038,17 @@ class TestMiniAppClinicCalendarDateValidation:
         assert (
             telegram_webhook._localized_text("share_contact", "uz-Latn") in reply_text
         )
-        assert fake_service._send_message.await_args.args[2] == (
-            telegram_webhook._localized_main_menu("uz-Latn")
-        )
+        assert fake_service._send_message.await_args.args[
+            2
+        ] == _expected_onboarding_menu("uz-Latn")
 
         fake_service._send_message.reset_mock()
         help_update = {
             "update_id": 121,
             "message": {
                 "message_id": 2,
-                "chat": {"id": 7020},
-                "from": {"id": 111, "language_code": "ru"},
+                "chat": {"id": 7020, "type": "private"},
+                "from": {"id": 7020, "language_code": "ru"},
                 "text": "Yordam",
             },
         }
@@ -2050,11 +2061,11 @@ class TestMiniAppClinicCalendarDateValidation:
         fake_service._send_message.assert_awaited_once_with(
             7020,
             telegram_webhook._localized_text("help", "uz-Latn"),
-            telegram_webhook._localized_main_menu("uz-Latn"),
+            _expected_onboarding_menu("uz-Latn"),
         )
 
     @pytest.mark.asyncio
-    async def test_menu_command_refreshes_patient_main_menu_without_staff_intercept(
+    async def test_menu_command_refreshes_unlinked_patient_menu_without_staff_intercept(
         self, db_session
     ):
         telegram_user = TelegramUser(
@@ -2075,8 +2086,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 126,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7026},
-                "from": {"id": 111, "language_code": "uz"},
+                "chat": {"id": 7026, "type": "private"},
+                "from": {"id": 7026, "language_code": "uz"},
                 "text": "/menu",
             },
         }
@@ -2089,7 +2100,7 @@ class TestMiniAppClinicCalendarDateValidation:
         fake_service._send_message.assert_awaited_once_with(
             7026,
             telegram_webhook._localized_text("main_menu_refreshed", "uz-Latn"),
-            telegram_webhook._localized_main_menu("uz-Latn"),
+            _expected_onboarding_menu("uz-Latn"),
         )
         latest_log = (
             db_session.query(TelegramMessage)
@@ -2131,8 +2142,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 122,
             "message": {
                 "message_id": 3,
-                "chat": {"id": 7021},
-                "from": {"id": 111, "language_code": "ru"},
+                "chat": {"id": 7021, "type": "private"},
+                "from": {"id": 7021, "language_code": "ru"},
                 "text": "O'zbekcha",
             },
         }
@@ -2151,7 +2162,9 @@ class TestMiniAppClinicCalendarDateValidation:
         )
         assert "Joriy til: O'zbekcha" in reply_text
         assert fake_service._send_message.await_args.args[2] == (
-            telegram_webhook._localized_settings_menu("uz-Latn")
+            telegram_webhook._localized_settings_menu(
+                "uz-Latn", navigation_menu=_expected_onboarding_menu("uz-Latn")
+            )
         )
         latest_log = (
             db_session.query(TelegramMessage)
@@ -2183,8 +2196,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 109,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7015},
-                "from": {"id": 111, "language_code": "uz"},
+                "chat": {"id": 7015, "type": "private"},
+                "from": {"id": 7015, "language_code": "uz"},
                 "text": "🇷🇺 Русский",
             },
         }
@@ -2223,8 +2236,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 103,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7007},
-                "from": {"id": 111},
+                "chat": {"id": 7007, "type": "private"},
+                "from": {"id": 7007},
                 "text": "🔔 Xabarnomalarga roziman",
             },
         }
@@ -2262,8 +2275,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 104,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7008},
-                "from": {"id": 111},
+                "chat": {"id": 7008, "type": "private"},
+                "from": {"id": 7008},
                 "text": "Без уведомлений",
             },
         }
@@ -2310,8 +2323,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 123,
             "message": {
                 "message_id": 4,
-                "chat": {"id": 7022},
-                "from": {"id": 111},
+                "chat": {"id": 7022, "type": "private"},
+                "from": {"id": 7022},
                 "text": "Без уведомлений",
             },
         }
@@ -2334,7 +2347,9 @@ class TestMiniAppClinicCalendarDateValidation:
             telegram_webhook._telegram_settings_message(db_session, 7022) in reply_text
         )
         assert fake_service._send_message.await_args.args[2] == (
-            telegram_webhook._localized_settings_menu("ru")
+            telegram_webhook._localized_settings_menu(
+                "ru", navigation_menu=_expected_onboarding_menu("ru")
+            )
         )
         latest_log = (
             db_session.query(TelegramMessage)
@@ -2367,8 +2382,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 105,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7009},
-                "from": {"id": 111},
+                "chat": {"id": 7009, "type": "private"},
+                "from": {"id": 7009},
                 "text": "/settings",
             },
         }
@@ -2381,7 +2396,9 @@ class TestMiniAppClinicCalendarDateValidation:
         fake_service._send_message.assert_awaited_once_with(
             7009,
             telegram_webhook._telegram_settings_message(db_session, 7009),
-            telegram_webhook._localized_settings_menu("uz-Latn"),
+            telegram_webhook._localized_settings_menu(
+                "uz-Latn", navigation_menu=_expected_onboarding_menu("uz-Latn")
+            ),
         )
         settings_message = fake_service._send_message.await_args.args[1]
         assert "Joriy til: O'zbekcha" in settings_message
@@ -2409,8 +2426,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 125,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7019},
-                "from": {"id": 111},
+                "chat": {"id": 7019, "type": "private"},
+                "from": {"id": 7019},
                 "text": "/support",
             },
         }
@@ -2420,11 +2437,14 @@ class TestMiniAppClinicCalendarDateValidation:
         )
 
         assert handled is True
-        fake_service._send_message.assert_awaited_once_with(
-            7019,
-            telegram_webhook._localized_text("support", "uz-Latn"),
-            telegram_webhook._localized_main_menu("uz-Latn"),
+        fake_service._send_message.assert_awaited_once()
+        chat_id, message, reply_markup = fake_service._send_message.await_args.args
+        assert chat_id == 7019
+        assert message.startswith(
+            telegram_webhook._localized_text("clinic_title", "uz-Latn")
         )
+        assert _reply_keyboard_texts(reply_markup) == ["⬅️ Asosiy menyu"]
+        assert "inline_keyboard" not in reply_markup
         log = (
             db_session.query(TelegramMessage)
             .filter(TelegramMessage.chat_id == 7019)
@@ -2453,8 +2473,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 126,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7022},
-                "from": {"id": 111},
+                "chat": {"id": 7022, "type": "private"},
+                "from": {"id": 7022},
                 "text": "/book",
             },
         }
@@ -2467,7 +2487,9 @@ class TestMiniAppClinicCalendarDateValidation:
         fake_service._send_message.assert_awaited_once()
         chat_id, message, reply_markup = fake_service._send_message.await_args.args
         assert chat_id == 7022
-        assert message == telegram_webhook._localized_text("book", "uz-Latn")
+        assert message == telegram_webhook._localized_text(
+            "patient_open_booking", "uz-Latn"
+        )
         assert reply_markup == {
             "inline_keyboard": [
                 [
@@ -2498,34 +2520,34 @@ class TestMiniAppClinicCalendarDateValidation:
                 "/forms",
                 "patient_forms",
                 "patient_forms_entry_button",
-                "telegram_patient_forms_placeholder",
+                "telegram_patient_forms",
                 "forms",
                 7050,
                 1270,
             ),
             (
                 "/documents",
-                "patient_documents",
-                "patient_documents_entry_button",
-                "telegram_patient_documents_placeholder",
-                "documents",
+                "patient_open_results",
+                "results_entry_button",
+                "telegram_patient_results",
+                "results",
                 7051,
                 1271,
             ),
             (
                 "/doctors",
-                "doctor_schedule",
-                "patient_doctors_entry_button",
-                "telegram_patient_doctor_schedule_placeholder",
-                "doctors",
+                "patient_open_booking",
+                "booking_entry_button",
+                "telegram_patient_book",
+                "appointments",
                 7052,
                 1272,
             ),
             (
                 "/cabinet",
-                "patient_cabinet",
+                "patient_open_cabinet",
                 "patient_cabinet_entry_button",
-                "telegram_patient_cabinet_placeholder",
+                "telegram_patient_cabinet",
                 "cabinet",
                 7053,
                 1273,
@@ -2563,8 +2585,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": update_id,
             "message": {
                 "message_id": 1,
-                "chat": {"id": chat_id},
-                "from": {"id": 111},
+                "chat": {"id": chat_id, "type": "private"},
+                "from": {"id": chat_id},
                 "text": command,
             },
         }
@@ -2604,46 +2626,21 @@ class TestMiniAppClinicCalendarDateValidation:
         assert log.template_key == template_key
 
     @pytest.mark.parametrize(
-        "command,text_key,template_key,chat_id,update_id",
+        "command,template_key,chat_id,update_id",
         [
-            (
-                "/forms",
-                "patient_forms",
-                "telegram_patient_forms_placeholder",
-                7054,
-                1274,
-            ),
-            (
-                "/documents",
-                "patient_documents",
-                "telegram_patient_documents_placeholder",
-                7055,
-                1275,
-            ),
-            (
-                "/doctors",
-                "doctor_schedule",
-                "telegram_patient_doctor_schedule_placeholder",
-                7056,
-                1276,
-            ),
-            (
-                "/cabinet",
-                "patient_cabinet",
-                "telegram_patient_cabinet_placeholder",
-                7057,
-                1277,
-            ),
+            ("/forms", "telegram_patient_forms", 7054, 1274),
+            ("/documents", "telegram_patient_results", 7055, 1275),
+            ("/doctors", "telegram_patient_book", 7056, 1276),
+            ("/cabinet", "telegram_patient_cabinet", 7057, 1277),
         ],
     )
     @pytest.mark.asyncio
-    async def test_patient_service_commands_without_frontend_falls_back_to_services_menu(
+    async def test_patient_service_commands_without_frontend_return_to_linked_menu(
         self,
         db_session,
         test_patient,
         monkeypatch,
         command,
-        text_key,
         template_key,
         chat_id,
         update_id,
@@ -2665,8 +2662,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": update_id,
             "message": {
                 "message_id": 1,
-                "chat": {"id": chat_id},
-                "from": {"id": 111},
+                "chat": {"id": chat_id, "type": "private"},
+                "from": {"id": chat_id},
                 "text": command,
             },
         }
@@ -2678,8 +2675,8 @@ class TestMiniAppClinicCalendarDateValidation:
         assert handled is True
         fake_service._send_message.assert_awaited_once_with(
             chat_id,
-            telegram_webhook._localized_text(text_key, "uz-Latn"),
-            telegram_webhook._localized_services_menu("uz-Latn"),
+            telegram_webhook._localized_text("patient_app_unavailable", "uz-Latn"),
+            telegram_webhook._localized_main_menu("uz-Latn"),
         )
         log = (
             db_session.query(TelegramMessage)
@@ -2690,8 +2687,12 @@ class TestMiniAppClinicCalendarDateValidation:
 
     @pytest.mark.asyncio
     async def test_book_command_without_link_uses_request_review_onboarding_cta(
-        self, db_session
+        self, db_session, monkeypatch
     ):
+        monkeypatch.setattr(telegram_webhook.settings, "ENV", "dev")
+        monkeypatch.setattr(
+            telegram_webhook.settings, "FRONTEND_URL", "http://127.0.0.1:5173"
+        )
         telegram_user = TelegramUser(
             chat_id=7030,
             username="unlinked_patient",
@@ -2710,8 +2711,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 127,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7030},
-                "from": {"id": 111},
+                "chat": {"id": 7030, "type": "private"},
+                "from": {"id": 7030},
                 "text": "/book",
             },
         }
@@ -2724,14 +2725,19 @@ class TestMiniAppClinicCalendarDateValidation:
         fake_service._send_message.assert_awaited_once()
         chat_id, message, reply_markup = fake_service._send_message.await_args.args
         assert chat_id == 7030
-        assert message == telegram_webhook._localized_text("book", "uz-Latn")
+        assert message == telegram_webhook._localized_text(
+            "patient_open_onboarding", "uz-Latn"
+        )
         button = reply_markup["inline_keyboard"][0][0]
         assert button["text"] == telegram_webhook._localized_text(
             "onboarding_entry_button",
             "uz-Latn",
         )
-        entry_url = button.get("url") or button.get("web_app", {}).get("url")
-        assert entry_url
+        entry_url = button["url"]
+        assert entry_url.startswith(
+            "http://127.0.0.1:5173" + admin_telegram.PATIENT_BOOKING_ENTRY_ROUTE
+        )
+        assert "web_app" not in button
         assert "entryToken=pmo_" in entry_url
         assert "pma_" not in entry_url
         entry_token = parse_qs(urlsplit(entry_url).query)["entryToken"][0]
@@ -2740,6 +2746,13 @@ class TestMiniAppClinicCalendarDateValidation:
             expected_section="appointments",
         )
         assert parsed_onboarding["chat_id"] == 7030
+        assert (
+            telegram_webhook._parse_patient_onboarding_entry_token(
+                entry_token,
+                expected_section="results",
+            )
+            is None
+        )
         assert (
             telegram_webhook._parse_patient_mini_app_entry_token(
                 entry_token,
@@ -2761,12 +2774,7 @@ class TestMiniAppClinicCalendarDateValidation:
         [
             ("/queue", "telegram_patient_queue", 7031, 1281),
             ("/payments", "telegram_patient_payments", 7032, 1282),
-            (
-                "/documents",
-                "telegram_patient_documents_placeholder",
-                7033,
-                1283,
-            ),
+            ("/documents", "telegram_patient_results", 7033, 1283),
         ],
     )
     @pytest.mark.asyncio
@@ -2792,6 +2800,7 @@ class TestMiniAppClinicCalendarDateValidation:
         )
         db_session.add(telegram_user)
         db_session.commit()
+        monkeypatch.setattr(telegram_webhook.settings, "ENV", "dev")
         monkeypatch.setattr(
             telegram_webhook.settings,
             "FRONTEND_URL",
@@ -2803,8 +2812,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": update_id,
             "message": {
                 "message_id": 1,
-                "chat": {"id": chat_id},
-                "from": {"id": 111},
+                "chat": {"id": chat_id, "type": "private"},
+                "from": {"id": chat_id},
                 "text": command,
             },
         }
@@ -2820,7 +2829,7 @@ class TestMiniAppClinicCalendarDateValidation:
         )
         assert reply_chat_id == chat_id
         assert message == telegram_webhook._localized_text(
-            "unlinked_protected_action",
+            "patient_link_prompt",
             "uz-Latn",
         )
         assert "payment_id" not in message
@@ -2832,8 +2841,11 @@ class TestMiniAppClinicCalendarDateValidation:
             "onboarding_entry_button",
             "uz-Latn",
         )
-        entry_url = button.get("url") or button.get("web_app", {}).get("url")
-        assert entry_url
+        entry_url = button["url"]
+        assert entry_url.startswith(
+            "http://localhost:5173" + admin_telegram.PATIENT_BOOKING_ENTRY_ROUTE
+        )
+        assert "web_app" not in button
         assert "entryToken=pmo_" in entry_url
         assert "pma_" not in entry_url
         entry_token = parse_qs(urlsplit(entry_url).query)["entryToken"][0]
@@ -2866,7 +2878,7 @@ class TestMiniAppClinicCalendarDateValidation:
             db_session,
             user_id=admin_user.id,
             chat_id=7010,
-            expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+            expires_at=datetime.now(UTC) + timedelta(minutes=10),
             issued_by_user_id=admin_user.id,
             request_id="staff-link-webhook-test",
             nonce="staffwebhook",
@@ -2942,7 +2954,7 @@ class TestMiniAppClinicCalendarDateValidation:
             db_session,
             user_id=admin_user.id,
             chat_id=7011,
-            expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+            expires_at=datetime.now(UTC) + timedelta(minutes=10),
             issued_by_user_id=admin_user.id,
             nonce="staffreplay",
         )
@@ -3319,7 +3331,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 129,
             "message": {
                 "message_id": 1,
-                "chat": {"id": chat_id},
+                "chat": {"id": chat_id, "type": "private"},
                 "from": {"id": chat_id, "language_code": "ru"},
                 "text": "/start",
             },
@@ -3341,7 +3353,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 130,
             "message": {
                 "message_id": 2,
-                "chat": {"id": chat_id},
+                "chat": {"id": chat_id, "type": "private"},
                 "from": {"id": chat_id, "language_code": "ru"},
                 "text": "O'zbekcha",
             },
@@ -3364,7 +3376,7 @@ class TestMiniAppClinicCalendarDateValidation:
             telegram_webhook._localized_text("language_selected", "uz-Latn") in text_arg
         )
         assert telegram_webhook._localized_text("share_contact", "uz-Latn") in text_arg
-        assert reply_markup == telegram_webhook._localized_main_menu("uz-Latn")
+        assert reply_markup == _expected_onboarding_menu("uz-Latn")
         fake_service._send_message.reset_mock()
 
         contact_update = {
@@ -3432,7 +3444,7 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 133,
             "message": {
                 "message_id": 5,
-                "chat": {"id": chat_id},
+                "chat": {"id": chat_id, "type": "private"},
                 "from": {"id": chat_id, "language_code": "uz"},
                 "text": "Xabarnomalarga roziman",
             },
@@ -3579,9 +3591,12 @@ class TestMiniAppClinicCalendarDateValidation:
             assert test_patient.phone not in message
 
     @pytest.mark.asyncio
-    async def test_profile_command_returns_linked_patient_status_without_medical_details(
-        self, db_session, test_patient, test_visit
+    async def test_profile_command_opens_cabinet_without_patient_data(
+        self, db_session, test_patient, test_visit, monkeypatch
     ):
+        monkeypatch.setattr(
+            telegram_webhook.settings, "FRONTEND_URL", "https://clinic.example"
+        )
         _link_patient_to_chat(db_session, chat_id=7022, patient_id=test_patient.id)
         test_visit.status = "open"
         test_visit.notes = "diagnosis: private clinical note"
@@ -3591,8 +3606,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 122,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7022},
-                "from": {"id": 111},
+                "chat": {"id": 7022, "type": "private"},
+                "from": {"id": 7022},
                 "text": "/profile",
             },
         }
@@ -3605,10 +3620,26 @@ class TestMiniAppClinicCalendarDateValidation:
         fake_service._send_message.assert_awaited_once()
         chat_id, message, reply_markup = fake_service._send_message.await_args.args
         assert chat_id == 7022
-        assert test_patient.first_name in message
-        assert f"#{test_visit.id}" in message
-        assert "open" in message
-        assert reply_markup == telegram_webhook._localized_main_menu("ru")
+        assert message == telegram_webhook._localized_text("patient_open_cabinet", "ru")
+        assert reply_markup == {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": telegram_webhook._localized_text(
+                            "patient_cabinet_entry_button", "ru"
+                        ),
+                        "web_app": {
+                            "url": "https://clinic.example"
+                            + admin_telegram.PATIENT_MINI_APP_ENTRY_ROUTE
+                            + "?section=cabinet"
+                        },
+                    }
+                ]
+            ]
+        }
+        assert test_patient.first_name not in message
+        assert f"#{test_visit.id}" not in message
+        assert "open" not in message
         assert "diagnosis" not in message
         assert "private clinical note" not in message
         if test_patient.phone:
@@ -3702,8 +3733,8 @@ class TestMiniAppClinicCalendarDateValidation:
             "update_id": 124,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7024},
-                "from": {"id": 111},
+                "chat": {"id": 7024, "type": "private"},
+                "from": {"id": 7024},
                 "text": "/payments",
             },
         }
@@ -3714,8 +3745,13 @@ class TestMiniAppClinicCalendarDateValidation:
 
         assert handled is True
         fake_service._send_message.assert_awaited_once()
-        chat_id, _message, reply_markup = fake_service._send_message.await_args.args
+        chat_id, message, reply_markup = fake_service._send_message.await_args.args
         assert chat_id == 7024
+        assert message == telegram_webhook._localized_text(
+            "patient_open_payments", "ru"
+        )
+        assert "120 000" not in message
+        assert "10 000" not in message
         assert reply_markup == {
             "inline_keyboard": [
                 [
@@ -3734,7 +3770,7 @@ class TestMiniAppClinicCalendarDateValidation:
         assert str(test_patient.id) not in str(reply_markup)
         assert str(test_visit.id) not in str(reply_markup)
         assert str(payment.id) not in str(reply_markup)
-        telegram_payload = f"{_message} {reply_markup}"
+        telegram_payload = f"{message} {reply_markup}"
         assert f"#{test_visit.id}" not in telegram_payload
         assert "patient_id" not in telegram_payload
         assert "visit_id" not in telegram_payload
@@ -3812,9 +3848,12 @@ class TestMiniAppClinicCalendarDateValidation:
         ]
 
     @pytest.mark.asyncio
-    async def test_lab_results_flow_sends_pdf_through_bot_service(
+    async def test_lab_results_flow_opens_protected_section_without_sending_pdf(
         self, db_session, test_patient, monkeypatch
     ):
+        monkeypatch.setattr(
+            telegram_webhook.settings, "FRONTEND_URL", "https://clinic.example"
+        )
         _link_patient_to_chat(db_session, chat_id=7004, patient_id=test_patient.id)
         fake_service = FakeTelegramBotService(active=True)
         fake_instance = SimpleNamespace(id=456)
@@ -3833,23 +3872,50 @@ class TestMiniAppClinicCalendarDateValidation:
             ),
         )
 
-        await telegram_webhook._send_clinic_lab_results(db_session, fake_service, 7004)
-
-        fake_service._send_document.assert_awaited_once_with(
-            7004,
-            "result.pdf",
-            b"%PDF-1.4",
-            "Ready result",
+        assert await telegram_webhook._handle_clinic_bot_update(
+            {
+                "message": {
+                    "chat": {"id": 7004, "type": "private"},
+                    "from": {"id": 7004},
+                    "text": "/results",
+                },
+            },
+            db_session,
+            fake_service,
         )
+        fake_service._send_document.assert_not_awaited()
+        fake_service._send_message.assert_awaited_once()
+        chat_id, message, reply_markup = fake_service._send_message.await_args.args
+        assert chat_id == 7004
+        assert message == telegram_webhook._localized_text("patient_open_results", "ru")
+        assert "Ready result" not in message
+        assert reply_markup == {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": telegram_webhook._localized_text(
+                            "results_entry_button", "ru"
+                        ),
+                        "web_app": {
+                            "url": "https://clinic.example"
+                            + admin_telegram.PATIENT_MINI_APP_ENTRY_ROUTE
+                            + "?section=results"
+                        },
+                    }
+                ]
+            ]
+        }
         log = (
             db_session.query(TelegramMessage)
-            .filter(TelegramMessage.related_entity_id == 456)
+            .filter(TelegramMessage.chat_id == 7004)
             .one()
         )
-        assert log.message_type == "lab_result_pdf"
-        assert log.related_entity_type == "lab_report_instance"
+        assert log.related_entity_id is None
+        assert log.related_entity_type is None
+        assert log.message_type == "patient_bot_reply"
+        assert log.template_key == "telegram_patient_results"
         assert log.status == "sent"
-        assert log.message_id == 77
+        assert log.message_id is None
 
     @pytest.mark.asyncio
     async def test_telegram_bot_service_send_document_posts_pdf_bytes(
