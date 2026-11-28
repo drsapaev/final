@@ -14913,6 +14913,72 @@
         }
       }
     },
+    "/api/v1/section-templates/{section_type}/{template_id}/review": {
+      "post": {
+        "tags": [
+          "section-templates",
+          "section-templates"
+        ],
+        "summary": "Review Section Template",
+        "operationId": "review_section_template_api_v1_section_templates__section_type___template_id__review_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "section_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SectionType"
+            }
+          },
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorSectionTemplateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/section-templates/{section_type}": {
       "get": {
         "tags": [
@@ -15160,6 +15226,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The selected template revision has changed"
           },
           "422": {
             "description": "Validation Error",
@@ -74055,6 +74124,571 @@
         }
       }
     },
+    "/api/v1/v2/emr/{visit_id}/workspace": {
+      "get": {
+        "tags": [
+          "emr-v2"
+        ],
+        "summary": "Get Emr Workspace",
+        "operationId": "get_emr_workspace_api_v1_v2_emr__visit_id__workspace_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/v2/emr/{visit_id}/workspace/entries/{entry_id}": {
+      "put": {
+        "tags": [
+          "emr-v2"
+        ],
+        "summary": "Put Clinical Entry",
+        "operationId": "put_clinical_entry_api_v1_v2_emr__visit_id__workspace_entries__entry_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClinicalEntryWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalEntryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/v2/emr/{visit_id}/workspace/entries/{entry_id}/history": {
+      "get": {
+        "tags": [
+          "emr-v2"
+        ],
+        "summary": "Get Clinical Entry History",
+        "operationId": "get_clinical_entry_history_api_v1_v2_emr__visit_id__workspace_entries__entry_id__history_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Entry Id"
+            }
+          },
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClinicalEntryOut"
+                  },
+                  "title": "Response Get Clinical Entry History Api V1 V2 Emr  Visit Id  Workspace Entries  Entry Id  History Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/v2/emr/{visit_id}/workspace/history/{source_visit_id}/{version}": {
+      "get": {
+        "tags": [
+          "emr-v2"
+        ],
+        "summary": "Get Workspace History Document",
+        "operationId": "get_workspace_history_document_api_v1_v2_emr__visit_id__workspace_history__source_visit_id___version__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "source_visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Source Visit Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version"
+            }
+          },
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceHistoryDocument"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/v2/emr/{visit_id}/workspace/prescription": {
+      "get": {
+        "tags": [
+          "emr-v2"
+        ],
+        "summary": "Get Workspace Prescription",
+        "operationId": "get_workspace_prescription_api_v1_v2_emr__visit_id__workspace_prescription_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/WorkspacePrescription"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Workspace Prescription Api V1 V2 Emr  Visit Id  Workspace Prescription Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "emr-v2"
+        ],
+        "summary": "Post Workspace Prescription",
+        "operationId": "post_workspace_prescription_api_v1_v2_emr__visit_id__workspace_prescription_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssuePrescription"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspacePrescription"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/v2/emr/{visit_id}/workspace/labs": {
+      "get": {
+        "tags": [
+          "emr-v2"
+        ],
+        "summary": "Get Workspace Labs",
+        "operationId": "get_workspace_labs_api_v1_v2_emr__visit_id__workspace_labs_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceLabs"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/v2/emr/{visit_id}/workspace/labs/{instance_id}/review": {
+      "post": {
+        "tags": [
+          "emr-v2"
+        ],
+        "summary": "Post Workspace Lab Review",
+        "operationId": "post_workspace_lab_review_api_v1_v2_emr__visit_id__workspace_labs__instance_id__review_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Instance Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabReviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/emr/{visit_id}": {
       "get": {
         "tags": [
@@ -77786,6 +78420,132 @@
           "can_reject"
         ],
         "title": "AllFreeVisitResponse"
+      },
+      "AllergyCheckFact": {
+        "properties": {
+          "event_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event On"
+          },
+          "ended_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended On"
+          },
+          "kind": {
+            "type": "string",
+            "const": "allergy_check",
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "none_reported",
+              "unknown",
+              "not_checked"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "status"
+        ],
+        "title": "AllergyCheckFact"
+      },
+      "AllergyFact": {
+        "properties": {
+          "event_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event On"
+          },
+          "ended_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended On"
+          },
+          "kind": {
+            "type": "string",
+            "const": "allergy",
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "reaction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 240
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reaction"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "mild",
+                  "moderate",
+                  "severe"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "name",
+          "status"
+        ],
+        "title": "AllergyFact"
       },
       "AnalyzeComplaintsIntegrationRequest": {
         "properties": {
@@ -84467,6 +85227,158 @@
         "title": "ClinicStatsOut",
         "description": "Статистика клиники"
       },
+      "ClinicalEntryOut": {
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entry Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "author_id": {
+            "type": "integer",
+            "title": "Author Id"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "clinician",
+              "patient_report",
+              "legacy_verified"
+            ],
+            "title": "Source"
+          },
+          "clinical_details": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProblemFact"
+              },
+              {
+                "$ref": "#/components/schemas/MedicationFact"
+              },
+              {
+                "$ref": "#/components/schemas/AllergyFact"
+              },
+              {
+                "$ref": "#/components/schemas/AllergyCheckFact"
+              }
+            ],
+            "title": "Clinical Details",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "allergy": "#/components/schemas/AllergyFact",
+                "allergy_check": "#/components/schemas/AllergyCheckFact",
+                "medication": "#/components/schemas/MedicationFact",
+                "problem": "#/components/schemas/ProblemFact"
+              }
+            }
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "version",
+          "schema_version",
+          "visit_id",
+          "author_id",
+          "source",
+          "clinical_details",
+          "recorded_at",
+          "confirmed_at"
+        ],
+        "title": "ClinicalEntryOut"
+      },
+      "ClinicalEntryWrite": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id"
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "clinician",
+              "patient_report",
+              "legacy_verified"
+            ],
+            "title": "Source"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed",
+            "default": false
+          },
+          "clinical_details": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProblemFact"
+              },
+              {
+                "$ref": "#/components/schemas/MedicationFact"
+              },
+              {
+                "$ref": "#/components/schemas/AllergyFact"
+              },
+              {
+                "$ref": "#/components/schemas/AllergyCheckFact"
+              }
+            ],
+            "title": "Clinical Details",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "allergy": "#/components/schemas/AllergyFact",
+                "allergy_check": "#/components/schemas/AllergyCheckFact",
+                "medication": "#/components/schemas/MedicationFact",
+                "problem": "#/components/schemas/ProblemFact"
+              }
+            }
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "expected_version",
+          "source",
+          "clinical_details"
+        ],
+        "title": "ClinicalEntryWrite"
+      },
       "CommonUpdates": {
         "properties": {
           "payment_type": {
@@ -89536,6 +90448,34 @@
               }
             ],
             "title": "Created At"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "template_revision": {
+            "type": "integer",
+            "title": "Template Revision",
+            "default": 1
+          },
+          "shortcut": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shortcut"
           }
         },
         "type": "object",
@@ -89561,6 +90501,31 @@
             ],
             "title": "Mode",
             "default": "replace"
+          },
+          "shortcut": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shortcut",
+            "description": "Use an empty string to clear the shortcut."
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
           }
         },
         "type": "object",
@@ -91288,6 +92253,19 @@
             "title": "Row Version",
             "description": "Current row version for optimistic locking",
             "default": 0
+          },
+          "expected_patient_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Patient Id",
+            "description": "Patient ID currently selected in the editor"
           },
           "client_session_id": {
             "anyOf": [
@@ -96354,6 +97332,36 @@
         "type": "object",
         "title": "InvoiceUpdate"
       },
+      "IssuePrescription": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id"
+          },
+          "expected_row_version": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Expected Row Version"
+          },
+          "reviewed_text": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewedPrescriptionText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "expected_row_version"
+        ],
+        "title": "IssuePrescription"
+      },
       "JSONLoginRequest": {
         "properties": {
           "username": {
@@ -99281,6 +100289,63 @@
         "title": "LabResultsData",
         "description": "Lab results data for notifications."
       },
+      "LabReviewOut": {
+        "properties": {
+          "reviewer_id": {
+            "type": "integer",
+            "title": "Reviewer Id"
+          },
+          "reviewed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Reviewed At"
+          },
+          "next_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reviewer_id",
+          "reviewed_at",
+          "next_action"
+        ],
+        "title": "LabReviewOut"
+      },
+      "LabReviewRequest": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id"
+          },
+          "next_action": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "LabReviewRequest"
+      },
       "LabServiceContextItemIn": {
         "properties": {
           "service_id": {
@@ -100796,6 +101861,84 @@
         ],
         "title": "MedicalDocumentRequest",
         "description": "Запрос на печать медицинского документа"
+      },
+      "MedicationFact": {
+        "properties": {
+          "event_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event On"
+          },
+          "ended_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended On"
+          },
+          "kind": {
+            "type": "string",
+            "const": "medication",
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "dose": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dose"
+          },
+          "regimen": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 240
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regimen"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "prescribed",
+              "reported",
+              "taking",
+              "stopped"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "name",
+          "status"
+        ],
+        "title": "MedicationFact"
       },
       "MedicationItem": {
         "properties": {
@@ -110666,6 +111809,71 @@
         "title": "PrintTicketRequest",
         "description": "Схема для печати талона"
       },
+      "ProblemFact": {
+        "properties": {
+          "event_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event On"
+          },
+          "ended_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended On"
+          },
+          "kind": {
+            "type": "string",
+            "const": "problem",
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "resolved",
+              "inactive"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "name",
+          "status"
+        ],
+        "title": "ProblemFact"
+      },
       "ProcessRefundRequest": {
         "properties": {
           "action": {
@@ -117723,6 +118931,47 @@
         "title": "RestoreToNextRequest",
         "description": "Запрос на восстановление пациента следующим в очереди"
       },
+      "ReviewedPrescriptionText": {
+        "properties": {
+          "expected_token": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Expected Token"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "doctor_notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_token",
+          "instructions",
+          "doctor_notes"
+        ],
+        "title": "ReviewedPrescriptionText"
+      },
       "RoleCreate": {
         "properties": {
           "name": {
@@ -118496,6 +119745,18 @@
           "end_time"
         ],
         "title": "ScheduleRowOut"
+      },
+      "SectionType": {
+        "type": "string",
+        "enum": [
+          "complaints",
+          "anamnesis",
+          "examination",
+          "treatment",
+          "recommendations"
+        ],
+        "title": "SectionType",
+        "description": "EMR Section types"
       },
       "SecurityConfigResponse": {
         "properties": {
@@ -123045,6 +124306,25 @@
         "type": "object",
         "title": "TemplateDataBase",
         "description": "Base for optional template data passed to notification services.\n\nTemplate data is intentionally a permissive dict (the email/SMS\nservice fills placeholders from it). We cap the size to prevent\nmemory abuse and require string keys.\n\nP0-6a FIX: the original ``field_validator(\"*\")`` only validated\ndeclared fields, not ``extra=\"allow\"`` extras. Added a\n``model_validator(mode=\"before\")`` that walks the raw input dict\nso oversized strings in extras are also rejected."
+      },
+      "TemplateReviewRequest": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "reviewed": {
+            "type": "boolean",
+            "title": "Reviewed",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_revision"
+        ],
+        "title": "TemplateReviewRequest"
       },
       "TestProviderRequest": {
         "properties": {
@@ -129885,6 +131165,684 @@
         },
         "type": "object",
         "title": "WizardSettingsRequest"
+      },
+      "WorkspaceExecution": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "service_name": {
+            "type": "string",
+            "title": "Service Name"
+          },
+          "attempt": {
+            "type": "integer",
+            "title": "Attempt"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "service_name",
+          "attempt",
+          "status"
+        ],
+        "title": "WorkspaceExecution"
+      },
+      "WorkspaceHistoryDocument": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "visit_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Date"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "signed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed At"
+          },
+          "complaints": {
+            "type": "string",
+            "title": "Complaints"
+          },
+          "diagnosis": {
+            "type": "string",
+            "title": "Diagnosis"
+          },
+          "treatment": {
+            "type": "string",
+            "title": "Treatment"
+          },
+          "recommendations": {
+            "type": "string",
+            "title": "Recommendations"
+          },
+          "vitals": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Vitals"
+          },
+          "echo": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Echo"
+          },
+          "laboratory": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceLabValue"
+            },
+            "type": "array",
+            "title": "Laboratory"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "visit_id",
+          "visit_date",
+          "version",
+          "status",
+          "signed_at",
+          "complaints",
+          "diagnosis",
+          "treatment",
+          "recommendations",
+          "vitals",
+          "echo",
+          "data"
+        ],
+        "title": "WorkspaceHistoryDocument"
+      },
+      "WorkspaceHistoryItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "visit_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Date"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "signed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed At"
+          },
+          "complaints": {
+            "type": "string",
+            "title": "Complaints"
+          },
+          "diagnosis": {
+            "type": "string",
+            "title": "Diagnosis"
+          },
+          "treatment": {
+            "type": "string",
+            "title": "Treatment"
+          },
+          "recommendations": {
+            "type": "string",
+            "title": "Recommendations"
+          },
+          "vitals": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Vitals"
+          },
+          "echo": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Echo"
+          },
+          "laboratory": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceLabValue"
+            },
+            "type": "array",
+            "title": "Laboratory"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "visit_id",
+          "visit_date",
+          "version",
+          "status",
+          "signed_at",
+          "complaints",
+          "diagnosis",
+          "treatment",
+          "recommendations",
+          "vitals",
+          "echo"
+        ],
+        "title": "WorkspaceHistoryItem"
+      },
+      "WorkspaceInvoiceStatus": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "WorkspaceInvoiceStatus"
+      },
+      "WorkspaceLabComparison": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Opaque key for an exact template version, field and unit"
+          },
+          "field_key": {
+            "type": "string",
+            "title": "Field Key"
+          },
+          "template_name": {
+            "type": "string",
+            "title": "Template Name"
+          },
+          "template_version": {
+            "type": "integer",
+            "title": "Template Version"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value",
+            "description": "Persisted numeric value from the source lab report"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "field_key",
+          "template_name",
+          "template_version",
+          "value"
+        ],
+        "title": "WorkspaceLabComparison"
+      },
+      "WorkspaceLabOrder": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceLabReport"
+            },
+            "type": "array",
+            "title": "Reports"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "created_at",
+          "reports"
+        ],
+        "title": "WorkspaceLabOrder"
+      },
+      "WorkspaceLabReport": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "template_name": {
+            "type": "string",
+            "title": "Template Name"
+          },
+          "supersedes_instance_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Instance Id"
+          },
+          "finalized_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalized At"
+          },
+          "is_current_final": {
+            "type": "boolean",
+            "title": "Is Current Final"
+          },
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/LabReviewOut"
+            },
+            "type": "array",
+            "title": "Reviews"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "template_name",
+          "supersedes_instance_id",
+          "finalized_at",
+          "is_current_final",
+          "reviews"
+        ],
+        "title": "WorkspaceLabReport"
+      },
+      "WorkspaceLabValue": {
+        "properties": {
+          "instance_id": {
+            "type": "integer",
+            "title": "Instance Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "finalized_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalized At"
+          },
+          "abnormal": {
+            "type": "boolean",
+            "title": "Abnormal"
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceLabComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "instance_id",
+          "name",
+          "value",
+          "unit",
+          "finalized_at",
+          "abnormal"
+        ],
+        "title": "WorkspaceLabValue"
+      },
+      "WorkspaceLabs": {
+        "properties": {
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceLabOrder"
+            },
+            "type": "array",
+            "title": "Orders"
+          },
+          "unlinked_reports": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceLabReport"
+            },
+            "type": "array",
+            "title": "Unlinked Reports"
+          },
+          "executions": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceExecution"
+            },
+            "type": "array",
+            "title": "Executions"
+          },
+          "invoices": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceInvoiceStatus"
+            },
+            "type": "array",
+            "title": "Invoices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "orders",
+          "unlinked_reports",
+          "executions",
+          "invoices"
+        ],
+        "title": "WorkspaceLabs"
+      },
+      "WorkspaceOut": {
+        "properties": {
+          "patient": {
+            "$ref": "#/components/schemas/WorkspacePatient"
+          },
+          "visit": {
+            "$ref": "#/components/schemas/WorkspaceVisit"
+          },
+          "allergy_state": {
+            "type": "string",
+            "enum": [
+              "specific",
+              "none_reported",
+              "unknown",
+              "not_checked"
+            ],
+            "title": "Allergy State"
+          },
+          "clinical_entries": {
+            "items": {
+              "$ref": "#/components/schemas/ClinicalEntryOut"
+            },
+            "type": "array",
+            "title": "Clinical Entries"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceHistoryItem"
+            },
+            "type": "array",
+            "title": "History"
+          },
+          "has_more_history": {
+            "type": "boolean",
+            "title": "Has More History"
+          },
+          "current_laboratory": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceLabValue"
+            },
+            "type": "array",
+            "title": "Current Laboratory"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient",
+          "visit",
+          "allergy_state",
+          "clinical_entries",
+          "history",
+          "has_more_history"
+        ],
+        "title": "WorkspaceOut"
+      },
+      "WorkspacePatient": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "birth_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
+          },
+          "legacy_allergies": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Allergies"
+          },
+          "legacy_conditions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Conditions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "full_name",
+          "birth_date",
+          "legacy_allergies",
+          "legacy_conditions"
+        ],
+        "title": "WorkspacePatient"
+      },
+      "WorkspacePrescription": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "emr_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emr Version"
+          },
+          "is_draft": {
+            "type": "boolean",
+            "title": "Is Draft"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "doctor_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Notes"
+          },
+          "review_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "visit_id",
+          "emr_version",
+          "is_draft"
+        ],
+        "title": "WorkspacePrescription"
+      },
+      "WorkspaceVisit": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "date",
+          "status"
+        ],
+        "title": "WorkspaceVisit"
       },
       "app__api__v1__endpoints__admin_departments___helpers__DepartmentCreate": {
         "properties": {

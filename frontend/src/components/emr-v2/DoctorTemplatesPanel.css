@@ -69,7 +69,7 @@
 .doctor-templates-backdrop {
     position: absolute;
     inset: 0;
-    background: color-mix(in srgb, var(--mac-bg-primary, #0f172a), black 44%);
+    background: color-mix(in srgb, var(--emr-v2-surface-primary, var(--mac-bg-primary, #0f172a)), black 44%);
     backdrop-filter: blur(4px);
 }
 
@@ -311,7 +311,7 @@
 .doctor-templates-edit-overlay {
     position: absolute;
     inset: 0;
-    background: color-mix(in srgb, var(--mac-bg-primary, #0f172a), black 58%);
+    background: color-mix(in srgb, var(--emr-v2-surface-primary, var(--mac-bg-primary, #0f172a)), black 58%);
     display: flex;
     align-items: center;
     justify-content: center;

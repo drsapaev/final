@@ -116,7 +116,7 @@
     justify-content: center;
     border: 1px solid var(--mac-border, #e5e5e5);
     border-radius: 6px;
-    background: var(--mac-bg-primary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
     cursor: pointer;
     font-size: 12px;
     color: #aeaeb2;

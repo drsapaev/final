@@ -72,7 +72,7 @@
 
 /* Content */
 .ai-suggestion-card__content {
-    background: var(--mac-bg-primary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
     border: 1px solid #e0e0e0;
     border-radius: 6px;
     padding: 10px 12px;
@@ -133,13 +133,13 @@
 }
 
 .ai-suggestion-card__dismiss:hover {
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
 }
 
 /* Disclaimer */
 .ai-suggestion-card__disclaimer {
     font-size: 0.65rem;
-    color: var(--mac-text-tertiary);
+    color: var(--emr-v2-text-tertiary, var(--mac-text-tertiary));
     text-align: center;
     font-style: italic;
 }

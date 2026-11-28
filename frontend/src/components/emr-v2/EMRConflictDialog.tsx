@@ -1,27 +1,10 @@
-/**
- * EMRConflictDialog - Conflict resolution UI (for 409 errors)
- * 
- * When conflict detected, user MUST choose:
- * - 🔄 Reload from server (discard local changes)
- * - 🧾 Compare changes (see diff before deciding)
- * - 📝 Create amendment (if EMR is signed)
- * 
- * Forbidden (by design):
- * - Auto-merge
- * - Silent overwrite
- * - "We did it for you"
- * - A "force overwrite" button: the backend deliberately rejects the
- *   row_version=0 bypass for genuine cross-session conflicts (EMR-AUDIT-28
- *   P0-3), so such a button could never deliver what it promises — it only
- *   trapped the doctor in a 409 loop (EMRCONFLICT-FE-002, audit 3886
- *   round 17). The server-protected revision history is the authority.
- * 
- * UX Principle:
- * Nothing happens without a conscious click by the doctor
- */
-
-import './EMRConflictDialog.css';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from '../../i18n/useTranslation';
+import Button from '../ui/macos/Button';
+import Modal from '../ui/macos/Modal';
+import './EMRConflictDialog.css';
+
+const editorShortcuts = new Set(['s', 'ы', 'z', 'я', 'y', 'н', 'enter']);
 
 interface EMRConflictInfo {
     serverVersion?: string | number;
@@ -33,27 +16,13 @@ interface EMRConflictInfo {
 interface EMRConflictDialogProps {
     conflict?: EMRConflictInfo | null;
     isSigned?: boolean;
-    onReload?: () => void;
+    onReload?: () => Promise<unknown>;
     onCompare?: () => void;
     onAmend?: () => void;
     loading?: boolean;
 }
 
-/**
- * EMRConflictDialog Component
- * 
- * @param {Object} props
- * @param {Object} props.conflict - Conflict info from server
- * @param {number} props.conflict.serverVersion - Current server version
- * @param {number} props.conflict.yourVersion - User's version
- * @param {number} props.conflict.lastEditedBy - Who last edited
- * @param {string} props.conflict.lastEditedAt - When last edited
- * @param {boolean} props.isSigned - Is EMR already signed
- * @param {Function} props.onReload - Reload from server callback
- * @param {Function} props.onCompare - Show diff callback
- * @param {Function} props.onAmend - Create amendment callback (signed only)
- * @param {boolean} props.loading - Is action in progress
- */
+/** A 409 conflict stays open until the doctor chooses how to resolve it. */
 export function EMRConflictDialog({
     conflict,
     isSigned = false,
@@ -62,129 +31,97 @@ export function EMRConflictDialog({
     onAmend,
     loading = false,
 }: EMRConflictDialogProps = {}) {
+    const { t, language } = useTranslation();
+    const discardHintId = useId();
+    const actionsRef = useRef<HTMLDivElement>(null);
+    const reloadPending = useRef(false);
+    const [reloadState, setReloadState] = useState<'idle' | 'loading' | 'error'>('idle');
+    const isOpen = Boolean(conflict);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        // Focus the first real action because backdrop dismissal is disabled.
+        const frame = requestAnimationFrame(() => actionsRef.current?.querySelector('button')?.focus());
+        return () => cancelAnimationFrame(frame);
+    }, [isOpen]);
+
     if (!conflict) return null;
 
-    const formatTime = (dateStr?: string) => {
-        if (!dateStr) return '—';
-        return new Date(dateStr).toLocaleString('ru-RU', {
-            hour: '2-digit',
-            minute: '2-digit',
-            day: '2-digit',
-            month: '2-digit',
-        });
-    };
+    const busy = loading || reloadState === 'loading';
+    const lastEdit = new Date(conflict.lastEditedAt ?? '');
+    const date = Number.isNaN(lastEdit.getTime()) ? '' : new Intl.DateTimeFormat(language, {
+        dateStyle: 'medium', timeStyle: 'short',
+    }).format(lastEdit);
+    const canAct = () => !loading && !reloadPending.current;
+
+    async function reload() {
+        if (!onReload || !canAct()) return;
+        reloadPending.current = true;
+        setReloadState('loading');
+        try {
+            const result = await onReload();
+            // The hook returns a loaded record on success, or an outcome
+            // marker when the read was denied or superseded.
+            setReloadState(result && typeof result === 'object' && 'data' in result && result.data ? 'idle' : 'error');
+        } catch {
+            setReloadState('error');
+        } finally {
+            reloadPending.current = false;
+        }
+    }
 
     return (
-        <div className="emr-conflict-overlay">
-            <div className="emr-conflict-dialog">
-                {/* Header */}
-                <div className="emr-conflict-dialog__header">
-                    <span className="emr-conflict-dialog__icon">⚠️</span>
-                    <h2>Конфликт версий</h2>
+        <Modal isOpen title={t('emr_workspace.version_conflict_title')} className="emr-conflict-dialog"
+            closeOnBackdrop={false} closeOnEscape={false} onKeyDown={event => {
+                // Native undo can still reach the previously edited field behind the dialog.
+                if ((event.ctrlKey || event.metaKey) && editorShortcuts.has(event.key.toLowerCase())) {
+                    event.preventDefault();
+                }
+            }}>
+            {busy ? <p key="loading" role="status">{t('emr_workspace.loading')}</p>
+                : reloadState === 'error' ? <p key="error" role="alert" className="emr-conflict-dialog__error">
+                    {t('emr_workspace.version_conflict_reload_error')}
+                </p>
+                : <p>{t('emr_workspace.version_conflict_description')}</p>}
+            <dl className="emr-conflict-dialog__versions">
+                <div>
+                    <dt>{t('emr_workspace.version_conflict_local')}</dt>
+                    <dd>{conflict.yourVersion == null ? '—' : `v${conflict.yourVersion}`}</dd>
                 </div>
-
-                {/* Description */}
-                <div className="emr-conflict-dialog__body">
-                    <p className="emr-conflict-dialog__lead">
-                        Документ был изменён другим пользователем, пока вы работали.
+                <div>
+                    <dt>{t('emr_workspace.version_conflict_server')}</dt>
+                    <dd>{conflict.serverVersion == null ? '—' : `v${conflict.serverVersion}`}</dd>
+                </div>
+                {date && <div>
+                    <dt>{t('emr_workspace.version_conflict_edited_at')}</dt>
+                    <dd>{date}</dd>
+                </div>}
+                {conflict.lastEditedBy != null && conflict.lastEditedBy > 0 && <div>
+                    <dt>{t('emr_workspace.version_conflict_edited_by')}</dt>
+                    <dd>№{conflict.lastEditedBy}</dd>
+                </div>}
+            </dl>
+            <div className="emr-conflict-dialog__actions" ref={actionsRef}>
+                {onCompare && <Button type="button" variant="primary" aria-disabled={busy}
+                    onClick={() => { if (canAct()) onCompare(); }}>
+                    {t('emr_workspace.version_conflict_compare')}
+                </Button>}
+                {onReload && <>
+                    <Button type="button" variant="secondary" aria-disabled={busy} aria-describedby={discardHintId}
+                        onClick={() => void reload()}>
+                        {t('emr_workspace.version_conflict_reload')}
+                    </Button>
+                    <p id={discardHintId} className="emr-conflict-dialog__hint">
+                        {t('emr_workspace.version_conflict_discard')}
                     </p>
-
-                    {/* Version info */}
-                    <div className="emr-conflict-dialog__info">
-                        <div className="emr-conflict-dialog__info-row">
-                            <span className="emr-conflict-dialog__info-label">Ваша версия:</span>
-                            <span className="emr-conflict-dialog__info-value">
-                                v{conflict.yourVersion}
-                            </span>
-                        </div>
-                        <div className="emr-conflict-dialog__info-row">
-                            <span className="emr-conflict-dialog__info-label">Версия на сервере:</span>
-                            <span className="emr-conflict-dialog__info-value emr-conflict-dialog__info-value--new">
-                                v{conflict.serverVersion}
-                            </span>
-                        </div>
-                        {conflict.lastEditedAt && (
-                            <div className="emr-conflict-dialog__info-row">
-                                <span className="emr-conflict-dialog__info-label">Изменено:</span>
-                                <span className="emr-conflict-dialog__info-value">
-                                    {formatTime(conflict.lastEditedAt)}
-                                </span>
-                            </div>
-                        )}
-                        {conflict.lastEditedBy !== undefined && conflict.lastEditedBy > 0 && (
-                            <div className="emr-conflict-dialog__info-row">
-                                <span className="emr-conflict-dialog__info-label">Кем:</span>
-                                <span className="emr-conflict-dialog__info-value">
-                                    Пользователь #{conflict.lastEditedBy}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Warning */}
-                    <div className="emr-conflict-dialog__warning">
-                        ⚡ Ваши несохранённые изменения могут быть потеряны.
-                    </div>
-                </div>
-
-                {/* Primary Actions */}
-                <div className="emr-conflict-dialog__actions">
-                    {/* Compare - always recommended first */}
-                    <button
-                        className="emr-conflict-btn emr-conflict-btn--primary"
-                        onClick={onCompare}
-                        disabled={loading}
-                    >
-                        🧾 Сравнить изменения
-                    </button>
-
-                    {/* Reload from server */}
-                    <button
-                        className="emr-conflict-btn emr-conflict-btn--secondary"
-                        onClick={onReload}
-                        disabled={loading}
-                    >
-                        🔄 Загрузить новую версию
-                        <span className="emr-conflict-btn__hint">
-                            (мои изменения будут потеряны)
-                        </span>
-                    </button>
-
-                    {/* Amendment option (only for signed EMRs) */}
-                    {isSigned && onAmend && (
-                        <button
-                            className="emr-conflict-btn emr-conflict-btn--warning"
-                            onClick={onAmend}
-                            disabled={loading}
-                        >
-                            📝 Создать поправку
-                            <span className="emr-conflict-btn__hint">
-                                (сохранить как amendment)
-                            </span>
-                        </button>
-                    )}
-                </div>
-
-                {/* Advanced info (hidden by default) */}
-                <div className="emr-conflict-dialog__advanced">
-                    <p className="emr-conflict-dialog__advanced-warning">
-                        Принудительная перезапись чужих изменений отключена: сервер
-                        защищает историю клинических версий и отклоняет запись по
-                        устаревшей версии (409). Ваши правки можно перенести вручную
-                        после загрузки новой версии или оформить поправкой.
-                    </p>
-                </div>
-
-                {/* Loading indicator */}
-                {loading && (
-                    <div className="emr-conflict-dialog__loading">
-                        Обработка...
-                    </div>
-                )}
+                </>}
+                {isSigned && onAmend && <Button type="button" variant="secondary" aria-disabled={busy}
+                    onClick={() => { if (canAct()) onAmend(); }}>
+                    {t('misc.emr_amend')}
+                </Button>}
             </div>
-        </div>
+        </Modal>
     );
 }
-
 
 export default EMRConflictDialog;

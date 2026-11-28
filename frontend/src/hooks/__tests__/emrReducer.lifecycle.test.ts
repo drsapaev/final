@@ -136,3 +136,16 @@ describe('EMRSAVE/EMRSIGN action contract (regression guards)', () => {
         expect((action as { payload: { resolution: string } }).payload.resolution).toBe('discard');
     });
 });
+
+it('undoes reviewed template text and provenance in a single edit', () => {
+    const state = { ...initialState, data: { recommendations: 'SYNTHETIC manual text' } };
+    const next = emrReducer(state, emrActions.setField(
+        'recommendations', 'SYNTHETIC manual text\nSYNTHETIC reviewed text', {
+            source: 'section_template', templateId: 'SYNTHETIC-template', templateRevision: 3,
+        },
+    ));
+    expect(next.data.content_sources).toEqual([
+        expect.objectContaining({ field: 'recommendations', template_id: 'SYNTHETIC-template', template_revision: 3 }),
+    ]);
+    expect(emrReducer(next, emrActions.undo()).data).toEqual(state.data);
+});

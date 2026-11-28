@@ -1,0 +1,117 @@
+<style>
+#emr-concept{--em-bg:light-dark(#f4f5f7,#202226);--em-panel:light-dark(#ffffff,#292c31);--em-ink:light-dark(#202733,#f0f2f6);--em-sub:light-dark(#5d6877,#b7bfcb);--em-line:light-dark(#dce1e8,#414650);--em-blue:light-dark(#235caa,#a8caff);--em-soft:light-dark(#eaf1fa,#293e58);--em-warm:light-dark(#83540a,#f0c780);--em-warm-bg:light-dark(#fff5de,#463b25);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--em-ink);background:var(--em-bg);border:1px solid var(--em-line);border-radius:16px;overflow:clip;width:100%;box-sizing:border-box}
+#emr-concept *{box-sizing:border-box}#emr-concept [hidden]{display:none!important}
+#emr-concept h2,#emr-concept h3,#emr-concept p{margin:0}#emr-concept h2{font-size:19px;font-weight:600;letter-spacing:-.3px}#emr-concept h3{font-size:14px;font-weight:600}#emr-concept button,#emr-concept input,#emr-concept textarea,#emr-concept select{font:inherit;color:inherit}#emr-concept button{border:1px solid var(--em-line);border-radius:8px;padding:7px 11px;background:var(--em-panel);min-height:34px;white-space:normal}#emr-concept button:hover{background:var(--em-soft)}#emr-concept button:disabled{opacity:.52}#emr-concept .em-primary{color:light-dark(#fff,#17283f);background:light-dark(#265fae,#a8caff);border-color:transparent}#emr-concept .em-primary:hover{background:light-dark(#1d4f95,#b9d5ff)}#emr-concept .em-plain{border-color:transparent;background:transparent;color:var(--em-blue);padding:5px 0}
+#emr-concept .em-toolbar{padding:13px 110px 13px 20px;border-bottom:1px solid var(--em-line);display:flex;align-items:center;flex-wrap:wrap;gap:10px;background:var(--em-panel)}#emr-concept .em-title{font-weight:600}#emr-concept .em-demo{font-size:12px;color:var(--em-warm);background:var(--em-warm-bg);padding:3px 8px;border-radius:6px}#emr-concept .em-patient{padding:17px 20px;display:flex;justify-content:space-between;gap:12px;align-items:center;background:var(--em-panel);border-bottom:1px solid var(--em-line)}#emr-concept .em-sub{font-size:12px;color:var(--em-sub)}#emr-concept .em-patient-meta{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px}#emr-concept .em-date{text-align:right;flex-shrink:0}
+#emr-concept .em-workspace{display:grid;grid-template-columns:245px minmax(0,1fr)}#emr-concept .em-sidebar{padding:18px;border-right:1px solid var(--em-line)}#emr-concept .em-sidebar section+section{margin-top:18px;padding-top:17px;border-top:1px solid var(--em-line)}#emr-concept .em-sidebar h3{margin-bottom:8px}#emr-concept .em-fact{margin-top:7px}#emr-concept .em-fact span{display:block}#emr-concept .em-history-date{font-size:12px;color:var(--em-sub);margin-bottom:8px}#emr-concept .em-history-check{display:flex;gap:8px;align-items:flex-start;margin:8px 0 10px;font-size:13px}#emr-concept input[type=checkbox]{margin:3px 0 0;width:16px;height:16px;flex:0 0 16px;accent-color:var(--em-blue)}#emr-concept .em-mini-table{width:100%;border-collapse:collapse;margin-top:9px;font-size:12px}#emr-concept .em-mini-table td{padding:6px 0;border-bottom:1px solid var(--em-line)}#emr-concept .em-mini-table td:last-child{text-align:right;font-variant-numeric:tabular-nums}#emr-concept summary{color:var(--em-blue);font-weight:500;min-height:32px;padding-top:5px}
+#emr-concept .em-editor{padding:18px 20px;background:var(--em-panel);min-width:0}#emr-concept .em-editor-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:15px;flex-wrap:wrap}#emr-concept .em-segment{display:flex;gap:3px;background:var(--em-bg);border-radius:9px;padding:3px}#emr-concept .em-segment button{background:transparent;border-color:transparent;min-height:30px;padding:4px 10px;font-size:12px}#emr-concept .em-segment button[aria-pressed=true]{background:var(--em-panel);border-color:var(--em-line)}#emr-concept .em-field{display:block;min-width:0}#emr-concept .em-field>span:first-child{display:block;font-weight:500;margin-bottom:5px}#emr-concept textarea,#emr-concept input[type=text],#emr-concept input[type=number],#emr-concept select{width:100%;border:1px solid var(--em-line);background:var(--em-panel);border-radius:8px;padding:8px 10px;min-width:0}#emr-concept textarea{resize:vertical;min-height:60px;display:block}#emr-concept textarea::placeholder,#emr-concept input::placeholder{color:var(--em-sub);opacity:.85}#emr-concept .em-block+.em-block{margin-top:13px}#emr-concept .em-mode-block{margin-top:9px}#emr-concept .em-mode-block textarea{min-height:48px}#emr-concept .em-vitals{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:8px}#emr-concept .em-vitals label{font-size:12px}#emr-concept .em-section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px}#emr-concept .em-section-head button{font-size:12px;min-height:28px;padding:3px 7px}#emr-concept .em-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}#emr-concept .em-import{padding:10px;background:var(--em-warm-bg);border-radius:9px;margin-top:10px}#emr-concept .em-import textarea{margin-top:7px;min-height:52px}#emr-concept .em-import .em-history-check{margin-bottom:0}#emr-concept .em-import-status{color:var(--em-warm);font-size:12px}#emr-concept .em-order-controls{display:flex;align-items:end;gap:8px;margin-top:7px}#emr-concept .em-order-controls .em-field{flex:1}#emr-concept .em-order-list{list-style:none;padding:0;margin:8px 0 0}#emr-concept .em-order-list li{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--em-line);padding:5px 0;font-size:12px}#emr-concept .em-order-list button{font-size:12px;padding:3px 7px;min-height:28px}#emr-concept .em-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border-top:1px solid var(--em-line);margin-top:15px;padding-top:12px}#emr-concept .em-feedback{font-size:12px;color:var(--em-sub);min-height:18px;margin-top:8px}#emr-concept .em-preview{margin-top:14px;padding:16px;border:1px solid var(--em-line);border-radius:10px;background:var(--em-bg)}#emr-concept .em-preview h3{margin:12px 0 3px}#emr-concept .em-preview p{white-space:pre-wrap;overflow-wrap:anywhere}#emr-concept .em-preview h3:first-child{margin-top:0}
+@media(max-width:650px){#emr-concept .em-workspace{grid-template-columns:1fr}#emr-concept .em-sidebar{border-right:0;border-bottom:1px solid var(--em-line);padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}#emr-concept .em-sidebar section+section{margin:0;padding:0;border:0}#emr-concept .em-sidebar section:last-child{grid-column:1/-1}#emr-concept .em-patient{align-items:flex-start;padding:14px 16px}#emr-concept .em-date{font-size:12px}#emr-concept .em-editor{padding:16px}#emr-concept .em-toolbar{padding-left:16px}#emr-concept .em-two{grid-template-columns:1fr}#emr-concept .em-vitals{gap:6px}#emr-concept .em-vitals input{padding:8px}#emr-concept h2{font-size:18px}}
+@media(pointer:coarse){#emr-concept button,#emr-concept summary{min-height:44px}#emr-concept input[type=text],#emr-concept input[type=number],#emr-concept textarea,#emr-concept select{font-size:16px;min-height:44px}#emr-concept .em-history-check{min-height:44px;align-items:center}#emr-concept .em-segment button,#emr-concept .em-section-head button,#emr-concept .em-order-list button{min-height:44px}}
+</style>
+<div id="emr-concept">
+  <div class="em-toolbar"><span class="em-title">ЭМК · Пример</span><span class="em-demo">Вымышленный пациент</span></div>
+  <header class="em-patient">
+    <div><h2>Демо Пациент</h2><div class="em-patient-meta em-sub"><span>12.03.1971 · 55 лет</span><span>Карта DEMO-001</span></div></div>
+    <div class="em-date"><div>23.11.2026</div><div class="em-sub">Кардиология</div></div>
+  </header>
+  <div class="em-workspace">
+    <aside class="em-sidebar" aria-label="Контекст пациента">
+      <section><h3>Важное к приёму</h3><div class="em-fact"><span>Аллергии</span><span class="em-sub">Не уточнены</span></div><div class="em-fact"><span>Текущие препараты</span><span class="em-sub">Требуют сверки</span></div></section>
+      <section><h3>Прошлый анамнез</h3><div class="em-history-date">Источник: приём 12.08.2026</div><label class="em-history-check"><input id="em-history-choice" type="checkbox"><span>Наблюдается у кардиолога с 2023 года.</span></label><button id="em-import-button" class="cursor-interaction" type="button">Перенести выбранное</button></section>
+      <section><details><summary class="cursor-interaction">Прошлые результаты</summary><div class="em-sub">12.08.2026 · демонстрационные данные</div><table class="em-mini-table"><tbody><tr><td>АД, мм рт. ст.</td><td>138/84</td></tr><tr><td>Пульс, уд/мин</td><td>72</td></tr><tr><td>ЭхоКГ · ФВ ЛЖ</td><td>61%</td></tr></tbody></table></details></section>
+    </aside>
+    <main class="em-editor">
+      <div class="em-editor-top"><h3>Текущий приём</h3><div class="em-segment" role="group" aria-label="Тип приёма"><button id="em-first" type="button" class="cursor-interaction" aria-pressed="false">Первичный</button><button id="em-follow" type="button" class="cursor-interaction" aria-pressed="true">Повторный</button></div></div>
+      <div class="em-block"><label class="em-field"><span id="em-complaint-label">Жалобы и динамика</span><textarea id="em-complaint" rows="2" placeholder="Что беспокоит пациента сегодня?"></textarea></label>
+        <div id="em-first-fields" class="em-mode-block" hidden><label class="em-field"><span>Начало и течение заболевания</span><textarea id="em-onset" rows="2" placeholder="Уточните анамнез заболевания"></textarea></label></div>
+        <div id="em-follow-fields" class="em-mode-block"><label class="em-field"><span>После прошлого приёма</span><textarea id="em-changes" rows="2" placeholder="Изменения симптомов, обследования, переносимость"></textarea></label></div>
+        <div id="em-import-area" class="em-import" hidden><div class="em-section-head"><span class="em-import-status" id="em-import-status">Из записи 12.08.2026 · не проверено</span><button id="em-remove-import" type="button" class="cursor-interaction">Убрать</button></div><label class="em-field"><span class="em-sub">Перенесённый анамнез</span><textarea id="em-import-text" rows="2"></textarea></label><label class="em-history-check"><input id="em-verified" type="checkbox"><span>Сверено с пациентом сегодня</span></label></div>
+      </div>
+      <section class="em-block"><div class="em-section-head"><h3>Измерения сегодня</h3><span class="em-sub">23.11.2026</span></div><div class="em-vitals"><label class="em-field"><span>САД, мм рт. ст.</span><input id="em-sbp" type="number" inputmode="numeric" min="1" step="1" placeholder="—"></label><label class="em-field"><span>ДАД, мм рт. ст.</span><input id="em-dbp" type="number" inputmode="numeric" min="1" step="1" placeholder="—"></label><label class="em-field"><span>Пульс, уд/мин</span><input id="em-pulse" type="number" inputmode="numeric" min="1" step="1" placeholder="—"></label></div></section>
+      <section class="em-block"><div class="em-section-head"><h3><label for="em-exam">Осмотр сегодня</label></h3><div><button id="em-exam-phrase" type="button" class="cursor-interaction">Добавить «Отёков нет»</button> <button id="em-undo-exam" type="button" class="cursor-interaction" hidden>Отменить</button></div></div><textarea id="em-exam" rows="2" placeholder="Только то, что вы проверили при осмотре"></textarea></section>
+      <div class="em-block em-two"><label class="em-field"><span>Диагноз / клиническая оценка</span><textarea id="em-assessment" rows="2" placeholder="Ваше заключение"></textarea></label><label class="em-field"><span>План и рекомендации</span><textarea id="em-plan" rows="2" placeholder="Ваш план дальнейших действий"></textarea></label></div>
+      <section class="em-block"><div class="em-order-controls"><label class="em-field"><span>Исследование</span><select id="em-test"><option value="ЭКГ">ЭКГ</option><option value="ЭхоКГ">ЭхоКГ</option></select></label><button id="em-add-test" type="button" class="cursor-interaction">В черновик</button></div><ul id="em-orders" class="em-order-list" aria-label="Черновики назначений"></ul></section>
+      <div class="em-bottom"><span class="em-sub">Демонстрация · данные не отправляются</span><button id="em-preview-button" type="button" class="em-primary cursor-interaction" aria-expanded="false" aria-controls="em-preview">Предпросмотр</button></div>
+      <div id="em-feedback" class="em-feedback" aria-live="polite">Ввод сохраняется при переключении типа приёма.</div>
+      <section id="em-preview" class="em-preview" aria-label="Предпросмотр записи" hidden><div class="em-section-head"><h3>Предпросмотр · черновик</h3><button id="em-close-preview" class="cursor-interaction" type="button">Закрыть</button></div><div id="em-preview-content"></div></section>
+    </main>
+  </div>
+</div>
+<script>
+(()=>{
+  const root=document.getElementById('emr-concept');
+  if(!root)return;
+  const el=id=>root.querySelector('#'+id);
+  let mode='follow';
+  let previousExam=null;
+  const orders=[];
+  const say=text=>{el('em-feedback').textContent=text;};
+  function setMode(next){
+    mode=next;
+    el('em-first').setAttribute('aria-pressed',String(mode==='first'));
+    el('em-follow').setAttribute('aria-pressed',String(mode==='follow'));
+    el('em-first-fields').hidden=mode!=='first';
+    el('em-follow-fields').hidden=mode!=='follow';
+    el('em-complaint-label').textContent=mode==='first'?'Жалобы':'Жалобы и динамика';
+    say('Тип приёма изменён. Введённый текст сохранён в этой демонстрации.');
+    updatePreview();
+  }
+  el('em-first').addEventListener('click',()=>setMode('first'));
+  el('em-follow').addEventListener('click',()=>setMode('follow'));
+  el('em-import-button').addEventListener('click',()=>{
+    if(!el('em-history-choice').checked){say('Сначала выберите строку прошлого анамнеза.');return;}
+    if(!el('em-import-area').hidden){say('Анамнез уже перенесён. Его можно отредактировать и сверить.');return;}
+    el('em-import-area').hidden=false;
+    el('em-import-text').value='Наблюдается у кардиолога с 2023 года.';
+    el('em-verified').checked=false;
+    syncVerification();say('Перенесён только выбранный анамнез от 12.08.2026.');updatePreview();
+  });
+  function syncVerification(){el('em-import-status').textContent='Из записи 12.08.2026 · '+(el('em-verified').checked?'сверено сегодня':'не проверено');}
+  el('em-verified').addEventListener('change',()=>{syncVerification();updatePreview();});
+  el('em-import-text').addEventListener('input',()=>{el('em-verified').checked=false;syncVerification();});
+  el('em-remove-import').addEventListener('click',()=>{el('em-import-area').hidden=true;el('em-verified').checked=false;say('Перенесённый анамнез убран из текущей записи.');updatePreview();});
+  el('em-exam-phrase').addEventListener('click',()=>{
+    const field=el('em-exam');previousExam=field.value;
+    field.value=field.value.trim()?(field.value.trim()+'\nПериферических отёков нет.'):'Периферических отёков нет.';
+    el('em-undo-exam').hidden=false;say('Фраза добавлена по вашему выбору. Можно отменить вставку.');updatePreview();
+  });
+  el('em-undo-exam').addEventListener('click',()=>{if(previousExam===null)return;el('em-exam').value=previousExam;previousExam=null;el('em-undo-exam').hidden=true;say('Вставка отменена.');updatePreview();});
+  el('em-exam').addEventListener('input',()=>{previousExam=null;el('em-undo-exam').hidden=true;});
+  function drawOrders(){
+    const list=el('em-orders');list.replaceChildren();
+    orders.forEach(name=>{
+      const row=document.createElement('li');const text=document.createElement('span');text.textContent=name+' · Черновик назначения';
+      const remove=document.createElement('button');remove.type='button';remove.className='cursor-interaction';remove.textContent='Убрать';remove.setAttribute('aria-label','Убрать '+name);
+      remove.addEventListener('click',()=>{orders.splice(orders.indexOf(name),1);drawOrders();say(name+' убрано из черновика.');updatePreview();});row.append(text,remove);list.append(row);
+    });
+  }
+  el('em-add-test').addEventListener('click',()=>{
+    const name=el('em-test').value;
+    if(orders.includes(name)){say(name+' уже добавлено в черновик.');return;}
+    orders.push(name);drawOrders();say(name+' добавлено в локальный черновик назначения.');updatePreview();
+  });
+  function updatePreview(){
+    if(el('em-preview').hidden)return;
+    const content=el('em-preview-content');content.replaceChildren();
+    const add=(heading,text)=>{if(!text.trim())return;const h=document.createElement('h3');h.textContent=heading;const p=document.createElement('p');p.textContent=text;content.append(h,p);};
+    const val=id=>el(id).value.trim();
+    add('Клиническая оценка',val('em-assessment'));
+    add('План и рекомендации',val('em-plan'));
+    if(orders.length)add('Черновики назначений',orders.join(', ')+'.');
+    add(mode==='first'?'Жалобы':'Жалобы и динамика',val('em-complaint'));
+    if(mode==='first')add('Начало и течение заболевания',val('em-onset'));
+    if(mode==='follow')add('После прошлого приёма',val('em-changes'));
+    if(!el('em-import-area').hidden)add('Анамнез · источник 12.08.2026'+(el('em-verified').checked?' · сверено сегодня':' · требует проверки'),val('em-import-text'));
+    const vitals=[];
+    if(val('em-sbp'))vitals.push('САД '+val('em-sbp')+' мм рт. ст.');
+    if(val('em-dbp'))vitals.push('ДАД '+val('em-dbp')+' мм рт. ст.');
+    if(val('em-pulse'))vitals.push('Пульс '+val('em-pulse')+' уд/мин');
+    if(vitals.length)add('Измерения · 23.11.2026',vitals.join('; ')+'.');
+    add('Осмотр · 23.11.2026',val('em-exam'));
+    if(!content.childNodes.length){const p=document.createElement('p');p.textContent='Пока нет заполненных клинических данных.';content.append(p);}
+  }
+  el('em-preview-button').addEventListener('click',()=>{el('em-preview').hidden=!el('em-preview').hidden;el('em-preview-button').setAttribute('aria-expanded',String(!el('em-preview').hidden));updatePreview();say(el('em-preview').hidden?'Предпросмотр закрыт.':'Предпросмотр содержит только введённые или выбранные вами данные.');});
+  el('em-close-preview').addEventListener('click',()=>{el('em-preview').hidden=true;el('em-preview-button').setAttribute('aria-expanded','false');el('em-preview-button').focus();});
+  root.addEventListener('input',updatePreview);
+})();
+</script>

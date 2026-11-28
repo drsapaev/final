@@ -6,7 +6,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_db, require_active_roles, require_roles
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, is_doctor_role_spelling
 from app.models.clinic import Doctor
 from app.models.lab import FINAL_INSTANCE_STATUSES
 from app.models.visit import Visit
@@ -41,6 +42,10 @@ from app.services.lab_reporting_service import (
 )
 
 router = APIRouter(prefix="/lab", tags=["lab-reporting"])
+
+require_lab_workspace_staff = require_active_roles(
+    "Admin", "Lab", *DOCTOR_FAMILY_GATE_ROLES
+)
 
 
 def _handle_domain_error(exc: LabReportingDomainError) -> None:
@@ -399,7 +404,7 @@ analyte_code: str | None = Query(default=None, max_length=64),
 def list_lab_templates(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
     offset: int = Query(default=0, ge=0, description="Смещение"),
 db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab", "Doctor")),
+    user=Depends(require_lab_workspace_staff),
 ):
     service = LabReportingService(db)
     return [_template_summary_out(template) for template in service.list_templates()]
@@ -556,11 +561,11 @@ def list_lab_report_instances(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab", "Doctor")),
+    user=Depends(require_lab_workspace_staff),
 ):
     service = LabReportingService(db)
     scoped_visit_ids = visit_ids
-    if getattr(user, "role", None) == "Doctor" and not getattr(
+    if is_doctor_role_spelling(user.role) and not getattr(
         user, "is_superuser", False
     ):
         scoped_visit_ids = _doctor_allowed_visit_ids(
@@ -705,7 +710,7 @@ def mark_lab_report_printed(
 def download_lab_report_pdf(
     instance_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab", "Doctor")),
+    user=Depends(require_lab_workspace_staff),
 ):
     service = LabReportingService(db)
     try:
@@ -883,7 +888,7 @@ class LabOrderResponse(PydBaseModel):
 def create_lab_order(
     payload: LabOrderCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Doctor", "Lab")),
+    user=Depends(require_lab_workspace_staff),
 ):
     """
     Create a lab order from a doctor panel.
@@ -898,12 +903,28 @@ def create_lab_order(
         if not template:
             raise HTTPException(status_code=404, detail="Шаблон не найден")
 
-        if user.role not in ("Admin", "Lab") and payload.visit_id:
-            visit = db.query(Visit).filter(Visit.id == payload.visit_id).first()
+        if is_doctor_role_spelling(user.role):
+            if payload.visit_id is None:
+                raise HTTPException(
+                    status_code=422, detail="Для назначения анализа требуется визит"
+                )
+            doctor = (
+                db.query(Doctor)
+                .filter(Doctor.user_id == user.id, Doctor.active.is_(True))
+                .first()
+            )
+            if not doctor:
+                raise HTTPException(status_code=403, detail="Нет доступа к этому визиту")
+            visit = (
+                db.query(Visit)
+                .filter(Visit.id == payload.visit_id)
+                .populate_existing()
+                .with_for_update(of=Visit)
+                .one_or_none()
+            )
             if not visit:
                 raise HTTPException(status_code=404, detail="Визит не найден")
-            doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
-            if doctor and visit.doctor_id != doctor.id:
+            if visit.doctor_id != doctor.id:
                 raise HTTPException(status_code=403, detail="Нет доступа к этому визиту")
 
         # LabReportTemplate has no stored published_version_id attribute;

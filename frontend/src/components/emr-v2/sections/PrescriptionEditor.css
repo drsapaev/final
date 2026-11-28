@@ -71,7 +71,7 @@
     border: none;
     cursor: pointer;
     padding: 4px;
-    color: var(--mac-text-tertiary, #aeaeb2);
+    color: var(--emr-v2-text-tertiary, var(--mac-text-tertiary, #aeaeb2));
     border-radius: 4px;
     transition: color 0.1s;
 }

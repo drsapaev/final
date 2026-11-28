@@ -13,7 +13,7 @@
     align-items: center;
     gap: 6px;
     padding: 8px 14px;
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     border: 1px solid #ddd;
     border-radius: 8px;
     font-size: 0.85rem;
@@ -43,7 +43,7 @@
     right: 0;
     margin-top: 8px;
     width: 320px;
-    background: var(--mac-bg-primary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
     border: 1px solid #ddd;
     border-radius: 10px;
     box-shadow: 0 8px 30px color-mix(in srgb, black, transparent 85%);

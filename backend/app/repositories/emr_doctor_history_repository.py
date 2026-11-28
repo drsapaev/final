@@ -6,6 +6,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.models.emr_v2 import EMRRecord
+from app.models.visit import Visit
 
 
 class EMRDoctorHistoryRepository:
@@ -21,7 +22,8 @@ class EMRDoctorHistoryRepository:
         specialty: str,
         limit: int,
     ) -> list[EMRRecord]:
-        query = self.db.query(EMRRecord).filter(
+        query = self.db.query(EMRRecord).join(Visit, Visit.id == EMRRecord.visit_id).filter(
+            EMRRecord.patient_id == Visit.patient_id,
             EMRRecord.created_by == doctor_id,
             EMRRecord.is_active == True,
             EMRRecord.status.in_(["in_progress", "signed", "amended"]),

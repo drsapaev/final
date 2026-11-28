@@ -863,12 +863,9 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     });
   });
 
-  // --- Surface 5/5: EMR (doctor panel visit view → EMRContainerV2). No data
-  // table on this screen (form sections) — nothing to wire sticky headers on;
-  // the baseline locks the zero-delta invariant for the screen. The EMR GET
-  // is mocked 404 → the canonical "new visit draft" state (the same path
-  // production takes for a first visit).
-  test('PR-UI-12-4 EMR screen — dermatology visit view (zero-delta lock, no tables)', async ({ page }) => {
+  // The first-visit draft uses the workspace patient identity and empty longitudinal data.
+  test('PR-UI-12-4 EMR screen — dermatology visit workspace', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
     await installAuth(page, doctorProfile);
     const dermaQueueEntry = {
       id: 1001,
@@ -928,6 +925,46 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
       // 200 would need the full section schema; the draft path is production
       // behavior for a first visit).
       if (pathname === '/api/v1/v2/emr/501') { await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ detail: 'not found' }) }); return; }
+      if (pathname === '/api/v1/v2/emr/501/workspace') {
+        await route.fulfill(jsonResponse({
+          patient: { id: 101, full_name: 'SYNTHETIC-EMR', birth_date: '1990-02-12', legacy_allergies: null, legacy_conditions: null },
+          visit: { id: 501, date: '2026-08-29', status: 'open' },
+          allergy_state: 'not_checked',
+          clinical_entries: [],
+          history: [{
+            id: 499,
+            visit_id: 499,
+            version: 2,
+            visit_date: '2026-08-01',
+            signed_at: '2026-08-01T08:00:00+05:00',
+            status: 'signed',
+            complaints: 'SYNTHETIC-PRIOR-COMPLAINT',
+            diagnosis: 'SYNTHETIC-PRIOR-DIAGNOSIS',
+            treatment: 'SYNTHETIC-PRIOR-PLAN',
+            recommendations: 'SYNTHETIC-PRIOR-RECOMMENDATION',
+            vitals: {},
+            echo: {},
+            laboratory: [{
+              instance_id: 9001,
+              name: 'SYNTHETIC-LAB-RESULT',
+              value: '4.8',
+              unit: 'mmol/L',
+              finalized_at: '2026-08-01T08:30:00+05:00',
+              abnormal: false,
+            }],
+          }],
+          has_more_history: false,
+        }));
+        return;
+      }
+      if (pathname === '/api/v1/v2/emr/501/workspace/labs') {
+        await route.fulfill(jsonResponse({ orders: [], unlinked_reports: [], executions: [], invoices: [] }));
+        return;
+      }
+      if (pathname === '/api/v1/v2/emr/501/workspace/prescription') {
+        await route.fulfill(jsonResponse(null));
+        return;
+      }
       if (pathname === '/api/v1/derma/examinations') { await route.fulfill(jsonResponse({ items: [], total: 0, page: 1, size: 20, pages: 0 })); return; }
       if (pathname === '/api/v1/derma/procedures') { await route.fulfill(jsonResponse({ items: [], total: 0, page: 1, size: 20, pages: 0 })); return; }
       if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
@@ -937,12 +974,203 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     // Deep link: visitId opens the visit tab and resolves the patient from
     // the mocked derma queue (URL resolution in DermatologistPanelUnified).
     await page.goto('/doctor/dermatology?visitId=501&patientId=101');
-    await page.locator('.emr-v2-container').first().waitFor({ state: 'visible', timeout: 20000 });
-    await page.waitForTimeout(500);
+    const editor = page.locator('.emr-v2-container');
+    const identity = editor.getByRole('heading', { name: 'SYNTHETIC-EMR', exact: true });
+    await expect(identity).toBeVisible({ timeout: 20000 });
+    await expect(editor.getByRole('heading', { name: 'Текущий приём', exact: true })).toBeVisible();
+    await expect(editor.getByText('Возраст: 36')).toBeVisible();
+    await expect(editor.getByText('Специальность: Дерматология')).toBeVisible();
+    await editor.evaluate(element => element.scrollIntoView({ block: 'start', inline: 'nearest' }));
+    await expect(identity).toBeInViewport();
+    await expect(editor.getByRole('heading', { name: 'Клиническая сводка', exact: true })).toBeInViewport();
+    const summaryBox = await editor.locator('.emr-workspace-sidebar').boundingBox();
+    const sectionsBox = await editor.locator('.emr-v2-sections').boundingBox();
+    if (!summaryBox || !sectionsBox) throw new Error('EMR columns have no layout bounds');
+    expect(summaryBox.x + summaryBox.width).toBeLessThanOrEqual(sectionsBox.x + 1);
+    const summaryShare = summaryBox.width / (summaryBox.width + sectionsBox.width);
+    expect(summaryShare).toBeGreaterThanOrEqual(0.18);
+    expect(summaryShare).toBeLessThanOrEqual(0.25);
+    await expect(editor.getByRole('button', { name: 'Первичный', exact: true })).toBeVisible();
+    await expect(editor.getByRole('button', { name: 'Повторный', exact: true })).toBeVisible();
+    const visitHeadingBounds = await editor.getByRole('heading', { name: 'Текущий приём', exact: true }).boundingBox();
+    const visitModeBounds = await editor.locator('.emr-workspace-visit-mode').boundingBox();
+    if (!visitHeadingBounds || !visitModeBounds) throw new Error('Visit heading or mode selector has no layout bounds');
+    expect(Math.abs(visitHeadingBounds.y - visitModeBounds.y)).toBeLessThan(5);
+    const vitals = editor.getByRole('region', { name: 'Показатели текущего приёма' });
+    await expect(vitals).toBeInViewport();
+    await expect(vitals.getByRole('spinbutton', { name: 'Пульс', exact: true })).toHaveValue('');
+    await expect(vitals.getByRole('textbox', { name: 'Частота дыхания', exact: true })).toHaveValue('');
+    await expect(vitals.getByRole('textbox', { name: 'Температура', exact: true })).toHaveValue('');
 
-    await expect(page.locator('.emr-v2-container').first()).toHaveScreenshot('pr124-emr-screen.png', {
+    // Capture the visible editor, where the identity, vitals and summary are rendered.
+    const bounds = await editor.boundingBox();
+    if (!bounds) throw new Error('EMR editor has no layout bounds');
+    await expect(page).toHaveScreenshot('pr124-emr-screen.png', {
+      clip: {
+        x: Math.ceil(bounds.x),
+        y: Math.max(0, Math.ceil(bounds.y)),
+        width: Math.floor(bounds.width),
+        height: 540,
+      },
       maxDiffPixelRatio: 0.01,
       animations: 'disabled',
+    });
+
+    const refresh = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/v1/v2/emr/501/workspace' && response.ok(),
+    );
+    const actionMenu = editor.locator('.emr-v2-action-menu');
+    const actionMenuSummary = actionMenu.locator(':scope > summary');
+    await actionMenuSummary.focus();
+    await page.keyboard.press('Space');
+    await expect(actionMenu).toHaveAttribute('open', '');
+    await editor.getByRole('button', { name: 'Обновить EMR', exact: true }).click();
+    await refresh;
+    await expect(actionMenu).not.toHaveAttribute('open');
+
+    const allergyNotice = editor.getByText('Аллергии. Сведения ещё не сверены', { exact: true });
+    const previousPlan = editor.getByRole('region', { name: 'План предыдущего приёма' });
+    await expect(allergyNotice).toBeVisible();
+    await expect(previousPlan).toContainText('2026-08-01');
+    await expect(previousPlan).toContainText('SYNTHETIC-PRIOR-PLAN');
+    const historyDetails = editor.locator('.emr-workspace-history-details');
+    await expect(historyDetails).not.toHaveAttribute('open', '');
+    await expect(editor.getByText('SYNTHETIC-PRIOR-COMPLAINT', { exact: true })).not.toBeVisible();
+    const historySummary = historyDetails.locator(':scope > summary');
+    await historySummary.focus();
+    await page.keyboard.press('Space');
+    await expect(historyDetails).toHaveAttribute('open', '');
+    await expect(editor.getByText('SYNTHETIC-PRIOR-COMPLAINT', { exact: true })).toBeVisible();
+    const previousLabs = historyDetails.locator('details').first();
+    await expect(previousLabs).not.toHaveAttribute('open', '');
+    await expect(previousLabs.locator('li').first()).not.toBeVisible();
+    await previousLabs.locator(':scope > summary').focus();
+    await page.keyboard.press('Space');
+    await expect(previousLabs).toHaveAttribute('open', '');
+    await expect(previousLabs.locator('li').first()).toContainText('SYNTHETIC-LAB-RESULT');
+    await historySummary.focus();
+    await page.keyboard.press('Space');
+    await expect(historyDetails).not.toHaveAttribute('open', '');
+
+    const repeatVisit = editor.getByRole('button', { name: 'Повторный', exact: true });
+    await repeatVisit.focus();
+    await page.keyboard.press('Space');
+    await expect(repeatVisit).toHaveAttribute('aria-pressed', 'true');
+    const newComplaint = editor.getByRole('checkbox', { name: 'Новая жалоба', exact: true });
+    await page.keyboard.press('Tab');
+    await expect(newComplaint).toBeFocused();
+    await page.keyboard.press('Space');
+    await expect(newComplaint).toBeChecked();
+    const firstEditorSection = editor.locator('.emr-v2-sections .emr-section__header').first();
+    await page.keyboard.press('Tab');
+    await expect(firstEditorSection).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(editor.locator('.emr-v2-sections .emr-section__header-action button').first()).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(editor.getByRole('textbox', { name: 'Жалобы', exact: true })).toBeFocused();
+
+    for (const viewport of [
+      { width: 375, height: 812 },
+      { width: 768, height: 1024 },
+      { width: 1024, height: 768 },
+      { width: 1280, height: 800 },
+      { width: 1920, height: 1080 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
+      const layout = await editor.evaluate(element => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
+      expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+      const summary = await editor.locator('.emr-workspace-sidebar').boundingBox();
+      const content = await editor.locator('.emr-v2-sections').boundingBox();
+      const root = await editor.boundingBox();
+      if (!summary || !content || !root) throw new Error(`EMR columns have no bounds at ${viewport.width}px`);
+      expect(summary.x).toBeGreaterThanOrEqual(0);
+      expect(content.x).toBeGreaterThanOrEqual(0);
+      expect(summary.x + summary.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(content.x + content.width).toBeLessThanOrEqual(viewport.width + 1);
+      if (viewport.width >= 1200) {
+        expect(summary.x + summary.width).toBeLessThanOrEqual(content.x + 1);
+      } else {
+        await expect.poll(async () => {
+          const currentSummary = await editor.locator('.emr-workspace-sidebar').boundingBox();
+          const currentContent = await editor.locator('.emr-v2-sections').boundingBox();
+          if (!currentSummary || !currentContent) return Number.POSITIVE_INFINITY;
+          return currentSummary.y + currentSummary.height - currentContent.y;
+        }).toBeLessThanOrEqual(1);
+      }
+      await page.screenshot({ path: `../.scratch/emr-m15-${viewport.width}.png`, animations: 'disabled' });
+    }
+
+    const localeCases = [
+      { name: /O'zbek/, initial: 'Birlamchi', repeat: 'Takroriy', complaint: 'Yangi shikoyat', fieldLabel: 'Shikoyatlar' },
+      { name: 'Ўзбекча', initial: 'Бирламчи', repeat: 'Такрорий', complaint: 'Янги шикоят', fieldLabel: 'Шикоятлар' },
+      { name: 'English', initial: 'Initial', repeat: 'Follow-up', complaint: 'New complaint', fieldLabel: 'Complaints' },
+      { name: 'Қазақ', initial: 'Бастапқы', repeat: 'Қайталама', complaint: 'Жаңа шағым', fieldLabel: 'Шағымдар' },
+    ];
+    for (const locale of localeCases) {
+      await page.locator('button[aria-haspopup="listbox"]').first().click();
+      await page.getByRole('option', { name: new RegExp(locale.name) }).click();
+      await expect(editor.getByRole('button', { name: locale.initial, exact: true })).toBeVisible();
+      await expect(editor.getByRole('button', { name: locale.repeat, exact: true })).toBeVisible();
+      await expect(editor.getByRole('checkbox', { name: locale.complaint, exact: true })).toBeVisible();
+      await expect(editor.getByRole('textbox', { name: locale.fieldLabel, exact: true })).toBeVisible();
+
+      for (const viewport of [
+        { width: 375, height: 812 },
+        { width: 768, height: 1024 },
+        { width: 1024, height: 768 },
+        { width: 1280, height: 800 },
+        { width: 1920, height: 1080 },
+      ]) {
+        await page.setViewportSize(viewport);
+        await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
+        const layout = await editor.evaluate(element => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
+        expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+        const summary = await editor.locator('.emr-workspace-sidebar').boundingBox();
+        const content = await editor.locator('.emr-v2-sections').boundingBox();
+        if (!summary || !content) throw new Error(`EMR columns have no bounds for ${locale.name} at ${viewport.width}px`);
+        expect(summary.x).toBeGreaterThanOrEqual(0);
+        expect(content.x).toBeGreaterThanOrEqual(0);
+        expect(summary.x + summary.width).toBeLessThanOrEqual(viewport.width + 1);
+        expect(content.x + content.width).toBeLessThanOrEqual(viewport.width + 1);
+        if (viewport.width >= 1200) {
+          expect(summary.x + summary.width).toBeLessThanOrEqual(content.x + 1);
+        } else {
+          await expect.poll(async () => {
+            const currentSummary = await editor.locator('.emr-workspace-sidebar').boundingBox();
+            const currentContent = await editor.locator('.emr-v2-sections').boundingBox();
+            if (!currentSummary || !currentContent) return Number.POSITIVE_INFINITY;
+            return currentSummary.y + currentSummary.height - currentContent.y;
+          }).toBeLessThanOrEqual(1);
+        }
+      }
+    }
+
+    await page.locator('button[aria-haspopup="listbox"]').first().click();
+    await page.getByRole('option', { name: /Русский/ }).click();
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
+    const lightSurface = await editor.locator('.emr-v2-main').evaluate(element => getComputedStyle(element).backgroundColor);
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.style.colorScheme = 'dark';
+      document.documentElement.classList.remove('light-theme', 'theme-light');
+      document.documentElement.classList.add('dark-theme', 'theme-dark');
+      document.body.style.colorScheme = 'dark';
+      document.body.classList.remove('light-theme', 'theme-light');
+      document.body.classList.add('dark-theme', 'theme-dark');
+    });
+    const darkSurface = await editor.locator('.emr-v2-main').evaluate(element => getComputedStyle(element).backgroundColor);
+    expect(darkSurface).not.toBe(lightSurface);
+    await page.screenshot({ path: '../.scratch/emr-m15-dark-1280.png', animations: 'disabled' });
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.documentElement.style.colorScheme = 'light';
+      document.documentElement.classList.remove('dark-theme', 'theme-dark');
+      document.documentElement.classList.add('light-theme', 'theme-light');
+      document.body.style.colorScheme = 'light';
+      document.body.classList.remove('dark-theme', 'theme-dark');
+      document.body.classList.add('light-theme', 'theme-light');
     });
   });
 });

@@ -21,7 +21,7 @@
 
 .emr-vitals__separator {
     font-size: 16px;
-    color: var(--mac-text-tertiary, #aeaeb2);
+    color: var(--emr-v2-text-tertiary, var(--mac-text-tertiary, #aeaeb2));
     margin: 0 -4px;
     padding-top: 12px;
 }
@@ -41,6 +41,18 @@
     color: var(--mac-text-secondary, #86868b);
     font-weight: 500;
     white-space: nowrap;
+}
+
+.emr-vitals__row--measurements {
+    align-items: flex-end;
+}
+
+.emr-vitals__row--measurements .emr-vitals__field {
+    min-width: min(8rem, 100%);
+}
+
+.emr-vitals__row--measurements label {
+    white-space: normal;
 }
 
 .emr-vitals__field input {
@@ -96,7 +108,7 @@
     right: 6px;
     bottom: 5px;
     font-size: 10px;
-    color: var(--mac-text-tertiary, #aeaeb2);
+    color: var(--emr-v2-text-tertiary, var(--mac-text-tertiary, #aeaeb2));
     pointer-events: none;
 }
 

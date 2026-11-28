@@ -1,4 +1,4 @@
-
+import { useId } from 'react';
 import './VitalsWidget.css';
 import { Input } from '../../ui/macos';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -34,12 +34,31 @@ const parseVital = (raw: unknown): number | null => {
     return Number.isFinite(n) ? n : null;
 };
 
-const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled }: { vitals?: Record<string, unknown>; onChange?: (v: Record<string, any>) => void; onFieldTouch?: (field: string) => void; disabled?: boolean }) => {
-  const vitals = vitalsRaw as Record<string, any>;
+const numericInputValue = (raw: unknown): string =>
+    typeof raw === 'number' || typeof raw === 'string' ? String(raw).trim() : '';
+
+// Chromium can silently drop the comma typed into a native number input.
+const DECIMAL_ENTRY = /^-?\d*(?:[.,]\d*)?$/;
+
+const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled, collapseAdditional = false }: {
+  vitals?: Record<string, unknown>; onChange?: (v: Record<string, any>) => void;
+  onFieldTouch?: (field: string) => void; disabled?: boolean; collapseAdditional?: boolean;
+}) => {
+  const id = useId();
+  const bloodPressure = vitalsRaw.blood_pressure as { systolic?: unknown; diastolic?: unknown } | null | undefined;
+  const vitals = {
+    ...vitalsRaw,
+    systolic: vitalsRaw.systolic ?? bloodPressure?.systolic,
+    diastolic: vitalsRaw.diastolic ?? bloodPressure?.diastolic,
+  } as Record<string, any>;
   const { t: rawT } = useTranslation(); const t = rawT;
     const handleChange = (field: string, value: string) => {
-        onChange?.({ ...vitals, [field]: value });
+        onChange?.({ ...vitalsRaw, [field]: value });
         onFieldTouch?.(`vitals.${field}`);
+    };
+    const handleDecimalChange = (field: 'respiratory_rate' | 'temperature', value: string) => {
+        const entry = value.trim();
+        if (DECIMAL_ENTRY.test(entry)) handleChange(field, entry);
     };
 
     // EMRVITAL-FE-001: parse through Number() (never parseInt-with-||0 for the
@@ -74,14 +93,35 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
             : null;
 
 
+    const additional = (
+            <div className="emr-vitals__row">
+                <div className={`emr-vitals__field ${isFieldInvalid('height') ? 'emr-vitals__field--invalid' : ''}`}>
+                    <label htmlFor={`${id}-height`}>{t('emr_workspace.height')} {vitals.heightSource && <small>({vitals.heightSource})</small>}</label>
+                    <Input id={`${id}-height`} type="number" aria-describedby={`${id}-height-unit`} error={isFieldInvalid('height')}
+                        value={vitals.height || ''} onChange={event => handleChange('height', event.target.value)}
+                        placeholder="170" disabled={disabled} />
+                    <span id={`${id}-height-unit`} className="emr-vitals__unit">{t('emr_workspace.cm')}</span>
+                    {fieldHint('height') && <span className="emr-vitals__invalid-hint" role="alert">{fieldHint('height')}</span>}
+                </div>
+                <div className={`emr-vitals__field ${isFieldInvalid('weight') ? 'emr-vitals__field--invalid' : ''}`}>
+                    <label htmlFor={`${id}-weight`}>{t('emr_workspace.weight')} {vitals.weightSource && <small>({vitals.weightSource})</small>}</label>
+                    <Input id={`${id}-weight`} type="number" aria-describedby={`${id}-weight-unit`} error={isFieldInvalid('weight')}
+                        value={vitals.weight || ''} onChange={event => handleChange('weight', event.target.value)}
+                        placeholder="70" disabled={disabled} />
+                    <span id={`${id}-weight-unit`} className="emr-vitals__unit">{t('emr_workspace.kg')}</span>
+                    {fieldHint('weight') && <span className="emr-vitals__invalid-hint" role="alert">{fieldHint('weight')}</span>}
+                </div>
+                {bmi && <div className="emr-vitals__bmi">{t('emr_workspace.bmi', { value: bmi })}</div>}
+            </div>
+    );
     return (
         <div className="emr-vitals">
             <div className="emr-vitals__row">
                 <div className={`emr-vitals__field ${isBPCritical ? 'emr-vitals__field--critical' : isBPHigh ? 'emr-vitals__field--warning' : ''} ${isFieldInvalid('systolic') ? 'emr-vitals__field--invalid' : ''}`}>
-                    <label>{t('misc.vw_ad_sist')}</label>
+                    <label htmlFor={`${id}-systolic`}>{t('misc.vw_ad_sist')}</label>
                     <Input
+                        id={`${id}-systolic`}
                         type="number"
-                        aria-label="Systolic blood pressure"
                         error={isFieldInvalid('systolic')}
                         value={vitals?.systolic || ''}
                         onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('systolic', e.target.value)}
@@ -92,10 +132,10 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
                 </div>
                 <span className="emr-vitals__separator">/</span>
                 <div className={`emr-vitals__field ${isBPCritical ? 'emr-vitals__field--critical' : isBPHigh ? 'emr-vitals__field--warning' : ''} ${isFieldInvalid('diastolic') ? 'emr-vitals__field--invalid' : ''}`}>
-                    <label>{t('misc.vw_ad_diast')}</label>
+                    <label htmlFor={`${id}-diastolic`}>{t('misc.vw_ad_diast')}</label>
                     <Input
+                        id={`${id}-diastolic`}
                         type="number"
-                        aria-label="Diastolic blood pressure"
                         error={isFieldInvalid('diastolic')}
                         value={vitals?.diastolic || ''}
                         onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('diastolic', e.target.value)}
@@ -105,10 +145,10 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
                     {fieldHint('diastolic') && <span className="emr-vitals__invalid-hint" role="alert">{fieldHint('diastolic')}</span>}
                 </div>
                 <div className={`emr-vitals__field ${isFieldInvalid('pulse') ? 'emr-vitals__field--invalid' : ''}`}>
-                    <label>{t('misc.vw_puls')}</label>
+                    <label htmlFor={`${id}-pulse`}>{t('misc.vw_puls')}</label>
                     <Input
+                        id={`${id}-pulse`}
                         type="number"
-                        aria-label="Pulse"
                         error={isFieldInvalid('pulse')}
                         value={vitals?.pulse || ''}
                         onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('pulse', e.target.value)}
@@ -118,17 +158,18 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
                     {fieldHint('pulse') && <span className="emr-vitals__invalid-hint" role="alert">{fieldHint('pulse')}</span>}
                 </div>
                 <div className={`emr-vitals__field ${isFieldInvalid('spo2') ? 'emr-vitals__field--invalid' : ''}`}>
-                    <label>SpO₂</label>
+                    <label htmlFor={`${id}-spo2`}>SpO₂</label>
                     <Input
+                        id={`${id}-spo2`}
                         type="number"
-                        aria-label="Blood oxygen saturation"
+                        aria-describedby={`${id}-spo2-unit`}
                         error={isFieldInvalid('spo2')}
                         value={vitals?.spo2 || ''}
                         onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('spo2', e.target.value)}
                         placeholder="98"
                         disabled={disabled}
                     />
-                    <span className="emr-vitals__unit">%</span>
+                    <span id={`${id}-spo2-unit`} className="emr-vitals__unit">%</span>
                     {fieldHint('spo2') && <span className="emr-vitals__invalid-hint" role="alert">{fieldHint('spo2')}</span>}
                 </div>
 
@@ -139,41 +180,25 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
                     </div>
                 )}
             </div>
-            <div className="emr-vitals__row">
-                <div className={`emr-vitals__field ${isFieldInvalid('height') ? 'emr-vitals__field--invalid' : ''}`}>
-                    <label>Рост {vitals?.heightSource && <small>({vitals.heightSource})</small>}</label>
-                    <Input
-                        type="number"
-                        aria-label="Height in centimeters"
-                        error={isFieldInvalid('height')}
-                        value={vitals?.height || ''}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('height', e.target.value)}
-                        placeholder="170"
-                        disabled={disabled}
-                    />
-                    <span className="emr-vitals__unit">см</span>
-                    {fieldHint('height') && <span className="emr-vitals__invalid-hint" role="alert">{fieldHint('height')}</span>}
+            <div className="emr-vitals__row emr-vitals__row--measurements">
+                <div className="emr-vitals__field">
+                    <label htmlFor={`${id}-respiratory-rate`}>{t('emr_workspace.respiratory_rate')}</label>
+                    <Input id={`${id}-respiratory-rate`} type="text" inputMode="decimal"
+                        aria-describedby={`${id}-respiratory-rate-unit`} value={numericInputValue(vitals.respiratory_rate)}
+                        onChange={event => handleDecimalChange('respiratory_rate', event.target.value)} disabled={disabled} />
+                    <span id={`${id}-respiratory-rate-unit`} className="emr-vitals__unit">
+                        {t('emr_workspace.respiratory_rate_unit')}
+                    </span>
                 </div>
-                <div className={`emr-vitals__field ${isFieldInvalid('weight') ? 'emr-vitals__field--invalid' : ''}`}>
-                    <label>Вес {vitals?.weightSource && <small>({vitals.weightSource})</small>}</label>
-                    <Input
-                        type="number"
-                        aria-label="Weight in kilograms"
-                        error={isFieldInvalid('weight')}
-                        value={vitals?.weight || ''}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('weight', e.target.value)}
-                        placeholder="70"
-                        disabled={disabled}
-                    />
-                    <span className="emr-vitals__unit">кг</span>
-                    {fieldHint('weight') && <span className="emr-vitals__invalid-hint" role="alert">{fieldHint('weight')}</span>}
+                <div className="emr-vitals__field">
+                    <label htmlFor={`${id}-temperature`}>{t('emr_workspace.temperature')}</label>
+                    <Input id={`${id}-temperature`} type="text" inputMode="decimal"
+                        aria-describedby={`${id}-temperature-unit`} value={numericInputValue(vitals.temperature)}
+                        onChange={event => handleDecimalChange('temperature', event.target.value)} disabled={disabled} />
+                    <span id={`${id}-temperature-unit`} className="emr-vitals__unit">°C</span>
                 </div>
-                {bmi && (
-                    <div className="emr-vitals__bmi">
-                        ИМТ: {bmi}
-                    </div>
-                )}
             </div>
+            {collapseAdditional ? <details><summary>{t('emr_workspace.more_vitals')}</summary>{additional}</details> : additional}
         </div>
     );
 };

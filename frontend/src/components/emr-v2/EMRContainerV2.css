@@ -7,8 +7,12 @@
     display: flex;
     min-height: 100vh;
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
-    background-color: var(--mac-bg-secondary);
-    padding: var(--mac-spacing-6);
+    --emr-v2-surface-primary: Canvas;
+    --emr-v2-surface-secondary: color-mix(in srgb, Canvas, CanvasText 4%);
+    --emr-v2-surface-tertiary: color-mix(in srgb, Canvas, CanvasText 8%);
+    --emr-v2-text-tertiary: var(--mac-text-secondary, GrayText);
+    background-color: var(--emr-v2-surface-secondary);
+    padding: var(--mac-spacing-4);
     box-sizing: border-box;
 }
 
@@ -20,12 +24,12 @@
 .emr-v2-main {
     flex: 1;
     width: 100%;
-    max-width: 1024px;
+    max-width: 1560px;
     margin: 0 auto;
-    background: var(--mac-bg-primary);
-    border-radius: var(--mac-radius-xl);
-    box-shadow: var(--mac-shadow-md);
-    border: 1px solid var(--mac-border);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
+    border-radius: var(--mac-radius-md);
+    box-shadow: none;
+    border: 1px solid var(--mac-separator);
     display: flex;
     flex-direction: column;
     overflow: visible;
@@ -41,12 +45,12 @@
     justify-content: space-between;
     align-items: center;
     padding: var(--mac-spacing-4) var(--mac-spacing-6);
-    background: var(--mac-bg-primary);
-    backdrop-filter: var(--mac-blur-light);
-    -webkit-backdrop-filter: var(--mac-blur-light);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     border-bottom: 1px solid var(--mac-separator);
-    border-top-left-radius: var(--mac-radius-xl);
-    border-top-right-radius: var(--mac-radius-xl);
+    border-top-left-radius: var(--mac-radius-md);
+    border-top-right-radius: var(--mac-radius-md);
 }
 
 .emr-v2-header__left {
@@ -67,7 +71,7 @@
     font-size: var(--mac-font-size-sm);
     font-weight: var(--mac-font-weight-medium);
     color: var(--mac-text-secondary);
-    background: var(--mac-bg-tertiary);
+    background: var(--emr-v2-surface-tertiary, var(--mac-bg-tertiary));
     padding: var(--mac-spacing-1) var(--mac-spacing-2);
     border-radius: var(--mac-radius-sm);
 }
@@ -79,34 +83,58 @@
 }
 
 /* Toolbar */
-.emr-v2-toolbar {
-    padding: var(--mac-spacing-3) var(--mac-spacing-6) 0;
-    display: flex;
-    gap: var(--mac-spacing-2);
-    background: var(--mac-bg-primary);
+.emr-v2-action-menu {
+    position: relative;
+    flex: 0 0 auto;
 }
 
-.emr-v2-toolbar button {
+.emr-v2-action-menu > summary {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
     padding: var(--mac-spacing-1) var(--mac-spacing-3);
     border: 1px solid var(--mac-border);
     border-radius: var(--mac-radius-sm);
-    background: var(--mac-bg-primary);
-    font-size: var(--mac-font-size-sm);
-    font-weight: var(--mac-font-weight-medium);
     color: var(--mac-text-primary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
     cursor: pointer;
-    box-shadow: var(--mac-shadow-sm);
-    transition: all var(--mac-duration-fast) var(--mac-ease);
+    list-style: none;
+    white-space: nowrap;
 }
 
-.emr-v2-toolbar button:hover:not(:disabled) {
-    background: var(--mac-bg-tertiary);
-    border-color: var(--mac-border-secondary);
+.emr-v2-action-menu > summary::-webkit-details-marker {
+    display: none;
 }
 
-.emr-v2-toolbar button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.emr-v2-action-menu > summary:hover {
+    background: var(--emr-v2-surface-tertiary, var(--mac-bg-tertiary));
+}
+
+.emr-v2-action-menu__items {
+    position: absolute;
+    inset-block-start: calc(100% + 6px);
+    inset-inline-end: 0;
+    z-index: 120;
+    display: grid;
+    gap: var(--mac-spacing-1);
+    width: min(18rem, 88vw);
+    padding: var(--mac-spacing-2);
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-md);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
+    box-shadow: var(--mac-shadow-md);
+}
+
+.emr-v2-action-menu__items > button {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: start;
+}
+
+.emr-v2-action-menu :focus-visible {
+    outline: 2px solid var(--mac-accent-blue);
+    outline-offset: 2px;
 }
 
 /* Sections Container */
@@ -114,7 +142,7 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    background: var(--mac-bg-primary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
 }
 
 /* Actions Footer */
@@ -123,7 +151,7 @@
     gap: var(--mac-spacing-3);
     align-items: center;
     padding: var(--mac-spacing-5) var(--mac-spacing-6);
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
     border-top: 1px solid var(--mac-separator);
     border-bottom-left-radius: var(--mac-radius-xl);
     border-bottom-right-radius: var(--mac-radius-xl);
@@ -192,7 +220,7 @@
 
 .emr-v2-btn--icon:hover {
     color: var(--mac-text-primary);
-    background: var(--mac-bg-tertiary);
+    background: var(--emr-v2-surface-tertiary, var(--mac-bg-tertiary));
 }
 
 /* Signed Badge */
@@ -222,7 +250,7 @@
     border-radius: var(--mac-radius-md);
     font-family: inherit;
     font-size: var(--mac-font-size-base);
-    background: var(--mac-bg-primary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
     color: var(--mac-text-primary);
     box-shadow: 0 2px 6px rgba(255, 159, 10, 0.1);
     resize: vertical;
@@ -271,7 +299,7 @@
 .emr-skeleton-section {
     border: 1px solid var(--mac-border, #d2d2d7);
     border-radius: var(--mac-radius-md, 8px);
-    background: var(--mac-bg-primary, #ffffff);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary, #ffffff));
     padding: var(--mac-spacing-4, 16px);
     display: flex;
     flex-direction: column;
@@ -292,7 +320,7 @@
 
 .emr-skeleton-bone {
     display: inline-block;
-    background: var(--mac-bg-secondary, #f5f5f7);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary, #f5f5f7));
     border-radius: var(--mac-radius-sm, 6px);
     /* Skeleton pulse is intentionally slower than interaction tokens
      * (250ms tokens would flicker); 1.6s is a calm loading rhythm. */

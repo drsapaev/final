@@ -1,0 +1,394 @@
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  getEMRWorkspace, getWorkspaceHistoryDocument,
+  type EMRWorkspaceData, type FollowUp, type HistoryDocument, type HistorySummary, type TransferField,
+} from '@/api/emrWorkspace';
+import { useTranslation } from '@/i18n/useTranslation';
+import { echoAdultTteFacts, echoMeasurementFacts } from '@/utils/echoMeasurements';
+import { useLabReporting } from '@/hooks/useLabReporting';
+import { Button, Input, Textarea } from '../../ui/macos';
+import { AdultTteSummary } from './AdultTteSummary';
+import { ClinicalSummary } from './ClinicalSummary';
+import { DocumentPreview } from './DocumentPreview';
+import { LabTrendPanel } from './LabTrendPanel';
+
+const copyFields: TransferField[] = ['complaints', 'diagnosis', 'treatment', 'recommendations'];
+const followUpNotes = ['changes', 'actual_treatment', 'prior_plan_follow_through', 'new_results'] as const;
+
+export function FollowUpEditor({
+  value, disabled, onChange,
+}: { value: FollowUp; disabled: boolean; onChange: (value: FollowUp) => void }) {
+  const { t } = useTranslation();
+  const newComplaintId = useId();
+  const isRepeatVisit = value.mode === 'follow_up' || value.mode === 'new_complaint';
+  return (
+    <section className="emr-workspace-visit-section" aria-label={t('emr_workspace.visit_type')}>
+      <div className="emr-workspace-visit-heading">
+        <h3>{t('emr_workspace.current_visit')}</h3>
+        <div className="emr-workspace-visit-mode" role="group" aria-label={t('emr_workspace.visit_type')}>
+          <Button type="button" size="small" variant="ghost" className="emr-workspace-mode-option"
+            disabled={disabled} aria-pressed={value.mode === 'initial'}
+            onClick={() => onChange({ ...value, mode: 'initial' })}>
+            {t('emr_workspace.initial_visit')}
+          </Button>
+          <Button type="button" size="small" variant="ghost" className="emr-workspace-mode-option"
+            disabled={disabled} aria-pressed={isRepeatVisit}
+            onClick={() => onChange({ ...value, mode: value.mode === 'new_complaint' ? 'new_complaint' : 'follow_up' })}>
+            {t('emr_workspace.repeat_visit')}
+          </Button>
+        </div>
+      </div>
+      {!value.mode && <p className="emr-workspace-mode-hint">{t('emr_workspace.unselected')}</p>}
+      {isRepeatVisit && <label className="emr-workspace-new-complaint" htmlFor={newComplaintId}>
+        <input id={newComplaintId} type="checkbox" aria-label={t('emr_workspace.new_complaint_toggle')}
+          checked={value.mode === 'new_complaint'} disabled={disabled}
+          onChange={event => onChange({ ...value, mode: event.target.checked ? 'new_complaint' : 'follow_up' })} />
+        {t('emr_workspace.new_complaint_toggle')}
+      </label>}
+      {(value.mode === 'follow_up' || followUpNotes.some(field => value[field])) && (
+        <div className="emr-workspace-follow-up">
+          {followUpNotes.map(field => <label key={field} className="emr-workspace-field">
+            {t(`emr_workspace.${field}`)}
+            <Textarea value={value[field] ?? ''} rows={2} maxLength={5000} disabled={disabled}
+              aria-label={t(`emr_workspace.${field}`)}
+              onChange={event => onChange({ ...value, [field]: event.target.value })} />
+          </label>)}
+        </div>
+      )}
+      {!!value.transferred_fields?.length && (
+        <details open className="emr-workspace-group">
+          <summary>{t('emr_workspace.transferred')}</summary>
+          <ul className="emr-workspace-list">
+            {value.transferred_fields.map((field, index) => (
+              <li key={`${field.source_visit_id}:${field.source_version}:${field.field}`} className="emr-workspace-entry">
+                <strong>{t(`emr_workspace.${field.field}`)}</strong>
+                <span className="emr-workspace-document-text">{field.text}</span>
+                <small>{t('emr_workspace.visit_number', { id: field.source_visit_id })} · {t('emr_workspace.version', { version: field.source_version })}</small>
+                <small>{t(field.confirmed_current ? 'emr_workspace.confirmed_today' : 'emr_workspace.historical_only')}</small>
+                {field.transferred_at && <small>{t('emr_workspace.entry_recorded', {
+                  id: field.transferred_by, date: new Date(field.transferred_at).toLocaleString(),
+                })}</small>}
+                {!disabled && <Button type="button" size="small" variant="ghost" onClick={() => onChange({
+                  ...value, transferred_fields: value.transferred_fields?.filter((_, item) => item !== index),
+                })}>{t('emr_workspace.remove_transfer')}</Button>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+function measurement(raw: unknown): string {
+  const candidate = typeof raw === 'string' || typeof raw === 'number' ? String(raw).trim() : '';
+  return candidate !== '' && Number.isFinite(Number(candidate.replace(',', '.'))) ? candidate : '';
+}
+
+function measurements({ vitals, echo }: Pick<HistorySummary, 'vitals' | 'echo'>) {
+  const pressure = vitals.blood_pressure && typeof vitals.blood_pressure === 'object'
+    ? vitals.blood_pressure as Record<string, unknown> : {};
+  const systolic = measurement(vitals.systolic ?? pressure.systolic);
+  const diastolic = measurement(vitals.diastolic ?? pressure.diastolic);
+  const legacyEf = echoMeasurementFacts(echo).find(fact => fact.key === 'ef');
+  const adultTte = echoAdultTteFacts(echo);
+  return {
+    pressure: systolic || diastolic ? `${systolic || '—'}/${diastolic || '—'}` : '',
+    pulse: measurement(vitals.pulse),
+    spo2: measurement(vitals.spo2),
+    respiratoryRate: measurement(vitals.respiratory_rate),
+    temperature: measurement(vitals.temperature),
+    weight: measurement(vitals.weight),
+    legacyEf,
+    adultTte: adultTte.length > 0 ? adultTte : undefined,
+  };
+}
+
+function MeasurementValues({ values }: { values: ReturnType<typeof measurements> }) {
+  const { t, language } = useTranslation();
+  const { legacyEf, adultTte } = values;
+  return <>
+    {values.pressure && <span>{t('emr_workspace.pressure_value', { value: values.pressure })}</span>}
+    {values.pulse && <span>{t('emr_workspace.pulse_value', { value: values.pulse })}</span>}
+    {values.spo2 && <span>SpO₂ {values.spo2}%</span>}
+    {values.respiratoryRate && <span>{t('emr_workspace.respiratory_rate_value', { value: values.respiratoryRate })}</span>}
+    {values.temperature && <span>{t('emr_workspace.temperature_value', { value: values.temperature })}</span>}
+    {values.weight && <span>{t('emr_workspace.weight_value', { value: values.weight })}</span>}
+    {legacyEf && <span>{t('emr_workspace.echo_legacy_measurements')} · {t('emr_workspace.ef_value', {
+      value: new Intl.NumberFormat(language).format(legacyEf.value),
+      method: legacyEf.method || t('emr_workspace.unknown_method'),
+    })}{legacyEf.measuredAt && ` · ${legacyEf.measuredAt}`}</span>}
+    {adultTte && <AdultTteSummary facts={adultTte} />}
+  </>;
+}
+
+function HistoryDetails({
+  document, patient, disabled, accept,
+}: { document: HistoryDocument; patient: EMRWorkspaceData['patient']; disabled: boolean;
+  accept: (fields: TransferField[], confirmed: boolean) => void }) {
+  const { t } = useTranslation();
+  const [chosen, setChosen] = useState<TransferField[]>([]);
+  const [confirmed, setConfirmed] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const followUp = document.data.follow_up as FollowUp | undefined;
+  const values = measurements(document);
+  return (
+    <div className="emr-workspace-history-document">
+      <p>{t('emr_workspace.visit_number', { id: document.visit_id })} · {t('emr_workspace.version', { version: document.version })}</p>
+      <Button type="button" variant="outline" size="small" onClick={() => setPreview(true)}>
+        {t('emr_workspace.history_preview')}
+      </Button>
+      {copyFields.filter(field => document[field].trim()).map(field => (
+        <section key={field} className="emr-workspace-group">
+          <h4>{t(`emr_workspace.${field}`)}</h4>
+          <p className="emr-workspace-document-text">{document[field]}</p>
+          {!disabled && <label className="emr-workspace-check">
+            <input type="checkbox" aria-label={t('emr_workspace.choose_field', { field: t(`emr_workspace.${field}`) })}
+              checked={chosen.includes(field)} onChange={event => {
+              setChosen(event.target.checked ? [...chosen, field] : chosen.filter(item => item !== field));
+            }} />
+            {t('emr_workspace.choose_field', { field: t(`emr_workspace.${field}`) })}
+          </label>}
+        </section>
+      ))}
+      {followUpNotes.map(field => typeof followUp?.[field] === 'string' && followUp[field] && (
+        <section key={field} className="emr-workspace-group">
+          <h4>{t(`emr_workspace.${field}`)}</h4>
+          <p className="emr-workspace-document-text">{followUp[field]}</p>
+        </section>
+      ))}
+      {Object.values(values).some(Boolean) && <div className="emr-workspace-entry"><MeasurementValues values={values} /></div>}
+      {!disabled && <>
+        <label className="emr-workspace-check">
+          <input type="checkbox" aria-label={t('emr_workspace.confirm_today')}
+            checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />
+          {t('emr_workspace.confirm_today')}
+        </label>
+        <Button type="button" size="small" disabled={chosen.length === 0}
+          onClick={() => { accept(chosen, confirmed); setChosen([]); }}>
+          {t('emr_workspace.transfer')}
+        </Button>
+      </>}
+      {preview && <DocumentPreview visitId={document.visit_id} patientId={patient.id}
+        workspace={{ patient, visit: { id: document.visit_id, date: document.visit_date, status: document.status } }}
+        version={document.version} signedAt={document.signed_at} status={document.status}
+        data={document.data} dirty={false} onClose={() => setPreview(false)} />}
+    </div>
+  );
+}
+
+export function WorkspaceSidePanel({
+  workspace, status, readOnly, reload, followUp, onFollowUpChange, currentVitals, currentEcho,
+}: {
+  workspace?: EMRWorkspaceData | undefined;
+  status: 'loading' | 'ready' | 'error';
+  readOnly: boolean;
+  reload: () => void;
+  followUp: FollowUp;
+  onFollowUpChange: (value: FollowUp) => void;
+  currentVitals?: Record<string, unknown> | undefined;
+  currentEcho?: Record<string, unknown> | undefined;
+}) {
+  const { t, language } = useTranslation();
+  const labReporting = useLabReporting();
+  const [extra, setExtra] = useState<HistorySummary[]>([]);
+  const [hasExtra, setHasExtra] = useState<boolean>();
+  const [pagination, setPagination] = useState<'loading' | 'error'>();
+  const [source, setSource] = useState<HistorySummary>();
+  const [version, setVersion] = useState('');
+  const [document, setDocument] = useState<HistoryDocument>();
+  const [historyStatus, setHistoryStatus] = useState<'loading' | 'error'>();
+  const [transferLimit, setTransferLimit] = useState(false);
+  const [labDownloadFailed, setLabDownloadFailed] = useState(false);
+  const selectionRequest = useRef(0);
+  const labDownloadContext = useRef(0);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const historyDetailsRef = useRef<HTMLDetailsElement>(null);
+  const currentMeasurements = measurements({ vitals: currentVitals ?? {}, echo: currentEcho ?? {} });
+  const history = useMemo(() => {
+    const firstPage = workspace?.history ?? [];
+    const items = new Map(firstPage.map(item => [item.id, item]));
+    for (const item of extra) {
+      if (!items.has(item.id)) items.set(item.id, item);
+    }
+    return [...items.values()];
+  }, [workspace, extra]);
+  const labVisits = useMemo(() => workspace ? [
+    { id: workspace.visit.id, date: workspace.visit.date, values: workspace.current_laboratory ?? [] },
+    ...history.map(item => ({ id: item.visit_id, date: item.visit_date, values: item.laboratory ?? [] })),
+  ] : [], [workspace, history]);
+  const historyMeasurements = history.map(item => ({ item, values: measurements(item) }))
+    .filter(({ values }) => Object.values(values).some(Boolean));
+  const hasCurrentMeasurements = Object.values(currentMeasurements).some(Boolean);
+
+  useEffect(() => () => { labDownloadContext.current += 1; }, []);
+
+  async function openLabReport(instanceId: number) {
+    const context = labDownloadContext.current;
+    setLabDownloadFailed(false);
+    try {
+      const blob = await labReporting.downloadPdf(instanceId);
+      if (context !== labDownloadContext.current) return;
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = `lab-${instanceId}.pdf`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      if (context === labDownloadContext.current) setLabDownloadFailed(true);
+    }
+  }
+
+  async function openHistory(item: HistorySummary, selectedVersion = item.version) {
+    if (!workspace) return;
+    // A visit can also be opened from the separate measurement history.
+    // Reveal the destination before rendering or focusing its document.
+    if (historyDetailsRef.current) historyDetailsRef.current.open = true;
+    const sequence = ++selectionRequest.current;
+    setSource(item);
+    setVersion(String(selectedVersion));
+    setDocument(undefined);
+    setHistoryStatus('loading');
+    setTransferLimit(false);
+    try {
+      const next = await getWorkspaceHistoryDocument(workspace.visit.id, workspace.patient.id, item.visit_id, selectedVersion);
+      if (selectionRequest.current !== sequence) return;
+      if (next.visit_id !== item.visit_id || next.version !== selectedVersion) throw new Error('Mismatched history');
+      setDocument(next);
+      setHistoryStatus(undefined);
+      headingRef.current?.focus();
+    } catch {
+      if (selectionRequest.current === sequence) setHistoryStatus('error');
+    }
+  }
+
+  async function loadMore() {
+    if (!workspace || pagination === 'loading') return;
+    setPagination('loading');
+    try {
+      const page = await getEMRWorkspace(workspace.visit.id, workspace.patient.id, undefined, workspace.history.length + extra.length);
+      setExtra([...extra, ...page.history]);
+      setHasExtra(page.has_more_history);
+      setPagination(undefined);
+    } catch {
+      setPagination('error');
+    }
+  }
+
+  function transfer(fields: TransferField[], confirmed: boolean) {
+    if (readOnly || !workspace || !document) return;
+    const keep = (followUp.transferred_fields ?? []).filter(
+      item => item.source_visit_id !== document.visit_id || item.source_version !== document.version || !fields.includes(item.field),
+    );
+    const selected = fields.map(field => ({
+      field,
+      source_visit_id: document.visit_id,
+      source_version: document.version,
+      source_patient_id: workspace.patient.id,
+      source_document_id: document.id,
+      text: document[field],
+      confirmed_current: confirmed,
+    }));
+    if (keep.length + selected.length > 24) {
+      setTransferLimit(true);
+      return;
+    }
+    setTransferLimit(false);
+    onFollowUpChange({ ...followUp, transferred_fields: [...keep, ...selected] });
+  }
+
+  return (
+    <aside className="emr-workspace-sidebar" aria-label={t('emr_workspace.summary')}>
+      {status === 'loading' && <p role="status">{t('emr_workspace.loading')}</p>}
+      {status === 'error' && <div role="alert">
+        <p>{t('emr_workspace.load_error')}</p>
+        <Button type="button" size="small" variant="outline" onClick={reload}>{t('emr_workspace.retry')}</Button>
+      </div>}
+      {workspace && (
+        <>
+          <ClinicalSummary workspace={workspace} readOnly={readOnly} reload={reload} />
+          <section className="emr-workspace-group">
+            <h3>{t('emr_workspace.patient_history')}</h3>
+            {labDownloadFailed && <p role="alert">{t('emr_workspace.load_error')}</p>}
+            {history.length === 0 ? <p>{t('emr_workspace.no_history')}</p> : (
+              <details className="emr-workspace-history-details" ref={historyDetailsRef}>
+                <summary>{t('emr_workspace.history_details')}</summary>
+                <ol className="emr-workspace-list">
+                  {history.map(item => (
+                    <li key={item.id} className="emr-workspace-entry">
+                      <Button type="button" variant="ghost" size="small" onClick={() => void openHistory(item)}>
+                        {item.visit_date ?? t('emr_workspace.visit_number', { id: item.visit_id })}
+                      </Button>
+                      {item.complaints && <span>{item.complaints}</span>}
+                      {item.diagnosis && <strong>{item.diagnosis}</strong>}
+                      {Boolean(item.laboratory?.length) && <details>
+                        <summary>{t('emr_workspace.previous_labs')}</summary>
+                        <ul>
+                          {item.laboratory.map((value, index) => <li key={`${value.instance_id}:${index}`}>
+                            <span>{value.name} {value.value} {value.unit} {value.abnormal && t('emr_workspace.lab_abnormal')}
+                              {value.finalized_at && ` · ${new Date(value.finalized_at).toLocaleDateString(language)}`}</span>
+                            <Button type="button" size="small" variant="ghost" onClick={() => void openLabReport(value.instance_id)}>
+                              {t('emr_workspace.lab_report', { id: value.instance_id })}
+                            </Button>
+                          </li>)}
+                        </ul>
+                      </details>}
+                    </li>
+                  ))}
+                </ol>
+                {(hasExtra ?? workspace.has_more_history) && <Button type="button" size="small" variant="outline"
+                  disabled={pagination === 'loading'} onClick={() => void loadMore()}>
+                  {t(pagination === 'loading' ? 'emr_workspace.loading' : 'emr_workspace.more_history')}
+                </Button>}
+                {pagination === 'error' && <p role="alert">{t('emr_workspace.load_error')}</p>}
+                {source && (
+                  <div className="emr-workspace-group">
+                    <h4 tabIndex={-1} ref={headingRef}>{t('emr_workspace.source_document')}</h4>
+                    <form onSubmit={event => { event.preventDefault(); void openHistory(source, Number(version)); }}>
+                      <label className="emr-workspace-field">{t('emr_workspace.document_version')}
+                        <Input type="number" aria-label={t('emr_workspace.document_version')} min={1} max={source.version} required
+                          value={version} onChange={event => setVersion(event.target.value)} />
+                      </label>
+                      <Button type="submit" size="small" variant="outline">{t('emr_workspace.open_version')}</Button>
+                      <Button type="button" size="small" variant="ghost" onClick={() => {
+                        selectionRequest.current += 1;
+                        setSource(undefined);
+                        setDocument(undefined);
+                      }}>{t('misc.cancel')}</Button>
+                    </form>
+                    {historyStatus === 'loading' && <p role="status">{t('emr_workspace.loading')}</p>}
+                    {historyStatus === 'error' && <p role="alert">{t('emr_workspace.history_error')}</p>}
+                    {transferLimit && <p role="alert">{t('emr_workspace.transfer_limit')}</p>}
+                    {document && <HistoryDetails key={`${document.id}:${document.version}`} document={document} patient={workspace.patient}
+                      disabled={readOnly} accept={transfer} />}
+                  </div>
+                )}
+              </details>
+            )}
+            <details className="emr-workspace-group">
+              <summary>{t('emr_workspace.measurement_history')}</summary>
+              {!hasCurrentMeasurements && historyMeasurements.length === 0 && !labVisits.some(item => item.values.length > 0) &&
+                <p>{t('emr_workspace.no_entries')}</p>}
+              <ol className="emr-workspace-list">
+                {hasCurrentMeasurements && <li className="emr-workspace-entry">
+                  <strong>{t('emr_workspace.today_vitals')} {workspace.visit.date}</strong>
+                  <MeasurementValues values={currentMeasurements} />
+                </li>}
+                {historyMeasurements.map(({ item, values }) => (
+                  <li key={item.id} className="emr-workspace-entry">
+                    <Button type="button" variant="ghost" size="small" onClick={() => void openHistory(item)}>
+                      {item.visit_date ?? t('emr_workspace.visit_number', { id: item.visit_id })}
+                    </Button>
+                    <MeasurementValues values={values} />
+                  </li>
+                ))}
+              </ol>
+              <LabTrendPanel visits={labVisits} onOpenReport={instanceId => { void openLabReport(instanceId); }} />
+            </details>
+          </section>
+        </>
+      )}
+    </aside>
+  );
+}

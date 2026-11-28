@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
@@ -14,6 +14,11 @@ describe('AppointmentModal exact service selection', () => {
   });
 
   it('includes the selected catalog service ID in the save callback', async () => {
+    let resolveServices!: (response: { data: { id: number; name: string }[] }) => void;
+    apiGet.mockReturnValueOnce(new Promise((resolve) => {
+      resolveServices = resolve;
+    }));
+
     // Time-bomb fix: the form rejects past dates, so the appointment date must
     // always be computed relative to "now" instead of a hardcoded calendar day.
     const tomorrow = new Date(Date.now() + 86_400_000);
@@ -36,6 +41,11 @@ describe('AppointmentModal exact service selection', () => {
     );
 
     const serviceSelector = await screen.findByLabelText(/services|услуги/i);
+    expect(serviceSelector).toBeDisabled();
+    await act(async () => {
+      resolveServices({ data: [{ id: 91, name: 'Первичный приём' }] });
+    });
+    await waitFor(() => expect(serviceSelector).toBeEnabled());
     fireEvent.click(serviceSelector);
     fireEvent.click(await screen.findByRole('option', { name: 'Первичный приём' }));
 
@@ -84,7 +94,9 @@ describe('AppointmentModal exact service selection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Выберите врача' }));
     fireEvent.click(await screen.findByRole('option', { name: /Тестовый врач/ }));
-    fireEvent.click(await screen.findByLabelText(/services|услуги/i));
+    const serviceSelector = await screen.findByLabelText(/services|услуги/i);
+    await waitFor(() => expect(serviceSelector).toBeEnabled());
+    fireEvent.click(serviceSelector);
 
     expect(await screen.findByRole('option', { name: 'Услуга выбранного врача' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Общая услуга' })).toBeInTheDocument();

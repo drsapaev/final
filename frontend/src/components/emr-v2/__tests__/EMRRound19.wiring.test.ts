@@ -86,15 +86,19 @@ describe('EMR round 19 wiring (source contract)', () => {
     const orderBlock = lab.slice(orderStart, orderEnd);
     // Intent captured at start, rechecked after the confirm and before the POST.
     expect(orderBlock).toContain('const startContext = contextRef.current');
-    const confirmIdx = orderBlock.indexOf('await (confirm');
-    const recheckIdx = orderBlock.indexOf('if (contextRef.current.patientId !== startContext.patientId');
+    expect(orderBlock).toContain('const epoch = contextEpoch.current');
+    const confirmIdx = orderBlock.indexOf('await confirm(');
+    expect(orderBlock).toContain('contextRef.current.patientId !== startContext.patientId');
+    expect(orderBlock).toContain('contextEpoch.current !== epoch');
+    expect(lab).toContain('useEffect(() => () => { contextEpoch.current += 1; }, [labScope]);');
+    const recheckIdx = orderBlock.indexOf('if (!ok || contextChanged()) return;');
     const createIdx = orderBlock.indexOf('labReportingApi.createOrder(');
     expect(confirmIdx).toBeGreaterThan(-1);
     expect(recheckIdx).toBeGreaterThan(confirmIdx);
     expect(createIdx).toBeGreaterThan(recheckIdx);
     // The success toast is rechecked as well (context switch during the POST).
     const successIdx = orderBlock.indexOf('notify.success(');
-    const secondRecheckIdx = orderBlock.indexOf('if (contextRef.current.patientId !== startContext.patientId', recheckIdx + 1);
+    const secondRecheckIdx = orderBlock.indexOf('if (contextChanged()) return;', createIdx);
     expect(secondRecheckIdx).toBeGreaterThan(-1);
     expect(successIdx).toBeGreaterThan(secondRecheckIdx);
   });

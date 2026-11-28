@@ -38,14 +38,14 @@ def _mint_access_token(user) -> str:
     )
 
 
-def _create_doctor_user(db_session, *, label: str) -> tuple[User, Doctor]:
+def _create_doctor_user(db_session, *, label: str, role: str = "Doctor") -> tuple[User, Doctor]:
     suffix = _suffix()
     user = User(
         username=f"lab_report_{label}_{suffix}",
         email=f"lab-report-{label}-{suffix}@test.local",
         full_name=f"Lab Report {label}",
         hashed_password=get_password_hash("doctor123"),
-        role="Doctor",
+        role=role,
         is_active=True,
         is_superuser=False,
     )
@@ -650,6 +650,96 @@ def test_doctor_lab_report_reads_are_limited_to_own_visits(
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("role", ["cardio", "derma", "dentist", "Cardiologist", "Dermatologist", "dentistry"])
+def test_doctor_family_uses_owned_workspace_lab_transports(
+    client, auth_headers, db_session, monkeypatch, role,
+) -> None:
+    user, doctor = _create_doctor_user(db_session, label="workspace", role=role)
+    own_patient = _create_patient(db_session)
+    own_visit = _create_visit(db_session, patient_id=own_patient.id, doctor_id=doctor.id)
+    _other_user, other_doctor = _create_doctor_user(db_session, label="colleague")
+    other_patient = _create_patient(db_session)
+    other_visit = _create_visit(db_session, patient_id=other_patient.id, doctor_id=other_doctor.id)
+    other_report = _create_lab_report_instance(
+        client, auth_headers=auth_headers, patient_id=other_patient.id, visit_id=other_visit.id,
+    )
+    headers = {"Authorization": f"Bearer {_mint_access_token(user)}"}
+
+    templates = client.get("/api/v1/lab/templates", headers=headers)
+    assert templates.status_code == 200, templates.text
+    template = next(item for item in templates.json() if item["code"] == "cbc_oak")
+    order = client.post(
+        "/api/v1/lab/orders", headers=headers,
+        json={"template_id": template["id"], "patient_id": own_patient.id, "visit_id": own_visit.id},
+    )
+    assert order.status_code == 200, order.text
+    ordered = order.json()
+    report_id = ordered["instance_id"]
+    assert (ordered["patient_id"], ordered["visit_id"], ordered["status"]) == (
+        own_patient.id, own_visit.id, "DRAFT",
+    )
+
+    listed = client.get("/api/v1/lab/report-instances", headers=headers)
+    assert listed.status_code == 200, listed.text
+    assert {item["id"] for item in listed.json()} == {report_id}
+    assert other_report["id"] != report_id
+
+    report = db_session.get(LabReportInstance, report_id)
+    report.status = "FINALIZED"
+    report.finalized_at = datetime.now(UTC)
+    db_session.commit()
+    finalized = client.get(
+        "/api/v1/lab/report-instances", headers=headers,
+        params={"visit_ids": [own_visit.id], "patient_id": own_patient.id, "status": "FINALIZED"},
+    )
+    assert finalized.status_code == 200, finalized.text
+    assert [item["id"] for item in finalized.json()] == [report_id]
+
+    pdf_bytes = b"%PDF-1.4\n% SYNTHETIC workspace report\n%%EOF\n"
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.lab_reporting.lab_report_pdf_service.render_report",
+        lambda _report: pdf_bytes,
+    )
+    pdf = client.get(f"/api/v1/lab/report-instances/{report_id}/pdf", headers=headers)
+    assert pdf.status_code == 200, pdf.text
+    assert pdf.headers["content-type"] == "application/pdf"
+    assert pdf.content == pdf_bytes
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("role", ["Doctor", "cardio"])
+def test_clinician_lab_orders_require_an_assigned_visit_and_an_active_doctor(
+    client, db_session, role,
+) -> None:
+    user, doctor = _create_doctor_user(db_session, label="order_scope", role=role)
+    patient = _create_patient(db_session)
+    visit = _create_visit(db_session, patient_id=patient.id, doctor_id=doctor.id)
+    headers = {"Authorization": f"Bearer {_mint_access_token(user)}"}
+    templates = client.get("/api/v1/lab/templates", headers=headers)
+    assert templates.status_code == 200, templates.text
+    template = next(item for item in templates.json() if item["code"] == "cbc_oak")
+    payload = {"template_id": template["id"], "patient_id": patient.id}
+    no_visit = client.post("/api/v1/lab/orders", headers=headers, json=payload)
+    assert no_visit.status_code == 422, no_visit.text
+
+    visit.doctor_id = None
+    db_session.commit()
+    unassigned = client.post("/api/v1/lab/orders", headers=headers, json={**payload, "visit_id": visit.id})
+    assert unassigned.status_code == 403, unassigned.text
+
+    visit.doctor_id = doctor.id
+    doctor.active = False
+    db_session.commit()
+    inactive = client.post("/api/v1/lab/orders", headers=headers, json={**payload, "visit_id": visit.id})
+    assert inactive.status_code == 403, inactive.text
+    assert db_session.query(LabOrder).filter_by(patient_id=patient.id).count() == 0
+
+    user.is_active = False
+    db_session.commit()
+    assert client.get("/api/v1/lab/templates", headers=headers).status_code == 403
+
+
+@pytest.mark.integration
 def test_lab_role_without_doctor_profile_reads_created_instance_and_pdf(
     client,
     db_session,
@@ -1224,8 +1314,9 @@ def test_legacy_lab_contract_is_not_published(client, auth_headers):
         assert response.status_code == 404
 
 
+@pytest.mark.parametrize("role", ["Admin", "Lab"])
 def test_create_lab_order_endpoint_resolves_published_version(
-    client, auth_headers, db_session, test_patient
+    client, auth_headers, db_session, test_patient, role,
 ):
     """Regression: POST /api/v1/lab/orders used to 500 on two ghost lookups.
 
@@ -1234,7 +1325,11 @@ def test_create_lab_order_endpoint_resolves_published_version(
     not exist on LabReportingService). Published-version resolution must go
     through template.versions, and the version fetch through the repository.
     """
-    templates_response = client.get("/api/v1/lab/templates", headers=auth_headers)
+    headers = auth_headers
+    if role == "Lab":
+        lab_user = _create_lab_user(db_session, label="workspace_order")
+        headers = {"Authorization": f"Bearer {_mint_access_token(lab_user)}"}
+    templates_response = client.get("/api/v1/lab/templates", headers=headers)
     assert templates_response.status_code == 200
     cbc_template = next(
         template
@@ -1244,7 +1339,7 @@ def test_create_lab_order_endpoint_resolves_published_version(
 
     response = client.post(
         "/api/v1/lab/orders",
-        headers=auth_headers,
+        headers=headers,
         json={
             "template_id": cbc_template["id"],
             "patient_id": test_patient.id,
@@ -1254,6 +1349,7 @@ def test_create_lab_order_endpoint_resolves_published_version(
     body = response.json()
     assert body["instance_id"] > 0
     assert body["patient_id"] == test_patient.id
+    assert body["visit_id"] is None
     assert body["template_name"]
     assert body["status"]
 

@@ -18,22 +18,9 @@
     border-bottom: none;
 }
 
-/* EMRREAD-FE-001 (audit 3886, round 21): a disabled (read-only) section must
-   still be expandable — the header toggle stays interactive. pointer-events
-   is scoped to the section BODY only, so clinical inputs keep their belt-and-
-   braces guard while the expansion button (a sibling, outside the body)
-   remains clickable by mouse/touch. */
-.emr-section--disabled {
-    opacity: 0.6;
-}
-
-.emr-section--disabled .emr-section__body {
-    pointer-events: none;
-}
-
 /* Focus/Hover state — subtle highlight */
 .emr-section:focus-within {
-    background: var(--mac-bg-tertiary);
+    background: var(--emr-v2-surface-tertiary, var(--mac-bg-tertiary));
 }
 
 /* Header */
@@ -52,7 +39,7 @@
 }
 
 .emr-section__header:hover {
-    background: var(--mac-bg-tertiary);
+    background: var(--emr-v2-surface-tertiary, var(--mac-bg-tertiary));
 }
 
 .emr-section__header-wrapper {
@@ -88,7 +75,7 @@
 /* Chevron Animation */
 .emr-section__chevron {
     font-size: var(--mac-font-size-xs);
-    color: var(--mac-text-tertiary);
+    color: var(--emr-v2-text-tertiary, var(--mac-text-tertiary));
     transition: transform var(--mac-duration-normal) var(--mac-ease);
     transform: rotate(-90deg);
     /* Closed state (pointing right) */
@@ -157,7 +144,7 @@
     padding: var(--mac-spacing-3);
     border: 1px solid var(--mac-border);
     border-radius: var(--mac-radius-md);
-    background: var(--mac-bg-primary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
     color: var(--mac-text-primary);
     font-family: inherit;
     font-size: var(--mac-font-size-base);
@@ -168,7 +155,7 @@
 }
 
 .emr-section__content textarea::placeholder {
-    color: var(--mac-text-tertiary);
+    color: var(--emr-v2-text-tertiary, var(--mac-text-tertiary));
 }
 
 .emr-section__content textarea:focus {

@@ -55,7 +55,8 @@ describe('EMRContainerV2 visit completion contract', () => {
     // R34 regression (#3433 P2): the read-only sign must pass the optimistic-lock
     // token (rowVersion) — NOT the clinical revision (version).
     expect(source).toContain('&& rowVersion > 0');
-    expect(source).toContain('signSavedEMR({ confirm: confirmSigning, rowVersion, sign: signEMR })');
+    expect(source).toContain('signSavedEMR({ confirm: confirmSigning, rowVersion, sign })');
+    expect(source).toContain('scope.active ? signEMR(options) : Promise.resolve(null)');
     expect(source).not.toContain('signSavedEMR({ confirm: confirmSigning, rowVersion: version, sign: signEMR })');
 
     // Round 17 (audit 3886): the editable branch now also excludes amended

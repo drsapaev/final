@@ -56,7 +56,6 @@ export interface ComplaintsFieldProps {
 
 // Debounce hook
 const useDebounce = (value: string, delay: number) => {
-  const { t } = useTranslation();
     const [debouncedValue, setDebouncedValue] = useState(value);
 
     useEffect(() => {
@@ -80,6 +79,8 @@ const ComplaintsField = ({
     label = 'Жалобы',
     placeholder = 'Введите жалобы пациента...'
 }: ComplaintsFieldProps) => {
+    const { t } = useTranslation();
+    const accessibleLabel = label.trim() || t('emr_workspace.complaints');
     const complaintsFieldId = useId();
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     // EMRCOMPLAINT-FE-001 (audit 3886 round 27): every value/editability
@@ -227,8 +228,8 @@ const ComplaintsField = ({
             return;
         }
 
-        // Enter or Tab to accept selected suggestion
-        if ((e.key === 'Enter' && e.altKey) || (e.key === 'Tab' && aiSuggestions.length > 0)) {
+        // Alt+Enter accepts the selected suggestion
+        if (e.key === 'Enter' && e.altKey && aiSuggestions.length > 0) {
             e.preventDefault();
             handleAcceptSuggestion(aiSuggestions[selectedIndex]);
             return;
@@ -262,12 +263,12 @@ const ComplaintsField = ({
 
     return (
         <div className="complaints-wrapper">
-            <label className="complaints-label" htmlFor={complaintsFieldId}>{label}</label>
+            {label.trim() && <label className="complaints-label" htmlFor={complaintsFieldId}>{label}</label>}
 
             <div className="complaints-container">
                 <textarea
                     id={complaintsFieldId}
-                    aria-label={label}
+                    aria-label={accessibleLabel}
                     ref={textareaRef}
                     className={fieldClasses}
                     value={value}

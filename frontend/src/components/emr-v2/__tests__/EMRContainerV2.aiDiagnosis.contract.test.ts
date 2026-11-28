@@ -77,18 +77,10 @@ describe('EMRPROGRESS-FE-001: progress counts only meaningful clinical text', ()
         expect(source).not.toContain('function fieldText');
     });
 
-    it('R32: all seven progress rows use trimmed canonical text selectors', () => {
-        // Round 29 (EMRTREAT-FE-001): the treatment row evolved from the
-        // top-level `data?.treatment` check to the canonical
-        // emrTreatmentText selector (treatment → medications.text →
-        // plan.treatment, mirroring the backend's get_emr_text_field
-        // chain) because the visible TreatmentSection editor is bound to
-        // medications.text. Six rows keep the direct emrTextValue shape;
-        // the seventh (treatment) uses the canonical treatment selector.
-        const rows = source.match(/filled: emrTextValue\(data\?\.\w+\)\.trim\(\) !== ''/g);
-        expect(rows).not.toBeNull();
-        expect(rows!.length).toBe(6);
-        expect(source).toContain("filled: emrTreatmentText(data) !== ''");
+    it('uses saved-document readiness without requiring optional clinical text', () => {
+        expect(source).not.toContain('filledCount');
+        expect(source).toContain("isDirty || !emr?.id || savedEMRStatus === 'draft'");
+        expect(source).toContain('readSavedEMRForCompletion({');
     });
 });
 

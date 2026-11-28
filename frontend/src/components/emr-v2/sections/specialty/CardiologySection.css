@@ -48,7 +48,7 @@
 .cardiology-interpretation {
     margin-top: 16px;
     padding: 12px;
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     border-radius: var(--mac-radius-md);
     border-left: 3px solid var(--mac-accent-blue-500);
 }
@@ -69,7 +69,7 @@
 
 .cardiology-risk-calculator {
     padding: 16px;
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     border-radius: var(--mac-radius-md);
 }
 
@@ -88,7 +88,7 @@
 
 .cardiology-risk-result {
     padding: 12px;
-    background: var(--mac-bg-primary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
     border-radius: var(--mac-radius-sm);
     border: 1px solid var(--mac-border);
 }
@@ -124,7 +124,7 @@
     padding: 10px 12px;
     border: 1px solid var(--mac-border);
     border-radius: var(--mac-radius-md);
-    background: var(--mac-bg-primary);
+    background: var(--emr-v2-surface-primary, var(--mac-bg-primary));
     color: var(--mac-text-primary);
     font-size: 14px;
     cursor: pointer;
@@ -144,7 +144,7 @@
 .cardiology-risk-placeholder {
     text-align: center;
     padding: 20px;
-    color: var(--mac-text-tertiary);
+    color: var(--emr-v2-text-tertiary, var(--mac-text-tertiary));
     font-style: italic;
 }
 
@@ -166,7 +166,7 @@
 .cardiology-score2-eligible {
     padding: var(--mac-spacing-3, 12px) var(--mac-spacing-4, 16px);
     border-radius: var(--mac-radius-md, 8px);
-    background: var(--mac-bg-tertiary, transparent);
+    background: var(--emr-v2-surface-tertiary, var(--mac-bg-tertiary, transparent));
     color: var(--mac-text-primary, inherit);
     line-height: 1.5;
 }
@@ -348,7 +348,7 @@
 
 .cardiology-ecg-summary div {
     padding: 4px 8px;
-    background: var(--mac-bg-secondary);
+    background: var(--emr-v2-surface-secondary, var(--mac-bg-secondary));
     border-radius: 4px;
 }
 

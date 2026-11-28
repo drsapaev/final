@@ -24,6 +24,8 @@ import { useDoctorTreatmentTemplates } from '@/hooks/useDoctorTreatmentTemplates
 import type { TreatmentTemplate } from '@/hooks/useDoctorTreatmentTemplates';
 import logger from '@/utils/logger';
 import { useTranslation } from '@/i18n/useTranslation';
+import { DoctorTemplatesPanel } from '../DoctorTemplatesPanel';
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from '../../ui/macos';
 import React from "react";
 
 /** EMRTEMPL-FE-001 (audit 3886 round 23): module-level style constant —
@@ -99,6 +101,8 @@ export function TreatmentSection({
   const { t: rawT } = useTranslation(); const t = rawT;
   const [showTemplates, setShowTemplates] = useState(false);
   const [showMyExperience, setShowMyExperience] = useState(false);
+  const [showReviewedTemplates, setShowReviewedTemplates] = useState(false);
+  const [legacyPreview, setLegacyPreview] = useState('');
   const [editingTemplate, setEditingTemplate] = useState<TreatmentTemplate | null>(null);
   const [editText, setEditText] = useState('');
   // EMRTEMPL-FE-001 (audit 3886 round 23): a failed update must keep the
@@ -162,17 +166,6 @@ export function TreatmentSection({
     });
   }, [onChange]);
 
-  // Handle "My Experience" template apply
-  const handleApplyMyExperience = useCallback((template: Record<string, any>) => {
-    onChange?.(template.treatment_text, {
-      source: 'my_experience',
-      templateId: template.id,
-      icd10Code: template.icd10_code
-    });
-    setShowMyExperience(false);
-    onTelemetry?.({ type: 'treatment.my_experience.applied', payload: { icd10: template.icd10_code } });
-  }, [onChange, onTelemetry]);
-
   return (
     <EMRSection
       title={t('misc.ts_lechenie')}
@@ -220,6 +213,8 @@ export function TreatmentSection({
                     <TreatmentTemplatesButton
           onClick={() => setShowTemplates(true)}
           disabled={disabled} />
+                    <Button type="button" size="small" variant="ghost" disabled={disabled}
+                      onClick={() => setShowReviewedTemplates(true)}>{t('emr_workspace.open_templates')}</Button>
         
                 </div>
       }>
@@ -309,7 +304,7 @@ export function TreatmentSection({
                 alignItems: 'stretch',
                 gap: 'var(--mac-spacing-2)',
                 padding: 'var(--mac-spacing-2)',
-                background: tmpl.is_pinned ? 'var(--mac-bg-primary)8e1' : '#f9f9f9',
+                background: tmpl.is_pinned ? 'var(--emr-v2-surface-primary, var(--mac-bg-primary, Canvas))' : '#f9f9f9',
                 border: tmpl.is_pinned ? '2px solid #ffb300' : '1px solid #e0e0e0',
                 borderRadius: 'var(--mac-radius-sm)'
               }}>
@@ -363,7 +358,7 @@ export function TreatmentSection({
                                         {/* Template content - clickable */}
                                         <button
                 type="button"
-                onClick={() => handleApplyMyExperience(tmpl)}
+                onClick={() => setLegacyPreview(String(tmpl.treatment_text ?? ''))}
                 style={{
                   flex: 1,
                   textAlign: 'left',
@@ -445,6 +440,17 @@ export function TreatmentSection({
         currentValue={value}
         onApply={handleApplyTemplate}
         onClose={() => setShowTemplates(false)} />
+            <DoctorTemplatesPanel section="treatment" icd10Code={icd10Code || null}
+              isOpen={showReviewedTemplates} onClose={() => setShowReviewedTemplates(false)}
+              onApply={(text, source) => onChange?.(value.trim() ? `${value.trim()}\n\n${text}` : text, source)} />
+            {legacyPreview && <Dialog open onClose={() => setLegacyPreview('')} maxWidth="md" fullWidth>
+              <DialogTitle>{t('emr_workspace.treatment_history')}</DialogTitle>
+              <DialogContent>
+                <p>{t('emr_workspace.template_learned')}</p>
+                <p className="emr-workspace-document-text">{legacyPreview}</p>
+              </DialogContent>
+              <DialogActions><Button type="button" onClick={() => setLegacyPreview('')}>{t('misc.cancel')}</Button></DialogActions>
+            </Dialog>}
       
 
             {/* ✏️ Edit Template Modal */}
@@ -525,7 +531,7 @@ export function TreatmentSection({
               style={{
                 flex: 1,
                 padding: 'var(--mac-spacing-3)',
-                background: 'var(--mac-bg-primary)3e0',
+                background: 'var(--emr-v2-surface-primary, var(--mac-bg-primary, Canvas))',
                 border: '1px solid #ff9800',
                 borderRadius: 'var(--mac-radius-sm)',
                 cursor: 'pointer',
