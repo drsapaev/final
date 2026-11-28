@@ -1,0 +1,141 @@
+diff --git a/frontend/src/pages/registrar/views/WelcomeView.tsx b/frontend/src/pages/registrar/views/WelcomeView.tsx
+--- a/frontend/src/pages/registrar/views/WelcomeView.tsx
++++ b/frontend/src/pages/registrar/views/WelcomeView.tsx
+@@ -45,4 +45,4 @@
+  * @param {Function} props.openRecordPreview - open a read-only record preview
+  * @param {Function} props.openRecordEditor - open the wizard in edit mode for a row
+- * @param {Function} props.updateAppointmentStatus - patch a row status (e.g. 'in_cabinet', 'done')
++ * @param {Function} props.handleTableAction - route clinical row commands through the shared confirmation gate
+  * @param {Function} props.handleStartVisit - call the patient into the cabinet (start visit)
+@@ -150,7 +150,7 @@ export interface WelcomeViewProps {
+   // Action: records
+   openRecordPreview: (row: unknown) => void;
+   openRecordEditor: (row: unknown) => void;
+-  updateAppointmentStatus: (id: unknown, status: string, note: string, row?: unknown) => void | Promise<void>;
++  handleTableAction: (action: string, row: Record<string, unknown>, event?: unknown) => void | Promise<void>;
+   handleStartVisit: (row: unknown) => void | Promise<void>;
+   // Action: CSV — actual signatures come from registrarCsv.ts; loosened here.
+   generateCSV: (...args: unknown[]) => unknown;
+@@ -198,7 +198,7 @@ const WelcomeView = React.memo(({
+   setContextMenu,
+   openRecordPreview,
+   openRecordEditor,
+-  updateAppointmentStatus,
++  handleTableAction,
+   handleStartVisit,
+   generateCSV,
+   downloadCSV,
+@@ -797,17 +797,14 @@ const WelcomeView = React.memo(({
+                     setPaymentDialog({ open: true, row, paid: false, source: 'welcome' });
+                     break;
+                   case 'in_cabinet':
+-                    logger.info('[Welcome] Row action: in_cabinet', { recordId: row.id });
+-                    updateAppointmentStatus(row.id, 'in_cabinet', '', row);
+-                    break;
++                    // REG-FE-006: use the shared confirmation-gated row router.
++                    return handleTableAction('in_cabinet', row as Record<string, unknown>, event);
+                   case 'call':
+                     logger.info('[Welcome] Row action: call', { recordId: row.id });
+                     handleStartVisit(row);
+                     break;
+                   case 'complete':
+-                    logger.info('[Welcome] Row action: complete', { recordId: row.id });
+-                    updateAppointmentStatus(row.id, 'done', '', row);
+-                    break;
++                    return handleTableAction('complete', row as Record<string, unknown>, event);
+                   case 'print':
+                     logger.info('[Welcome] Row action: print', { recordId: row.id });
+                     setPrintDialog({ open: true, type: 'ticket', data: row });
+diff --git a/frontend/src/pages/RegistrarPanel.tsx b/frontend/src/pages/RegistrarPanel.tsx
+--- a/frontend/src/pages/RegistrarPanel.tsx
++++ b/frontend/src/pages/RegistrarPanel.tsx
+@@ -381,7 +381,7 @@
+             setContextMenu={setContextMenu as unknown as React.Dispatch<React.SetStateAction<{ open: boolean; row: unknown; position: { x: number; y: number } }>>}
+             openRecordPreview={openRecordPreview}
+             openRecordEditor={openRecordEditor}
+-            updateAppointmentStatus={updateAppointmentStatus as unknown as (id: unknown, status: string, note: string, row?: unknown) => void | Promise<void>}
++            handleTableAction={handleTableAction}
+             handleStartVisit={handleStartVisit as unknown as (row: unknown) => void | Promise<void>}
+             generateCSV={generateCSV as unknown as (...args: unknown[]) => unknown}
+             downloadCSV={downloadCSV as unknown as (...args: unknown[]) => void}
+diff --git a/frontend/src/pages/registrar/views/__tests__/WelcomeView.honestStates.test.tsx b/frontend/src/pages/registrar/views/__tests__/WelcomeView.honestStates.test.tsx
+--- a/frontend/src/pages/registrar/views/__tests__/WelcomeView.honestStates.test.tsx
++++ b/frontend/src/pages/registrar/views/__tests__/WelcomeView.honestStates.test.tsx
+@@ -52,10 +52,21 @@ vi.mock('@/components/statistics/ModernStatistics', () => ({
+ }));
+
+ vi.mock('@/components/tables/EnhancedAppointmentsTable', () => ({
+-  default: ({ showCheckboxes, data }: { showCheckboxes?: boolean; data?: unknown[] }) => (
++  default: ({ showCheckboxes, data, onActionClick }: {
++    showCheckboxes?: boolean;
++    data?: Record<string, unknown>[];
++    onActionClick?: (action: string, row: Record<string, unknown>) => void | Promise<void>;
++  }) => (
+     <div
+       data-testid="appointments-stub"
+       data-show-checkboxes={String(Boolean(showCheckboxes))}
+-      data-rows={String(data?.length ?? 0)} />
++      data-rows={String(data?.length ?? 0)}>
++      {data?.map((row, index) => (
++        <div key={String(row.id ?? index)}>
++          <button type="button" onClick={() => { void onActionClick?.('in_cabinet', row); }}>test-in-cabinet</button>
++          <button type="button" onClick={() => { void onActionClick?.('complete', row); }}>test-complete</button>
++        </div>
++      ))}
++    </div>
+   ),
+ }));
+@@ -120,7 +131,7 @@ const makeProps = (overrides: Record<string, unknown> = {}) => ({
+   setContextMenu: vi.fn(),
+   openRecordPreview: vi.fn(),
+   openRecordEditor: vi.fn(),
+-  updateAppointmentStatus: vi.fn(),
++  handleTableAction: vi.fn().mockResolvedValue(undefined),
+   handleStartVisit: vi.fn(),
+   generateCSV: vi.fn(),
+   downloadCSV: vi.fn(),
+@@ -413,1 +424,23 @@
+ });
++
++// REG-FE-006: the Welcome action must never bypass the parent table router,
++// which owns the confirmation and prevents clinical status mutation on cancel.
++describe('REG-FE-006 — Welcome clinical actions share the confirm-gated router', () => {
++  const row = { id: 87, patient_fio: 'SYNTHETIC PATIENT' };
++
++  it.each([
++    ['test-in-cabinet', 'in_cabinet'],
++    ['test-complete', 'complete'],
++  ])('delegates %s to the existing action handler', async (label, action) => {
++    const handleTableAction = vi.fn().mockResolvedValue(undefined);
++    const oldDirectMutation = vi.fn();
++    render(<WelcomeView {...makeProps({
++      appointments: [row], filteredAppointments: [row], handleTableAction,
++      updateAppointmentStatus: oldDirectMutation,
++    })} />);
++
++    fireEvent.click(screen.getByRole('button', { name: label }));
++    await waitFor(() => expect(handleTableAction).toHaveBeenCalledWith(action, row, undefined));
++    expect(oldDirectMutation).not.toHaveBeenCalled();
++  });
++});
+diff --git a/frontend/src/pages/registrar/__tests__/useRegistrarRowActions.test.ts b/frontend/src/pages/registrar/__tests__/useRegistrarRowActions.test.ts
+--- a/frontend/src/pages/registrar/__tests__/useRegistrarRowActions.test.ts
++++ b/frontend/src/pages/registrar/__tests__/useRegistrarRowActions.test.ts
+@@ -161,8 +161,17 @@ describe('useRegistrarRowActions (PR-UI-13-5)', () => {
+   it('complete from the table routes to the done status after confirmation', async () => {
+     const { hook, updateAppointmentStatus } = renderRowActions();
+     const row = { id: 9, patient_name: 'C D' };
+     await act(async () => { await hook.current.handleTableAction('complete', row); });
+     expect(updateAppointmentStatus).toHaveBeenCalledWith(9, 'done', '', row);
+   });
+
++  it('complete from the table makes no mutation when confirmation is declined', async () => {
++    const confirm = vi.fn().mockResolvedValue(false);
++    const updateAppointmentStatus = vi.fn().mockResolvedValue(undefined);
++    const { hook } = renderRowActions({ confirm, updateAppointmentStatus });
++    await act(async () => { await hook.current.handleTableAction('complete', { id: 9 }); });
++    expect(confirm).toHaveBeenCalledTimes(1);
++    expect(updateAppointmentStatus).not.toHaveBeenCalled();
++  });
++
+   it('print action opens the print dialog with a ticket payload', async () => {
