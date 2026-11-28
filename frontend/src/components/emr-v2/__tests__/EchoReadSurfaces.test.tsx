@@ -132,7 +132,7 @@ describe('Adult TTE clinical read surfaces', () => {
     const visitDetails = screen.getByText('emr_workspace.history_details').closest('details')!;
     const measurements = screen.getByText('emr_workspace.measurement_history').closest('details')!;
     expect(visitDetails.open).toBe(false);
-    fireEvent.click(within(measurements).getByRole('button', { name: '2026-09-05', exact: true }));
+    fireEvent.click(within(measurements).getByRole('button', { name: /^2026-09-05$/ }));
     expect(visitDetails.open).toBe(true);
 
     const details = within(visitDetails);
