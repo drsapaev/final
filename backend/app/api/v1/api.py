@@ -64,6 +64,7 @@ from app.api.v1.endpoints import (
     emr_templates,
     emr_v2,
     emr_versioning_enhanced,
+    emr_workspace,
     fcm_notifications,
     feature_flags,
     file_system,
@@ -73,7 +74,13 @@ from app.api.v1.endpoints import (
     force_majeure,
     global_search,
     group_permissions,
+    lab_clinical_configurations,
+    lab_critical_communication,
+    lab_equipment_integrations,
+    lab_imports,
     lab_reporting,
+    lab_specimens,
+    lab_worklist,
     medical_equipment,
     messages,
     mobile_api,
@@ -495,8 +502,22 @@ api_router.include_router(cardio.router, tags=["cardio"])
 api_router.include_router(derma.router, tags=["derma"])
 api_router.include_router(dental.router, tags=["dental"])
 api_router.include_router(lab_reporting.router, tags=["lab-reporting"])
+api_router.include_router(lab_specimens.router)
+api_router.include_router(lab_worklist.router)
+api_router.include_router(lab_critical_communication.router)
+api_router.include_router(lab_imports.router)
+api_router.include_router(
+    lab_clinical_configurations.router,
+    prefix="/clinic",
+    tags=["clinic-management", "lab-clinical-configuration"],
+)
+api_router.include_router(
+    lab_equipment_integrations.router,
+    prefix="/clinic",
+    tags=["clinic-management", "lab-equipment-integrations"],
+)
 # Legacy /lab CRUD and placeholder routers are intentionally not published.
-# The lab reporting template workflow is the only supported public contract.
+# The supported lab contract lives in these lab reporting workflow routers.
 api_router.include_router(
     appointment_flow.router, prefix="/appointments", tags=["appointment_flow"]
 )
@@ -593,6 +614,7 @@ api_router.include_router(
 
 # EMR v2 - Production EMR with versioning and audit
 api_router.include_router(emr_v2.router, prefix="/v2", tags=["emr-v2"])
+api_router.include_router(emr_workspace.router, prefix="/v2", tags=["emr-v2"])
 
 # Mobile-contract alias (Android client): GET/POST /api/v1/emr/{visit_id} via
 # a NARROW alias router. Kept AFTER every static /emr/* router so those

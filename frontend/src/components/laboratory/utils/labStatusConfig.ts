@@ -22,20 +22,25 @@
 // Жизненный цикл бланка (instance status). Порядок = порядок stepper'а.
 // ────────────────────────────────────────────────────────────────────────────
 export const LAB_REPORT_STATUS_CONFIG = [
-  { key: 'DRAFT',       label: 'Черновик',          variant: 'warning' },
-  { key: 'IN_PROGRESS', label: 'Заполняется',       variant: 'primary' },
-  { key: 'READY',       label: 'Готов к проверке',  variant: 'primary' },
-  { key: 'FINALIZED',   label: 'Утверждён',         variant: 'success' },
-  { key: 'PRINTED',     label: 'Напечатан',         variant: 'success' },
+  { key: 'DRAFT', label: 'Черновик', variant: 'warning', translationKey: 'status.draft' },
+  { key: 'IN_PROGRESS', label: 'Заполняется', variant: 'primary', translationKey: 'status.in_progress' },
+  { key: 'READY', label: 'Готов к проверке', variant: 'primary', translationKey: 'status.ready' },
+  { key: 'IN_REVIEW', label: 'На проверке', variant: 'warning', translationKey: 'workbench.workflow_status_in_review' },
+  { key: 'REVIEWED', label: 'Проверен', variant: 'primary', translationKey: 'workbench.workflow_status_reviewed' },
+  { key: 'FINALIZED', label: 'Утверждён', variant: 'success', translationKey: 'status.finalized' },
+  { key: 'PRINTED', label: 'Напечатан', variant: 'success', translationKey: 'status.printed' },
 ];
 
+type LabStatusConfig = { label: string; variant: string; translationKey?: string };
+export type LabStatusTranslator = (key: string, options?: Record<string, unknown>) => string;
+
 // Быстрый lookup по ключу статуса.
-export const LAB_REPORT_STATUS_BY_KEY: Record<string, { key: string; label: string; variant: string }> = LAB_REPORT_STATUS_CONFIG.reduce(
+export const LAB_REPORT_STATUS_BY_KEY = LAB_REPORT_STATUS_CONFIG.reduce(
   (acc, item) => {
     acc[item.key] = item;
     return acc;
   },
-  {} as Record<string, { key: string; label: string; variant: string }>
+  {} as Record<string, (typeof LAB_REPORT_STATUS_CONFIG)[number]>
 );
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -43,13 +48,13 @@ export const LAB_REPORT_STATUS_BY_KEY: Record<string, { key: string; label: stri
 // это state machine очереди, а не бланка.
 // ────────────────────────────────────────────────────────────────────────────
 export const LAB_QUEUE_STATUS_CONFIG = {
-  waiting:     { label: 'Ожидает',     variant: 'warning' },
-  confirmed:   { label: 'Подтверждён', variant: 'warning' },
-  pending:     { label: 'Ожидает',     variant: 'warning' },
-  called:      { label: 'Вызван',      variant: 'primary' },
-  in_progress: { label: 'В работе',    variant: 'primary' },
-  completed:   { label: 'Завершён',    variant: 'success' },
-  done:        { label: 'Завершён',    variant: 'success' },
+  waiting: { label: 'Ожидает', variant: 'warning', translationKey: 'queue_status.waiting' },
+  confirmed: { label: 'Подтверждён', variant: 'warning', translationKey: 'queue_status.confirmed' },
+  pending: { label: 'Ожидает', variant: 'warning', translationKey: 'queue_status.pending' },
+  called: { label: 'Вызван', variant: 'primary', translationKey: 'queue_status.called' },
+  in_progress: { label: 'В работе', variant: 'primary', translationKey: 'queue_status.in_progress' },
+  completed: { label: 'Завершён', variant: 'success', translationKey: 'queue_status.completed' },
+  done: { label: 'Завершён', variant: 'success', translationKey: 'queue_status.done' },
 };
 
 /**
@@ -60,13 +65,13 @@ export const LAB_QUEUE_STATUS_CONFIG = {
  * @param {string} status — ключ статуса
  * @returns {{ label: string, variant: string }}
  */
-export function getLabStatusConfig(status: string) {
+export function getLabStatusConfig(status: string): LabStatusConfig {
   if (!status) {
-    return { label: 'Неизвестно', variant: 'info' };
+    return { label: 'Неизвестно', variant: 'info', translationKey: 'status.unknown' };
   }
   return (
     LAB_REPORT_STATUS_BY_KEY[status]
-    || (LAB_QUEUE_STATUS_CONFIG as Record<string, { label: string; variant: string }>)[status]
+    || (LAB_QUEUE_STATUS_CONFIG as Record<string, LabStatusConfig>)[status]
     || { label: status, variant: 'info' }
   );
 }
@@ -75,8 +80,9 @@ export function getLabStatusConfig(status: string) {
  * Возвращает человекочитаемый label статуса.
  * Заменяет старую formatLabStatus() из labUiLabels.js.
  */
-export function formatLabStatusLabel(status: string) {
-  return getLabStatusConfig(status).label;
+export function formatLabStatusLabel(status: string, translate?: LabStatusTranslator) {
+  const { label, translationKey } = getLabStatusConfig(status);
+  return translationKey && translate ? translate(translationKey, { defaultValue: label }) : label;
 }
 
 /**

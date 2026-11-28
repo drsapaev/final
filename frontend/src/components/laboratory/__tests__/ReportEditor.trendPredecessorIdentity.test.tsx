@@ -67,14 +67,6 @@ vi.mock('../../../hooks/useLabReporting', () => {
   return { useLabReporting: () => mockedApi };
 });
 
-vi.mock('./hooks/useLabToast', () => ({
-  useLabToast: () => ({
-    interactiveInfo: vi.fn(),
-    interactiveWarning: vi.fn(),
-    interactiveError: vi.fn(),
-  }),
-}));
-
 import ReportEditorRaw from '../ReportEditor';
 
 const ReportEditor = ReportEditorRaw as unknown as React.ComponentType<Record<string, unknown>>;
@@ -192,7 +184,7 @@ describe('LABEDIT-FE-003 — the previous report’s trend details are dropped s
     // in particular A's «135» (another patient's clinical value) is gone.
     await act(async () => { await flush(); });
     expect(screen.queryByText(/135/)).toBeNull();
-    expect(screen.queryByText(/↗/)).toBeNull();
+    expect(screen.queryByText(/Ранее /)).toBeNull();
 
     // B's own predecessor (id 94) is fetched and its value renders.
     await act(async () => { resolveBDetails(PREV_DETAILS_B); });
@@ -211,6 +203,7 @@ describe('LABEDIT-FE-003 — the previous report’s trend details are dropped s
       id: 93,
       patient_id: 2,
       template_id: 3,
+      status: 'FINALIZED',
       created_at: '2026-11-05T10:00:00Z',
       sections: [{ key: 'cbc', title: 'CBC', fields: [hgbField('130')] }],
     });
@@ -231,7 +224,7 @@ describe('LABEDIT-FE-003 — the previous report’s trend details are dropped s
 
     await waitFor(() => expect(getInstanceMock).toHaveBeenCalledWith(93));
     expect(getInstanceMock).not.toHaveBeenCalledWith(94);
-    await waitFor(() => expect(screen.getByText(/↗ 130/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Ранее 130/)).toBeInTheDocument());
   });
 
   it('a details DTO claiming another patient is suppressed entirely (fail-closed)', async () => {
@@ -259,7 +252,7 @@ describe('LABEDIT-FE-003 — the previous report’s trend details are dropped s
     await act(async () => { await flush(); });
     await waitFor(() => expect(getInstanceMock).toHaveBeenCalledWith(94));
     expect(screen.queryByText(/140/)).toBeNull();
-    expect(screen.queryByText(/↗/)).toBeNull();
+    expect(screen.queryByText(/Ранее /)).toBeNull();
   });
 });
 
@@ -271,6 +264,7 @@ describe('LABEDIT-FE-004 — the previous value is a chronologically OLDER same-
       id: 89,
       patient_id: 1,
       template_id: 3,
+      status: 'FINALIZED',
       created_at: '2026-09-01T10:00:00Z',
       sections: [{ key: 'cbc', title: 'CBC', fields: [hgbField('120')] }],
     });
@@ -308,6 +302,7 @@ describe('LABEDIT-FE-004 — the previous value is a chronologically OLDER same-
       id: 89,
       patient_id: 1,
       template_id: 3,
+      status: 'FINALIZED',
       created_at: '2026-10-05T10:00:00Z',
       sections: [{ key: 'cbc', title: 'CBC', fields: [hgbField('110')] }],
     });

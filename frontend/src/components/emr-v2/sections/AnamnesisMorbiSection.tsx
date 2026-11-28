@@ -29,7 +29,7 @@ import { useTranslation } from '@/i18n/useTranslation';
  */
 interface AnamnesisMorbiSectionProps {
   value?: string;
-  onChange?: ((value: string) => void) | undefined;
+  onChange?: ((value: string, options?: Record<string, unknown>) => void) | undefined;
   disabled?: boolean;
   defaultOpen?: boolean;
   icd10Code?: string;
@@ -87,13 +87,13 @@ export function AnamnesisMorbiSection({
   }, [doctorSuggestions]);
 
   // Handle template apply
-  const handleApplyTemplate = useCallback((text: string) => {
+  const handleApplyTemplate = useCallback((text: string, source?: Record<string, unknown>) => {
     if (!text) return;
     const current = value || '';
     const newValue = current.trim() ?
     `${current.trim()}\n\n${text}` :
     text;
-    onChange?.(newValue);
+    onChange?.(newValue, source);
   }, [value, onChange]);
 
   return (

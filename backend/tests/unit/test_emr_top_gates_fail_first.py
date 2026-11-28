@@ -207,6 +207,28 @@ def test_section_templates_get_returns_seeded_template(
     assert body.get("total", 0) >= 1
 
 
+def test_section_templates_reject_inactive_owner(client, db_session, section_doctor):
+    _seed_template(db_session, section_doctor.id, "complaints", "SYNTHETIC template")
+    template = (
+        db_session.query(DoctorSectionTemplate)
+        .filter_by(doctor_id=section_doctor.id, section_type="complaints")
+        .one()
+    )
+    section_doctor.is_active = False
+    db_session.commit()
+    _authorize_as(section_doctor)
+
+    listing = client.get("/api/v1/section-templates/complaints")
+    review = client.post(
+        f"/api/v1/section-templates/complaints/{template.id}/review",
+        json={"expected_revision": template.template_revision},
+    )
+
+    assert (listing.status_code, review.status_code) == (403, 403)
+    db_session.refresh(template)
+    assert template.reviewed_at is None
+
+
 def test_section_templates_db_failure_not_masked_as_empty_success(
     client, section_doctor
 ) -> None:

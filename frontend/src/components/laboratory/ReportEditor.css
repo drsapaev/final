@@ -1,0 +1,218 @@
+.lab-result-editor {
+  container-type: inline-size;
+  display: grid;
+  gap: var(--mac-spacing-4, 1rem);
+  min-width: 0;
+}
+
+.lab-result-section {
+  background: var(--mac-bg-primary, Canvas);
+  border: 1px solid var(--mac-border, GrayText);
+  border-radius: var(--mac-radius-lg, 0.75rem);
+}
+
+.lab-result-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mac-spacing-2, 0.5rem);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--mac-spacing-2, 0.5rem) var(--mac-spacing-3, 0.75rem);
+  color: var(--mac-text-primary, CanvasText);
+  background: var(--mac-bg-tertiary, Canvas);
+  border: 0;
+  border-radius: var(--mac-radius-lg, 0.75rem);
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--mac-font-weight-semibold, 600);
+  text-align: start;
+}
+
+.lab-result-section-toggle:focus-visible,
+.lab-result-details summary:focus-visible {
+  outline: 2px solid var(--mac-accent, Highlight);
+  outline-offset: 2px;
+}
+
+.lab-result-fields {
+  padding: 0 var(--mac-spacing-3, 0.75rem);
+}
+
+.lab-result-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.45fr) minmax(0, 0.9fr) minmax(0, 0.75fr) minmax(0, 1fr);
+  grid-template-areas:
+    'name input unit reference assessment previous'
+    'details details details details details details';
+  align-items: start;
+  gap: var(--mac-spacing-2, 0.5rem);
+  padding: var(--mac-spacing-3, 0.75rem) 0;
+  overflow-wrap: anywhere;
+}
+
+.lab-result-row + .lab-result-row {
+  border-top: 1px solid var(--mac-border, GrayText);
+}
+
+.lab-result-name {
+  grid-area: name;
+  display: grid;
+  gap: var(--mac-spacing-1, 0.25rem);
+  font-weight: var(--mac-font-weight-semibold, 600);
+}
+
+.lab-result-input {
+  grid-area: input;
+  min-width: 0;
+}
+
+.lab-result-input > :is(select, textarea) {
+  width: 100%;
+  min-width: 0;
+}
+
+.lab-result-unit { grid-area: unit; }
+.lab-result-assessment { grid-area: assessment; }
+.lab-result-previous { grid-area: previous; }
+
+.lab-result-reference {
+  grid-area: reference;
+  display: grid;
+  gap: var(--mac-spacing-1, 0.25rem);
+}
+
+.lab-result-required,
+.lab-result-unit,
+.lab-result-reference,
+.lab-result-previous,
+.lab-result-instrument-flags,
+.lab-result-details {
+  color: var(--mac-text-secondary, CanvasText);
+  font-size: var(--mac-font-size-xs, 0.75rem);
+}
+
+.lab-result-instrument-flags {
+  margin: var(--mac-spacing-1, 0.25rem) 0 0;
+}
+
+.lab-result-error {
+  color: var(--mac-error, CanvasText);
+  font-size: var(--mac-font-size-xs, 0.75rem);
+}
+
+.lab-result-details {
+  grid-area: details;
+}
+
+.lab-result-details summary {
+  width: fit-content;
+  padding: var(--mac-spacing-1, 0.25rem) 0;
+  cursor: pointer;
+}
+
+.lab-result-details[open] label {
+  display: grid;
+  gap: var(--mac-spacing-1, 0.25rem);
+  margin-top: var(--mac-spacing-2, 0.5rem);
+}
+
+.lab-result-assessment .mac-badge {
+  max-width: 100%;
+}
+
+@container (max-width: 750px) {
+  .lab-result-row {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 0.85fr);
+    grid-template-areas:
+      'name input unit'
+      'reference assessment previous'
+      'details details details';
+  }
+}
+
+@container (max-width: 390px) {
+  .lab-result-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'name name'
+      'input unit'
+      'reference assessment'
+      'previous previous'
+      'details details';
+  }
+}
+
+.lab-save-status {
+  display: grid;
+  gap: var(--mac-spacing-2, 0.5rem);
+  padding: var(--mac-spacing-2, 0.5rem) 0;
+  color: var(--mac-text-secondary, CanvasText);
+  font-size: var(--mac-font-size-sm, 0.875rem);
+}
+
+.lab-save-status[data-failure] {
+  color: var(--mac-text-primary, CanvasText);
+  border-block-start: 2px solid var(--mac-warning, CanvasText);
+}
+
+.lab-save-status-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--mac-spacing-2, 0.5rem);
+}
+
+.lab-save-comparison-scroll { overflow-x: auto; }
+
+.lab-save-comparison-table {
+  width: 100%;
+  margin-bottom: var(--mac-spacing-2, 0.5rem);
+  border-collapse: collapse;
+  overflow-wrap: anywhere;
+}
+
+.lab-save-comparison-table :is(caption, th, td) {
+  padding: var(--mac-spacing-2, 0.5rem);
+  border-bottom: 1px solid var(--mac-border, GrayText);
+  text-align: start;
+  vertical-align: top;
+}
+
+.lab-save-comparison-table small { display: block; }
+
+.lab-critical-findings-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
+  align-items: start;
+  gap: var(--mac-spacing-2, 0.5rem);
+  overflow-wrap: anywhere;
+}
+
+.lab-report-study-date {
+  display: grid;
+  gap: var(--mac-spacing-1, 0.25rem);
+  max-width: 15rem;
+  font-size: var(--mac-font-size-sm, 0.875rem);
+}
+
+.lab-workflow-panel,
+.lab-workflow-form,
+.lab-workflow-form label,
+.lab-visit-assignment {
+  display: grid;
+  gap: var(--mac-spacing-2, 0.5rem);
+}
+
+.lab-visit-assignment {
+  min-width: 0;
+  padding: var(--mac-spacing-2, 0.5rem);
+  border: 1px solid var(--mac-border, GrayText);
+  border-radius: var(--mac-radius-md, 0.5rem);
+}
+
+.lab-visit-assignment label {
+  display: flex;
+  gap: var(--mac-spacing-2, 0.5rem);
+  align-items: center;
+}

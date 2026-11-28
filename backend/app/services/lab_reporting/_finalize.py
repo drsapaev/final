@@ -11,98 +11,169 @@ from app.services.lab_reporting._base import LabReportingServiceMixinBase
 class FinalizeMixin(LabReportingServiceMixinBase):
     """Finalize methods for LabReportingService."""
 
-    def finalize(self, instance_id: int) -> LabReportInstance:
+    def finalize(
+        self, instance_id: int, *, actor_user_id: int | None = None,
+        expected_updated_at: str | None = None,
+    ) -> LabReportInstance:
         logger.info("[LAB] finalize instance_id=%s", instance_id)
-        # Serialize the whole aggregate before reading status or child values.
-        # Draft saves and finalization share this parent-first lock order.
+        # Draft writers, review and release serialize on the parent row first.
         instance = self._get_locked_instance(instance_id)
-        self._assert_instance_editable(instance)
-        current_values = {
-            value.field_key: self._extract_effective_value(value)
-            for value in instance.values
-        }
-        field_map = self._field_map(instance.template_version)
-        context = self._build_rule_context(instance.patient_snapshot, current_values)
-
-        visible_required_fields = []
-        for field_def in field_map.values():
-            if self._is_visible(field_def.visibility_rule, context):
-                if field_def.required:
-                    visible_required_fields.append(field_def.field_key)
-                reference = self._resolve_reference(field_def, context)
-                value = next(
-                    (item for item in instance.values if item.field_key == field_def.field_key),
-                    None,
+        actor = self._workflow_actor(actor_user_id) if actor_user_id is not None else None
+        if actor_user_id is not None:
+            # Every user-facing release must have an exact clinic-approved
+            # configuration pinned at report creation/revision. Check the
+            # version first so a stale client still receives the concurrency
+            # conflict when release is blocked for missing clinic setup.
+            # Configured managed reports validate their token after replay
+            # detection so an acknowledged retry remains idempotent.
+            if (
+                instance.clinical_configuration_version_id is None
+                and expected_updated_at is not None
+            ):
+                self._assert_not_concurrently_modified(instance, expected_updated_at)
+            if instance.clinical_configuration_version_id is None:
+                raise LabReportingDomainError(
+                    409,
+                    "Approved clinic clinical configuration and assigned Lab physician required",
                 )
-                if value:
-                    value.resolved_reference_text = reference.get("text")
-                    flag = self._resolve_flag(
-                        field_def=field_def,
-                        effective_value=current_values.get(field_def.field_key),
-                        context=context,
-                        reference=reference,
-                    )
-                    value.resolved_flag = flag["flag"]
-                    value.resolved_flag_source = flag["source"]
-                    value.resolved_flag_severity = flag["severity_rank"]
-                    value.resolved_flag_meta = flag["meta"]
-
-        missing = [
-            field_key
-            for field_key in visible_required_fields
-            if current_values.get(field_key) in (None, "")
-        ]
-        if missing:
+        if (
+            instance.clinical_configuration_version_id is not None
+            and not instance.managed_release
+        ):
+            if actor is None:
+                raise LabReportingDomainError(
+                    403,
+                    "Assigned active laboratory physician required for clinical sign-off",
+                )
+            self._require_assigned_clinical_reviewer(instance, actor)
             raise LabReportingDomainError(
-                400,
-                f"Cannot finalize. Required fields missing: {', '.join(missing)}",
+                409, "Clinical configuration requires the managed review workflow"
             )
-        # Flush resolved references/flags while the row is still mutable.
-        # The database trigger only allows the immutable transition after this point.
+        expected_version = None
+        evidence = None
+        if instance.managed_release:
+            actor = actor or self._workflow_actor(actor_user_id)
+            self._require_workflow_permission(actor, "lab:release")
+            self._require_assigned_clinical_reviewer(instance, actor)
+            expected_version = self._workflow_expected_version(expected_updated_at)
+            if self._workflow_request_replayed(
+                instance, kind="finalized", actor=actor, expected_version=expected_version,
+            ):
+                return instance
+            evidence = self._assert_reviewed_release(instance, actor, expected_updated_at)
+        else:
+            if (
+                instance.status == "FINALIZED"
+                and actor is not None
+                and expected_updated_at is not None
+            ):
+                try:
+                    expected_version = self._workflow_expected_version(expected_updated_at)
+                except (LabReportingDomainError, OverflowError):
+                    # Released legacy reports retain their immutability error.
+                    pass
+                if expected_version is not None and self._workflow_request_replayed(
+                    instance, kind="finalized", actor=actor, expected_version=expected_version,
+                ):
+                    return instance
+            self._assert_instance_editable(instance)
+            self._assert_not_concurrently_modified(instance, expected_updated_at)
+            if actor is not None and expected_updated_at is not None:
+                expected_version = self._normalized_version(instance.updated_at)
+            if not self._has_published_template(instance):
+                raise LabReportingDomainError(409, "Release requires a published template version")
+            values, context = self._refresh_result_evaluation(instance, validate_existing=True)
+            self._assert_required_results(instance, values, context)
+
+        # Persist legacy evaluation before switching the report to its
+        # immutable state. Managed values already contain the review snapshot.
         self.repository.flush()
+        if instance.managed_release and actor is not None:
+            self._apply_managed_signer_snapshot(instance, actor)
         instance.status = "FINALIZED"
         instance.finalized_at = datetime.now(UTC)
         self._advance_instance_version(instance)
-        # P-01 bridge: sync в legacy lab_results таблицу для read-only
-        # потребителей (mobile app, EMR, statistics, notifications).
-        # Создаёт LabResult записи как projection из LabReportValue.
-        # См. _sync_legacy_lab_results ниже для подробностей.
-        self._sync_legacy_lab_results(instance, field_map)
+        if actor is not None:
+            self._append_workflow_event(
+                instance, kind="finalized", actor=actor,
+                expected_version=expected_version, evidence=evidence,
+            )
+        self._sync_legacy_lab_results(instance, self._field_map(instance.template_version))
+        from app.services.lab_critical_communication import record_released_report
+
+        record_released_report(self.db, instance, actor_user_id=actor_user_id)
         self.repository.commit()
 
-        # P0 fix: emit inline notifications on finalize — no cron/scheduler needed.
-        # Notifies (1) the patient via Telegram that results are ready, and
-        # (2) the ordering doctor if the instance was created from a lab order.
-        # Previously lab_notification_service.py was fully implemented but
-        # never called — patients had to manually poll for results.
-        # Now wired up: see check_critical_values() call below.
         try:
             self._emit_lab_results_ready_notification(instance)
         except Exception as notify_err:
-            logger.warning(
-                "[LAB] results-ready notification failed (non-blocking): %s",
-                notify_err,
-            )
+            logger.warning("[LAB] results-ready notification failed: %s", type(notify_err).__name__)
 
-        # Wire-up: check critical values on finalize. The
-        # LabNotificationService.check_critical_values() was implemented
-        # but never called. Now we invoke it inline after finalization
-        # so doctors get immediate alerts for glucose >20, potassium >6.5,
-        # hemoglobin <70, etc. (8 markers in CRITICAL_VALUES dict).
-        # Non-blocking — a failure here does not roll back the finalization.
-        try:
-            from app.services.lab_notification_service import LabNotificationService
-            lab_notif_svc = LabNotificationService(self.db)
-            asyncio.get_event_loop().create_task(
-                lab_notif_svc.check_critical_values()
-            )
-        except Exception as critical_err:
-            logger.warning(
-                "[LAB] critical values check failed (non-blocking): %s",
-                critical_err,
-            )
+        if not instance.managed_release:
+            try:
+                from app.services.lab_notification_service import LabNotificationService
+
+                lab_notif_svc = LabNotificationService(self.db)
+                asyncio.get_event_loop().create_task(lab_notif_svc.check_critical_values())
+            except Exception as critical_err:
+                logger.warning("[LAB] critical value check failed: %s", type(critical_err).__name__)
 
         return self.get_instance(instance.id)
+
+    def _assert_required_results(
+        self, instance: LabReportInstance, values: dict[str, Any], context: dict[str, Any],
+    ) -> None:
+        incoming = {value.field_key: value for value in instance.values}
+        missing = []
+        has_result = False
+        for key, field in self._field_map(instance.template_version).items():
+            value = incoming.get(key)
+            payload = (value.result_payload or {}) if value else {}
+            field_context = {**context, "method_code": payload.get("method_code")}
+            if not self._is_visible(field.visibility_rule, field_context):
+                continue
+            absent_with_reason = payload.get("kind") == "absent" and bool(payload.get("absence_reason"))
+            complete = values.get(key) not in (None, "") or absent_with_reason
+            has_result = has_result or complete
+            if field.required and not complete:
+                missing.append(key)
+        if missing:
+            raise LabReportingDomainError(400, f"Required results missing: {', '.join(missing)}")
+        if not has_result and not self._is_legacy_clearing_revision(instance):
+            raise LabReportingDomainError(400, "A report needs at least one result or absence reason")
+
+    def _is_legacy_clearing_revision(self, instance: LabReportInstance) -> bool:
+        # The established lineage API can clear the last projected value.
+        # Managed corrections need an explicit absence reason instead.
+        source = instance.supersedes_instance if not instance.managed_release else None
+        return bool(source and any(
+            self._extract_effective_value(value) not in (None, "") for value in source.values
+        ))
+
+    def _assert_reviewed_release(self, instance, actor, expected_updated_at):
+        self._require_assigned_clinical_reviewer(instance, actor)
+        if instance.status != "REVIEWED":
+            raise LabReportingDomainError(409, "Release requires a reviewed report")
+        self._assert_not_concurrently_modified(instance, expected_updated_at)
+        if not self._reviewer_has_separation(instance.id, actor):
+            raise LabReportingDomainError(403, "Report requires an authorized releasing employee")
+        review = self._latest_workflow_event(instance.id, "reviewed")
+        if not review or self._normalized_version(review.report_version) != self._normalized_version(instance.updated_at):
+            raise LabReportingDomainError(409, "Current report version has not been reviewed")
+        evidence = self._assert_managed_prerequisites(instance)
+        if review.evidence != evidence:
+            raise LabReportingDomainError(409, "Specimen or QC changed after review")
+        return {**evidence, "review_event_id": review.id}
+
+    def _apply_managed_signer_snapshot(self, instance, actor) -> None:
+        last_entry = self._latest_workflow_event(instance.id, "entered")
+        review = self._latest_workflow_event(instance.id, "reviewed")
+        instance.signer_snapshot = {
+            **(instance.signer_snapshot or {}),
+            "lab_technician_name": last_entry.actor_name if last_entry else "",
+            "reviewer_name": review.actor_name if review else "",
+            "approver_name": actor.full_name or actor.username,
+        }
 
     # ============================================================
     # === LEGACY SYNC ===
@@ -235,21 +306,15 @@ class FinalizeMixin(LabReportingServiceMixinBase):
                 continue
             code = value.field_key
 
-            # value_numeric имеет приоритет для numeric fields, иначе value_text.
-            # Нормализуем Decimal: LabReportValue.value_numeric хранится как
-            # Numeric(18, 4), поэтому str(Decimal('100')) = '100.0000'.
-            # Для legacy LabResult.value (String(128)) убираем trailing zeros,
-            # чтобы mobile app показывал '100', а не '100.0000'.
-            if value.value_numeric is not None:
-                numeric_str = str(value.value_numeric)
-                # Decimal('100.0000') → '100', Decimal('5.2000') → '5.2'
-                if '.' in numeric_str:
-                    numeric_str = numeric_str.rstrip('0').rstrip('.')
-                    if not numeric_str or numeric_str == '-':
-                        numeric_str = '0'
-                result_value = numeric_str
-            else:
-                result_value = value.value_text or ""
+            evaluation = value.evaluation_snapshot
+            result_value = (
+                "" if evaluation and evaluation.get("visible") is False
+                else self._format_result_display(value)
+            )
+            unit = (
+                evaluation.get("unit") if evaluation is not None
+                else self._resolve_field_unit(field_def)
+            )
 
             # abnormal = True для любого непустого resolved_flag
             # (high, low, abnormal, critical, warning). None/empty → False.
@@ -275,7 +340,7 @@ class FinalizeMixin(LabReportingServiceMixinBase):
             projected = {
                 "test_name": field_def.label or code,
                 "value": result_value[:128],
-                "unit": (field_def.unit or "")[:32] or None,
+                "unit": (unit or "")[:32] or None,
                 "ref_range": (value.resolved_reference_text or "")[:64] or None,
                 "abnormal": abnormal,
             }

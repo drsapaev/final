@@ -4,8 +4,17 @@ Split from lab_reporting_service.py.
 """
 from __future__ import annotations
 
-from datetime import timedelta
+import hmac
+import json
+from datetime import date, timedelta
+from typing import Literal
+from uuid import UUID
 
+from sqlalchemy import select
+
+from app.core.config import settings
+from app.models.lab import LabClinicalConfigurationVersion
+from app.models.lab_release import LabDraftMutationReceipt, LabReportCreationReceipt
 from app.services.lab_reporting._base import *  # noqa: F401, F403
 from app.services.lab_reporting._base import LabReportingServiceMixinBase
 
@@ -21,6 +30,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
         status: str | None,
         limit: int,
         offset: int,
+        hide_managed_drafts: bool = False,
     ) -> list[LabReportInstance]:
         logger.info(
             "[LAB] list_instances has_patient_filter=%s visit_filter_count=%s status=%s limit=%s offset=%s",
@@ -36,6 +46,7 @@ class InstancesMixin(LabReportingServiceMixinBase):
             status=status,
             limit=limit,
             offset=offset,
+            hide_managed_drafts=hide_managed_drafts,
         )
 
 
@@ -56,6 +67,8 @@ class InstancesMixin(LabReportingServiceMixinBase):
         payload: dict[str, Any],
         *,
         actor_name: str | None = None,
+        actor_user_id: int | None = None,
+        idempotency_key: str | None = None,
     ) -> LabReportInstance:
         logger.info(
             "[LAB] create_instance has_appointment_context=%s has_visit_context=%s has_template_version=%s",
@@ -63,6 +76,14 @@ class InstancesMixin(LabReportingServiceMixinBase):
             payload.get("visit_id") is not None,
             payload.get("template_version_id") is not None,
         )
+        receipt = None
+        if idempotency_key is not None:
+            receipt = self._creation_receipt_identity(payload, actor_user_id, idempotency_key)
+            existing = self._report_from_creation_receipt(receipt)
+            if existing is not None:
+                return existing
+        elif settings.LAB_MANAGED_RELEASE_ENABLED:
+            self._workflow_actor(actor_user_id)
         patient = self.repository.get_patient(payload["patient_id"])
         if not patient:
             raise LabReportingDomainError(404, "Patient not found")
@@ -79,6 +100,13 @@ class InstancesMixin(LabReportingServiceMixinBase):
             appointment_id=appointment_id,
             create_if_missing=True,
         )
+        if visit_id is None and payload.get("order_id"):
+            explicit_order = self.repository.get_order(payload["order_id"])
+            if explicit_order is not None:
+                self._assert_order_belongs_to_context(
+                    order=explicit_order, patient_id=patient.id, visit_id=explicit_order.visit_id,
+                )
+                visit_id = explicit_order.visit_id
         if visit_id:
             self._assert_visit_belongs_to_patient(
                 visit_id=int(visit_id),
@@ -96,22 +124,58 @@ class InstancesMixin(LabReportingServiceMixinBase):
             service_codes=payload.get("service_codes"),
             service_items=payload.get("service_items"),
         )
+        if receipt is not None:
+            # Visit resolution and template seeding may commit independently.
+            # Serialize the report, order and allocation writes after those steps.
+            self.repository.lock_creation_request(receipt.key_digest)
+            existing = self._report_from_creation_receipt(receipt)
+            if existing is not None:
+                return existing
         order, created_new_order = self._resolve_or_create_order(
             order_id=payload.get("order_id"),
             patient_id=patient.id,
             visit_id=visit_id,
         )
+        if order is not None:
+            due_at = payload.get("order_due_at")
+            priority = payload.get("order_priority")
+            if due_at is not None:
+                current_due = order.due_at
+                if current_due is not None and current_due.tzinfo is None:
+                    current_due = current_due.replace(tzinfo=UTC)
+                if current_due is not None and current_due != due_at:
+                    raise LabReportingDomainError(409, "Lab order already has a different due date")
+                order.due_at = due_at.astimezone(UTC)
+            if priority is not None:
+                if order.priority is not None and order.priority != priority:
+                    raise LabReportingDomainError(409, "Lab order already has a different priority")
+                order.priority = priority
 
         signer_overrides = payload.get("signer_overrides") or {}
         branding_overrides = payload.get("branding_overrides") or {}
+        clinical_configuration_version_id = self.db.scalar(
+            select(LabClinicalConfigurationVersion.id).where(
+                LabClinicalConfigurationVersion.status == "APPROVED"
+            )
+        )
         instance = LabReportInstance(
             order_id=order.id if order else None,
             visit_id=visit_id,
             patient_id=patient.id,
             template_id=template.id,
             template_version_id=version.id,
+            clinical_configuration_version_id=clinical_configuration_version_id,
             status="DRAFT",
-            patient_snapshot=self._build_patient_snapshot(patient),
+            # A clinic-approved configuration turns on the assigned Lab
+            # physician workflow for this report even when the rollout flag
+            # remains at its legacy default. Interactive API drafts created
+            # before clinic setup stay unreleasable until a configuration is
+            # approved; the API response exposes that hold to the workbench.
+            managed_release=(
+                clinical_configuration_version_id is not None
+                or settings.LAB_MANAGED_RELEASE_ENABLED
+            ),
+            patient_snapshot=self._build_patient_snapshot(patient, study_date=payload.get("study_date")),
             branding_snapshot=self._build_branding_snapshot(version, branding_overrides),
             signer_snapshot=self._build_signer_snapshot(
                 version,
@@ -120,6 +184,10 @@ class InstancesMixin(LabReportingServiceMixinBase):
             ),
         )
         self.repository.add_instance(instance)
+        self._claim_ordered_services(instance, payload.get("visit_service_ids") or [], template.code)
+        if receipt is not None:
+            receipt.instance_id = instance.id
+            self.repository.add_creation_receipt(receipt)
         self.repository.commit()
         if created_new_order and order is not None:
             self._emit_lab_new_study_notification(
@@ -130,23 +198,92 @@ class InstancesMixin(LabReportingServiceMixinBase):
         logger.info("[LAB] create_instance created instance_id=%s", instance.id)
         return self.get_instance(instance.id)
 
+    def reconcile_created_instance(
+        self, payload: dict[str, Any], *, actor_user_id: int, idempotency_key: str,
+    ) -> LabReportInstance:
+        receipt = self._creation_receipt_identity(payload, actor_user_id, idempotency_key)
+        instance = self._report_from_creation_receipt(receipt)
+        if instance is None:
+            raise LabReportingDomainError(404, "No committed report for this creation request")
+        return instance
+
+    def _creation_receipt_identity(
+        self, payload: dict[str, Any], actor_user_id: int | None, idempotency_key: str,
+    ) -> LabReportCreationReceipt:
+        actor = self._workflow_actor(actor_user_id)
+        secret = settings.SECRET_KEY.encode()
+        key_digest = hmac.new(
+            secret, f"lab-report-create-key-v1\x00{actor.id}\x00{idempotency_key}".encode(), "sha256",
+        ).hexdigest()
+        body = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=date.isoformat)
+        request_digest = hmac.new(
+            secret, f"lab-report-create-payload-v1\x00{key_digest}\x00{body}".encode(), "sha256",
+        ).hexdigest()
+        return LabReportCreationReceipt(
+            actor_user_id=actor.id, key_digest=key_digest, request_digest=request_digest,
+        )
+
+    def _report_from_creation_receipt(
+        self, identity: LabReportCreationReceipt,
+    ) -> LabReportInstance | None:
+        receipt = self.repository.get_creation_receipt(identity.actor_user_id, identity.key_digest)
+        if receipt is None:
+            return None
+        if not hmac.compare_digest(receipt.request_digest, identity.request_digest):
+            raise LabReportingDomainError(409, "Creation key already bound to a different report request")
+        return self.get_instance(receipt.instance_id)
+
 
     def update_instance(
-        self, instance_id: int, payload: dict[str, Any], expected_updated_at: str | None = None
+        self, instance_id: int, payload: dict[str, Any], expected_updated_at: str | None = None,
+        *, actor_user_id: int | None = None, commit: bool = True,
+        draft_request_id: UUID | None = None,
     ) -> LabReportInstance:
         logger.info("[LAB] update_instance instance_id=%s", instance_id)
         instance = self._get_locked_instance(instance_id)
-        self._assert_instance_editable(instance)
-        self._assert_not_concurrently_modified(instance, expected_updated_at)
+        self._assert_instance_mutable_draft(instance)
+        actor = (
+            self._workflow_actor(actor_user_id)
+            if instance.managed_release or actor_user_id is not None or draft_request_id is not None
+            else None
+        )
+        receipt, replay = self._prepare_draft_write(
+            instance, actor, "metadata", draft_request_id, expected_updated_at, payload,
+        )
+        if replay:
+            if commit:
+                self.repository.commit()
+            return instance
         changed = False
+        edited_metadata = False
         if "signer_snapshot" in payload and payload["signer_snapshot"] is not None:
+            edited_metadata = instance.signer_snapshot != payload["signer_snapshot"]
             instance.signer_snapshot = payload["signer_snapshot"]
             changed = True
         if "branding_snapshot" in payload and payload["branding_snapshot"] is not None:
+            edited_metadata |= instance.branding_snapshot != payload["branding_snapshot"]
             instance.branding_snapshot = payload["branding_snapshot"]
             changed = True
+        if "study_date" in payload:
+            previous_study_date = (instance.patient_snapshot or {}).get("study_date")
+            self._set_report_study_date(instance, payload["study_date"])
+            self._refresh_result_evaluation(instance)
+            edited_metadata |= previous_study_date != instance.patient_snapshot.get(
+                "study_date"
+            )
+            changed = True
+        # Accepted draft writes still advance the optimistic version. Only
+        # actual metadata edits belong in the audit trail.
         if changed:
             self._advance_instance_version(instance)
+        if edited_metadata and actor is not None:
+            self._record_report_draft_edit(instance, actor)
+        if receipt is not None:
+            receipt.applied_version = instance.updated_at
+            self.repository.add_draft_mutation_receipt(receipt)
+        if not commit:
+            self._flush_draft_response(instance, refresh=receipt is not None)
+            return instance
         self.repository.commit()
         return self.get_instance(instance.id)
 
@@ -154,6 +291,11 @@ class InstancesMixin(LabReportingServiceMixinBase):
     def bulk_upsert_values(
         self, instance_id: int, values_payload: list[dict[str, Any]],
         expected_updated_at: str | None = None,
+        *, actor_user_id: int | None = None, commit: bool = True,
+        source_specimen_id: int | None = None,
+        import_origins: dict[str, dict[str, Any]] | None = None,
+        source_integration_profile_version_id: int | None = None,
+        draft_request_id: UUID | None = None,
     ) -> tuple[LabReportInstance, list[LabReportValue]]:
         logger.info(
             "[LAB] bulk_upsert_values instance_id=%s items=%s",
@@ -161,59 +303,223 @@ class InstancesMixin(LabReportingServiceMixinBase):
             len(values_payload),
         )
         instance = self._get_locked_instance(instance_id)
-        self._assert_instance_editable(instance)
-        self._assert_not_concurrently_modified(instance, expected_updated_at)
-        field_map = self._field_map(instance.template_version)
+        self._assert_instance_mutable_draft(instance)
+        actor = (
+            self._workflow_actor(actor_user_id)
+            if instance.managed_release or actor_user_id is not None or draft_request_id is not None
+            else None
+        )
+        receipt, replay = self._prepare_draft_write(
+            instance, actor, "values", draft_request_id, expected_updated_at,
+            {
+                "values": values_payload,
+                "source_specimen_id": source_specimen_id,
+                "source_integration_profile_version_id": (
+                    source_integration_profile_version_id
+                ),
+            },
+        )
         existing_by_key = {value.field_key: value for value in instance.values}
-        current_values = {
-            value.field_key: self._extract_effective_value(value)
-            for value in instance.values
-        }
+        if replay:
+            updated = [existing_by_key[item["field_key"]] for item in values_payload]
+            if commit:
+                self.repository.commit()
+            return instance, updated
 
-        updated_values: list[LabReportValue] = []
+        field_map = self._field_map(instance.template_version)
+        normalized_by_key = {}
         for item in values_payload:
             field_key = item["field_key"]
             field_def = field_map.get(field_key)
             if not field_def:
                 raise LabReportingDomainError(404, f"Field '{field_key}' not found in template")
-            normalized = self._normalize_value_payload(item, field_def)
-            current_values[field_key] = normalized["effective_value"]
-            context = self._build_rule_context(instance.patient_snapshot, current_values)
-            reference = self._resolve_reference(field_def, context)
-            flag = self._resolve_flag(
-                field_def=field_def,
-                effective_value=normalized["effective_value"],
-                context=context,
-                reference=reference,
-            )
+            if field_key in normalized_by_key:
+                raise LabReportingDomainError(400, f"Duplicate value for {field_key}")
+            normalized_by_key[field_key] = self._normalize_value_payload(item, field_def)
 
+        specimen_id = source_specimen_id
+        if source_specimen_id is not None or (instance.managed_release and normalized_by_key):
+            eligible_ids = self._accepted_result_specimen_ids(instance)
+            if source_specimen_id is not None and source_specimen_id not in eligible_ids:
+                raise LabReportingDomainError(409, "Result specimen is not an accepted report specimen")
+            if source_specimen_id is None and len(eligible_ids) == 1:
+                specimen_id = next(iter(eligible_ids))
+
+        updated_values: list[LabReportValue] = []
+        entered_result = False
+        edited_draft = False
+        for field_key, normalized in normalized_by_key.items():
             lab_value = existing_by_key.get(field_key)
             if lab_value is None:
                 lab_value = LabReportValue(instance_id=instance.id, field_key=field_key)
                 instance.values.append(lab_value)
                 existing_by_key[field_key] = lab_value
 
+            result = normalized["result_payload"]
+            same_measurement = self._same_measurement(
+                lab_value, normalized, field_map[field_key],
+            )
+            previous = lab_value.result_payload or {}
+            old_specimen_id = previous.get("source_specimen_id")
+            if result and result["kind"] != "absent":
+                # Saving a comment or resending the same result cannot silently
+                # move a measurement to a recollected specimen.
+                result_specimen_id = specimen_id
+                if source_specimen_id is None and same_measurement:
+                    result_specimen_id = old_specimen_id
+                if result_specimen_id is not None:
+                    result = {**result, "source_specimen_id": result_specimen_id}
+            if result:
+                if import_origins is not None:
+                    result["import_origin"] = import_origins[field_key]
+                elif (
+                    same_measurement
+                    and result.get("method_code") == previous.get("method_code")
+                    and "import_origin" in previous
+                ):
+                    result["import_origin"] = previous["import_origin"]
+            # An explicit import anchored to a different accepted specimen is
+            # a new measurement even when its result equals the old one.
+            imported_measurement = (
+                source_specimen_id is not None
+                and result is not None
+                and result.get("source_specimen_id") == source_specimen_id
+                and source_specimen_id != old_specimen_id
+            )
+            if result and (not same_measurement or imported_measurement):
+                entered_result = True
+            edited_draft |= (
+                lab_value.value_text != normalized["value_text"]
+                or lab_value.value_numeric != normalized["value_numeric"]
+                or lab_value.comment != normalized["comment"]
+                or lab_value.result_payload != result
+            )
             lab_value.value_text = normalized["value_text"]
             lab_value.value_numeric = normalized["value_numeric"]
             lab_value.comment = normalized["comment"]
-            lab_value.resolved_reference_text = reference.get("text")
-            lab_value.resolved_flag = flag["flag"]
-            lab_value.resolved_flag_source = flag["source"]
-            lab_value.resolved_flag_severity = flag["severity_rank"]
-            lab_value.resolved_flag_meta = flag["meta"]
+            lab_value.result_payload = result
+            if source_integration_profile_version_id is not None:
+                lab_value.source_integration_profile_version_id = (
+                    source_integration_profile_version_id
+                )
+            elif import_origins is not None or not same_measurement:
+                lab_value.source_integration_profile_version_id = None
             updated_values.append(lab_value)
 
+        self._refresh_result_evaluation(instance)
         if instance.status == "DRAFT" and updated_values:
             instance.status = "IN_PROGRESS"
         self._advance_instance_version(instance)
+        if actor is not None:
+            if entered_result:
+                self._append_workflow_event(instance, kind="entered", actor=actor)
+            elif edited_draft:
+                self._record_report_draft_edit(instance, actor)
+        if receipt is not None:
+            receipt.applied_version = instance.updated_at
+            self.repository.add_draft_mutation_receipt(receipt)
+        if not commit:
+            self._flush_draft_response(instance, refresh=receipt is not None)
+            return instance, updated_values
         self.repository.commit()
         return self.get_instance(instance.id), updated_values
+
+    def _flush_draft_response(self, instance: LabReportInstance, *, refresh: bool) -> None:
+        self.repository.flush()
+        if refresh:
+            # Reload this identity-map instance under the existing report lock.
+            # The DTO must use database values, including stored decimal scale.
+            self.repository.get_instance(instance.id, populate_existing=True)
+
+    def _prepare_draft_write(
+        self,
+        instance: LabReportInstance,
+        actor: User | None,
+        operation: Literal["metadata", "values"],
+        request_id: UUID | None,
+        expected_updated_at: str | None,
+        payload: dict[str, Any],
+    ) -> tuple[LabDraftMutationReceipt | None, bool]:
+        """Resolve a retry while holding the lock that protects the draft version."""
+        if instance.managed_release or request_id is not None:
+            self._workflow_expected_version(expected_updated_at)
+        if request_id is None:
+            self._assert_not_concurrently_modified(instance, expected_updated_at)
+            return None, False
+        if actor is None:
+            raise LabReportingDomainError(403, "Laboratory workflow access denied")
+
+        # Bind even the original version spelling and bulk item order. Store a
+        # keyed digest so low-entropy clinical inputs cannot be guessed from it.
+        encoded = json.dumps(
+            [instance.id, actor.id, operation, str(request_id), expected_updated_at, payload],
+            sort_keys=True, separators=(",", ":"), default=date.isoformat,
+        ).encode()
+        digest = hmac.new(
+            settings.SECRET_KEY.encode(), b"lab-draft-receipt-v1\x00" + encoded, "sha256",
+        ).hexdigest()
+        previous = self.repository.get_draft_mutation_receipt(
+            instance.id, actor.id, operation, request_id,
+        )
+        if previous is not None:
+            if not hmac.compare_digest(digest, previous.request_digest):
+                raise LabReportingDomainError(409, "Draft request ID already bound to a different save")
+            # Never acknowledge an old operation with another writer's version.
+            self._assert_not_concurrently_modified(instance, previous.applied_version.isoformat())
+            return None, True
+
+        self._assert_not_concurrently_modified(instance, expected_updated_at)
+        return LabDraftMutationReceipt(
+            instance_id=instance.id,
+            actor_user_id=actor.id,
+            operation=operation,
+            request_id=request_id,
+            request_digest=digest,
+            applied_version=instance.updated_at,
+        ), False
+
+    def _same_measurement(
+        self, value: LabReportValue, normalized: dict[str, Any], field_def: LabReportFieldDef,
+    ) -> bool:
+        value_text = value.value_text
+        value_numeric = value.value_numeric
+        before = value.result_payload or None
+        if before is None and (value_text is not None or value_numeric is not None):
+            # Older copied corrections may have a measured value without
+            # structured provenance. A matching resave still proves no source.
+            try:
+                legacy = self._normalize_value_payload(
+                    {"value_text": value_text, "value_numeric": value_numeric}, field_def,
+                )
+            except LabReportingDomainError:
+                return False
+            before = legacy["result_payload"]
+            value_text = legacy["value_text"]
+            value_numeric = legacy["value_numeric"]
+        after = normalized["result_payload"]
+        if after is None:
+            return before is None
+        kind = after["kind"]
+        if before is None or before.get("kind") != kind:
+            return False
+        if kind == "text":
+            return value_text == normalized["value_text"]
+        if kind == "coded_qualitative":
+            return before.get("qualitative_code") == after.get("qualitative_code")
+        if kind == "absent":
+            return before.get("absence_reason") == after.get("absence_reason")
+        return (
+            value_numeric == normalized["value_numeric"]
+            and before.get("comparator") == after.get("comparator")
+        )
 
 
     def mark_ready(self, instance_id: int) -> LabReportInstance:
         logger.info("[LAB] mark_ready instance_id=%s", instance_id)
         instance = self._get_locked_instance(instance_id)
         self._assert_instance_editable(instance)
+        if instance.managed_release:
+            raise LabReportingDomainError(409, "Use the managed review workflow")
         instance.status = "READY"
         self._advance_instance_version(instance)
         self.repository.commit()
@@ -224,11 +530,49 @@ class InstancesMixin(LabReportingServiceMixinBase):
     # ============================================================
 
 
-    def revise(self, instance_id: int) -> LabReportInstance:
+    def revise(
+        self, instance_id: int, *, actor_user_id: int | None = None,
+        expected_updated_at: str | None = None, reason: str | None = None,
+    ) -> LabReportInstance:
         logger.info("[LAB] revise instance_id=%s", instance_id)
-        source = self.get_instance(instance_id)
+        source = self._get_locked_instance(instance_id)
         if source.status not in FINAL_INSTANCE_STATUSES:
             raise LabReportingDomainError(409, "Only finalized instances can be revised")
+        clinical_configuration_version_id = (
+            source.clinical_configuration_version_id
+            or self.db.scalar(
+                select(LabClinicalConfigurationVersion.id).where(
+                    LabClinicalConfigurationVersion.status == "APPROVED"
+                )
+            )
+        )
+        managed = (
+            source.managed_release
+            or clinical_configuration_version_id is not None
+            or settings.LAB_MANAGED_RELEASE_ENABLED
+        )
+        actor = self._workflow_actor(actor_user_id) if managed or actor_user_id is not None else None
+        expected_version = None
+        if managed:
+            reason = self._workflow_reason(reason)
+            expected_version = self._workflow_expected_version(expected_updated_at)
+            existing_id = self.db.scalar(select(LabReportInstance.id).where(
+                LabReportInstance.supersedes_instance_id == source.id,
+            ).order_by(LabReportInstance.id).limit(1))
+            if existing_id is not None:
+                event = self._latest_workflow_event(existing_id, "revision_created")
+                if (
+                    event
+                    and event.actor_user_id == actor.id
+                    and event.reason == reason
+                    and event.expected_version
+                    and self._normalized_version(event.expected_version) == expected_version
+                ):
+                    return self.get_instance(existing_id)
+                raise LabReportingDomainError(409, "A correction already exists for this report version")
+        elif reason is not None:
+            reason = self._workflow_reason(reason)
+        self._assert_not_concurrently_modified(source, expected_updated_at)
 
         revision = LabReportInstance(
             order_id=source.order_id,
@@ -236,7 +580,9 @@ class InstancesMixin(LabReportingServiceMixinBase):
             patient_id=source.patient_id,
             template_id=source.template_id,
             template_version_id=source.template_version_id,
+            clinical_configuration_version_id=clinical_configuration_version_id,
             status="DRAFT",
+            managed_release=managed,
             patient_snapshot=deepcopy(source.patient_snapshot),
             branding_snapshot=deepcopy(source.branding_snapshot),
             signer_snapshot=deepcopy(source.signer_snapshot),
@@ -249,6 +595,8 @@ class InstancesMixin(LabReportingServiceMixinBase):
                     field_key=value.field_key,
                     value_text=value.value_text,
                     value_numeric=value.value_numeric,
+                    result_payload=deepcopy(value.result_payload),
+                    evaluation_snapshot=deepcopy(value.evaluation_snapshot),
                     resolved_reference_text=value.resolved_reference_text,
                     resolved_flag=value.resolved_flag,
                     resolved_flag_source=value.resolved_flag_source,
@@ -258,6 +606,11 @@ class InstancesMixin(LabReportingServiceMixinBase):
                     else None,
                     comment=value.comment,
                 )
+            )
+        if actor is not None:
+            self._append_workflow_event(
+                revision, kind="revision_created", actor=actor,
+                expected_version=expected_version, reason=reason,
             )
         self.repository.commit()
         return self.get_instance(revision.id)
@@ -275,7 +628,11 @@ class InstancesMixin(LabReportingServiceMixinBase):
         return self.get_instance(instance.id)
 
 
-    def instance_available_actions(self, instance: LabReportInstance) -> list[str]:
+    def instance_available_actions(
+        self, instance: LabReportInstance, actor_user_id: int | None = None,
+    ) -> list[str]:
+        if instance.managed_release:
+            return self.managed_workflow_actions(instance, actor_user_id)
         actions: list[str] = []
         if instance.status not in FINAL_INSTANCE_STATUSES:
             # PR8: preview — серверный A4-рендер сохранённых значений без
@@ -286,8 +643,13 @@ class InstancesMixin(LabReportingServiceMixinBase):
         return actions
 
 
-    def instance_action_flags(self, instance: LabReportInstance) -> dict[str, bool]:
-        actions = set(self.instance_available_actions(instance))
+    def instance_action_flags(
+        self, instance: LabReportInstance, actor_user_id: int | None = None,
+        *, available_actions: list[str] | None = None,
+    ) -> dict[str, bool]:
+        actions = set(available_actions) if available_actions is not None else set(
+            self.instance_available_actions(instance, actor_user_id)
+        )
         return {
             "can_edit": "edit" in actions,
             "can_save_draft": "save_draft" in actions,

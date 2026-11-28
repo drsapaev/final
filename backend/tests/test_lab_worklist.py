@@ -1,0 +1,687 @@
+from datetime import UTC, date, datetime, timedelta
+from types import SimpleNamespace
+from uuid import uuid4
+from zoneinfo import ZoneInfo
+
+import pytest
+from sqlalchemy import select
+
+from app.models.lab import (
+    LabOrder,
+    LabOrderTest,
+    LabReportInstance,
+    LabReportTemplate,
+    LabReportTemplateVersion,
+)
+from app.models.lab_specimen import LabSpecimen, LabSpecimenAssignment
+from app.models.patient import Patient
+from app.models.patient_access_audit import PatientAccessAuditLog
+from app.models.service import Service
+from app.models.visit import Visit, VisitService
+from app.repositories.lab_worklist_repository import (
+    InvalidWorklistCursor,
+    count_lab_worklist,
+    search_lab_worklist,
+)
+from app.schemas.lab_worklist import LabWorklistSearch
+from app.services.lab_reporting import LabReportingDomainError, LabReportingService
+
+CLINIC_TZ = ZoneInfo("Asia/Tashkent")
+NOW = datetime(2012, 1, 4, 19, 15, tzinfo=UTC)
+TODAY = date(2012, 1, 5)
+YESTERDAY = date(2012, 1, 4)
+
+
+def _new_visit(db, suffix, service, *, patient=None, day=YESTERDAY, status="closed"):
+    if patient is None:
+        patient = Patient(
+            first_name="SYNTHETIC-LAB", last_name=f"SYNTHETIC-WORKLIST-{suffix}"
+        )
+        db.add(patient)
+        db.flush()
+    visit = Visit(patient_id=patient.id, visit_date=day, status=status)
+    db.add(visit)
+    db.flush()
+    line = VisitService(visit_id=visit.id, service_id=service.id, name=service.name)
+    db.add(line)
+    db.flush()
+    return patient, visit, line
+
+
+def _catalog(db):
+    lab = Service(name="SYNTHETIC-LAB-TEST", service_code="L998", queue_tag="lab")
+    non_lab = Service(name="SYNTHETIC-NONLAB", service_code="L999", queue_tag="cardio")
+    db.add_all([lab, non_lab])
+    db.flush()
+    return lab, non_lab
+
+
+def _search(db, **options):
+    return search_lab_worklist(db, LabWorklistSearch(**options), CLINIC_TZ, now=NOW)
+
+
+def test_worklist_searches_before_cursor_and_counts_the_entire_scope(db_session):
+    lab, non_lab = _catalog(db_session)
+    _, earliest, _ = _new_visit(db_session, "000", lab)
+    for index in range(51):
+        _new_visit(db_session, f"{index + 1:03}", lab)
+    last_patient, last, _ = _new_visit(db_session, "TARGET", lab, day=TODAY)
+    _, _, _ = _new_visit(db_session, "COMPETING-ROUTE", non_lab)
+    _, _, _ = _new_visit(db_session, "CANCELED", lab, status="cancelled")
+    _, same_patient_visit, _ = _new_visit(
+        db_session, "TARGET", lab, patient=last_patient
+    )
+    # A visit that predates the worklist's first page still counts and is searchable.
+    first = _search(db_session, limit=50)
+    assert first.date == TODAY
+    assert first.total == first.counts.actionable == 54
+    assert count_lab_worklist(db_session, CLINIC_TZ, now=NOW) == first.counts
+    assert first.counts.today == 1
+    assert first.entries[0].id == f"visit:{earliest.id}"
+    assert first.entries[0].service_details[0].can_cancel
+    assert all(row.visit_id != last.id for row in first.entries)
+    assert first.next_cursor is not None
+    next_page = _search(db_session, limit=50, cursor=first.next_cursor)
+    assert [
+        row.id for row in next_page.entries if row.patient_id == last_patient.id
+    ] == [
+        f"visit:{same_patient_visit.id}",
+        f"visit:{last.id}",
+    ]
+    assert next_page.next_cursor is None
+    assert not {row.id for row in first.entries}.intersection(
+        row.id for row in next_page.entries
+    )
+    outside_first_page = _search(db_session, q=f"visit:{last.id}")
+    assert outside_first_page.total == outside_first_page.counts.actionable == 1
+    assert outside_first_page.entries[0].visit_id == last.id
+    assert _search(db_session, q="synthetic-worklist-target").total == 2
+    assert _search(db_session, q="%_").total == 0
+    assert _search(db_session, view="today").total == 1
+    with pytest.raises(InvalidWorklistCursor):
+        _search(db_session, limit=50, cursor=first.next_cursor, view="today")
+    anchor = _search(db_session, limit=1)
+    earliest.status = "canceled"
+    db_session.flush()
+    with pytest.raises(InvalidWorklistCursor):
+        _search(db_session, cursor=anchor.next_cursor)
+
+
+def test_same_name_patients_keep_distinct_worklist_rows_and_report_history(
+    client, db_session, auth_headers
+):
+    lab, _ = _catalog(db_session)
+    first_patient, first_visit, _ = _new_visit(db_session, "HOMONYM", lab)
+    second_patient, second_visit, _ = _new_visit(
+        db_session, "HOMONYM", lab, day=TODAY
+    )
+    display_name = first_patient.short_name()
+    assert first_patient.id != second_patient.id
+    assert display_name == second_patient.short_name()
+
+    template = LabReportTemplate(
+        code="SYNTHETIC-LONG-HISTORY", name="SYNTHETIC-LONG-HISTORY", family="SYNTHETIC"
+    )
+    db_session.add(template)
+    db_session.flush()
+    version = LabReportTemplateVersion(
+        template_id=template.id,
+        version_no=1,
+        layout_preset="default",
+        status="PUBLISHED",
+        published_at=NOW,
+    )
+    db_session.add(version)
+    db_session.flush()
+
+    reports = []
+    for patient, history_length in ((first_patient, 52), (second_patient, 1)):
+        order = LabOrder(patient_id=patient.id, status="done", completed_at=NOW)
+        db_session.add(order)
+        db_session.flush()
+        reports.extend(
+            LabReportInstance(
+                order_id=order.id,
+                patient_id=patient.id,
+                template_id=template.id,
+                template_version_id=version.id,
+                patient_snapshot={"patient_id": patient.id, "full_name": display_name},
+                status="FINALIZED",
+                created_at=NOW,
+                finalized_at=NOW,
+            )
+            for _ in range(history_length)
+        )
+    db_session.add_all(reports)
+    db_session.commit()
+
+    worklist_url = "/api/v1/lab/worklist/search"
+    name_matches = client.post(
+        worklist_url, headers=auth_headers, json={"q": display_name}
+    )
+    assert name_matches.status_code == 200, name_matches.text
+    name_page = name_matches.json()
+    matching_rows = name_page["entries"]
+    assert name_page["total"] == len(matching_rows) == 2
+    assert {row["patient_fio"] for row in matching_rows} == {display_name}
+    assert {(row["patient_id"], row["visit_id"]) for row in matching_rows} == {
+        (first_patient.id, first_visit.id),
+        (second_patient.id, second_visit.id),
+    }
+    exact_match = client.post(
+        worklist_url, headers=auth_headers, json={"q": f"patient:{second_patient.id}"}
+    )
+    assert exact_match.status_code == 200, exact_match.text
+    assert [row["id"] for row in exact_match.json()["entries"]] == [
+        f"visit:{second_visit.id}"
+    ]
+
+    history_url = "/api/v1/lab/report-instances"
+    # Identical creation timestamps exercise the ID tie-breaker across pages.
+    first_patient_report_ids = [report.id for report in reversed(reports[:-1])]
+    expected_pages = (
+        (0, first_patient_report_ids[:50]),
+        (50, first_patient_report_ids[50:]),
+    )
+    for offset, expected_ids in expected_pages:
+        first_history = client.get(
+            history_url,
+            headers=auth_headers,
+            params={"patient_id": first_patient.id, "limit": 50, "offset": offset},
+        )
+        assert first_history.status_code == 200, first_history.text
+        first_rows = first_history.json()
+        assert [row["id"] for row in first_rows] == expected_ids
+        assert {row["patient_id"] for row in first_rows} == {first_patient.id}
+
+    second_history = client.get(
+        history_url,
+        headers=auth_headers,
+        params={"patient_id": second_patient.id, "limit": 50},
+    )
+    assert second_history.status_code == 200, second_history.text
+    assert [(row["id"], row["patient_id"]) for row in second_history.json()] == [
+        (reports[-1].id, second_patient.id)
+    ]
+
+
+def test_worklist_preserves_release_across_correction_and_scans_exact_specimen(
+    db_session,
+):
+    lab, _ = _catalog(db_session)
+    patient, visit, line = _new_visit(db_session, "CORRECTION", lab)
+    _, unassigned_visit, _ = _new_visit(
+        db_session, "CORRECTION", lab, patient=patient, day=TODAY
+    )
+    order = LabOrder(
+        patient_id=patient.id,
+        visit_id=visit.id,
+        due_at=datetime(2012, 1, 4, 19, 0, tzinfo=UTC),
+        priority="urgent",
+    )
+    other_order = LabOrder(patient_id=patient.id, visit_id=visit.id)
+    template = LabReportTemplate(
+        code="SYNTHETIC-QUEUE", name="SYNTHETIC-QUEUE", family="SYNTHETIC"
+    )
+    db_session.add_all([order, other_order, template])
+    db_session.flush()
+    version = LabReportTemplateVersion(
+        template_id=template.id, version_no=1, layout_preset="default"
+    )
+    db_session.add(version)
+    db_session.flush()
+    released = LabReportInstance(
+        order_id=order.id,
+        visit_id=visit.id,
+        patient_id=patient.id,
+        template_id=template.id,
+        template_version_id=version.id,
+        status="FINALIZED",
+        finalized_at=NOW,
+    )
+    db_session.add(released)
+    db_session.flush()
+    allocation = LabOrderTest(
+        order_id=order.id, visit_service_id=line.id, report_instance_id=released.id
+    )
+    specimen = LabSpecimen(
+        order_id=order.id,
+        barcode="SYNTHETIC-AB123",
+        material_code="SYNTHETIC",
+        container_code="SYNTHETIC",
+        status="accepted",
+        revision=1,
+        created_at=NOW,
+        create_request_id="synthetic-scan",
+    )
+    db_session.add_all([allocation, specimen])
+    db_session.flush()
+
+    assert _search(db_session, view="ready").total == 1
+    scanned = _search(db_session, barcode=specimen.barcode.lower())
+    assert scanned.total == 1 and scanned.counts.ready == 1
+    assert scanned.entries[0].id == f"order:{order.id}"
+    assert scanned.entries[0].work_date == YESTERDAY
+    assert scanned.entries[0].specimen_ids == [specimen.id]
+    assert scanned.entries[0].progress.released_tests == 1
+    assert _search(db_session, barcode="SYNTHETIC-AB12").total == 0
+
+    # A correction is new work against the same order, and the original
+    # remains released until the correction is successfully published.
+    correction = LabReportInstance(
+        order_id=order.id,
+        visit_id=visit.id,
+        patient_id=patient.id,
+        template_id=template.id,
+        template_version_id=version.id,
+        status="READY",
+        supersedes_instance_id=released.id,
+    )
+    db_session.add(correction)
+    db_session.flush()
+    result = _search(db_session, view="overdue")
+    assert result.total == result.counts.in_review == 1
+    row = result.entries[0]
+    assert row.report_instance_id == correction.id
+    assert row.status == "in_review"
+    assert row.progress.total_reports == row.progress.released_reports == 1
+    assert row.priority == "urgent"
+    assert row.service_details[0].visit_service_id == line.id
+    assert not row.service_details[0].can_cancel
+    assert _search(db_session, q=lab.name).total == 2
+    assert {row.id for row in _search(db_session).entries} == {
+        f"order:{order.id}",
+        f"order:{other_order.id}",
+        f"visit:{unassigned_visit.id}",
+    }
+
+
+def test_previous_day_partial_order_stays_actionable_after_tashkent_midnight(
+    db_session, admin_user
+):
+    lab, _ = _catalog(db_session)
+    patient, visit, released_line = _new_visit(db_session, "PARTIAL", lab)
+    _, today_visit, _ = _new_visit(db_session, "TODAY", lab, day=TODAY)
+    midnight = NOW - timedelta(minutes=15)
+    before_midnight = midnight - timedelta(seconds=1)
+    opened_at = midnight - timedelta(hours=2)
+    visit.created_at = opened_at
+    released_line.created_at = opened_at
+    active_line = VisitService(
+        visit_id=visit.id, service_id=lab.id, name=lab.name, created_at=opened_at
+    )
+    canceled_line = VisitService(
+        visit_id=visit.id, service_id=lab.id, name=lab.name, created_at=opened_at
+    )
+    order = LabOrder(
+        patient_id=patient.id,
+        visit_id=visit.id,
+        created_at=opened_at,
+        due_at=midnight,
+        priority="urgent",
+    )
+    template = LabReportTemplate(
+        code="SYNTHETIC-PARTIAL", name="SYNTHETIC-PARTIAL", family="SYNTHETIC"
+    )
+    db_session.add_all([active_line, canceled_line, order, template])
+    db_session.flush()
+    version = LabReportTemplateVersion(
+        template_id=template.id,
+        version_no=1,
+        layout_preset="default",
+        status="PUBLISHED",
+        published_at=opened_at,
+    )
+    db_session.add(version)
+    db_session.flush()
+    released = LabReportInstance(
+        order_id=order.id,
+        visit_id=visit.id,
+        patient_id=patient.id,
+        template_id=template.id,
+        template_version_id=version.id,
+        status="FINALIZED",
+        created_at=opened_at,
+        finalized_at=midnight - timedelta(minutes=1),
+    )
+    db_session.add(released)
+    db_session.flush()
+    db_session.add_all(
+        [
+            LabOrderTest(
+                order_id=order.id,
+                visit_service_id=released_line.id,
+                report_instance_id=released.id,
+            ),
+            LabOrderTest(order_id=order.id, visit_service_id=active_line.id),
+            LabOrderTest(
+                order_id=order.id,
+                visit_service_id=canceled_line.id,
+                canceled_at=midnight - timedelta(minutes=2),
+                canceled_by_user_id=admin_user.id,
+                cancel_reason="SYNTHETIC cancellation",
+            ),
+        ]
+    )
+    db_session.flush()
+
+    order_identity = f"order:{order.id}"
+    before = search_lab_worklist(
+        db_session, LabWorklistSearch(view="today"), CLINIC_TZ, now=before_midnight
+    )
+    assert before.date == YESTERDAY and before.counts.overdue == 0
+    assert [(entry.id, entry.status) for entry in before.entries] == [
+        (order_identity, "partial")
+    ]
+
+    actionable = _search(db_session)
+    assert actionable.date == TODAY
+    assert actionable.total == actionable.counts.actionable == 2
+    assert actionable.counts.ready == 0 and actionable.counts.overdue == 1
+    partial = next(entry for entry in actionable.entries if entry.id == order_identity)
+    assert partial.work_date == YESTERDAY and partial.status == "partial"
+    assert partial.priority == "urgent" and partial.report_instance_id == released.id
+    assert partial.progress.model_dump() == {
+        "total_reports": 1,
+        "released_reports": 1,
+        "ordered_tests": 3,
+        "released_tests": 1,
+        "canceled_tests": 1,
+    }
+    assert {
+        item.visit_service_id: (item.canceled, item.can_cancel)
+        for item in partial.service_details
+    } == {
+        released_line.id: (False, False),
+        active_line.id: (False, True),
+        canceled_line.id: (True, False),
+    }
+    assert [entry.id for entry in _search(db_session, view="overdue").entries] == [
+        order_identity
+    ]
+    assert [entry.id for entry in _search(db_session, view="today").entries] == [
+        f"visit:{today_visit.id}"
+    ]
+
+
+def test_first_specimen_moves_exact_requisition_to_its_order(
+    client, db_session, auth_headers
+):
+    lab, _ = _catalog(db_session)
+    patient, visit, line = _new_visit(db_session, "BEFORE-REPORT", lab)
+    assert [row.id for row in _search(db_session).entries] == [f"visit:{visit.id}"]
+
+    response = client.post(
+        f"/api/v1/lab/visits/{visit.id}/specimens",
+        headers=auth_headers,
+        json={
+            "material_code": "synthetic",
+            "container_code": "synthetic",
+            "request_id": str(uuid4()),
+            "visit_service_ids": [line.id],
+        },
+    )
+    assert response.is_success, response.text
+    specimen = response.json()
+    order_id = specimen["order_id"]
+    other = LabOrder(patient_id=patient.id, visit_id=visit.id)
+    db_session.add(other)
+    db_session.flush()
+
+    page = _search(db_session, q=f"visit:{visit.id}")
+    assert {row.id for row in page.entries} == {
+        f"order:{order_id}",
+        f"order:{other.id}",
+    }
+    assert page.total == 2
+    scoped = _search(db_session, barcode=specimen["barcode"])
+    row = scoped.entries[0]
+    assert scoped.total == 1 and row.order_id == order_id
+    assert row.status == "awaiting_specimen"
+    assert row.progress.ordered_tests == 1 and row.progress.released_tests == 0
+    assert row.service_details[0].visit_service_id == line.id
+    assert row.service_details[0].can_cancel
+    assert _search(db_session, q=lab.name).total == 1
+
+    conflicting_collection = client.post(
+        f"/api/v1/lab/orders/{other.id}/specimens",
+        headers=auth_headers,
+        json={
+            "material_code": "synthetic",
+            "container_code": "synthetic",
+            "request_id": str(uuid4()),
+            "visit_service_ids": [line.id],
+        },
+    )
+    assert conflicting_collection.status_code == 409
+    other_report = SimpleNamespace(
+        order=other, order_id=other.id, patient_id=patient.id, visit_id=visit.id
+    )
+    with pytest.raises(LabReportingDomainError, match="specimen custody in another"):
+        LabReportingService(db_session)._claim_ordered_services(
+            other_report, [line.id], "unused"
+        )
+    wrong_order = client.post(
+        f"/api/v1/lab/visits/{visit.id}/tests/{line.id}/cancel",
+        headers=auth_headers,
+        json={"order_id": other.id, "reason": "SYNTHETIC-CROSS-ORDER"},
+    )
+    assert wrong_order.status_code == 409
+
+    # Old inconsistent custody data remains visible without proposing either order.
+    competing_specimen = LabSpecimen(
+        order_id=other.id,
+        barcode="SYNTHETIC-COMPETITION",
+        material_code="synthetic",
+        container_code="synthetic",
+        status="expected",
+        revision=1,
+        created_at=NOW,
+        create_request_id=str(uuid4()),
+    )
+    db_session.add(competing_specimen)
+    db_session.flush()
+    db_session.add(
+        LabSpecimenAssignment(
+            specimen_id=competing_specimen.id, visit_service_id=line.id
+        )
+    )
+    db_session.flush()
+    disputed = next(
+        row for row in _search(db_session).entries if row.id == f"visit:{visit.id}"
+    )
+    assert disputed.status == "held"
+    assert disputed.hold_reason == "specimen_order_ambiguous"
+    assert disputed.service_details[0].visit_service_id is None
+
+    reconciled = client.post(
+        f"/api/v1/lab/specimens/{competing_specimen.id}/assignments",
+        headers=auth_headers,
+        json={
+            "operation": "remove",
+            "reason": "SYNTHETIC-CUSTODY-RECONCILED",
+            "expected_revision": 1,
+            "request_id": str(uuid4()),
+            "visit_service_ids": [line.id],
+        },
+    )
+    assert reconciled.is_success, reconciled.text
+    assert (
+        _search(db_session, barcode=specimen["barcode"])
+        .entries[0]
+        .service_details[0]
+        .visit_service_id
+        == line.id
+    )
+
+
+def test_legacy_release_marks_unknown_lines_and_preserves_new_requisitions(db_session):
+    lab, _ = _catalog(db_session)
+    patient, visit, old_line = _new_visit(db_session, "LEGACY-COVERAGE", lab)
+    old_line.created_at = NOW - timedelta(hours=2)
+    order = LabOrder(patient_id=patient.id, visit_id=visit.id)
+    template = LabReportTemplate(
+        code="SYNTHETIC-LEGACY", name="SYNTHETIC-LEGACY", family="SYNTHETIC"
+    )
+    db_session.add_all([order, template])
+    db_session.flush()
+    version = LabReportTemplateVersion(
+        template_id=template.id, version_no=1, layout_preset="standard"
+    )
+    db_session.add(version)
+    db_session.flush()
+    db_session.add(
+        LabReportInstance(
+            order_id=order.id,
+            visit_id=visit.id,
+            patient_id=patient.id,
+            template_id=template.id,
+            template_version_id=version.id,
+            status="FINALIZED",
+            finalized_at=NOW - timedelta(hours=1),
+        )
+    )
+    db_session.flush()
+
+    released = _search(db_session, view="ready").entries[0]
+    assert released.order_id == order.id and released.progress.ordered_tests is None
+    historical = _search(db_session).entries[0]
+    assert historical.id == f"visit:{visit.id}" and historical.status == "held"
+    assert historical.hold_reason == "historical_allocation_unknown"
+    assert historical.service_details[0].visit_service_id is None
+    assert not historical.service_details[0].can_cancel
+    proposed = SimpleNamespace(
+        order=order, order_id=order.id, patient_id=patient.id, visit_id=visit.id
+    )
+    with pytest.raises(LabReportingDomainError, match="unconfirmed historical"):
+        LabReportingService(db_session)._claim_ordered_services(
+            proposed, [old_line.id], template.code
+        )
+
+    new_line = VisitService(
+        visit_id=visit.id,
+        service_id=lab.id,
+        name="SYNTHETIC-NEW-REQUEST",
+        created_at=NOW,
+    )
+    db_session.add(new_line)
+    db_session.flush()
+    pending = _search(db_session, q="SYNTHETIC-NEW-REQUEST").entries[0]
+    assert pending.id == historical.id and pending.status == "pending"
+    assert [item.visit_service_id for item in pending.service_details] == [
+        None,
+        new_line.id,
+    ]
+    assert pending.service_details[1].can_cancel
+
+
+def test_worklist_api_audits_each_returned_patient_without_search_text(
+    client, db_session, auth_headers, caplog
+):
+    lab, _ = _catalog(db_session)
+    patient, visit, _ = _new_visit(db_session, "AUDIT", lab)
+    endpoint = "/api/v1/lab/worklist/search"
+    assert client.post(endpoint, json={}).status_code in (401, 403)
+    response = client.post(
+        endpoint, json={"q": "synthetic-worklist-audit"}, headers=auth_headers
+    )
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert [row["visit_id"] for row in response.json()["entries"]] == [visit.id]
+    audit = (
+        db_session.execute(
+            select(PatientAccessAuditLog).where(
+                PatientAccessAuditLog.subject_patient_id == patient.id,
+                PatientAccessAuditLog.resource_type == "lab_worklist",
+            )
+        )
+        .scalars()
+        .one()
+    )
+    assert audit.resource_id == f"visit:{visit.id}"
+    assert audit.action == "read"
+    assert audit.extra_data is None
+    malformed_query = "SYNTHETIC-UNLOGGED-SEARCH" * 10
+    rejected = client.post(endpoint, json={"q": malformed_query}, headers=auth_headers)
+    assert rejected.status_code == 422
+    assert "SYNTHETIC-UNLOGGED-SEARCH" not in rejected.text
+    assert "SYNTHETIC-UNLOGGED-SEARCH" not in caplog.text
+
+
+def test_cancel_unreported_line_is_idempotent_and_remains_out_of_active_list(
+    client, db_session, auth_headers
+):
+    lab, non_lab = _catalog(db_session)
+    _, visit, line = _new_visit(db_session, "LINE-CANCEL", lab)
+    _, _, unrelated = _new_visit(db_session, "NONLAB-LINE", non_lab)
+    endpoint = f"/api/v1/lab/visits/{visit.id}/tests/{line.id}/cancel"
+
+    assert (
+        client.post(endpoint, json={"reason": ""}, headers=auth_headers).status_code
+        == 422
+    )
+    mismatch = client.post(
+        f"/api/v1/lab/visits/{visit.id}/tests/{unrelated.id}/cancel",
+        json={"reason": "Synthetic cross-visit refusal"},
+        headers=auth_headers,
+    )
+    assert mismatch.status_code == 404
+    response = client.post(
+        endpoint, json={"reason": "Synthetic collection canceled"}, headers=auth_headers
+    )
+    assert response.status_code == 200, response.text
+    replay = client.post(
+        endpoint, json={"reason": "Synthetic collection canceled"}, headers=auth_headers
+    )
+    assert replay.json() == response.json()
+    assert (
+        client.post(
+            endpoint, json={"reason": "Synthetic second reason"}, headers=auth_headers
+        ).status_code
+        == 409
+    )
+    assert _search(db_session).total == 0
+    canceled_order = response.json()["order_id"]
+    canceled_collection = client.post(
+        f"/api/v1/lab/orders/{canceled_order}/specimens",
+        headers=auth_headers,
+        json={
+            "material_code": "synthetic",
+            "container_code": "synthetic",
+            "request_id": str(uuid4()),
+            "visit_service_ids": [line.id],
+        },
+    )
+    assert canceled_collection.status_code == 409
+
+
+def test_order_schedule_is_explicit_and_rejects_missing_timezone(
+    client, db_session, auth_headers
+):
+    route = "/api/v1/lab/orders"
+    template_list = client.get("/api/v1/lab/templates", headers=auth_headers).json()
+    template = next(row for row in template_list if row["code"] == "cbc_oak")
+    patient = Patient(first_name="SYNTHETIC-LAB", last_name="SYNTHETIC-SCHEDULE")
+    db_session.add(patient)
+    db_session.flush()
+    data = {
+        "template_id": template["id"],
+        "patient_id": patient.id,
+        "priority": "urgent",
+    }
+    assert (
+        client.post(
+            route, json={**data, "due_at": "2012-01-05T00:00:00"}, headers=auth_headers
+        ).status_code
+        == 422
+    )
+    response = client.post(
+        route,
+        json={**data, "due_at": "2012-01-05T00:00:00+05:00"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+    report_id = response.json()["instance_id"]
+    row = _search(db_session, q=f"report:{report_id}", view="overdue").entries[0]
+    assert row.priority == "urgent"
+    assert row.due_at.replace(tzinfo=UTC) == datetime(2012, 1, 4, 19, tzinfo=UTC)

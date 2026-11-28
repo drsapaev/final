@@ -1,12 +1,7 @@
 /**
- * Lab UI labels — static Russian exports.
+ * Lab UI labels with Russian fallbacks for callers without a translator.
  *
  * L-H-3 fix: маппинг статусов делегирован в utils/labStatusConfig.js.
- * L-M-6 fix: удалена неиспользуемая getLabLabels(t) i18n-обёртка (была
- * добавлена в PR-73, но ни один компонент в lab-модуле не использует
- * useTranslation — все рендерят русские строки напрямую). Когда i18n
- * будет внедряться на уровне всего проекта, миграция будет единой для
- * всех панелей — не точечно для lab.
  *
  * Usage in components:
  *   import { formatLabStatus, getLabStatusVariant } from './labUiLabels';
@@ -15,7 +10,7 @@
  *   import { getLabStatusConfig, getLabReportStepIndex } from './utils/labStatusConfig';
  */
 
-import { getLabStatusConfig } from './utils/labStatusConfig';
+import { formatLabStatusLabel, getLabStatusConfig, type LabStatusTranslator } from './utils/labStatusConfig';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Payment / specialty / severity labels (static Russian).
@@ -52,8 +47,8 @@ export const signerFieldLabels = {
 };
 
 // L-H-3 fix: formatLabStatus и getLabStatusVariant делегируют в labStatusConfig.
-export function formatLabStatus(status: string) {
-  return getLabStatusConfig(status).label;
+export function formatLabStatus(status: string, translate?: LabStatusTranslator) {
+  return formatLabStatusLabel(status, translate);
 }
 
 export function getLabStatusVariant(status: string) {

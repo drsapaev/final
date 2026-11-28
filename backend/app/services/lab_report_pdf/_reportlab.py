@@ -11,6 +11,18 @@ from app.services.lab_report_pdf._base import LabReportPDFServiceMixinBase
 class ReportlabMixin(LabReportPDFServiceMixinBase):
     """Reportlab methods."""
 
+    @staticmethod
+    def _reportlab_value_display(row: dict[str, Any], *, inline_unit: bool = False) -> str:
+        if "value_display" in row:
+            value = row["value_display"]
+        else:
+            value = row.get("value_numeric")
+            if value is None:
+                value = row.get("value_text")
+        display = "" if value is None else str(value)
+        unit = row.get("unit") if inline_unit else None
+        return f"{display} {unit}" if display and unit else display
+
     def _draw_reportlab_watermark(self, canvas, text: str, page_size) -> None:
         """PR8: диагональный watermark «Черновик» на одной странице.
 
@@ -20,7 +32,8 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
         """
         canvas.saveState()
         try:
-            canvas.setFontSize(64)
+            _, font_bold = self._register_reportlab_fonts()
+            canvas.setFont(font_bold, 64)
             canvas.setFillColorRGB(0.42, 0.45, 0.50)
             try:
                 # ReportLab >= 3.x: прозрачность через setFillAlpha.
@@ -41,15 +54,27 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
 
         return _on_page
 
-    def _build_reportlab_doc(
-        self, doc, story, *, watermark_text: str | None = None
-    ) -> None:
-        """Единая точка сборки ReportLab-документа: без watermark — обычный
-        build, с watermark — калбэки на каждую страницу."""
-        if watermark_text:
-            on_page = self._reportlab_watermark_callback(
-                doc.pagesize, str(watermark_text)
+    def _build_reportlab_doc(self, doc, story, *, context: dict[str, Any]) -> None:
+        from xml.sax.saxutils import escape
+
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.platypus import Paragraph
+
+        document_lines = (
+            context.get("report_document_label"),
+            context.get("report_release_label"),
+            context.get("report_correction_reason"),
+        )
+        if any(document_lines):
+            font_regular, _ = self._register_reportlab_fonts()
+            style = ParagraphStyle(
+                "LabDocumentVersion", fontName=font_regular, fontSize=9, spaceAfter=6,
             )
+            story[:0] = [Paragraph(escape(line), style) for line in document_lines if line]
+
+        watermark_text = context.get("watermark_text")
+        if watermark_text:
+            on_page = self._reportlab_watermark_callback(doc.pagesize, str(watermark_text))
             doc.build(story, onFirstPage=on_page, onLaterPages=on_page)
         else:
             doc.build(story)
@@ -269,6 +294,7 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
                 critical_rows,
                 colWidths=[5.0 * cm, 3.0 * cm, 4.0 * cm, 3.0 * cm, doc.width - 15.0 * cm],
                 repeatRows=1,
+                splitInRow=1,
             )
             critical_table.setStyle(
                 TableStyle(
@@ -299,9 +325,7 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
                 para("Флаг", "LabCenter"),
             ]]
             for row in section.get("fields") or []:
-                value_display = row.get("value_text") or ""
-                if row.get("value_numeric") is not None:
-                    value_display = row.get("value_numeric")
+                value_display = self._reportlab_value_display(row)
                 rows.append(
                     [
                         para(row.get("label"), "LabCell"),
@@ -315,6 +339,7 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
                 rows,
                 colWidths=[6.0 * cm, 3.2 * cm, 1.8 * cm, 5.4 * cm, doc.width - 16.4 * cm],
                 repeatRows=1,
+                splitInRow=1,
             )
             section_table.setStyle(
                 TableStyle(
@@ -367,7 +392,7 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
         story.append(signature_table)
 
         self._build_reportlab_doc(
-            doc, story, watermark_text=context.get("watermark_text")
+            doc, story, context=context
         )
         return buffer.getvalue()
 
@@ -528,13 +553,11 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
             para("Норма", "LabDocxCenter"),
         ]]
         for row in first_section.get("fields") or []:
-            value_display = row.get("value_text") or ""
-            if row.get("value_numeric") is not None:
-                value_display = row.get("value_numeric")
+            value_display = self._reportlab_value_display(row, inline_unit=True)
             rows.append(
                 [
                     para(row.get("label") or "", "LabDocxCell"),
-                    para(value_display if value_display is not None else "", "LabDocxCell"),
+                    para(value_display, "LabDocxCell"),
                     para(row.get("reference_text") or "", "LabDocxCell"),
                 ]
             )
@@ -543,6 +566,7 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
             rows,
             colWidths=[7.6 * cm, 3.8 * cm, doc.width - 11.4 * cm],
             repeatRows=1,
+            splitInRow=1,
         )
         table.setStyle(
             TableStyle(
@@ -575,7 +599,7 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
         )
 
         self._build_reportlab_doc(
-            doc, story, watermark_text=context.get("watermark_text")
+            doc, story, context=context
         )
         return buffer.getvalue()
 
@@ -739,13 +763,11 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
             ]
         ]
         for row in physical_section.get("fields") or []:
-            value_display = row.get("value_text") or ""
-            if row.get("value_numeric") is not None:
-                value_display = row.get("value_numeric")
+            value_display = self._reportlab_value_display(row, inline_unit=True)
             rows.append(
                 [
                     para(row.get("label") or "", "LabOamCell"),
-                    para(value_display if value_display is not None else "", "LabOamCell"),
+                    para(value_display, "LabOamCell"),
                     para(row.get("reference_text") or "", "LabOamCell"),
                 ]
             )
@@ -761,13 +783,11 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
                 ]
             )
             for row in sediment_section.get("fields") or []:
-                value_display = row.get("value_text") or ""
-                if row.get("value_numeric") is not None:
-                    value_display = row.get("value_numeric")
+                value_display = self._reportlab_value_display(row, inline_unit=True)
                 rows.append(
                     [
                         para(row.get("label") or "", "LabOamCell"),
-                        para(value_display if value_display is not None else "", "LabOamCell"),
+                        para(value_display, "LabOamCell"),
                         para(row.get("reference_text") or "", "LabOamCell"),
                     ]
                 )
@@ -776,6 +796,7 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
             rows,
             colWidths=[7.6 * cm, 3.8 * cm, doc.width - 11.4 * cm],
             repeatRows=1,
+            splitInRow=1,
         )
         table_style_commands = [
             ("GRID", (0, 0), (-1, -1), 0.7, colors.HexColor("#111827")),
@@ -817,7 +838,7 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
         )
 
         self._build_reportlab_doc(
-            doc, story, watermark_text=context.get("watermark_text")
+            doc, story, context=context
         )
         return buffer.getvalue()
 

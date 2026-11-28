@@ -13,6 +13,8 @@ import {
 import QueueCard from './QueueCard';
 // STRAT#27: VirtualizedQueueList for 1000+ entries via @tanstack/react-virtual.
 import VirtualizedQueueList from './VirtualizedQueueList';
+import LabWorklistFilters from './LabWorklistFilters';
+import type { LabWorklistPage, LabWorklistQuery } from '../../types/features/labWorkspace';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
 import React from "react";
@@ -154,6 +156,10 @@ interface LabQueueWorkbenchProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   queueTotal?: number;
+  worklist?: LabWorklistPage | null;
+  scanned?: boolean;
+  error?: boolean;
+  onQueryChange?: (query: LabWorklistQuery) => void;
 }
 
 export default function LabQueueWorkbench({
@@ -170,6 +176,10 @@ export default function LabQueueWorkbench({
   hasMore = false,
   loadingMore = false,
   queueTotal = 0,
+  worklist,
+  scanned = false,
+  error = false,
+  onQueryChange,
 }: LabQueueWorkbenchProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
   // QW-8 fix: локальный state поиска и фильтра статусов.
@@ -192,7 +202,7 @@ export default function LabQueueWorkbench({
   }, [searchQuery, statusFilter, sortBy]);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
-  const filteredAppointments = appointments.filter((appointment) => {
+  const filteredAppointments = worklist ? appointments : appointments.filter((appointment) => {
     // Фильтр по статусу
     if (statusFilter === 'active' && !activeQueueStatuses.has(appointment.status || '')) {
       return false;
@@ -214,7 +224,7 @@ export default function LabQueueWorkbench({
   });
 
   // PR-64 / Medium-14: client-side sorting
-  const sortedAppointments = [...filteredAppointments].sort((a, b) => {
+  const sortedAppointments = worklist ? filteredAppointments : [...filteredAppointments].sort((a, b) => {
     if (sortBy === 'name') {
       return (a.patient_fio || '').localeCompare(b.patient_fio || '', 'ru');
     }
@@ -230,18 +240,25 @@ export default function LabQueueWorkbench({
         <CardHeader className="lqw-card-header">
           <CardTitle className="lqw-card-title">
             <TestTube2 size={20} aria-hidden="true" />
-            {t18('queue.title')}
+            {worklist ? t('labWorkspace.title') : t18('queue.title')}
           </CardTitle>
           <div className="lqw-meta-row">
-            <Badge variant="info">{t18('queue.total')}: {appointments.length}</Badge>
-            <Badge variant="warning">
-              {t18('queue.in_progress')}: {appointments.filter((item) => activeQueueStatuses.has(item.status || '')).length}
-            </Badge>
+            {(!worklist || (!loading && !error)) && (
+              <Badge variant="info">{t18('queue.total')}: {worklist ? queueTotal : appointments.length}</Badge>
+            )}
+            {!worklist && (
+              <Badge variant="warning">
+                {t18('queue.in_progress')}: {appointments.filter((item) => activeQueueStatuses.has(item.status || '')).length}
+              </Badge>
+            )}
             <Button variant="outline" onClick={onRefresh} disabled={loading}>
               <RotateCw size={16} aria-hidden="true" />
               {t18('common.refresh')}
             </Button>
           </div>
+          {worklist && onQueryChange ? (
+            <LabWorklistFilters counts={loading || error ? null : worklist.counts} onChange={onQueryChange} />
+          ) : (<>
           {/* QW-8 fix: панель поиска и фильтра статусов. L-H-4: CSS-классы. */}
           {/* PR7: честный scope поиска/фильтра — при серверной пагинации
               поиск действует только по уже загруженным записям. */}
@@ -318,9 +335,10 @@ export default function LabQueueWorkbench({
               }`}
             </div>
           )}
+          </>)}
         </CardHeader>
-        <CardContent className="lqw-card-content">
-          {loading ? (
+        <CardContent className="lqw-card-content" aria-busy={loading}>
+          {loading && appointments.length === 0 ? (
             // QW-3 fix: skeleton-загрузка вместо текста «Загрузка…».
             // L-H-4: используется CSS-класс .lqw-skeleton с @media (prefers-reduced-motion).
             // L-M-4 fix: при prefers-reduced-motion skeleton остаётся статичным
@@ -344,11 +362,22 @@ export default function LabQueueWorkbench({
               ))}
             </div>
           ) : filteredAppointments.length === 0 ? (
-            <Alert severity="info">
-              {appointments.length === 0
-                ? t18('queue.no_entries')
-                : t18('queue.no_matches')}
-            </Alert>
+            <>
+              {!error && (
+                <Alert severity="info">
+                  {scanned ? t('labWorkspace.barcodeNotFound') : appointments.length === 0
+                    ? t18('queue.no_entries')
+                    : t18('queue.no_matches')}
+                </Alert>
+              )}
+              {hasMore && onLoadMore && (
+                <div className="lqw-load-more">
+                  <Button type="button" variant="outline" onClick={onLoadMore} disabled={loadingMore}>
+                    {loadingMore ? t('queue.loading') : t('queue.show_more')}
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
             /* STRAT#27: virtualized rendering replaces .slice().map() + load-more IIFE.
                VirtualizedQueueList handles both performance (only visible cards render)
@@ -366,7 +395,7 @@ export default function LabQueueWorkbench({
         </CardContent>
       </Card>
 
-      {selectedAppointment && (
+      {!worklist && selectedAppointment && (
         <Card variant="filled" padding="none">
           <CardHeader className="lqw-card-header">
             <CardTitle className="lqw-card-title">
@@ -386,12 +415,12 @@ export default function LabQueueWorkbench({
                         {item.template?.name || `${t18('queue.history_report_number')} #${item.id}`}
                       </div>
                       <div className="lqw-history-meta">
-                        {t18('queue.history_created')}: {new Date(item.created_at).toLocaleString()} | {t18('queue.history_status')}: {formatLabStatus(item.status)}
+                        {t18('queue.history_created')}: {new Date(item.created_at).toLocaleString()} | {t18('queue.history_status')}: {formatLabStatus(item.status, t)}
                       </div>
                     </div>
                     <div className="lqw-history-badges">
                       <Badge variant={getLabStatusVariant(item.status)}>
-                        {formatLabStatus(item.status)}
+                        {formatLabStatus(item.status, t)}
                       </Badge>
                       <Badge variant={historySeverityBadge(item).variant as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
                         {formatSeverityLabel(historySeverityBadge(item).label)}

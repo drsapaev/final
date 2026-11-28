@@ -301,6 +301,7 @@ export function useDirtyTransitionGuard(options?: {
     if (!pendingTransition) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (event.target instanceof Element && event.target.closest('dialog[open][aria-modal="true"]')) return;
       if (busy) return;
       event.preventDefault();
       event.stopPropagation();

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { hasLabReportAction } from '../utils/labReportActions';
 import { extractFieldValue, getServiceContextItems } from '../utils/labReportNormalize';
 
@@ -48,7 +48,7 @@ interface LabReportSection {
   [key: string]: unknown;
 }
 
-interface LabReportInstance {
+export interface LabReportInstance {
   sections: LabReportSection[];
   signer_snapshot?: Record<string, unknown>;
   template_id?: string | number;
@@ -80,6 +80,63 @@ interface PrintFeedback {
   text: string;
 }
 
+export interface ReportDraftSnapshot {
+  values: Record<string, unknown>;
+  signer: Record<string, unknown>;
+  studyDate: string;
+}
+
+function numericInputKey(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const match = raw.trim().match(/^(<=|>=|[<>≤≥])?\s*([+-]?)(\d*)(?:[.,](\d+))?$/);
+  if (!match) return null;
+  const [, qualifier = '', sign, integerPart, decimalPart = ''] = match;
+  if (!integerPart && !decimalPart) return null;
+  const integer = integerPart.replace(/^0+/, '') || '0';
+  const decimal = decimalPart.replace(/0+$/, '');
+  const prefix = sign === '-' && (integer !== '0' || decimal) ? '-' : '';
+  const operator = qualifier === '<=' ? '≤' : qualifier === '>=' ? '≥' : qualifier;
+  return `${operator}${prefix}${integer}${decimal ? `.${decimal}` : ''}`;
+}
+
+export function readReportDraft(instance: LabReportInstance, submitted?: ReportDraftSnapshot): ReportDraftSnapshot {
+  const values: Record<string, unknown> = {};
+  for (const section of instance.sections || []) {
+    for (const field of section.fields || []) {
+      values[field.field_key] = extractFieldValue(field);
+      // The response is authoritative for evaluation. When the number is
+      // unchanged, keep the operator's decimal spelling and caret intact.
+      if (submitted && (field.result_kind === 'numeric' || field.result_kind === 'qualified_numeric')) {
+        const typedValue = submitted.values[field.field_key];
+        const key = numericInputKey(typedValue);
+        if (key != null && key === numericInputKey(values[field.field_key])) values[field.field_key] = typedValue;
+      }
+      values[`${field.field_key}__comment`] = field.comment ?? '';
+      values[`${field.field_key}__absence_reason`] = field.absence_reason ?? '';
+    }
+  }
+  const patientSnapshot = instance.patient_snapshot as { study_date?: string } | undefined;
+  return { values, signer: { ...instance.signer_snapshot }, studyDate: patientSnapshot?.study_date ?? '' };
+}
+
+export function hasDraftDifference(left: unknown, right: unknown): boolean {
+  return (left ?? '') !== (right ?? '');
+}
+
+function retainDraftEdits(
+  current: Record<string, unknown>,
+  previous: Record<string, unknown>,
+  server: Record<string, unknown>,
+) {
+  const reconciled = { ...server };
+  for (const key of new Set([...Object.keys(current), ...Object.keys(server)])) {
+    if (hasDraftDifference(current[key], previous[key])) {
+      reconciled[key] = current[key];
+    }
+  }
+  return reconciled;
+}
+
 export function useLabReportState({
   selectedAppointment = null,
   templates = [],
@@ -90,6 +147,7 @@ export function useLabReportState({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [draftValues, setDraftValues] = useState<Record<string, unknown>>({});
   const [signerSnapshot, setSignerSnapshot] = useState<Record<string, unknown>>({});
+  const [studyDate, setStudyDate] = useState('');
   // PR-64 / Medium-16: collapsible sections in report editor
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState<boolean>(false);
@@ -98,41 +156,54 @@ export function useLabReportState({
   const [historySeverityFilter, setHistorySeverityFilter] = useState<string>('all');
   // WF-11 fix: escape hatch для template resolution blocking gap.
   const [escapeHatchActive, setEscapeHatchActive] = useState<boolean>(false);
-  // PR-58: autosave state
-  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
-  const [autoSaving, setAutoSaving] = useState<boolean>(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [saveFailure, setSaveFailure] = useState<'error' | 'conflict' | 'session' | null>(null);
 
-  // Dirty state tracking: snapshot значений при загрузке instance.
-  const initialValuesRef = useRef<{
+  const [initialValues, setInitialValues] = useState<ReportDraftSnapshot & {
     instanceId: string | number | null;
-    values: Record<string, unknown>;
-    signer: Record<string, unknown>;
-  }>({ instanceId: null, values: {}, signer: {} });
+    updatedAt: string | null;
+  }>({ instanceId: null, updatedAt: null, values: {}, signer: {}, studyDate: '' });
+  const initialValuesRef = useRef(initialValues);
+  const sourceInstanceRef = useRef<LabReportInstance | null>(null);
+  const acceptedInstanceRef = useRef<LabReportInstance | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // L-L-4 fix: ref для handleSaveDraft, чтобы autosave/keydown могли
-  // вызывать последнюю версию без пересоздания listener-ов.
-  const handleSaveDraftRef = useRef<(() => Promise<boolean>) | null>(null);
+  const handleSaveDraftRef = useRef<((mode?: 'manual' | 'auto' | 'leave') => Promise<boolean>) | null>(null);
+
+  const reconcileReportDraft = useCallback((instance: LabReportInstance, submitted?: ReportDraftSnapshot, preserveSpelling = false) => {
+    const remote = readReportDraft(instance, preserveSpelling ? submitted : undefined);
+    acceptedInstanceRef.current = instance;
+    const next = {
+      ...remote,
+      instanceId: instance.id as string | number,
+      updatedAt: typeof instance.updated_at === 'string' ? instance.updated_at : null,
+    };
+    initialValuesRef.current = next;
+    setInitialValues(next);
+    setDraftValues((current) => submitted ? retainDraftEdits(current, submitted.values, remote.values) : remote.values);
+    setSignerSnapshot((current) => submitted ? retainDraftEdits(current, submitted.signer, remote.signer) : remote.signer);
+    setStudyDate((current) => submitted && current !== submitted.studyDate ? current : remote.studyDate);
+  }, []);
 
   // ─── Derived: isDirty ────────────────────────────────────────────────────
   const isDirty = useMemo(() => {
     if (!activeInstance) return false;
-    if (String(initialValuesRef.current.instanceId ?? '') !== String(activeInstance.id ?? '')) {
+    if (String(initialValues.instanceId ?? '') !== String(activeInstance.id ?? '')) {
       return false;
     }
-    const initial = initialValuesRef.current.values;
+    const initial = initialValues.values;
     const draftKeys = new Set([...Object.keys(draftValues), ...Object.keys(initial)]);
     for (const key of draftKeys) {
-      if ((draftValues[key] || '') !== (initial[key] || '')) return true;
+      if (hasDraftDifference(draftValues[key], initial[key])) return true;
     }
-    const initialSigner = initialValuesRef.current.signer;
+    const initialSigner = initialValues.signer;
     const signerKeys = ['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'];
     for (const key of signerKeys) {
-      if ((signerSnapshot?.[key] || '') !== (initialSigner?.[key] || '')) return true;
+      if (hasDraftDifference(signerSnapshot?.[key], initialSigner?.[key])) return true;
     }
-    return false;
-  }, [activeInstance, draftValues, signerSnapshot]);
+    return studyDate !== initialValues.studyDate;
+  }, [activeInstance, draftValues, signerSnapshot, studyDate, initialValues]);
   const isInstanceHydrated = activeInstance == null
-    || String(initialValuesRef.current.instanceId ?? '') === String(activeInstance.id ?? '');
+    || String(initialValues.instanceId ?? '') === String(activeInstance.id ?? '');
 
   // ─── Derived: template collections ───────────────────────────────────────
   const publishedTemplates = useMemo(
@@ -173,7 +244,8 @@ export function useLabReportState({
       (section.fields || []).forEach((field) => {
         if (field.required) {
           const value = draftValues[field.field_key];
-          if (value === undefined || value === '' || value === null) {
+          const absenceReason = draftValues[`${field.field_key}__absence_reason`];
+          if ((value === undefined || value === '' || value === null) && !absenceReason) {
             missing.push(field.label || field.field_key);
           }
         }
@@ -186,36 +258,45 @@ export function useLabReportState({
 
   // ─── Init effect: load values from activeInstance on instance change ─────
   useLayoutEffect(() => {
+    const previous = sourceInstanceRef.current;
+    if (previous === activeInstance) return;
+    sourceInstanceRef.current = activeInstance;
+    const sameInstance = previous != null && activeInstance != null
+      && String(previous.id) === String(activeInstance.id)
+      && String(previous.patient_id ?? '') === String(activeInstance.patient_id ?? '');
+    if (!sameInstance) {
+      acceptedInstanceRef.current = null;
+      setLastSavedAt(null);
+      setSaveFailure(null);
+      setCollapsedSections(new Set());
+    }
     if (!activeInstance) {
       setDraftValues({});
       setSignerSnapshot({});
+      setStudyDate('');
       setPrintFeedback(null);
-      initialValuesRef.current = { instanceId: null, values: {}, signer: {} };
+      const empty = { instanceId: null, updatedAt: null, values: {}, signer: {}, studyDate: '' };
+      initialValuesRef.current = empty;
+      setInitialValues(empty);
       setEscapeHatchActive(false);
       return;
     }
     // WF-12 fix: сбрасываем printFeedback при смене activeInstance.
     setPrintFeedback(null);
-    const values: Record<string, unknown> = {};
-    activeInstance.sections.forEach((section) => {
-      section.fields.forEach((field) => {
-        values[field.field_key] = extractFieldValue(field);
-        // PR3: гидратируем per-field комментарий из материализованного поля
-        // (ReportEditor редактирует `field_key__comment`), иначе повторное
-        // сохранение отправит comment: null и затрёт существующий комментарий.
-        const fieldComment = (field as { comment?: unknown }).comment;
-        values[`${field.field_key}__comment`] = fieldComment ?? '';
-      });
-    });
-    setDraftValues(values);
-    setSignerSnapshot(activeInstance.signer_snapshot || {});
     setSelectedTemplateId(String(activeInstance.template_id));
-    initialValuesRef.current = {
-      instanceId: activeInstance.id as string | number | null,
-      values: { ...values },
-      signer: { ...(activeInstance.signer_snapshot || {}) },
-    };
-  }, [activeInstance]);
+    if (acceptedInstanceRef.current === activeInstance) return;
+    // A read refresh can arrive while the operator is editing the same
+    // report. Preserve the local edits, but keep their original version in
+    // the write path until the operator explicitly resolves a conflict.
+    if (sameInstance) {
+      const priorVersion = (acceptedInstanceRef.current ?? previous).updated_at;
+      if (isDirty && priorVersion != null && activeInstance.updated_at !== priorVersion) {
+        setSaveFailure('conflict');
+        return;
+      }
+    }
+    reconcileReportDraft(activeInstance, sameInstance ? initialValuesRef.current : undefined);
+  }, [activeInstance, isDirty, reconcileReportDraft]);
 
   // ─── Init effect: default template selection ─────────────────────────────
   useEffect(() => {
@@ -248,6 +329,8 @@ export function useLabReportState({
     setDraftValues,
     signerSnapshot,
     setSignerSnapshot,
+    studyDate,
+    setStudyDate,
     collapsedSections,
     setCollapsedSections,
     saving,
@@ -260,10 +343,12 @@ export function useLabReportState({
     setHistorySeverityFilter,
     escapeHatchActive,
     setEscapeHatchActive,
-    lastAutoSave,
-    setLastAutoSave,
-    autoSaving,
-    setAutoSaving,
+    lastSavedAt,
+    setLastSavedAt,
+    saveFailure,
+    setSaveFailure,
+    reconcileReportDraft,
+    initialValues,
     // Refs (для handlers и effects в компоненте)
     initialValuesRef,
     autoSaveTimerRef,

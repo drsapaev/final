@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta, timezone
+from decimal import Decimal
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -11,7 +13,15 @@ from app.core.security import get_password_hash
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.emr import EMR
-from app.models.lab import LabOrder, LabReportInstance, LabResult
+from app.models.lab import (
+    LabOrder,
+    LabReportInstance,
+    LabReportTemplate,
+    LabReportTemplateVersion,
+    LabReportValue,
+    LabResult,
+)
+from app.models.lab_release import LabReportCreationReceipt, LabReportWorkflowEvent
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
@@ -38,14 +48,14 @@ def _mint_access_token(user) -> str:
     )
 
 
-def _create_doctor_user(db_session, *, label: str) -> tuple[User, Doctor]:
+def _create_doctor_user(db_session, *, label: str, role: str = "Doctor") -> tuple[User, Doctor]:
     suffix = _suffix()
     user = User(
         username=f"lab_report_{label}_{suffix}",
         email=f"lab-report-{label}-{suffix}@test.local",
         full_name=f"Lab Report {label}",
         hashed_password=get_password_hash("doctor123"),
-        role="Doctor",
+        role=role,
         is_active=True,
         is_superuser=False,
     )
@@ -304,13 +314,13 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
         "edit",
         "save_draft",
         "mark_ready",
-        "finalize",
         "preview",
     }
     assert instance["can_edit"] is True
     assert instance["can_save_draft"] is True
     assert instance["can_mark_ready"] is True
-    assert instance["can_finalize"] is True
+    assert instance["can_finalize"] is False
+    assert "clinical_configuration_required" in instance["release_holds"]
     assert instance["can_revise"] is False
     assert instance["can_print"] is False
     assert instance["can_preview"] is True
@@ -355,7 +365,7 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert summary["critical_findings_count"] == 0
     assert summary["max_flag_severity"] is None
     assert summary["can_edit"] is True
-    assert summary["can_finalize"] is True
+    assert summary["can_finalize"] is False
     assert summary["can_revise"] is False
     assert summary["can_print"] is False
 
@@ -389,6 +399,7 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
         json={
             "patient_id": test_patient.id,
             "template_id": ige_template["id"],
+            "study_date": "2026-11-24",
         },
     )
     assert ige_instance_response.status_code == 200
@@ -411,46 +422,147 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert ige_field["reference_text"] == "< 130 МЕ/мл"
     assert ige_field["resolved_flag"] == "high"
     assert ige_field["resolved_flag_source"] == "catalog_reference"
+    assert ige_field["result_kind"] == "numeric"
+    assert ige_field["evaluation_status"] == "evaluated"
+    assert ige_field["interpretation"] == "high"
 
-    # /mark-ready endpoint was removed (L-2 fix: it was functionally empty —
-    # backend allows the same actions for DRAFT/IN_PROGRESS/READY statuses).
-    # Skip directly to /finalize, which is permitted from any non-FINALIZED status.
+    # The clinic has not approved a clinical configuration, so the report
+    # remains editable but cannot be submitted or released.
 
     finalize_response = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/finalize",
         headers=auth_headers,
     )
-    assert finalize_response.status_code == 200
-    finalized = finalize_response.json()
-    assert finalized["status"] == "FINALIZED"
-    assert set(finalized["available_actions"]) == {"revise", "print"}
-    assert finalized["can_edit"] is False
-    assert finalized["can_save_draft"] is False
-    assert finalized["can_mark_ready"] is False
-    assert finalized["can_finalize"] is False
-    assert finalized["can_revise"] is True
-    assert finalized["can_print"] is True
-    assert finalized["can_preview"] is False
+    assert finalize_response.status_code == 409
+    assert "Approved clinic clinical configuration" in finalize_response.json()["detail"]
+    blocked_detail = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}", headers=auth_headers
+    )
+    assert blocked_detail.status_code == 200
+    assert blocked_detail.json()["status"] == "IN_PROGRESS"
+    assert blocked_detail.json()["can_finalize"] is False
 
-    print_once_response = client.post(
+    print_blocked = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/mark-printed",
         headers=auth_headers,
     )
-    assert print_once_response.status_code == 200
-    printed = print_once_response.json()
-    assert printed["status"] == "PRINTED"
-    assert set(printed["available_actions"]) == {"revise", "print"}
-    assert printed["can_edit"] is False
-    assert printed["can_revise"] is True
-    assert printed["can_print"] is True
-    assert printed["can_preview"] is False
-
-    print_twice_response = client.post(
-        f"/api/v1/lab/report-instances/{instance['id']}/mark-printed",
-        headers=auth_headers,
+    assert print_blocked.status_code == 409
+    assert print_blocked.json()["detail"] == "Only finalized reports can be printed"
+    still_draft = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}", headers=auth_headers
     )
-    assert print_twice_response.status_code == 200
-    assert print_twice_response.json()["status"] == "PRINTED"
+    assert still_draft.json()["status"] == "IN_PROGRESS"
+
+
+@pytest.fixture
+def legacy_release_draft(client, auth_headers, test_patient, test_visit, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", False)
+    report = _create_lab_report_instance(
+        client, auth_headers=auth_headers, patient_id=test_patient.id,
+        visit_id=test_visit.id,
+    )
+    assert report["managed_release"] is False
+    route = f"/api/v1/lab/report-instances/{report['id']}"
+    saved = client.post(
+        f"{route}/bulk-values",
+        headers=auth_headers,
+        params={"expected_updated_at": report["updated_at"]},
+        json=[
+            {"field_key": "wbc", "value_text": "5.2"},
+            {"field_key": "hgb", "value_text": "140"},
+        ],
+    )
+    assert saved.status_code == 200, saved.text
+    return route, report["updated_at"], saved.json()["instance"]
+
+
+@pytest.fixture
+def legacy_release_side_effects(monkeypatch):
+    from app.services.lab_notification_service import LabNotificationService
+    from app.services.lab_reporting_service import LabReportingService
+
+    notification = Mock()
+    projection = Mock(wraps=LabReportingService._sync_legacy_lab_results)
+
+    def sync_projection(service, report, fields):
+        return projection(service, report, fields)
+
+    monkeypatch.setattr(
+        LabReportingService, "_emit_lab_results_ready_notification", notification,
+    )
+    monkeypatch.setattr(LabReportingService, "_sync_legacy_lab_results", sync_projection)
+    monkeypatch.setattr(LabNotificationService, "check_critical_values", AsyncMock())
+    return notification, projection
+
+
+@pytest.mark.integration
+def test_versioned_finalize_blocks_unconfigured_clinic_draft(
+    client, auth_headers, admin_user, db_session, legacy_release_draft,
+    legacy_release_side_effects,
+):
+    route, stale_version, draft = legacy_release_draft
+    notification, projection = legacy_release_side_effects
+    finalize_url = f"{route}/finalize"
+    command = {"expected_updated_at": draft["updated_at"]}
+    malformed = {"expected_updated_at": "SYNTHETIC-INVALID-TIMESTAMP"}
+    stale = {"expected_updated_at": stale_version}
+
+    def finalize_request(body=None, headers=auth_headers):
+        return client.post(finalize_url, headers=headers, json=body)
+
+    malformed_draft = finalize_request(malformed)
+    assert malformed_draft.status_code == 400, malformed_draft.text
+    assert malformed_draft.json()["detail"] == (
+        "Некорректная версия бланка. "
+        "Обновите страницу, чтобы получить актуальные данные."
+    )
+    stale_draft = finalize_request(stale)
+    assert stale_draft.status_code == 409, stale_draft.text
+    assert stale_draft.json()["detail"] == (
+        "Бланк был изменён другим пользователем. "
+        "Обновите страницу, чтобы получить актуальные данные."
+    )
+    notification.assert_not_called()
+    projection.assert_not_called()
+
+    blocked = finalize_request(command)
+    assert blocked.status_code == 409, blocked.text
+    assert "Approved clinic clinical configuration" in blocked.json()["detail"]
+    assert finalize_request().status_code == 409
+    notification.assert_not_called()
+    projection.assert_not_called()
+    assert db_session.query(LabReportWorkflowEvent).filter_by(
+        instance_id=draft["id"], kind="finalized",
+    ).count() == 0
+    stored = db_session.get(LabReportInstance, draft["id"])
+    db_session.refresh(stored)
+    assert stored.status == "IN_PROGRESS"
+
+
+@pytest.mark.integration
+def test_unversioned_finalize_blocks_unconfigured_clinic_draft(
+    client, auth_headers, db_session, legacy_release_draft, legacy_release_side_effects,
+):
+    route, _, draft = legacy_release_draft
+    notification, projection = legacy_release_side_effects
+    finalize_url = f"{route}/finalize"
+
+    first = client.post(finalize_url, headers=auth_headers)
+    assert first.status_code == 409, first.text
+    assert "Approved clinic clinical configuration" in first.json()["detail"]
+    versioned = client.post(
+        finalize_url,
+        headers=auth_headers,
+        json={"expected_updated_at": draft["updated_at"]},
+    )
+    assert versioned.status_code == 409, versioned.text
+    notification.assert_not_called()
+    projection.assert_not_called()
+    assert db_session.query(LabReportWorkflowEvent).filter_by(
+        instance_id=draft["id"], kind="finalized",
+    ).count() == 0
 
 
 # PR 3351 (review round 9, P1): report CREATE идемпотентен по операции.
@@ -504,6 +616,85 @@ def test_lab_report_create_same_idempotency_key_replays_committed_instance(
         .count()
     )
     assert count == 1, "две отправки с одним ключом создали второй бланк"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("appointment_only", [False, True], ids=["existing-visit", "appointment-only"])
+def test_lab_report_creation_recovers_after_commit_before_middleware_outcome(
+    client, auth_headers, admin_user, db_session, test_patient, test_visit, monkeypatch, appointment_only,
+):
+    from app.api.v1.endpoints import lab_reporting
+    from app.middleware import idempotency_middleware
+    from app.schemas.lab_reporting import LabReportInstanceCreate
+    from app.services.lab_reporting_service import LabReportingService
+
+    monkeypatch.setattr(idempotency_middleware, "get_distributed_claim", lambda: None)
+    notify = Mock()
+    monkeypatch.setattr(LabReportingService, "_emit_lab_new_study_notification", notify)
+    payload = _lab_create_instance_payload(client, auth_headers, test_patient, test_visit)
+    appointment_date = None
+    if appointment_only:
+        appointment = _create_appointment(db_session, patient_id=test_patient.id, doctor_id=test_visit.doctor_id)
+        appointment_date = test_visit.visit_date + timedelta(days=1)
+        appointment.appointment_date = appointment_date
+        db_session.commit()
+        payload.pop("visit_id")
+        payload["appointment_id"] = appointment.id
+        assert not db_session.query(Visit).filter_by(patient_id=test_patient.id, visit_date=appointment_date).count()
+    key = str(uuid4())
+    create_path = "/api/v1/lab/report-instances"
+    lookup_path = f"{create_path}/creation-result"
+    headers = auth_headers | {"Idempotency-Key": key}
+    lookup = {"idempotency_key": key, "request": payload}
+
+    # The endpoint commits before materializing its response. Crash at that
+    # boundary while the existing middleware has intent but no cached outcome.
+    with monkeypatch.context() as failure:
+        failure.setattr(lab_reporting, "_instance_out", Mock(
+            side_effect=RuntimeError("synthetic creation response lost"),
+        ))
+        with pytest.raises(RuntimeError, match="synthetic creation response lost"):
+            client.post(create_path, headers=headers, json=payload)
+
+    retry = client.post(create_path, headers=headers, json=payload)
+    assert retry.status_code == 409, retry.text
+    assert retry.json()["code"] == "idempotency_uncertain_outcome"
+
+    receipt = db_session.query(LabReportCreationReceipt).filter_by(actor_user_id=admin_user.id).one()
+    assert len(receipt.key_digest) == len(receipt.request_digest) == 64
+    assert receipt.key_digest != key
+    report_id = receipt.instance_id
+    recovered = client.post(lookup_path, headers=auth_headers, json=lookup)
+    assert recovered.status_code == 200, recovered.text
+    assert recovered.headers["Cache-Control"] == "no-store"
+    assert recovered.json()["id"] == report_id
+    assert recovered.json()["patient_id"] == test_patient.id
+
+    mismatched = client.post(lookup_path, headers=auth_headers, json={
+        **lookup, "request": {**payload, "branding_overrides": {"clinic_name": "SYNTHETIC changed"}},
+    })
+    assert mismatched.status_code == 409, mismatched.text
+
+    other_staff = _create_lab_user(db_session, label="other_create_recovery")
+    other_headers = {"Authorization": f"Bearer {_mint_access_token(other_staff)}"}
+    assert client.post(lookup_path, headers=other_headers, json=lookup).status_code == 404
+    assert client.post(lookup_path, headers=auth_headers, json={
+        **lookup, "idempotency_key": str(uuid4()),
+    }).status_code == 404
+
+    # If execution runs again after middleware cache/intent expiry, the
+    # canonical service still resolves the same durable creation.
+    replay = LabReportingService(db_session).create_instance(
+        LabReportInstanceCreate.model_validate(payload).model_dump(exclude_unset=True),
+        actor_user_id=admin_user.id, idempotency_key=key,
+    )
+    assert replay.id == report_id
+    assert db_session.query(LabReportInstance).filter_by(patient_id=test_patient.id).count() == 1
+    assert db_session.query(LabOrder).filter_by(patient_id=test_patient.id).count() == 1
+    if appointment_date is not None:
+        provisioned = db_session.query(Visit).filter_by(patient_id=test_patient.id, visit_date=appointment_date).one()
+        assert recovered.json()["visit_id"] == provisioned.id
+    notify.assert_called_once()
 
 
 @pytest.mark.integration
@@ -650,6 +841,112 @@ def test_doctor_lab_report_reads_are_limited_to_own_visits(
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("role", ["cardio", "derma", "dentist", "Cardiologist", "Dermatologist", "dentistry"])
+def test_doctor_family_uses_owned_workspace_lab_transports(
+    client, auth_headers, db_session, monkeypatch, role,
+) -> None:
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", False)
+    user, doctor = _create_doctor_user(db_session, label="workspace", role=role)
+    own_patient = _create_patient(db_session)
+    own_visit = _create_visit(db_session, patient_id=own_patient.id, doctor_id=doctor.id)
+    _other_user, other_doctor = _create_doctor_user(db_session, label="colleague")
+    other_patient = _create_patient(db_session)
+    other_visit = _create_visit(db_session, patient_id=other_patient.id, doctor_id=other_doctor.id)
+    other_report = _create_lab_report_instance(
+        client, auth_headers=auth_headers, patient_id=other_patient.id, visit_id=other_visit.id,
+    )
+    headers = {"Authorization": f"Bearer {_mint_access_token(user)}"}
+
+    templates = client.get("/api/v1/lab/templates", headers=headers)
+    assert templates.status_code == 200, templates.text
+    template = next(item for item in templates.json() if item["code"] == "cbc_oak")
+    order = client.post(
+        "/api/v1/lab/orders", headers=headers,
+        json={"template_id": template["id"], "patient_id": own_patient.id, "visit_id": own_visit.id},
+    )
+    assert order.status_code == 200, order.text
+    ordered = order.json()
+    report_id = ordered["instance_id"]
+    assert (ordered["patient_id"], ordered["visit_id"], ordered["status"]) == (
+        own_patient.id, own_visit.id, "DRAFT",
+    )
+
+    report = db_session.get(LabReportInstance, report_id)
+    db_session.add(
+        LabReportInstance(
+            order_id=report.order_id,
+            patient_id=own_patient.id,
+            visit_id=own_visit.id,
+            template_id=report.template_id,
+            template_version_id=report.template_version_id,
+            status="DRAFT",
+            managed_release=True,
+        )
+    )
+    db_session.commit()
+
+    listed = client.get("/api/v1/lab/report-instances", headers=headers)
+    assert listed.status_code == 200, listed.text
+    assert {item["id"] for item in listed.json()} == {report_id}
+    assert other_report["id"] != report_id
+
+    report.status = "FINALIZED"
+    report.finalized_at = datetime.now(UTC)
+    db_session.commit()
+    finalized = client.get(
+        "/api/v1/lab/report-instances", headers=headers,
+        params={"visit_ids": [own_visit.id], "patient_id": own_patient.id, "status": "FINALIZED"},
+    )
+    assert finalized.status_code == 200, finalized.text
+    assert [item["id"] for item in finalized.json()] == [report_id]
+
+    pdf_bytes = b"%PDF-1.4\n% SYNTHETIC workspace report\n%%EOF\n"
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.lab_reporting.lab_report_pdf_service.render_report",
+        lambda _report: pdf_bytes,
+    )
+    pdf = client.get(f"/api/v1/lab/report-instances/{report_id}/pdf", headers=headers)
+    assert pdf.status_code == 200, pdf.text
+    assert pdf.headers["content-type"] == "application/pdf"
+    assert pdf.content == pdf_bytes
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("role", ["Doctor", "cardio"])
+def test_clinician_lab_orders_require_an_assigned_visit_and_an_active_doctor(
+    client, db_session, role,
+) -> None:
+    user, doctor = _create_doctor_user(db_session, label="order_scope", role=role)
+    patient = _create_patient(db_session)
+    visit = _create_visit(db_session, patient_id=patient.id, doctor_id=doctor.id)
+    headers = {"Authorization": f"Bearer {_mint_access_token(user)}"}
+    templates = client.get("/api/v1/lab/templates", headers=headers)
+    assert templates.status_code == 200, templates.text
+    template = next(item for item in templates.json() if item["code"] == "cbc_oak")
+    payload = {"template_id": template["id"], "patient_id": patient.id}
+    no_visit = client.post("/api/v1/lab/orders", headers=headers, json=payload)
+    assert no_visit.status_code == 422, no_visit.text
+
+    visit.doctor_id = None
+    db_session.commit()
+    unassigned = client.post("/api/v1/lab/orders", headers=headers, json={**payload, "visit_id": visit.id})
+    assert unassigned.status_code == 403, unassigned.text
+
+    visit.doctor_id = doctor.id
+    doctor.active = False
+    db_session.commit()
+    inactive = client.post("/api/v1/lab/orders", headers=headers, json={**payload, "visit_id": visit.id})
+    assert inactive.status_code == 403, inactive.text
+    assert db_session.query(LabOrder).filter_by(patient_id=patient.id).count() == 0
+
+    user.is_active = False
+    db_session.commit()
+    assert client.get("/api/v1/lab/templates", headers=headers).status_code == 403
+
+
+@pytest.mark.integration
 def test_lab_role_without_doctor_profile_reads_created_instance_and_pdf(
     client,
     db_session,
@@ -727,7 +1024,7 @@ def test_doctor_emr_lab_reads_are_limited_to_own_patients(
         patient_id=own_patient.id,
         visit_id=own_visit.id,
         test_code="hemoglobin",
-        value="130",
+        value="80",
     )
     _create_legacy_lab_result(
         db_session,
@@ -746,6 +1043,16 @@ def test_doctor_emr_lab_reads_are_limited_to_own_patients(
     own_payload = own_results.json()
     assert own_payload["patient_id"] == own_patient.id
     assert {item["id"] for item in own_payload["results"]} == {own_result.id}
+
+    own_abnormal_results = client.get(
+        f"/api/v1/emr/lab/patients/{own_patient.id}/abnormal-lab-results",
+        headers=doctor_headers,
+    )
+    assert own_abnormal_results.is_success, own_abnormal_results.text
+    [historical] = own_abnormal_results.json()["abnormal_results"]
+    assert historical["id"] == own_result.id and historical["value"] == "80"
+    assert "deviation" in historical and "severity" in historical
+    assert "source_instance_id" not in historical
 
     other_results = client.get(
         f"/api/v1/emr/lab/patients/{other_patient.id}/lab-results",
@@ -772,6 +1079,364 @@ def test_doctor_emr_lab_reads_are_limited_to_own_patients(
         headers=doctor_headers,
     )
     assert other_summary.status_code == 403
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("value", "evaluation_status", "interpretation", "is_abnormal"),
+    [
+        ("<1", "not_evaluated", None, None),
+        ("135", "evaluated", "critical", True),
+        ("135", "evaluated", "high", True),
+    ],
+)
+def test_emr_lab_uses_current_frozen_assessment_and_release_date(
+    client, db_session, value, evaluation_status, interpretation, is_abnormal
+) -> None:
+    user, doctor = _create_doctor_user(db_session, label="exact_emr_release")
+    patient = _create_patient(db_session)
+    visit = _create_visit(db_session, patient_id=patient.id, doctor_id=doctor.id)
+    legacy = _create_legacy_lab_result(
+        db_session,
+        patient_id=patient.id,
+        visit_id=visit.id,
+        test_code="hemoglobin",
+        value="130",
+    )
+    now = datetime.now(UTC).replace(microsecond=0)
+    original_at = now - timedelta(days=45)
+    released_at = now - timedelta(hours=1)
+    order = LabOrder(patient_id=patient.id, visit_id=visit.id)
+    template = LabReportTemplate(
+        code=f"synthetic-emr-{_suffix()}",
+        name="SYNTHETIC EMR parity",
+        family="synthetic",
+    )
+    version = LabReportTemplateVersion(
+        template=template,
+        version_no=1,
+        layout_preset="default",
+        status="PUBLISHED",
+        published_at=original_at,
+    )
+    db_session.add_all([order, version])
+    db_session.flush()
+    release_context = {
+        "order_id": order.id,
+        "visit_id": visit.id,
+        "patient_id": patient.id,
+        "template_id": template.id,
+        "template_version_id": version.id,
+    }
+    original = LabReportInstance(
+        **release_context, status="FINALIZED", finalized_at=original_at
+    )
+    db_session.add(original)
+    db_session.flush()
+    correction = LabReportInstance(
+        **release_context,
+        status="PRINTED",
+        supersedes_instance_id=original.id,
+        finalized_at=released_at,
+    )
+    db_session.add(correction)
+    db_session.flush()
+    projected = LabResult(
+        order_id=order.id,
+        test_code="hemoglobin",
+        test_name="SYNTHETIC linked hemoglobin",
+        value=value,
+        unit="previous unit",
+        ref_range="previous range",
+        abnormal=False,
+        source_instance_id=correction.id,
+        source_root_instance_id=original.id,
+        created_at=original_at,
+    )
+    db_session.add_all(
+        [
+            projected,
+            LabReportValue(
+                instance_id=original.id,
+                field_key="hemoglobin",
+                evaluation_snapshot={"status": "evaluated", "interpretation": "normal"},
+            ),
+            LabReportValue(
+                instance_id=correction.id,
+                field_key="hemoglobin",
+                resolved_reference_text="SYNTHETIC current range",
+                evaluation_snapshot={
+                    "status": evaluation_status,
+                    "interpretation": interpretation,
+                    "unit": "g/L",
+                },
+            ),
+        ]
+    )
+    db_session.commit()
+
+    headers = _doctor_headers(client, user)
+    response = client.get(
+        f"/api/v1/emr/lab/patients/{patient.id}/lab-results",
+        params={"date_from": (now - timedelta(days=2)).isoformat()},
+        headers=headers,
+    )
+    assert response.is_success, response.text
+    payload = response.json()
+    rows = {row["id"]: row for row in payload["results"]}
+    historical = rows[legacy.id]
+    assert historical["is_abnormal"] is False
+    assert "evaluation_status" not in historical
+    linked = rows[projected.id]
+    assert linked["value"] == value
+    assert linked["unit"] == "g/L"
+    assert linked["ref_range"] == "SYNTHETIC current range"
+    assert linked["source_instance_id"] == correction.id
+    assert linked["source_root_instance_id"] == original.id
+    assert linked["supersedes_instance_id"] == original.id
+    assert datetime.fromisoformat(linked["released_at"]).replace(tzinfo=UTC) == released_at
+    assert linked["evaluation_status"] == evaluation_status
+    assert linked["interpretation"] == interpretation
+    assert linked["abnormal"] is is_abnormal and linked["is_abnormal"] is is_abnormal
+    assert payload["abnormal_count"] == int(is_abnormal is True)
+
+    response = client.get(
+        f"/api/v1/emr/lab/patients/{patient.id}/abnormal-lab-results", headers=headers
+    )
+    assert response.is_success, response.text
+    abnormal = response.json()
+    assert abnormal["total_abnormal"] == int(is_abnormal is True)
+    if is_abnormal:
+        [finding] = abnormal["abnormal_results"]
+        for key in (
+            "id",
+            "value",
+            "unit",
+            "ref_range",
+            "evaluation_status",
+            "interpretation",
+            "source_instance_id",
+            "source_root_instance_id",
+            "supersedes_instance_id",
+            "released_at",
+        ):
+            assert finding[key] == linked[key]
+        severity = "critical" if interpretation == "critical" else "unknown"
+        assert finding["severity"] == severity
+        assert finding["deviation"] == {
+            "deviation_percent": None,
+            "deviation_type": "unknown",
+        }
+        assert abnormal["severity_groups"] == {severity: [finding]}
+    else:
+        assert abnormal["abnormal_results"] == []
+        assert abnormal["severity_groups"] == {}
+
+    emr = _create_emr(
+        db_session,
+        appointment_id=_create_appointment(
+            db_session, patient_id=patient.id, doctor_id=doctor.id
+        ).id,
+    )
+    response = client.get(
+        f"/api/v1/emr/lab/emr/{emr.id}/lab-summary",
+        params={"patient_id": patient.id},
+        headers=headers,
+    )
+    assert response.is_success, response.text
+    summary = response.json()["summary"]["summary"]
+    assert summary["total_tests"] == 2
+    assert summary["abnormal_count"] == int(is_abnormal is True)
+    assert summary["recommendations"] == []
+
+    response = client.get(
+        "/api/v1/emr/lab/lab-results/trends",
+        params={"patient_id": patient.id, "test_type": "hemoglobin"},
+        headers=headers,
+    )
+    assert response.is_success, response.text
+    trend = response.json()
+    assert [point["value"] for point in trend["trend_data"]] == [value, "130"]
+    assert trend["trend_data"][0] == {
+        "date": released_at.date().isoformat(),
+        "value": value,
+        "unit": "g/L",
+        "is_abnormal": is_abnormal,
+        "normal_range": "SYNTHETIC current range",
+    }
+    assert trend["total_measurements"] == 2
+    assert trend["trend_stats"] == {}
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("changed_context", "timing"),
+    [
+        ({}, "study_date"),
+        ({}, "specimen_collection"),
+        ({"analyte_code": "other-analyte"}, "study_date"),
+        ({"unit_code": "other-unit"}, "study_date"),
+        ({"material_code": "other-material"}, "study_date"),
+        ({"method_code": "other-method"}, "study_date"),
+        ({"method_code": None}, "study_date"),
+        ({"status": "missing"}, "study_date"),
+        ({"age_at_date": None}, "study_date"),
+        ({"age_at_date": "invalid-date"}, "study_date"),
+        ({"reference_date_source": "unsupported"}, "study_date"),
+        ({"reference_date_source": "specimen_collection"}, "study_date"),
+        ({}, "same_release_time"),
+        ({}, "same_observation_date"),
+        ({}, "older_study_corrected"),
+    ],
+)
+def test_emr_lab_trends_only_aggregate_matching_numeric_observations(
+    client, db_session, changed_context, timing
+) -> None:
+    user, doctor = _create_doctor_user(db_session, label="trend_exact")
+    patient = _create_patient(db_session)
+    visit = _create_visit(db_session, patient_id=patient.id, doctor_id=doctor.id)
+    now = datetime.now(UTC)
+    order = LabOrder(patient_id=patient.id, visit_id=visit.id)
+    template = LabReportTemplate(
+        code=f"synthetic-trend-{_suffix()}", name="SYNTHETIC trend", family="synthetic"
+    )
+    version = LabReportTemplateVersion(
+        template=template,
+        version_no=1,
+        layout_preset="default",
+        status="PUBLISHED",
+        published_at=now - timedelta(days=5),
+    )
+    db_session.add_all([order, version])
+    db_session.flush()
+
+    test_code = "synthetic-series"
+    observations = [
+        ("0", Decimal("0"), "numeric", "evaluated", "normal"),
+        ("<1", Decimal("1"), "qualified_numeric", "not_evaluated", None),
+        ("positive", None, "coded_qualitative", "evaluated", "positive"),
+        ("8", Decimal("8"), "numeric", "evaluated", "high"),
+    ]
+    release_context = {
+        "order_id": order.id,
+        "visit_id": visit.id,
+        "patient_id": patient.id,
+        "template_id": template.id,
+        "template_version_id": version.id,
+        "status": "FINALIZED",
+    }
+    for index, (raw, numeric, kind, state, interpretation) in enumerate(observations):
+        observation_time = now - timedelta(days=len(observations) - index)
+        released_at = (
+            now - timedelta(days=1)
+            if timing == "same_release_time"
+            else observation_time
+        )
+        reference_date = (
+            (now - timedelta(days=len(observations))).date()
+            if timing == "same_observation_date"
+            else observation_time.date()
+        )
+        original = LabReportInstance(**release_context, finalized_at=released_at)
+        db_session.add(original)
+        db_session.flush()
+        report = original
+        snapshot = {
+            "status": state,
+            "interpretation": interpretation,
+            "visible": True,
+            "analyte_code": "synthetic-analyte",
+            "unit": "mg/L",
+            "unit_code": "synthetic-unit",
+            "material_code": "synthetic-material",
+            "method_code": "synthetic-method",
+            "age_at_date": reference_date.isoformat(),
+            "reference_date_source": "specimen_collection"
+            if timing == "specimen_collection"
+            else "study_date",
+        }
+        if index == len(observations) - 1:
+            snapshot.update(changed_context)
+        result_payload = {"kind": kind}
+        if kind == "qualified_numeric":
+            result_payload["comparator"] = "lt"
+        report_value = {
+            "field_key": test_code,
+            "value_numeric": numeric,
+            "value_text": raw if numeric is None else None,
+            "resolved_reference_text": "SYNTHETIC frozen reference",
+            "evaluation_snapshot": snapshot,
+            "result_payload": result_payload,
+        }
+        if timing == "older_study_corrected" and index == 0:
+            db_session.add(LabReportValue(instance_id=original.id, **report_value))
+            report = LabReportInstance(
+                **release_context,
+                finalized_at=now - timedelta(hours=1),
+                supersedes_instance_id=original.id,
+            )
+            db_session.add(report)
+            db_session.flush()
+        db_session.add_all(
+            [
+                LabReportValue(instance_id=report.id, **report_value),
+                LabResult(
+                    order_id=order.id,
+                    test_code=test_code,
+                    test_name="SYNTHETIC trend result",
+                    value=raw,
+                    unit="previous unit",
+                    ref_range="previous range",
+                    source_instance_id=report.id,
+                    source_root_instance_id=original.id,
+                    created_at=released_at,
+                ),
+            ]
+        )
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/emr/lab/lab-results/trends",
+        params={"patient_id": patient.id, "test_type": test_code, "period_days": 7},
+        headers=_doctor_headers(client, user),
+    )
+    assert response.is_success, response.text
+    trend = response.json()
+    assert trend["patient_id"] == patient.id and trend["test_type"] == test_code
+    assert trend["period_days"] == 7 and trend["total_measurements"] == 4
+    expected_values = ["0", "<1", "positive", "8"]
+    expected_assessments = [
+        False,
+        None,
+        None,
+        None if changed_context.get("status") == "missing" else True,
+    ]
+    if timing == "older_study_corrected":
+        assert (
+            trend["trend_data"][-1]["date"]
+            == (now - timedelta(hours=1)).date().isoformat()
+        )
+        expected_values = ["<1", "positive", "8", "0"]
+        expected_assessments = [None, None, True, False]
+    assert [point["value"] for point in trend["trend_data"]] == expected_values
+    assert [
+        point["is_abnormal"] for point in trend["trend_data"]
+    ] == expected_assessments
+    assert {point["unit"] for point in trend["trend_data"]} == {"mg/L"}
+    assert {point["normal_range"] for point in trend["trend_data"]} == {
+        "SYNTHETIC frozen reference"
+    }
+    assert trend["trend_stats"] == (
+        {}
+        if changed_context or timing not in ("study_date", "specimen_collection")
+        else {
+            "min_value": 0,
+            "max_value": 8,
+            "avg_value": 4,
+            "trend_direction": "increasing",
+            "abnormal_percentage": 50,
+        }
+    )
 
 
 @pytest.mark.integration
@@ -1224,8 +1889,9 @@ def test_legacy_lab_contract_is_not_published(client, auth_headers):
         assert response.status_code == 404
 
 
+@pytest.mark.parametrize("role", ["Admin", "Lab"])
 def test_create_lab_order_endpoint_resolves_published_version(
-    client, auth_headers, db_session, test_patient
+    client, auth_headers, db_session, test_patient, role,
 ):
     """Regression: POST /api/v1/lab/orders used to 500 on two ghost lookups.
 
@@ -1234,7 +1900,11 @@ def test_create_lab_order_endpoint_resolves_published_version(
     not exist on LabReportingService). Published-version resolution must go
     through template.versions, and the version fetch through the repository.
     """
-    templates_response = client.get("/api/v1/lab/templates", headers=auth_headers)
+    headers = auth_headers
+    if role == "Lab":
+        lab_user = _create_lab_user(db_session, label="workspace_order")
+        headers = {"Authorization": f"Bearer {_mint_access_token(lab_user)}"}
+    templates_response = client.get("/api/v1/lab/templates", headers=headers)
     assert templates_response.status_code == 200
     cbc_template = next(
         template
@@ -1244,7 +1914,7 @@ def test_create_lab_order_endpoint_resolves_published_version(
 
     response = client.post(
         "/api/v1/lab/orders",
-        headers=auth_headers,
+        headers=headers,
         json={
             "template_id": cbc_template["id"],
             "patient_id": test_patient.id,
@@ -1254,6 +1924,7 @@ def test_create_lab_order_endpoint_resolves_published_version(
     body = response.json()
     assert body["instance_id"] > 0
     assert body["patient_id"] == test_patient.id
+    assert body["visit_id"] is None
     assert body["template_name"]
     assert body["status"]
 
@@ -1349,6 +2020,74 @@ def test_bulk_values_optimistic_locking_bumps_token_and_rejects_stale(
     )
     assert wbc_field["value_text"] == "5.4", (
         "stale or malformed saves must not overwrite the accepted value"
+    )
+
+
+@pytest.mark.integration
+def test_draft_request_id_binds_each_operation_to_its_actor_payload_and_version(
+    client, auth_headers, db_session, test_patient, test_visit, test_doctor_user,
+):
+    instance = _create_lab_report_instance(
+        client, auth_headers=auth_headers, patient_id=test_patient.id, visit_id=test_visit.id,
+    )
+    route = f"/api/v1/lab/report-instances/{instance['id']}"
+    request_id = str(uuid4())
+    original_params = {
+        "draft_request_id": request_id,
+        "expected_updated_at": instance["updated_at"],
+    }
+    metadata = {"study_date": "2026-09-21"}
+
+    def report_with_normalized_version(report):
+        # SQLite drops timezone information on reload. PostgreSQL separately
+        # proves the replay returns the exact persisted version.
+        version = datetime.fromisoformat(report["updated_at"])
+        if version.tzinfo is None:
+            version = version.replace(tzinfo=UTC)
+        return {**report, "updated_at": version.astimezone(UTC)}
+
+    malformed = client.put(
+        route, params={**original_params, "draft_request_id": "invalid"},
+        headers=auth_headers, json=metadata,
+    )
+    assert malformed.status_code == 422, malformed.text
+    unversioned = client.put(
+        route, params={"draft_request_id": request_id}, headers=auth_headers, json=metadata,
+    )
+    assert unversioned.status_code == 400, unversioned.text
+
+    first = client.put(route, params=original_params, headers=auth_headers, json=metadata)
+    assert first.status_code == 200, first.text
+    replay = client.put(route, params=original_params, headers=auth_headers, json=metadata)
+    assert replay.status_code == 200, replay.text
+    assert report_with_normalized_version(replay.json()) == report_with_normalized_version(first.json())
+
+    lab_user = _create_lab_user(db_session, label="other_replay_actor")
+    other_actor = {"Authorization": f"Bearer {_mint_access_token(lab_user)}"}
+    cannot_replay = client.put(route, params=original_params, headers=other_actor, json=metadata)
+    assert cannot_replay.status_code == 409, cannot_replay.text
+    doctor = {"Authorization": f"Bearer {_mint_access_token(test_doctor_user)}"}
+    forbidden = client.put(route, params=original_params, headers=doctor, json=metadata)
+    assert forbidden.status_code == 403, forbidden.text
+
+    current_params = {**original_params, "expected_updated_at": first.json()["updated_at"]}
+    rebound = client.put(
+        route, params=current_params, headers=auth_headers, json={"study_date": "2026-09-22"},
+    )
+    assert rebound.status_code == 409, rebound.text
+    bulk = client.post(
+        f"{route}/bulk-values", params=current_params, headers=auth_headers,
+        json=[{"field_key": "wbc", "value_text": "5.2"}],
+    )
+    assert bulk.status_code == 200, bulk.text
+    assert bulk.json()["updated_field_keys"] == ["wbc"]
+
+    superseded = client.put(route, params=original_params, headers=auth_headers, json=metadata)
+    assert superseded.status_code == 409, superseded.text
+    latest = client.get(route, headers=auth_headers)
+    assert latest.status_code == 200, latest.text
+    assert report_with_normalized_version(latest.json()) == report_with_normalized_version(
+        bulk.json()["instance"]
     )
 
 
@@ -1680,10 +2419,16 @@ def test_draft_report_preview_renders_saved_values_inline_for_lab(
         patient_id=patient.id,
         visit_id=visit.id,
     )
+    invalid_numeric = client.post(
+        f"/api/v1/lab/report-instances/{instance['id']}/bulk-values",
+        headers=lab_headers,
+        json=[{"field_key": "hgb", "value_text": "SYNTHETIC_INVALID_NUMBER"}],
+    )
+    assert invalid_numeric.status_code == 400
     bulk_response = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/bulk-values",
         headers=lab_headers,
-        json=[{"field_key": "hgb", "value_text": "SYNTHETIC_PREVIEW_VALUE"}],
+        json=[{"field_key": "hgb", "value_text": "123.45"}],
     )
     assert bulk_response.status_code == 200, bulk_response.text
     # bulk-values переводит бланк DRAFT -> IN_PROGRESS (существующая
@@ -1740,7 +2485,7 @@ def test_draft_report_preview_passes_watermark_and_saved_values(
     bulk_response = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/bulk-values",
         headers=lab_headers,
-        json=[{"field_key": "hgb", "value_text": "SYNTHETIC_WM_135"}],
+        json=[{"field_key": "hgb", "value_text": "≥135,25"}],
     )
     assert bulk_response.status_code == 200, bulk_response.text
 
@@ -1761,15 +2506,15 @@ def test_draft_report_preview_passes_watermark_and_saved_values(
         for field in section.get("fields") or []
         if field.get("field_key") == "hgb"
     ]
-    assert rendered_values and rendered_values[0]["value_text"] == "SYNTHETIC_WM_135"
+    assert rendered_values and rendered_values[0]["value_display"] == "≥135.25"
+    assert rendered_values[0]["comparator"] == "gte"
 
-    # FINALIZED instance preview: watermark не ставится (утверждённый
-    # результат уже имеет финальный вид; печать — отдельное действие).
-    finalize_response = client.post(
-        f"/api/v1/lab/report-instances/{instance['id']}/finalize",
-        headers=lab_headers,
-    )
-    assert finalize_response.status_code == 200
+    # The PDF contract needs an immutable synthetic source state. Clinical
+    # release authorization is covered by the managed workflow tests.
+    report = db_session.get(LabReportInstance, instance["id"])
+    report.status = "FINALIZED"
+    report.finalized_at = datetime.now(UTC)
+    db_session.commit()
     captured.clear()
     service, original = _patch_render_spy(captured)
     try:

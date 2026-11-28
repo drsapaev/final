@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.schemas.lab_release import LabReportWorkflowEventOut
 
 
 class LabOrderSummaryOut(BaseModel):
@@ -158,15 +160,36 @@ class LabReportInstanceCreate(BaseModel):
     appointment_id: int | None = None
     visit_id: int | None = None
     template_version_id: int | None = None
+    study_date: date | None = None
     service_codes: list[str] = Field(default_factory=list)
     service_items: list[LabServiceContextItemIn] = Field(default_factory=list)
+    visit_service_ids: list[int] = Field(default_factory=list, max_length=100)
     signer_overrides: dict[str, Any] = Field(default_factory=dict)
     branding_overrides: dict[str, Any] = Field(default_factory=dict)
+
+
+class LabReportCreationLookupIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    idempotency_key: str = Field(min_length=1, max_length=128)
+    request: LabReportInstanceCreate
 
 
 class LabReportInstanceUpdate(BaseModel):
     signer_snapshot: dict[str, Any] | None = None
     branding_snapshot: dict[str, Any] | None = None
+    study_date: date | None = None
+
+
+LabResultKind = Literal["numeric", "qualified_numeric", "coded_qualitative", "text", "absent"]
+LabResultComparator = Literal["lt", "lte", "gt", "gte"]
+LabQualitativeCode = Literal["negative", "positive", "indeterminate"]
+LabEvaluationStatus = Literal["missing", "not_evaluated", "not_applicable", "evaluated", "unknown"]
+LabInterpretation = Literal["normal", "low", "high", "warning", "abnormal", "critical", "negative", "positive", "indeterminate"]
+LabInstrumentFlagCode = Annotated[
+    str, Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9_.%+!*?/-]+$")
+]
+LabInstrumentFlags = Annotated[list[LabInstrumentFlagCode], Field(max_length=16)]
 
 
 class LabReportValueIn(BaseModel):
@@ -174,6 +197,17 @@ class LabReportValueIn(BaseModel):
     value_text: str | None = None
     value_numeric: Decimal | None = None
     comment: str | None = None
+    result_kind: LabResultKind | None = None
+    comparator: LabResultComparator | None = None
+    qualitative_code: LabQualitativeCode | None = None
+    absence_reason: str | None = Field(default=None, max_length=500)
+    unit_code: str | None = Field(default=None, max_length=32)
+    method_code: str | None = Field(default=None, max_length=64)
+
+    @field_validator("value_numeric", mode="before")
+    @classmethod
+    def normalize_numeric_separator(cls, value: Any) -> Any:
+        return value.replace(",", ".") if isinstance(value, str) else value
 
 
 class LabReportRenderedFieldOut(BaseModel):
@@ -189,8 +223,23 @@ class LabReportRenderedFieldOut(BaseModel):
     reference_text: str | None = None
     visibility_rule: dict[str, Any] | None = None
     highlight_rule: dict[str, Any] | None = None
+    choice_options: list[str] | None = None
+    choice_option_codes: list[LabQualitativeCode | None] | None = None
     value_text: str | None = None
     value_numeric: Decimal | None = None
+    result_kind: LabResultKind | None = None
+    comparator: LabResultComparator | None = None
+    qualitative_code: LabQualitativeCode | None = None
+    absence_reason: str | None = None
+    method_code: str | None = None
+    value_display: str = ""
+    evaluation_status: LabEvaluationStatus = "unknown"
+    interpretation: LabInterpretation | None = None
+    evaluation_snapshot: dict[str, Any] | None = None
+    instrument_flags: LabInstrumentFlags = Field(
+        default_factory=list,
+        description="Unclassified warning codes from the import of this exact result",
+    )
     comment: str | None = None
     resolved_flag: str | None = None
     resolved_flag_source: str | None = None
@@ -233,6 +282,9 @@ class LabReportInstanceOut(BaseModel):
     template_id: int
     template_version_id: int
     status: str
+    managed_release: bool = False
+    workflow_events: list[LabReportWorkflowEventOut] = Field(default_factory=list)
+    release_holds: list[str] = Field(default_factory=list)
     patient_snapshot: dict[str, Any]
     branding_snapshot: dict[str, Any]
     signer_snapshot: dict[str, Any]
@@ -263,6 +315,8 @@ class LabReportInstanceSummaryOut(BaseModel):
     template_id: int
     template_version_id: int
     status: str
+    managed_release: bool = False
+    supersedes_instance_id: int | None = None
     created_at: datetime
     finalized_at: datetime | None = None
     printed_at: datetime | None = None
@@ -315,6 +369,9 @@ class LabCatalogReferenceRangeOut(BaseModel):
     sex: str | None = None
     age_min_months: int | None = None
     age_max_months: int | None = None
+    material_code: str | None = None
+    method_code: str | None = None
+    unit_code: str | None = None
     text: str | None = None
     low: Decimal | None = None
     high: Decimal | None = None

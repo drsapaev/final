@@ -73,6 +73,34 @@ beforeEach(() => {
 });
 
 describe('RETRO-3941-03: edits made while Save is in flight are never treated as persisted', () => {
+  it('skips a pristine save even when the doctor starts typing during its re-read', async () => {
+    const saved = emrWithEcho('58', 'Без патологии', 7);
+    apiMocks.get.mockResolvedValueOnce({ data: saved });
+    const gateGet = deferred<{ data: typeof saved }>();
+    apiMocks.get.mockImplementationOnce(() => gateGet.promise);
+
+    renderWithProviders(<EchoForm visitId={41} patientId={7} />);
+    const ef = await screen.findByDisplayValue('58');
+    const save = screen.getByRole('button', { name: /сохранить/i });
+    fireEvent.click(save);
+    fireEvent.change(ef, { target: { value: '52' } });
+
+    await act(async () => {
+      gateGet.resolve({ data: saved });
+    });
+
+    expect(apiMocks.post).not.toHaveBeenCalled();
+    expect(ef).toHaveValue('52');
+    expect(screen.getByText(/ещё не записаны/i)).toBeVisible();
+    expect(save).toBeEnabled();
+
+    apiMocks.get.mockResolvedValueOnce({ data: saved });
+    apiMocks.post.mockResolvedValueOnce({ status: 200 });
+    await act(async () => { fireEvent.click(save); });
+    expect(apiMocks.post).toHaveBeenCalledTimes(1);
+    expect(apiMocks.post.mock.calls[0][1].data.specialty_data.echo.leftVentricle.ef).toBe('52');
+  });
+
   it('an edit between submission start and ACK keeps the form dirty and requires a follow-up save', async () => {
     // Hydration returns the stored echo (ef 58, row_version 7).
     apiMocks.get.mockResolvedValueOnce({ data: emrWithEcho('58', 'Без патологии', 7) });
@@ -102,8 +130,9 @@ describe('RETRO-3941-03: edits made while Save is in flight are never treated as
       gateGet.resolve({ data: emrWithEcho('58', 'Без патологии', 7) });
       await Promise.resolve();
     });
+    const acknowledged = emrWithEcho('45', 'Без патологии', 8);
     await act(async () => {
-      gatePost.resolve({ status: 200, data: { data: { specialty_data: { echo: {} } } } });
+      gatePost.resolve({ status: 200, data: acknowledged });
       await Promise.resolve();
     });
 
@@ -118,7 +147,7 @@ describe('RETRO-3941-03: edits made while Save is in flight are never treated as
 
     // The dirty flag survived, so the follow-up Save must NOT be skipped
     // as "no changes" — it POSTs again and persists the latest value (52).
-    apiMocks.get.mockResolvedValueOnce({ data: emrWithEcho('45', 'Без патологии', 8) });
+    apiMocks.get.mockResolvedValueOnce({ data: acknowledged });
     apiMocks.post.mockResolvedValueOnce({ status: 200, data: { data: { specialty_data: { echo: {} } } } });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /сохранить/i }));

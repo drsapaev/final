@@ -3,15 +3,21 @@
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.crud import lab_result
+from app.crud import lab, lab_result
 from app.models.appointment import Appointment
 from app.models.emr import EMR
 from app.models.lab import LabOrder, LabResult
+from app.services.emr_lab_result_evidence import (
+    NON_NUMERIC_RESULT_KINDS,
+    frozen_assessment,
+    released_numeric_observation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,35 +42,74 @@ class EMRLabIntegrationService:
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         test_types: list[str] | None = None,
+        *,
+        _include_trend_evidence: bool = False,
     ) -> list[dict[str, Any]]:
         """Получить лабораторные результаты пациента"""
         try:
-            # Получаем результаты анализов
-            results = lab_result.get_lab_results_by_patient(
-                db, patient_id=patient_id, date_from=date_from, date_to=date_to
+            results = lab.get_patient_lab_results(
+                db,
+                patient_id,
+                limit=None,
+                date_from=date_from,
+                date_to=date_to,
+                include_observation=_include_trend_evidence,
             )
 
             # Фильтруем по типам тестов если указано
             if test_types:
-                results = [r for r in results if r.test_code in test_types]
+                results = [r for r in results if r["test_code"] in test_types]
 
             # Форматируем результаты
             formatted_results = []
             for result in results:
                 formatted_result = {
-                    "id": result.id,
-                    "test_name": result.test_name,
-                    "test_code": result.test_code,
-                    "value": result.value,
-                    "unit": result.unit,
-                    "ref_range": result.ref_range,
-                    "abnormal": result.abnormal,
-                    "is_abnormal": await self._check_abnormal_value(
-                        result.test_code, result.value, result.unit
-                    ),
-                    "created_at": result.created_at,
-                    "notes": result.notes,
+                    key: result[key]
+                    for key in (
+                        "id",
+                        "test_name",
+                        "test_code",
+                        "value",
+                        "unit",
+                        "ref_range",
+                        "abnormal",
+                        "created_at",
+                        "notes",
+                    )
                 }
+                source_id = result["source_instance_id"]
+                if source_id is None:
+                    formatted_result["is_abnormal"] = await self._check_abnormal_value(
+                        result["test_code"], result["value"], result["unit"]
+                    )
+                else:
+                    snapshot = result["evaluation_snapshot"]
+                    if not isinstance(snapshot, dict):
+                        snapshot = {}
+                    status, interpretation, is_abnormal = frozen_assessment(
+                        snapshot, result["value"]
+                    )
+                    formatted_result.update(
+                        abnormal=is_abnormal,
+                        is_abnormal=is_abnormal,
+                        evaluation_status=status,
+                        interpretation=interpretation,
+                        source_instance_id=source_id,
+                        source_root_instance_id=result["source_root_instance_id"],
+                        supersedes_instance_id=result["supersedes_instance_id"],
+                        released_at=result["released_at"],
+                    )
+                    if snapshot:
+                        formatted_result.update(
+                            unit=snapshot.get("unit"),
+                            ref_range=result["resolved_reference_text"],
+                        )
+                    if _include_trend_evidence:
+                        formatted_result["_trend_evidence"] = (
+                            result["result_payload"],
+                            snapshot,
+                            result["value_numeric"],
+                        )
                 formatted_results.append(formatted_result)
 
             return formatted_results
@@ -72,6 +117,104 @@ class EMRLabIntegrationService:
         except Exception as e:
             logger.error(f"Ошибка получения лабораторных результатов: {e}")
             raise
+
+    async def get_lab_result_trend(
+        self, db: Session, *, patient_id: int, test_type: str, period_days: int
+    ) -> dict[str, Any]:
+        results = await self.get_patient_lab_results(
+            db,
+            patient_id,
+            date_from=datetime.now(UTC) - timedelta(days=period_days),
+            test_types=[test_type],
+            _include_trend_evidence=True,
+        )
+
+        def result_date(result: dict[str, Any]) -> datetime:
+            timestamp = result.get("released_at") or result["created_at"]
+            return (
+                timestamp.replace(tzinfo=UTC)
+                if timestamp.tzinfo is None
+                else timestamp.astimezone(UTC)
+            )
+
+        results.sort(key=lambda result: (result_date(result), result["id"]))
+        trend_data = [
+            {
+                "date": result_date(result).date().isoformat(),
+                "value": result["value"],
+                "unit": result["unit"],
+                "is_abnormal": result["is_abnormal"],
+                "normal_range": result["ref_range"],
+            }
+            for result in results
+        ]
+        return {
+            "patient_id": patient_id,
+            "test_type": test_type,
+            "period_days": period_days,
+            "trend_data": trend_data,
+            "trend_stats": self._comparable_numeric_trend(results),
+            "total_measurements": len(trend_data),
+        }
+
+    @staticmethod
+    def _comparable_numeric_trend(results: list[dict[str, Any]]) -> dict[str, Any]:
+        # Release order is visible to the reader. The same order must hold
+        # for observations, including when a correction was released later.
+        comparison = None
+        previous_release = None
+        previous_observation_date: date | None = None
+        values: list[Decimal] = []
+        assessments: list[bool] = []
+        for result in results:
+            if not result["value"]:
+                continue
+            evidence = result.get("_trend_evidence")
+            if evidence is None:
+                return {}
+            payload, snapshot, numeric = evidence
+            kind = payload.get("kind") if isinstance(payload, dict) else None
+            if kind in NON_NUMERIC_RESULT_KINDS:
+                continue
+            released_at = result["released_at"]
+            observation = released_numeric_observation(
+                result["value"], payload, snapshot, numeric
+            )
+            if (
+                observation is None
+                or released_at is None
+                or released_at == previous_release
+                or (
+                    comparison is not None and observation.context != comparison
+                )
+                or (
+                    previous_observation_date is not None
+                    and observation.observed_on <= previous_observation_date
+                )
+            ):
+                return {}
+            comparison = observation.context
+            previous_release = released_at
+            previous_observation_date = observation.observed_on
+            values.append(observation.value)
+            if result["is_abnormal"] is not None:
+                assessments.append(result["is_abnormal"])
+
+        if len(values) < 2:
+            return {}
+        if values[-1] == values[0]:
+            direction = "stable"
+        else:
+            direction = "increasing" if values[-1] > values[0] else "decreasing"
+        return {
+            "min_value": float(min(values)),
+            "max_value": float(max(values)),
+            "avg_value": float(sum(values) / len(values)),
+            "trend_direction": direction,
+            "abnormal_percentage": sum(assessments) / len(assessments) * 100
+            if assessments
+            else None,
+        }
 
     async def integrate_lab_results_with_emr(
         self, db: Session, emr_id: int, lab_result_ids: list[int]
@@ -139,35 +282,50 @@ class EMRLabIntegrationService:
     ) -> list[dict[str, Any]]:
         """Получить аномальные лабораторные результаты пациента"""
         try:
-            # Получаем все результаты за период
-            results = lab_result.get_lab_results_by_patient(
+            results = await self.get_patient_lab_results(
                 db, patient_id=patient_id, date_from=date_from
             )
 
             abnormal_results = []
             for result in results:
-                is_abnormal = await self._check_abnormal_value(
-                    result.test_code, result.value, result.unit
-                )
-
-                if is_abnormal:
-                    abnormal_results.append(
-                        {
-                            "id": result.id,
-                            "test_name": result.test_name,
-                            "test_code": result.test_code,
-                            "value": result.value,
-                            "unit": result.unit,
-                            "ref_range": result.ref_range,
-                            "deviation": await self._calculate_deviation(
-                                result.test_code, result.value, result.unit
-                            ),
-                            "created_at": result.created_at,
-                            "severity": await self._assess_severity(
-                                result.test_code, result.value, result.unit
-                            ),
-                        }
+                if result["is_abnormal"] is not True:
+                    continue
+                finding = {
+                    key: result[key]
+                    for key in (
+                        "id",
+                        "test_name",
+                        "test_code",
+                        "value",
+                        "unit",
+                        "ref_range",
+                        "created_at",
                     )
+                }
+                if "source_instance_id" in result:
+                    finding.update(
+                        evaluation_status=result["evaluation_status"],
+                        interpretation=result["interpretation"],
+                        source_instance_id=result["source_instance_id"],
+                        source_root_instance_id=result["source_root_instance_id"],
+                        supersedes_instance_id=result["supersedes_instance_id"],
+                        released_at=result["released_at"],
+                        severity="critical"
+                        if result["interpretation"] == "critical"
+                        else "unknown",
+                        deviation={
+                            "deviation_percent": None,
+                            "deviation_type": "unknown",
+                        },
+                    )
+                else:
+                    finding["deviation"] = await self._calculate_deviation(
+                        result["test_code"], result["value"], result["unit"]
+                    )
+                    finding["severity"] = await self._assess_severity(
+                        result["test_code"], result["value"], result["unit"]
+                    )
+                abnormal_results.append(finding)
 
             return abnormal_results
 
@@ -200,7 +358,9 @@ class EMRLabIntegrationService:
                 "test_types": len(grouped_results),
                 "abnormal_count": len([r for r in results if r["is_abnormal"]]),
                 "latest_date": (
-                    max([r["created_at"] for r in results]) if results else None
+                    max(r.get("released_at") or r["created_at"] for r in results)
+                    if results
+                    else None
                 ),
                 "grouped_results": grouped_results,
                 "recommendations": await self._generate_lab_recommendations(results),
@@ -360,11 +520,14 @@ class EMRLabIntegrationService:
         """Генерировать рекомендации на основе лабораторных данных"""
         recommendations = []
 
-        # Анализируем результаты
-        abnormal_results = [r for r in results if r["is_abnormal"]]
+        # Keep legacy recommendations scoped to independently entered results.
+        abnormal_results = [
+            r for r in results if r["is_abnormal"] and "source_instance_id" not in r
+        ]
 
         if not abnormal_results:
-            recommendations.append("Все лабораторные показатели в пределах нормы")
+            if results and all(r["is_abnormal"] is False for r in results):
+                recommendations.append("Все лабораторные показатели в пределах нормы")
             return recommendations
 
         # Группируем аномальные результаты по типам

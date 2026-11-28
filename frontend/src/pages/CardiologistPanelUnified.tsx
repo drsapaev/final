@@ -1,4 +1,4 @@
-import { createElement, lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
@@ -251,7 +251,9 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     interpretation: ''
   } as Record<string, unknown>);
 
-  const [showForm, setShowForm] = useState({ open: false, type: 'blood' } as Record<string, unknown>);
+  const [showForm, setShowForm] = useState<{ open: boolean; type?: 'blood' | 'ecg' }>({
+    open: false, type: 'blood',
+  });
   const [ecgResults, setEcgResults] = useState<Record<string, unknown>[]>([]);
   const [bloodTests, setBloodTests] = useState<Record<string, unknown>[]>([]);
   const [patientFiles, setPatientFiles] = useState<Record<string, unknown>[]>([]);
@@ -2063,13 +2065,13 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     goToTab('visit');
   };
 
-  // Keep this dynamic JSX slot as `any`; narrowing its inferred result to a
-  // ReactNode currently makes the legacy parent fail strict child checking.
-  const cardiologyQueuePanel: any = activeTab === 'queue'
-    ? createElement(CardiologyQueueTab, {
-      onStartVisit: handleDoctorQueueStartVisit,
-      onOpenVisit: (entry, completed) => { void handleDoctorQueueOpenVisit(entry, completed); },
-    })
+  const [focusStudy, setFocusStudy] = useState<'ecg' | 'echo'>();
+
+  const cardiologyQueuePanel = activeTab === 'queue'
+    ? <CardiologyQueueTab
+        onStartVisit={handleDoctorQueueStartVisit}
+        onOpenVisit={(entry, completed) => { void handleDoctorQueueOpenVisit(entry, completed); }}
+      />
     : null;
 
   const tabLoadingFallback = (
@@ -2141,6 +2143,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
                 onComplete={handleCompleteVisitFromEMR}
                 onCompletionBlocked={handleEMRCompletionBlocked}
                 onGoToAppointments={() => goToTab('patients')}
+                onOpenStudy={study => goToTab('ecg', () => setFocusStudy(study))}
                 getColor={getColor}
                 getFontSize={getFontSize}
               />
@@ -2153,6 +2156,8 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
               <EcgTab
                 selectedPatient={selectedPatient}
                 onAddEcg={() => setShowForm({ open: true, type: 'ecg' })}
+                focusStudy={focusStudy}
+                onReturn={() => goToTab('visit', () => setFocusStudy(undefined))}
                 onDataUpdate={loadPatientData}
                 getSpacing={getSpacing}
               />

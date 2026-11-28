@@ -31,25 +31,42 @@ import { useConfirm } from '../../common/ConfirmDialog';
 // CANCELLED) забыли бы обновить LabResultsSection — пациенту показалось бы
 // 'Unknown'. Теперь используется единый источник истины.
 import { formatLabStatus, getLabStatusVariant } from '../../laboratory/labUiLabels';
+import LabCriticalAcknowledgement from '../../laboratory/LabCriticalAcknowledgement';
+import { getLabOperationsLabels } from '../../laboratory/labOperationsLabels';
 // STRAT#12: t() и tInterpolate() для i18n — order confirm dialog мигрирован.
 import logger from '@/utils/logger';
 import notify from '@/services/notify';
 import { useTranslation } from '@/i18n/useTranslation';
 import { getErrorMessage } from '../../../utils/type-guards';
 import { Download, FileText, Plus, TestTube2 } from 'lucide-react';
+import { getWorkspaceLabs, type WorkspaceLabs } from '@/api/emrWorkspace';
+import { LabVersionReview, LabWorkspaceState } from '../workspace/LabWorkspaceState';
 
 // UX-AUDIT-FIX10: STATUS_LABELS и STATUS_VARIANTS удалены —
 // используются formatLabStatus() и getLabStatusVariant() из labUiLabels.js.
 
 interface LabReportInstance {
   id: string | number;
+  visit_id?: string | number | null;
+  patient_id?: string | number;
+  template?: { name: string; code: string } | null;
   template_name?: string;
   template_code?: string;
   finalized_at?: string;
   updated_at?: string;
   flagged_findings_count?: number;
+  managed_release?: boolean;
+  supersedes_instance_id?: number | null;
   status?: string;
 }
+
+interface LabResultList {
+  scope: string;
+  refresh: number;
+  rows: LabReportInstance[] | null;
+}
+
+type PdfDownloadPhase = 'loading' | 'error';
 
 interface LabTemplate {
   id: string | number;
@@ -63,6 +80,7 @@ interface LabResultsSectionProps {
   patientId?: string | number | null;
   visitId?: string | number | null;
   disabled?: boolean;
+  reviewerId?: string | number | null;
 }
 
 function formatDate(dateStr: unknown): string {
@@ -78,17 +96,40 @@ function formatDate(dateStr: unknown): string {
   }
 }
 
-export function LabResultsSection({ patientId, visitId, disabled = false }: LabResultsSectionProps) {
-  const { t: rawT } = useTranslation(); const t = rawT;
+export function LabResultsSection({ patientId, visitId, disabled = false, reviewerId }: LabResultsSectionProps) {
+  const { t, language } = useTranslation();
+  const labLabels = getLabOperationsLabels(language);
   // ADR-0015: lab reporting API accessed via hook.
   const labReportingApi = useLabReporting();
-  const [instances, setInstances] = useState<LabReportInstance[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { listInstances } = labReportingApi;
+  const [resultList, setResultList] = useState<LabResultList>();
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [templates, setTemplates] = useState<LabTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [ordering, setOrdering] = useState(false);
+  const orderIntentRef = useRef<number | null>(null);
+  const [pdfDownloads, setPdfDownloads] = useState<{ scope: string; phases: Record<string, PdfDownloadPhase | undefined> }>();
+  const pdfInFlight = useRef(new Set<string>());
+  const labScope = `${visitId ?? ''}:${patientId ?? ''}`;
+  const [labState, setLabState] = useState<{ scope: string; refresh: number; data?: WorkspaceLabs; error: boolean }>();
+  const [labReload, setLabReload] = useState(0);
+  const refreshLabs = useCallback(() => setLabReload(value => value + 1), []);
+  const activeLabState = labState?.scope === labScope ? labState : undefined;
+  const labs = activeLabState?.data;
+  const activeResultList = resultList?.scope === labScope ? resultList : undefined;
+  const instances = activeResultList?.rows ?? [];
+  const loading = Boolean(patientId || visitId) && activeResultList?.refresh !== labReload;
+  const resultsFailed = !loading && activeResultList?.rows === null;
+  const metadataFailed = activeLabState?.refresh === labReload && activeLabState.error;
+  const canReview = !loading && !resultsFailed && activeLabState?.refresh === labReload && !activeLabState.error;
+  const criticalVisitId = Number(visitId);
+  // Exact-chart rows keep in-flight acknowledgements mounted during a refresh.
+  const criticalReports = patientId != null
+    && Number.isSafeInteger(criticalVisitId) && criticalVisitId > 0
+    ? instances.filter((instance) => String(instance.patient_id) === String(patientId)
+      && String(instance.visit_id) === String(visitId)
+      && Number.isSafeInteger(Number(instance.id)) && Number(instance.id) > 0)
+    : [];
 
   // UX-AUDIT-FIX9: useConfirm для подтверждения создания заказа на анализы.
   // Ранее один клик в модалке «Заказать анализы» мгновенно создавал заказ
@@ -96,13 +137,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
   // отмены. Лаборатория сразу видела новый заказ в очереди. Если врач
   // промахивался мимо нужного шаблона — приходилось идти в лабораторию
   // и просить отменить. Соответствует Nielsen Heuristic #5 (Error Prevention).
-  const [confirm] = useConfirm();
-
-  // EMRLAB-FE-002 (audit 3886, round 15): epoch-guard — ответы/ошибки
-  // superseded-контекста больше не могут перезаписать списки/spinner
-  // нового пациента; пустой контекст (null/null) немедленно чистит
-  // предыдущие строки.
-  const requestEpochRef = useRef(0);
+  const [confirm, orderConfirmation] = useConfirm();
 
   // EMRORDER-FE-001 (audit 3886, round 19): the mounted section can be
   // re-rendered in place for ANOTHER patient/visit while a confirmation
@@ -113,17 +148,10 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
   // the new visit's header.
   const contextRef = useRef({ patientId, visitId });
   contextRef.current = { patientId, visitId };
+  const contextEpoch = useRef(0);
+  useEffect(() => () => { contextEpoch.current += 1; }, [labScope]);
 
-  const loadInstances = useCallback(async (epoch: number) => {
-    if (epoch !== requestEpochRef.current) return;
-    if (!patientId && !visitId) {
-      setInstances([]);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
+  const loadInstances = useCallback(async (signal: AbortSignal) => {
     try {
       // EMRLAB-FE-001: канонические параметры контракта list-роута —
       // visit_ids-МАССИВ (не несуществующий singular visit_id, который
@@ -148,8 +176,8 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
           };
           if (patientId != null) params.patient_id = patientId;
           if (visitId != null) params.visit_ids = [visitId];
-          const result = await labReportingApi.listInstances(params);
-          if (epoch !== requestEpochRef.current) return;
+          const result = await listInstances(params);
+          if (signal.aborted) return;
           const list = Array.isArray(result)
             ? result
             : ((result as Record<string, unknown>)?.items || []);
@@ -158,13 +186,14 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
           offset += PAGE;
         }
       }
-      if (epoch !== requestEpochRef.current) return;
       // Второй пояс (render-time sanity): в списке — только финализированные
       // записи текущего контекста; дубли по id подавляются, порядок —
       // новее-первый по дате финализации.
       const seenIds = new Set<string>();
       const merged = collected
         .filter((r) => r.status === 'FINALIZED' || r.status === 'PRINTED')
+        .filter((r) => (r.visit_id === undefined || visitId == null || String(r.visit_id) === String(visitId))
+          && (r.patient_id === undefined || patientId == null || String(r.patient_id) === String(patientId)))
         .filter((r) => {
           const key = String(r.id);
           if (seenIds.has(key)) return false;
@@ -176,41 +205,66 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
             new Date(b.finalized_at || b.updated_at || 0).getTime()
             - new Date(a.finalized_at || a.updated_at || 0).getTime(),
         );
-      setInstances(merged);
+      setResultList({ scope: labScope, refresh: labReload, rows: merged });
     } catch (err: unknown) {
-      if (epoch !== requestEpochRef.current) return;
+      if (signal.aborted) return;
       const errShape = err as { message?: string };
       logger.warn('[LabResultsSection] Failed to load lab instances', { error: errShape?.message });
-      setError('Не удалось загрузить результаты анализов.');
-      setInstances([]);
-    } finally {
-      if (epoch === requestEpochRef.current) setLoading(false);
+      setResultList({ scope: labScope, refresh: labReload, rows: null });
     }
-  }, [patientId, visitId]);
+  }, [labReload, labScope, listInstances, patientId, visitId]);
 
   useEffect(() => {
-    // EMRLAB-FE-002: смена контекста — мгновенная очистка и новая эпоха;
-    // поздние ответы предыдущей эпохи отбрасываются целиком.
-    const epoch = requestEpochRef.current + 1;
-    requestEpochRef.current = epoch;
-    setInstances([]);
-    setError(null);
-    setLoading(Boolean(patientId || visitId));
-    void loadInstances(epoch);
-    return () => {
-      requestEpochRef.current += 1;
-    };
-  }, [patientId, visitId, loadInstances]);
+    if (!patientId && !visitId) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    void loadInstances(signal);
+    if (visitId) {
+      void getWorkspaceLabs(visitId, patientId ?? null, signal).then(
+        data => {
+          if (!signal.aborted) setLabState({ scope: labScope, refresh: labReload, data, error: false });
+        },
+        () => {
+          if (!signal.aborted) setLabState(previous => ({
+            scope: labScope, refresh: labReload,
+            data: previous?.scope === labScope ? previous.data : undefined, error: true,
+          }));
+        },
+      );
+    }
+    return () => controller.abort();
+  }, [visitId, patientId, labScope, labReload, loadInstances]);
 
   const handleDownload = async (instanceId: string | number) => {
+    const epoch = contextEpoch.current;
+    const reportId = String(instanceId);
+    const requestKey = `${epoch}:${reportId}`;
+    if (pdfInFlight.current.has(requestKey)) return;
+    pdfInFlight.current.add(requestKey);
+    const contextChanged = () => contextEpoch.current !== epoch
+      || contextRef.current.visitId !== visitId || contextRef.current.patientId !== patientId;
+    const setPhase = (phase?: PdfDownloadPhase) => setPdfDownloads(previous => ({
+      scope: labScope,
+      phases: { ...(previous?.scope === labScope ? previous.phases : {}), [reportId]: phase },
+    }));
+    setPhase('loading');
     try {
       const blob = await labReportingApi.downloadPdf(instanceId);
+      if (contextChanged()) return;
       const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = `lab-${reportId}.pdf`;
+      link.click();
+      setPhase();
     } catch (err: unknown) {
+      if (contextChanged()) return;
+      setPhase('error');
       const errShape = err as { message?: string };
       logger.error('[LabResultsSection] PDF download failed', { error: errShape?.message });
+    } finally {
+      pdfInFlight.current.delete(requestKey);
     }
   };
 
@@ -223,6 +277,8 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
     setShowOrderModal(false);
     setTemplates([]);
     setTemplatesLoading(false);
+    setOrdering(false);
+    setPdfDownloads(undefined);
   }, [patientId, visitId]);
 
   // P1 fix: Order lab tests — opens a modal listing published templates.
@@ -256,79 +312,90 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
   };
 
   const handleOrder = async (templateId: string | number, templateName: string) => {
-    // The intent is bound to the context it was started in.
     const startContext = contextRef.current;
-    // UX-AUDIT-FIX9: подтверждение перед созданием заказа.
-    // STRAT#12: строки мигрированы на t() / tInterpolate() из labTranslations.
-    const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
-      title: t('confirm.order_title'),
-      message: t('confirm.order_message', { name: templateName }),
-      description: t('confirm.order_description'),
-      confirmLabel: t('confirm.order_confirm'),
-      cancelLabel: t('confirm.cancel'),
-      intent: 'primary',
-    });
-    if (!ok) return;
-    // EMRORDER-FE-001: recheck before the irreversible createOrder — the
-    // mounted EMR must still belong to the patient/visit the intent was
-    // started in; a late confirm of visit A must not create A's order (and
-    // show a success toast) inside visit B's active EMR.
-    if (contextRef.current.patientId !== startContext.patientId
-      || contextRef.current.visitId !== startContext.visitId) {
-      logger.info('[LabResultsSection] Dropped stale order intent', {
-        templateId: String(templateId),
-        // No PHI in logs: template ids only, never patient/visit ids.
-      });
-      return;
-    }
+    const epoch = contextEpoch.current;
+    if (orderIntentRef.current === epoch || disabled || !patientId || !visitId) return;
+    orderIntentRef.current = epoch;
     setOrdering(true);
+    const contextChanged = () =>
+      contextRef.current.patientId !== startContext.patientId
+      || contextRef.current.visitId !== startContext.visitId
+      || contextEpoch.current !== epoch;
+
     try {
+      const ok = await confirm({
+        title: t('confirm.order_title'),
+        message: t('confirm.order_message', { name: templateName }),
+        description: t('confirm.order_description'),
+        confirmLabel: t('confirm.order_confirm'),
+        cancelLabel: t('confirm.cancel'),
+        intent: 'primary',
+      });
+      if (!ok || contextChanged()) return;
       await labReportingApi.createOrder({
         template_id: templateId,
         patient_id: patientId,
         visit_id: visitId,
       });
-      // Second recheck: if the context switched while the POST was in
-      // flight, the order exists server-side, but its success must not be
-      // celebrated inside the new visit's EMR.
-      if (contextRef.current.patientId !== startContext.patientId
-        || contextRef.current.visitId !== startContext.visitId) {
-        return;
-      }
-      notify.success(`Заказ «${templateName}» создан. Лаборатория увидит его в очереди.`);
+      if (contextChanged()) return;
+      notify.success(t('emr_workspace.lab_order_created'));
       setShowOrderModal(false);
+      refreshLabs();
     } catch (err: unknown) {
-      const msg = getErrorMessage(err) || 'Не удалось создать заказ.';
-      notify.error(typeof msg === 'string' ? msg : 'Не удалось создать заказ.');
+      if (!contextChanged()) {
+        const message = getErrorMessage(err) || t('emr_workspace.save_error');
+        notify.error(typeof message === 'string' ? message : t('emr_workspace.save_error'));
+      }
     } finally {
-      setOrdering(false);
+      if (orderIntentRef.current === epoch) orderIntentRef.current = null;
+      if (!contextChanged()) setOrdering(false);
     }
   };
 
   const renderContent = () => {
-    if (loading) {
-      return <div style={{ padding: '12px', color: 'var(--mac-text-secondary)' }}>{t('empty.loading_results')}</div>;
-    }
-
-    if (error) {
-      return <div style={{ padding: '12px', color: 'var(--mac-error)' }}>{error}</div>;
-    }
+    if (resultsFailed) return null;
 
     if (instances.length === 0) {
       return (
         <div style={{ padding: '12px', color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
-          {t('empty.no_lab_results')}
+          {loading ? t('empty.loading_results') : t('empty.no_lab_results')}
         </div>
       );
     }
 
+    const reportOrder = new Map(labs?.orders.flatMap(order => order.reports.map(report => [report.id, order] as const)) ?? []);
+    const reportDetails = new Map([
+      ...(labs?.orders.flatMap(order => order.reports) ?? []), ...(labs?.unlinked_reports ?? []),
+    ].map(report => [report.id, report]));
+    const replacedIds = new Set(instances.flatMap((instance) => {
+      const prior = instance.supersedes_instance_id ?? reportDetails.get(Number(instance.id))?.supersedes_instance_id;
+      return prior == null ? [] : [String(prior)];
+    }));
+    const groups = new Map<number | undefined, LabReportInstance[]>();
+    for (const instance of instances) {
+      const orderId = reportOrder.get(Number(instance.id))?.id;
+      const group = groups.get(orderId);
+      if (group) group.push(instance);
+      else groups.set(orderId, [instance]);
+    }
     return (
-      <div style={{ display: 'grid', gap: '8px', padding: '8px 0' }}>
-        {instances.map((instance) => (
+      <div className="emr-workspace-result-list">
+        {[...groups].map(([orderId, group]) => <section key={orderId ?? 'unlinked'}>
+          {orderId != null && <h4>{t('emr_workspace.lab_order', { id: orderId })} · {t(
+            `emr_workspace.lab_${reportOrder.get(Number(group[0]?.id))?.status}`,
+            { defaultValue: reportOrder.get(Number(group[0]?.id))?.status },
+          )}</h4>}
+          {group.map((instance) => {
+            const details = reportDetails.get(Number(instance.id));
+            const prior = instance.supersedes_instance_id ?? details?.supersedes_instance_id;
+            const pdfPhase = pdfDownloads?.scope === labScope ? pdfDownloads.phases[String(instance.id)] : undefined;
+            const reportTitle = instance.template?.name || instance.template?.code || details?.template_name
+              || instance.template_name || instance.template_code || t('emr_workspace.lab_report', { id: instance.id });
+            return <div key={instance.id} className="emr-workspace-group">
           <div
-            key={instance.id}
             style={{
               display: 'flex',
+              flexWrap: 'wrap',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '12px',
@@ -341,7 +408,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
               <TestTube2 size={16} aria-hidden="true" style={{ color: 'var(--mac-text-secondary)' }} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 500, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
-                  {instance.template_name || instance.template_code || 'Лабораторный отчёт'}
+                  {reportTitle}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
                   {formatDate(instance.finalized_at || instance.updated_at)}
@@ -354,6 +421,11 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              {replacedIds.has(String(instance.id)) ? (
+                <Badge variant="default" size="small">{labLabels.replaced}</Badge>
+              ) : prior != null ? (
+                <Badge variant="default" size="small">{labLabels.corrected} #{prior}</Badge>
+              ) : null}
               <Badge variant={getLabStatusVariant(instance.status || '') || 'default'} size="small">
                 {formatLabStatus(instance.status || '') || instance.status}
               </Badge>
@@ -362,44 +434,69 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
                   разрешает Doctor'у finalized/printed). disabled гейтит
                   только мутации (create order), а не чтение. */}
               <Button
+                type="button"
                 variant="outline"
                 size="small"
+                disabled={pdfPhase === 'loading'}
+                aria-busy={pdfPhase === 'loading'}
                 onClick={() => handleDownload(instance.id)}
-                aria-label={`Скачать PDF: ${instance.template_name || 'лабораторный отчёт'}`}>
+                aria-label={t('emr_workspace.lab_download_pdf_aria', { name: reportTitle })}>
                 <Download size={14} style={{ marginRight: 4 }} aria-hidden="true" />
                 PDF
               </Button>
             </div>
           </div>
-        ))}
+          {pdfPhase === 'error' && <p role="alert">{t('emr_workspace.lab_download_pdf_failed')}</p>}
+          {details && visitId && patientId && <LabVersionReview key={`${labScope}:${details.id}`} report={details}
+            visitId={visitId} patientId={patientId} reviewerId={canReview ? reviewerId : undefined} retry={refreshLabs} />}
+          </div>;
+          })}
+        </section>)}
       </div>
     );
   };
 
   return (
     <>
+      {visitId && <LabWorkspaceState labs={labs} error={Boolean(metadataFailed)} />}
+      {resultsFailed && !metadataFailed && <p role="alert">{t('emr_workspace.load_error')}</p>}
       {/* EMRLAB-FE-004: секция интерактивна для ЧТЕНИЯ даже в
           signed/read-only EMR (аккордеон раскрывается, PDF доступен);
           disabled больше не глушит pointer-events всего блока. */}
       <EMRSection
         title="Результаты анализов"
         icon={<FileText size={16} aria-hidden="true" />}
+        badge={instances.length ? String(instances.length) : undefined}
         defaultOpen={instances.length > 0}
-        headerAction={!disabled && patientId ? (
-          <Button variant="outline" size="small" onClick={handleOpenOrderModal}>
+        headerAction={patientId || visitId ? <div className="emr-workspace-controls">
+          <Button type="button" variant="ghost" size="small" onClick={refreshLabs} disabled={loading}>
+            {t(resultsFailed || metadataFailed ? 'emr_workspace.retry' : 'emr_workspace.lab_refresh')}
+          </Button>
+          {!disabled && patientId && <Button variant="outline" size="small" onClick={handleOpenOrderModal}>
             <Plus size={14} style={{ marginRight: 4 }} aria-hidden="true" />
             Заказать анализы
-          </Button>
-        ) : null}
+          </Button>}
+        </div> : null}
       >
         {renderContent()}
+        {/* Critical follow-up applies to both standard and managed releases. */}
+        {criticalReports.length > 0 && (
+          <LabCriticalAcknowledgement
+            key={labScope}
+            visitId={criticalVisitId}
+            refresh={labReload}
+            reportsReady={!loading && !resultsFailed}
+            reportIds={criticalReports.map((instance) => Number(instance.id))}
+            labels={labLabels}
+          />
+        )}
       </EMRSection>
 
       {/* P1 fix: Order lab tests modal */}
       {showOrderModal && (
         <Dialog open={showOrderModal} onClose={() => setShowOrderModal(false)} maxWidth="sm" fullWidth>
           <DialogTitle>Заказать анализы</DialogTitle>
-          <DialogContent>
+          <DialogContent className="emr-workspace-dialog-body">
             <div style={{ paddingTop: '8px', display: 'grid', gap: '8px' }}>
               {templatesLoading ? (
                 <div style={{ color: 'var(--mac-text-secondary)' }}>{t('empty.loading_templates')}</div>
@@ -445,6 +542,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
           </DialogActions>
         </Dialog>
       )}
+      {orderConfirmation}
     </>
   );
 }

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from uuid import UUID
+
+from sqlalchemy import or_, select, text
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.lab import (
+    FINAL_INSTANCE_STATUSES,
     LabCatalogAnalyte,
     LabCatalogReferenceRange,
     LabCatalogUnit,
@@ -16,6 +19,7 @@ from app.models.lab import (
     LabReportTemplateVersion,
     LabTemplateServiceBinding,
 )
+from app.models.lab_release import LabDraftMutationReceipt, LabReportCreationReceipt
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.setting import Setting
@@ -51,14 +55,20 @@ class LabReportingApiRepository:
     def get_order(self, order_id: int) -> LabOrder | None:
         return self.db.get(LabOrder, order_id)
 
-    def find_order_by_visit_and_patient(
-        self, *, visit_id: int | None, patient_id: int
-    ) -> LabOrder | None:
-        stmt = select(LabOrder).where(LabOrder.patient_id == patient_id)
-        if visit_id:
-            stmt = stmt.where(LabOrder.visit_id == visit_id)
-        stmt = stmt.order_by(LabOrder.id.desc()).limit(1)
-        return self.db.execute(stmt).scalars().first()
+    def find_active_orders_by_visit_and_patient(
+        self, *, visit_id: int, patient_id: int,
+    ) -> list[LabOrder]:
+        stmt = (
+            select(LabOrder)
+            .where(
+                LabOrder.patient_id == patient_id,
+                LabOrder.visit_id == visit_id,
+                LabOrder.status.notin_(("canceled", "cancelled")),
+            )
+            .order_by(LabOrder.id)
+            .limit(2)
+        )
+        return list(self.db.scalars(stmt))
 
     def add_order(self, order: LabOrder) -> LabOrder:
         self.db.add(order)
@@ -288,6 +298,7 @@ class LabReportingApiRepository:
         status: str | None,
         limit: int,
         offset: int,
+        hide_managed_drafts: bool = False,
     ) -> list[LabReportInstance]:
         stmt = (
             select(LabReportInstance)
@@ -308,9 +319,16 @@ class LabReportingApiRepository:
             stmt = stmt.where(LabReportInstance.visit_id.in_(visit_ids))
         if status:
             stmt = stmt.where(LabReportInstance.status == status)
+        if hide_managed_drafts:
+            stmt = stmt.where(or_(
+                LabReportInstance.managed_release.is_(False),
+                LabReportInstance.status.in_(FINAL_INSTANCE_STATUSES),
+            ))
         return self.db.execute(stmt).scalars().unique().all()
 
-    def get_instance(self, instance_id: int) -> LabReportInstance | None:
+    def get_instance(
+        self, instance_id: int, *, populate_existing: bool = False,
+    ) -> LabReportInstance | None:
         stmt = (
             select(LabReportInstance)
             .where(LabReportInstance.id == instance_id)
@@ -321,6 +339,7 @@ class LabReportingApiRepository:
                 .joinedload(LabReportSection.fields),
                 joinedload(LabReportInstance.values),
             )
+            .execution_options(populate_existing=populate_existing)
         )
         return self.db.execute(stmt).scalars().unique().first()
 
@@ -357,6 +376,29 @@ class LabReportingApiRepository:
         self.db.add(instance)
         self.db.flush()
         return instance
+
+    def lock_creation_request(self, key_digest: str) -> None:
+        if self.db.get_bind().dialect.name == "postgresql":
+            lock_key = int.from_bytes(bytes.fromhex(key_digest[:16]), "big", signed=True)
+            self.db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
+
+    def get_creation_receipt(
+        self, actor_user_id: int, key_digest: str,
+    ) -> LabReportCreationReceipt | None:
+        return self.db.get(LabReportCreationReceipt, (actor_user_id, key_digest))
+
+    def add_creation_receipt(self, receipt: LabReportCreationReceipt) -> None:
+        self.db.add(receipt)
+
+    def get_draft_mutation_receipt(
+        self, instance_id: int, actor_user_id: int, operation: str, request_id: UUID,
+    ) -> LabDraftMutationReceipt | None:
+        return self.db.get(
+            LabDraftMutationReceipt, (instance_id, actor_user_id, operation, request_id),
+        )
+
+    def add_draft_mutation_receipt(self, receipt: LabDraftMutationReceipt) -> None:
+        self.db.add(receipt)
 
     def get_patient(self, patient_id: int) -> Patient | None:
         return self.db.get(Patient, patient_id)

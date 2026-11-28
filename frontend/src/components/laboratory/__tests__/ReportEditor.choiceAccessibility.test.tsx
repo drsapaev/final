@@ -48,14 +48,6 @@ vi.mock('../../../hooks/useLabReporting', () => ({
   }),
 }));
 
-vi.mock('./hooks/useLabToast', () => ({
-  useLabToast: () => ({
-    interactiveInfo: vi.fn(),
-    interactiveWarning: vi.fn(),
-    interactiveError: vi.fn(),
-  }),
-}));
-
 import ReportEditorRaw from '../ReportEditor';
 
 const ReportEditor = ReportEditorRaw as unknown as React.ComponentType<Record<string, unknown>>;
@@ -116,8 +108,11 @@ describe('LABUX-FE-002: choice dropdown exposes its clinical field label', () =>
 
     const blood = screen.getByRole('combobox', { name: 'Результат: Кровь (визуальная оценка)' });
     expect(blood).toBeEnabled();
+    expect(blood).toHaveAccessibleDescription(/обязательное/);
+    expect(blood).not.toBeRequired();
     const urine = screen.getByRole('combobox', { name: 'Результат: Моча (визуальная оценка)' });
     expect(urine).toBeEnabled();
+    expect(urine).not.toHaveAccessibleDescription(/обязательное/);
   });
 
   it('two adjacent choice fields are distinguishable by name (not just by position)', () => {
@@ -132,5 +127,24 @@ describe('LABUX-FE-002: choice dropdown exposes its clinical field label', () =>
     const urine = screen.getByRole('combobox', { name: /Моча/ });
     expect(blood).not.toBe(urine);
     within(blood as HTMLElement).getByRole('option', { name: 'Норма' });
+  });
+
+  it('associates invalid numeric entry with the error, reference and draft assessment', () => {
+    const activeInstance = {
+      ...ACTIVE_INSTANCE,
+      sections: [{ key: 'numeric', title: 'SYNTHETIC chemistry', fields: [{
+        field_key: 'hgb', label: 'SYNTHETIC hgb', value_type: 'numeric',
+        value_text: '120', reference_text: '110–130', required: true,
+      }] }],
+    };
+    render(<ThemeProvider><ReportEditor {...baseProps} activeInstance={activeInstance}
+      draftValues={{ hgb: 'invalid', hgb__comment: 'SYNTHETIC note' }} /></ThemeProvider>);
+
+    const input = screen.getByRole('textbox', { name: 'Результат: SYNTHETIC hgb' });
+    expect(input).toBeInvalid();
+    expect(input).toHaveAccessibleDescription(/обязательное.*110–130.*черновик.*Примеры: 5,2 или <0,01/);
+    const summary = screen.getByText('Комментарий к полю', { selector: 'summary' });
+    expect(summary).toHaveAccessibleName('Комментарий к полю: SYNTHETIC hgb');
+    expect(summary).toHaveAccessibleDescription('Есть комментарий или причина отсутствия результата');
   });
 });

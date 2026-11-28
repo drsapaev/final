@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.services.lab_reporting._base import *  # noqa: F401, F403
 from app.services.lab_reporting._base import LabReportingServiceMixinBase
+from app.services.lab_reporting._result_values import normalize_result_value
 
 
 class PayloadMixin(LabReportingServiceMixinBase):
@@ -241,7 +242,10 @@ class PayloadMixin(LabReportingServiceMixinBase):
             version.seed_signature = template_signature
             seeded_count += 1
         _mark_seed_ensured(bind, "templates")
-        from app.services.lab_reporting._base import _SEED_ENSURED, _template_definitions_signature
+        from app.services.lab_reporting._base import (
+            _SEED_ENSURED,
+            _template_definitions_signature,
+        )
 
         _SEED_ENSURED["templates_sig"] = _template_definitions_signature(
             DEFAULT_LAB_TEMPLATE_DEFINITIONS
@@ -407,33 +411,15 @@ class PayloadMixin(LabReportingServiceMixinBase):
     def _normalize_value_payload(
         self, payload: dict[str, Any], field_def: LabReportFieldDef
     ) -> dict[str, Any]:
-        value_text = payload.get("value_text")
-        value_numeric = payload.get("value_numeric")
-        if (
-            value_numeric in ("", None)
-            and value_text not in (None, "")
-            and field_def.value_type == "numeric"
-        ):
-            try:
-                value_numeric = Decimal(str(value_text).replace(",", "."))
-            except (InvalidOperation, ValueError):
-                value_numeric = None
-        elif value_numeric not in ("", None):
-            try:
-                value_numeric = Decimal(str(value_numeric).replace(",", "."))
-            except (InvalidOperation, ValueError) as exc:
-                raise LabReportingDomainError(
-                    400, f"Invalid numeric value for {field_def.field_key}"
-                ) from exc
-        if value_text in ("", None) and value_numeric is not None:
-            value_text = str(value_numeric.normalize())
-        effective_value = value_numeric if value_numeric is not None else value_text
-        return {
-            "value_text": value_text,
-            "value_numeric": value_numeric,
-            "comment": payload.get("comment"),
-            "effective_value": effective_value,
-        }
+        unit_code = payload.get("unit_code")
+        if unit_code is not None and unit_code != self._resolve_field_unit_code(field_def):
+            raise LabReportingDomainError(400, f"Unit does not match field {field_def.field_key}")
+        return normalize_result_value(
+            payload,
+            field_key=field_def.field_key,
+            value_type=field_def.value_type,
+            choice_options=field_def.choice_options,
+        )
 
 
     def _validate_catalog_links(self, sections_payload: list[dict[str, Any]]) -> None:

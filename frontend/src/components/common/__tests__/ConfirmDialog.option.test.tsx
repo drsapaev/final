@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useConfirm } from '../ConfirmDialog';
@@ -39,6 +39,9 @@ describe('ConfirmDialog per-request option', () => {
     expect(onResult).toHaveBeenLastCalledWith(true, false);
 
     await open();
+    const dialog = screen.getByRole('dialog', { name: 'Finish visit?' });
+    // Let the modal finish assigning initial focus before moving it to the checkbox.
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
     option().focus();
     await user.keyboard(' ');
     expect(option()).toBeChecked();

@@ -303,9 +303,28 @@ class LabResultOut(BaseModel):
     result_value: str
     reference_range: str
     unit: str
-    result_date: datetime
-    status: str
+    result_date: datetime = Field(
+        description="Дата выпуска версии или дата записи legacy-результата"
+    )
+    status: str = Field(
+        description="Статус для отображения. unknown означает отсутствие подтверждённой оценки"
+    )
     notes: str | None = None
+    source_root_instance_id: int | None = Field(
+        None, description="Идентификатор исходного бланка"
+    )
+    source_instance_id: int | None = Field(
+        None, description="Идентификатор выпущенной версии бланка"
+    )
+    supersedes_instance_id: int | None = Field(
+        None, description="Идентификатор заменённой версии бланка"
+    )
+    evaluation_status: str | None = Field(
+        None, description="Статус оценки из снимка выпущенной версии"
+    )
+    interpretation: str | None = Field(
+        None, description="Интерпретация из снимка выпущенной версии"
+    )
 
 
 class MobileNotificationOut(BaseModel):

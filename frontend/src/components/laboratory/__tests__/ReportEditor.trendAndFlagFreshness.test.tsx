@@ -21,9 +21,10 @@
  * a differing draft value.
  */
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import i18n from '@/i18n';
 
 const getInstanceMock = vi.hoisted(() => vi.fn());
 
@@ -57,15 +58,8 @@ vi.mock('../../../hooks/useLabReporting', () => ({
   }),
 }));
 
-vi.mock('./hooks/useLabToast', () => ({
-  useLabToast: () => ({
-    interactiveInfo: vi.fn(),
-    interactiveWarning: vi.fn(),
-    interactiveError: vi.fn(),
-  }),
-}));
-
 import ReportEditorRaw from '../ReportEditor';
+import { readReportDraft } from '../hooks/useLabReportState';
 
 const ReportEditor = ReportEditorRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
@@ -92,6 +86,8 @@ const ACTIVE_INSTANCE = {
           reference_text: '130-170',
           resolved_flag: null,
           resolved_flag_severity: null,
+          evaluation_status: 'evaluated',
+          interpretation: 'normal',
           required: true,
         },
       ],
@@ -176,7 +172,7 @@ describe('LABEDIT-FE-001 — the previous-value trend reads the preceding same-t
 
     await new Promise((resolve) => { setTimeout(resolve, 80); });
     expect(getInstanceMock).not.toHaveBeenCalled();
-    expect(screen.queryByText(/↗/)).toBeNull();
+    expect(screen.queryByText(/Ранее /)).toBeNull();
   });
 });
 
@@ -210,6 +206,18 @@ describe('LABEDIT-FE-002 — the persisted flag badge is not presented beside a 
     expect(screen.queryByText(/черновик/i)).toBeNull();
   });
 
+  it('does not present an absent evaluation as normal', () => {
+    const section = ACTIVE_INSTANCE.sections[0];
+    const field = { ...section.fields[0], evaluation_status: 'unknown', interpretation: null };
+    render(
+      <ThemeProvider>
+        <ReportEditor {...baseProps} activeInstance={{ ...ACTIVE_INSTANCE, sections: [{ ...section, fields: [field] }] }} draftValues={{ hgb: '5.0' }} />
+      </ThemeProvider>
+    );
+    expect(screen.getByText('нет сведений об оценке')).toBeInTheDocument();
+    expect(screen.queryByText('норма')).toBeNull();
+  });
+
   it('editing the value live swaps the authoritative badge for the unsaved marker', async () => {
     getInstanceMock.mockResolvedValue(PREV_DETAILS);
     // Stateful host: ReportEditor is controlled — onUpdateField must flow
@@ -237,5 +245,101 @@ describe('LABEDIT-FE-002 — the persisted flag badge is not presented beside a 
       expect(screen.queryByText('норма')).toBeNull();
     });
     expect(screen.getByText(/черновик/i)).toBeInTheDocument();
+  });
+});
+
+describe('persisted analyzer warning codes', () => {
+  const section = ACTIVE_INSTANCE.sections[0];
+  const instrumentFlags = ['SYNTHETIC-B*', 'synthetic-a'];
+  const field = { ...section.fields[0], instrument_flags: instrumentFlags };
+  const report = {
+    ...ACTIVE_INSTANCE,
+    sections: [{ ...section, fields: [
+      field,
+      { ...section.fields[0], field_key: 'other', label: 'SYNTHETIC-NEIGHBOR', required: false },
+    ] }],
+  };
+
+  afterEach(async () => {
+    cleanup();
+    await i18n.changeLanguage('ru');
+  });
+
+  it.each([
+    ['ru', 'Предупреждения анализатора'],
+    ['uz-Cyrl', 'Анализатор огоҳлантиришлари'],
+    ['uz-Latn', 'Analizator ogohlantirishlari'],
+  ])('shows original codes in order for the saved value in %s', async (language, label) => {
+    await i18n.changeLanguage(language);
+    render(
+      <ThemeProvider>
+        <ReportEditor {...baseProps} activeInstance={report} draftValues={{ hgb: '5.0', other: '5.0' }} reportHistory={[]} />
+      </ThemeProvider>,
+    );
+
+    const warning = `${label} · SYNTHETIC-B*, synthetic-a`;
+    expect(screen.getByText(warning)).toBeVisible();
+    expect(screen.getByLabelText('Гемоглобин')).toHaveAccessibleDescription(expect.stringContaining(warning));
+    expect(screen.getByLabelText('SYNTHETIC-NEIGHBOR')).not.toHaveAccessibleDescription(expect.stringContaining(warning));
+  });
+
+  it('keeps the clinical assessment separate and drops old codes while the value is edited', () => {
+    const editor = (value: string) => (
+      <ThemeProvider>
+        <ReportEditor {...baseProps} activeInstance={report} draftValues={{ hgb: value, other: '5.0' }} reportHistory={[]} />
+      </ThemeProvider>
+    );
+    const { rerender } = render(editor('5.0'));
+
+    expect(screen.getAllByText('норма')).toHaveLength(2);
+    expect(screen.getByText(/Предупреждения анализатора/)).toBeVisible();
+    rerender(editor('7.0'));
+    expect(screen.getByText('черновик')).toBeVisible();
+    expect(screen.queryByText(/Предупреждения анализатора/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Гемоглобин')).not.toHaveAccessibleDescription(expect.stringContaining('SYNTHETIC-B*'));
+  });
+
+  it('keeps codes for an accepted equivalent decimal spelling', () => {
+    const value = '5,00';
+    const numericField = { ...field, result_kind: 'numeric', value_numeric: 5 };
+    const numericReport = { ...report, sections: [{ ...section, fields: [numericField] }] };
+    const accepted = readReportDraft(numericReport, { values: { hgb: value }, signer: {}, studyDate: '' });
+    expect(accepted.values.hgb).toBe(value);
+    render(
+      <ThemeProvider>
+        <ReportEditor {...baseProps} activeInstance={numericReport} draftValues={{ hgb: value }}
+          acceptedValues={accepted.values} reportHistory={[]} />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByText('Предупреждения анализатора · SYNTHETIC-B*, synthetic-a')).toBeVisible();
+  });
+
+  it('shows codes for a matching saved absence and hides them when its reason is edited', () => {
+    const absenceReason = 'SYNTHETIC-ABSENCE';
+    const absentField = { ...field, value_text: '', result_kind: 'absent', absence_reason: absenceReason };
+    const editor = (reason: string) => (
+      <ThemeProvider>
+        <ReportEditor {...baseProps} activeInstance={{ ...report, sections: [{ ...section, fields: [absentField] }] }}
+          draftValues={{ hgb: '', hgb__absence_reason: reason }} reportHistory={[]} />
+      </ThemeProvider>
+    );
+    const { rerender } = render(editor(absenceReason));
+
+    expect(screen.getByText('Предупреждения анализатора · SYNTHETIC-B*, synthetic-a')).toBeVisible();
+    rerender(editor('SYNTHETIC-REVISED-ABSENCE'));
+    expect(screen.queryByText(/Предупреждения анализатора/)).not.toBeInTheDocument();
+  });
+
+  it.each([['omitted', undefined], ['empty', []]])('omits the indicator when instrument codes are %s', (_condition, codes) => {
+    const fieldWithoutCodes = { ...field, instrument_flags: codes };
+    render(
+      <ThemeProvider>
+        <ReportEditor {...baseProps} activeInstance={{ ...report, sections: [{ ...section, fields: [fieldWithoutCodes] }] }}
+          draftValues={{ hgb: '5.0' }} reportHistory={[]} />
+      </ThemeProvider>,
+    );
+
+    expect(screen.queryByText(/Предупреждения анализатора/)).not.toBeInTheDocument();
   });
 });

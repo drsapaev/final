@@ -79,6 +79,14 @@ class Settings(BaseSettings):
         description="Secret key for JWT refresh token. Defaults to SECRET_KEY when unset.",
     )
     TESTING: bool = False
+    LAB_MANAGED_RELEASE_ENABLED: bool = False
+    LAB_RELEASE_REQUIRE_DISTINCT_REVIEWER: bool = True
+    LAB_AUTOVERIFICATION_SHADOW_ENABLED: bool = False
+    LAB_CRITICAL_ESCALATION_ADMIN_ID: int | None = Field(
+        default=None,
+        gt=0,
+        description="Approved Admin for unassigned or escalated critical Lab tasks on a dedicated clinic instance.",
+    )
     ENABLE_FALLBACK_AUTH: bool = Field(
         default=False,
         description="Enable legacy/fallback auth login endpoints. Keep false outside explicit break-glass/dev use.",

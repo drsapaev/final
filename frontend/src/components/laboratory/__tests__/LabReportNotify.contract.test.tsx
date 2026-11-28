@@ -20,7 +20,7 @@
  * URL + instance_id field) and the success:false / malformed cases show
  * the success confirmation.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
@@ -49,8 +49,10 @@ vi.mock('../../../api/client', () => ({
   },
 }));
 
+const confirm = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
+
 vi.mock('../../common/ConfirmDialog', () => ({
-  useConfirm: () => [() => Promise.resolve(true), null],
+  useConfirm: () => [confirm, null],
 }));
 
 import { api } from '@/api/client';
@@ -100,11 +102,12 @@ function workbenchProps(notify: (severity: string, message: string) => void) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  confirm.mockResolvedValue(true);
 });
 
 describe('LABN-FE-001 — notify targets the instance-scoped report PDF contract', () => {
   it('posts {patient_id, report_instance_id} to /telegram/send-lab-report-instance (pre-fix: legacy /send-lab-results with instance_id)', async () => {
-    mockedApiPost.mockResolvedValue({ data: { success: true } });
+    mockedApiPost.mockResolvedValue({ data: { success: true, report_instance_id: 91 } });
 
     render(
       <ThemeProvider>
@@ -135,10 +138,11 @@ describe('LABN-FE-001 — notify targets the instance-scoped report PDF contract
 
     await waitFor(() => expect(notify).toHaveBeenCalled());
     expect(notify).not.toHaveBeenCalledWith('success', expect.anything());
+    expect(screen.getByText('Отправка PDF в Telegram не подтверждена.')).toBeVisible();
   });
 });
 
-describe('LABN-FE-002 — a resolved 2xx is success ONLY on explicit success === true', () => {
+describe('Patient PDF send status uses the exact manual delivery response', () => {
   it('200 + {success:false} with a server reason shows that reason as an error (pre-fix: «отправлено»)', async () => {
     mockedApiPost.mockResolvedValue({
       data: { success: false, message: 'Пациент не зарегистрирован в Telegram боте' },
@@ -159,6 +163,7 @@ describe('LABN-FE-002 — a resolved 2xx is success ONLY on explicit success ===
       'Пациент не зарегистрирован в Telegram боте'
     );
     expect(notify).not.toHaveBeenCalledWith('success', expect.anything());
+    expect(screen.getByText('Последняя отправка PDF в Telegram не выполнена.')).toBeVisible();
   });
 
   it('200 + {success:false} without a readable message falls back to the honest not-delivered error', async () => {
@@ -179,8 +184,12 @@ describe('LABN-FE-002 — a resolved 2xx is success ONLY on explicit success ===
     expect(String(message)).not.toContain('отправлены');
   });
 
-  it('200 with a malformed/absent payload never produces false success (pre-fix: «отправлено»)', async () => {
-    mockedApiPost.mockResolvedValue({ data: undefined });
+  it.each([
+    { label: 'an absent payload', data: undefined },
+    { label: 'an absent report ID', data: { success: true } },
+    { label: 'a different report ID', data: { success: true, report_instance_id: 92 } },
+  ])('a 2xx with $label never produces false success', async ({ data }) => {
+    mockedApiPost.mockResolvedValue({ data });
 
     const notify = vi.fn();
     render(
@@ -194,10 +203,11 @@ describe('LABN-FE-002 — a resolved 2xx is success ONLY on explicit success ===
     await waitFor(() => expect(notify).toHaveBeenCalledTimes(1));
     expect(notify).not.toHaveBeenCalledWith('success', expect.anything());
     expect(notify.mock.calls[0][0]).toBe('error');
+    expect(screen.getByText('Отправка PDF в Telegram не подтверждена.')).toBeVisible();
   });
 
-  it('control: 200 + {success:true} shows the success confirmation', async () => {
-    mockedApiPost.mockResolvedValue({ data: { success: true } });
+  it('shows provider acceptance for the exact manually sent report', async () => {
+    mockedApiPost.mockResolvedValue({ data: { success: true, report_instance_id: 91 } });
 
     const notify = vi.fn();
     render(
@@ -212,5 +222,62 @@ describe('LABN-FE-002 — a resolved 2xx is success ONLY on explicit success ===
       expect(notify).toHaveBeenCalledWith('success', expect.stringContaining('Telegram'))
     );
     expect(notify).not.toHaveBeenCalledWith('error', expect.anything());
+    expect(screen.getByText('Telegram подтвердил отправку PDF.')).toBeVisible();
+  });
+
+  it.each(['FINALIZED', 'PRINTED'])('keeps %s report status separate from manual sending', (status) => {
+    render(
+      <ThemeProvider>
+        <LabReportWorkbench {...workbenchProps(vi.fn())} activeInstance={{ ...FINALIZED_INSTANCE, status }} />
+      </ThemeProvider>
+    );
+
+    expect(screen.getByText(/PDF в Telegram отправляется вручную\./)).toBeVisible();
+    expect(screen.getByText(/отдельное автоматическое уведомление в личном кабинете или по SMS/)).toBeVisible();
+    expect(screen.queryByText('Telegram подтвердил отправку PDF.')).not.toBeInTheDocument();
+    expect(mockedApiPost).not.toHaveBeenCalled();
+  });
+
+  it('does not show a late confirmation for a different report or patient', async () => {
+    let completeSend!: (response: unknown) => void;
+    mockedApiPost.mockReturnValue(new Promise((resolve) => { completeSend = resolve; }));
+    const notify = vi.fn();
+    const props = workbenchProps(notify);
+    const { rerender } = render(
+      <ThemeProvider><LabReportWorkbench {...props} /></ThemeProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Отправить пациенту/ }));
+    expect(await screen.findByText('Отправка PDF в Telegram…')).toBeVisible();
+    rerender(
+      <ThemeProvider>
+        <LabReportWorkbench
+          {...props}
+          activeInstance={{ ...FINALIZED_INSTANCE, id: 93, patient_id: 445 }}
+          getOperationContext={() => ({ epoch: 2, selectionKey: 'B', patientId: 445 })}
+        />
+      </ThemeProvider>
+    );
+
+    await act(async () => completeSend({ data: { success: true, report_instance_id: 91 } }));
+    expect(notify).not.toHaveBeenCalled();
+    expect(screen.getByText(/PDF в Telegram отправляется вручную\./)).toBeVisible();
+    expect(screen.queryByText('Telegram подтвердил отправку PDF.')).not.toBeInTheDocument();
+  });
+
+  it('does not queue a second confirmation or send while a confirmation is pending', async () => {
+    let completeConfirm!: (accepted: boolean) => void;
+    confirm.mockImplementationOnce(() => new Promise((resolve) => { completeConfirm = resolve; }));
+    mockedApiPost.mockResolvedValue({ data: { success: true, report_instance_id: 91 } });
+    render(<ThemeProvider><LabReportWorkbench {...workbenchProps(vi.fn())} /></ThemeProvider>);
+
+    const sendButton = screen.getByRole('button', { name: /Отправить пациенту/ });
+    fireEvent.click(sendButton);
+    fireEvent.click(sendButton);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(mockedApiPost).not.toHaveBeenCalled();
+
+    await act(async () => completeConfirm(true));
+    expect(mockedApiPost).toHaveBeenCalledTimes(1);
   });
 });

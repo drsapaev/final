@@ -74,7 +74,7 @@ SENTRY_ENVIRONMENT=production
 
 #### Installing Sentry SDK
 ```bash
-pip install sentry-sdk[fastapi]
+pip install -r backend/requirements-monitoring.txt
 ```
 
 ### Structured Logging
@@ -229,7 +229,7 @@ Sentry provides real-time error tracking and performance monitoring.
 1. Create account at [sentry.io](https://sentry.io)
 2. Create new Python project
 3. Copy DSN from project settings
-4. Install SDK: `pip install sentry-sdk[fastapi]`
+4. Install SDK: `pip install -r backend/requirements-monitoring.txt`
 5. Set environment variables
 
 ### Features Enabled

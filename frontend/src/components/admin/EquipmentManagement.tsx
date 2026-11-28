@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Calendar,
   DollarSign,
+  PlugZap,
 
 
 
@@ -32,6 +33,7 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import LabEquipmentIntegrationPanel from './LabEquipmentIntegrationPanel';
 
 interface EquipmentStats {
   total_equipment: number;
@@ -120,6 +122,7 @@ const EquipmentManagement = () => {
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
   const [stats, setStats] = useState<EquipmentStats | null>(null);
+  const [selectedIntegrationEquipment, setSelectedIntegrationEquipment] = useState<Equipment | null>(null);
 
   // Форма оборудования
   const [formData, setFormData] = useState({
@@ -633,6 +636,17 @@ const EquipmentManagement = () => {
 
               <div className="admin-d-flex-jc-end-gap-8">
                 <Button
+                  type="button"
+                  variant="outline"
+                  aria-label={t('admin2.lab_int_open_aria', { name: String(item.name ?? '') })}
+                  onClick={() => setSelectedIntegrationEquipment(
+                    selectedIntegrationEquipment?.id === item.id ? null : item,
+                  )}
+                  className="admin-p-6px-12px">
+                  <PlugZap aria-hidden="true" className="w-4 h-4" />
+                  <span>{t('admin2.lab_int_open')}</span>
+                </Button>
+                <Button
               type="button"
               variant="outline"
               aria-label={t('admin2.em_edit_aria', { name: String(item.name ?? '') })}
@@ -651,6 +665,16 @@ const EquipmentManagement = () => {
                   <Trash2 aria-hidden="true" className="w-4 h-4" />
                 </Button>
               </div>
+              {selectedIntegrationEquipment?.id === item.id && item.id !== undefined && (
+                <div className="mt-4">
+                  <LabEquipmentIntegrationPanel
+                    equipmentId={item.id}
+                    equipmentName={String(item.name ?? '')}
+                    t={t}
+                    onClose={() => setSelectedIntegrationEquipment(null)}
+                  />
+                </div>
+              )}
             </Card>
         )}
         </div>

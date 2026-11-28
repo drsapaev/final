@@ -14,7 +14,11 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.core.audit import extract_model_changes
 from app.core.config import settings
-from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, DOCTOR_ROLE_SPELLINGS, is_doctor_role_spelling
+from app.core.roles import (
+    DOCTOR_FAMILY_GATE_ROLES,
+    DOCTOR_ROLE_SPELLINGS,
+    is_doctor_role_spelling,
+)
 from app.crud import emr as crud_emr
 from app.crud.appointment import appointment as crud_appointment
 from app.models.clinic import Doctor
@@ -26,7 +30,6 @@ from app.schemas.emr import (
     EMRCreate,
     Prescription,
     PrescriptionCreate,
-    PrescriptionUpdate,
 )
 from app.services.appointment_flow_api_service import (
     AppointmentFlowApiDomainError,
@@ -271,6 +274,7 @@ def create_or_update_emr(
         allow_visit_fallback=False,
         current_user=current_user,
     )
+    expected_patient_id = appointment.patient_id
 
     # Проверяем статус записи
     # Разрешаем сохранение EMR если статус: in_visit, in_progress, completed, или called (вызван врачом)
@@ -327,6 +331,7 @@ def create_or_update_emr(
             row_version=row_version,
             client_session_id=f"legacy-appointment-flow:{current_user.id}",
             is_draft=emr_data.is_draft,
+            expected_patient_id=expected_patient_id,
         )
         if canonical_emr is None:
             logger.info(
@@ -379,6 +384,7 @@ def save_emr(
         allow_visit_fallback=False,
         current_user=current_user,
     )
+    expected_patient_id = appointment.patient_id
     canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
     if not canonical_emr:
         raise HTTPException(status_code=404, detail="EMR не найдена")
@@ -396,6 +402,7 @@ def save_emr(
         row_version=canonical_emr.row_version,
         client_session_id=f"legacy-appointment-flow:{current_user.id}",
         is_draft=False,
+        expected_patient_id=expected_patient_id,
     )
     logger.info(
         "[FIX:EMR_AUDIT] Logging UPDATE user audit for saved EMR %d on appointment %d",
@@ -467,40 +474,17 @@ def create_or_update_prescription(
             detail=f"Рецепт доступен только во время приема. Текущий статус: {appointment.status}",
         )
 
-    # Проверяем, есть ли уже рецепт
-    existing_prescription = crud_emr.prescription.get_by_visit(
-        db, visit_id=visit_id
+    item = crud_emr.prescription.store_for_visit(
+        db,
+        appointment_id=appointment.id,
+        visit_id=visit_id,
+        emr_record_id=canonical_emr.id,
+        emr_revision_id=None,
+        values=prescription_data.model_dump(include={"medications", "instructions", "doctor_notes", "is_draft"}),
     )
-    if not existing_prescription:
-        existing_prescription = crud_emr.prescription.get_by_appointment(
-            db, appointment_id=appointment.id
-        )
-
-    if existing_prescription:
-        # Обновляем существующий рецепт
-        prescription_update = PrescriptionUpdate(
-            **prescription_data.dict(
-                exclude={"appointment_id", "visit_id", "emr_id", "emr_record_id"}
-            )
-        )
-        updated_prescription = crud_emr.prescription.update(
-            db, db_obj=existing_prescription, obj_in=prescription_update
-        )
-        updated_prescription.appointment_id = appointment.id
-        updated_prescription.visit_id = visit_id
-        updated_prescription.emr_record_id = canonical_emr.id
-        db.add(updated_prescription)
-        db.commit()
-        db.refresh(updated_prescription)
-        return updated_prescription
-    else:
-        # Создаем новый рецепт
-        prescription_data.appointment_id = appointment.id
-        prescription_data.visit_id = visit_id
-        prescription_data.emr_id = None
-        prescription_data.emr_record_id = canonical_emr.id
-        new_prescription = crud_emr.prescription.create(db, obj_in=prescription_data)
-        return new_prescription
+    db.commit()
+    db.refresh(item)
+    return item
 
 
 @router.post("/{appointment_id}/prescription/save", response_model=Prescription)
@@ -554,6 +538,12 @@ def get_prescription(
         prescription = crud_emr.prescription.get_by_appointment(
             db, appointment_id=appointment.id
         )
+    if prescription is not None and prescription.appointment_id is None:
+        # Keep this appointment-based response compatible for prescriptions
+        # issued directly from the canonical visit.
+        result = {key: getattr(prescription, key) for key in Prescription.model_fields}
+        result["appointment_id"] = appointment.id
+        return result
     return prescription
 
 

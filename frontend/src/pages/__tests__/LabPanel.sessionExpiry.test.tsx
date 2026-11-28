@@ -1,6 +1,6 @@
 import React from 'react';
 import '@testing-library/jest-dom';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,7 +20,7 @@ const LabPanel = LabPanelRaw as unknown as React.ComponentType<Record<string, un
  * и исчезать как ЕДИНАЯ машина на живом рендере панели.
  *
  * Сценарий ревью: warning открыт → токен истёк и pending=true → токен
- * обновлён (gen N+1) → ОБЕ накладки исчезают НЕМЕДЛЕННО, ещё ДО
+ * обновлён (gen N+1) → диалог исчезает НЕМЕДЛЕННО, ещё ДО
  * завершения операции (round 9) → pending=false без ложного logout →
  * с новым поколением токена предупреждение срабатывает СНОВА.
  *
@@ -193,10 +193,17 @@ const settle = async () => {
   }
 };
 
+const nativeDialogMethods = Object.getOwnPropertyDescriptors(HTMLDialogElement.prototype);
+
 describe('LabPanel session-expiry overlays (PR 3351, review round 8, P2 — component level)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
+    // JSDOM lacks native modal APIs. Chromium covers focus and inert behavior.
+    Object.defineProperties(HTMLDialogElement.prototype, {
+      showModal: { configurable: true, value(this: HTMLDialogElement) { this.open = true; } },
+      close: { configurable: true, value(this: HTMLDialogElement) { this.open = false; } },
+    });
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockImplementation(() => ({
@@ -210,16 +217,20 @@ describe('LabPanel session-expiry overlays (PR 3351, review round 8, P2 — comp
   });
 
   afterEach(() => {
+    cleanup();
+    for (const method of ['showModal', 'close'] as const) {
+      const descriptor = nativeDialogMethods[method];
+      if (descriptor) Object.defineProperty(HTMLDialogElement.prototype, method, descriptor);
+      else Reflect.deleteProperty(HTMLDialogElement.prototype, method);
+    }
     window.sessionStorage.clear();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
-  it('clears both expiry overlays after a token refresh and warns again for the new generation', async () => {
+  it('replaces the warning while redirect is pending and clears it on token recovery', async () => {
     vi.useFakeTimers();
-    // gen N: внутри 5-минутного порога — предупреждение срабатывает сразу
-    // на mount-проверке опроса.
-    installToken(Date.now() + 4 * 60_000, '7');
+    installToken(Date.now() + 6 * 60_000, '7');
 
     let releaseCreate: ((value: unknown) => void) | null = null;
     createInstanceMock.mockImplementation(() => new Promise((resolve) => {
@@ -237,12 +248,6 @@ describe('LabPanel session-expiry overlays (PR 3351, review round 8, P2 — comp
     );
     await settle();
 
-    // (1) warning-overlay открыт.
-    expect(
-      screen.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' }),
-    ).toBeInTheDocument();
-
-
     // Открываем пациента → отчёт #88 → резолв шаблона.
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Пациент Один/ }));
@@ -257,23 +262,26 @@ describe('LabPanel session-expiry overlays (PR 3351, review round 8, P2 — comp
     expect(createInstanceMock).toHaveBeenCalledTimes(1);
     await settle();
 
-    // (2) gen N истёк поверх pending: redirectPending-overlay появляется,
-    // warning-overlay по-прежнему открыт — ОБЕ накладки видимы.
+    // В 5-минутном окне открыт warning поверх уже начатого CREATE.
     await act(async () => {
-      vi.advanceTimersByTime(4 * 60_000 + 30_000);
+      vi.advanceTimersByTime(90_000);
     });
-    expect(
-      screen.getByRole('alertdialog', { name: 'Переход после завершения операции' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' }),
-    ).toBeInTheDocument();
+    const warning = screen.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' });
+    expect(warning).toHaveAttribute('aria-modal', 'true');
+    expect(warning).toHaveAccessibleDescription(/Ваша сессия истекает/);
+
+    // Истечение сессии заменяет содержимое того же открытого диалога.
+    await act(async () => {
+      vi.advanceTimersByTime(5 * 60_000);
+    });
+    const waiting = screen.getByRole('alertdialog', { name: 'Переход после завершения операции' });
+    expect(waiting).toBe(warning);
+    expect(waiting).toHaveAccessibleDescription(/операция ещё выполняется/);
+    expect(screen.getAllByRole('alertdialog')).toHaveLength(1);
 
     // (3) single-flight refresh: gen N+1 (другое значение, валидный exp).
     // Следующий тик опроса видит смену поколения → onSessionRecovered +
-    // НЕМЕДЛЕННОЕ снятие redirectPending (review round 9): ОБЕ накладки
-    // исчезают, пока CREATE ещё висит — overlay «сессия истекла» лгал бы
-    // восстановленной сессии, а зависший POST держал бы его бессрочно.
+    // НЕМЕДЛЕННОЕ закрытие диалога (review round 9), пока CREATE ещё висит.
     installToken(Date.now() + 30 * 60_000, '7-refreshed');
     await act(async () => {
       vi.advanceTimersByTime(30_000);

@@ -72,4 +72,23 @@ describe('LABUX-FE-001: global lab shortcuts respect native interactive targets'
     fireEvent.keyDown(screen.getByTestId('plain'), { key: '1', ctrlKey: true });
     expect(switchTab).toHaveBeenCalledWith('queue');
   });
+
+  it('only suspends Escape while a mounted native alert dialog is open', () => {
+    const clearSelection = vi.fn();
+    const host = (open: boolean) => (
+      <>
+        <dialog role="alertdialog" aria-modal="true" open={open} />
+        <HotkeysHost onClearSelection={clearSelection} onSwitchTab={() => {}} />
+      </>
+    );
+    const { rerender } = render(host(false));
+    const target = screen.getByTestId('plain');
+
+    fireEvent.keyDown(target, { key: 'Escape' });
+    expect(clearSelection).toHaveBeenCalledTimes(1);
+
+    rerender(host(true));
+    fireEvent.keyDown(target, { key: 'Escape' });
+    expect(clearSelection).toHaveBeenCalledTimes(1);
+  });
 });

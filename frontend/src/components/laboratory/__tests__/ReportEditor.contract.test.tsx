@@ -33,16 +33,15 @@ describe('ReportEditor STRAT#24 — extracted sub-component', () => {
       'onUpdateField',
       'canEditActiveInstance',
       'reportHistory',
-      'notify',
     ];
     for (const prop of expectedProps) {
       expect(source).toContain(prop);
     }
   });
 
-  it('imports formatFlagLabel, formatThreshold from labReportNormalize', () => {
+  it('imports getEvaluationLabelKey, formatThreshold from labReportNormalize', () => {
     expect(source).toContain("from './utils/labReportNormalize'");
-    expect(source).toContain('formatFlagLabel');
+    expect(source).toContain('getEvaluationLabelKey');
     expect(source).toContain('formatThreshold');
   });
 
@@ -56,11 +55,6 @@ describe('ReportEditor STRAT#24 — extracted sub-component', () => {
     expect(source).toContain('import { useTranslation }');
   });
 
-  it('imports useLabToast for interactive numeric validation', () => {
-    expect(source).toContain("from './hooks/useLabToast'");
-    expect(source).toContain('useLabToast');
-  });
-
   it('renders sections.map with collapsible headers', () => {
     expect(source).toContain('activeInstance.sections.map');
     expect(source).toContain('collapsedSections.has');
@@ -68,11 +62,10 @@ describe('ReportEditor STRAT#24 — extracted sub-component', () => {
     expect(source).toContain('aria-expanded={!isCollapsed}');
   });
 
-  it('handles numeric onBlur validation with labToast', () => {
-    expect(source).toContain('labToast.interactiveError');
-    expect(source).toContain('labToast.interactiveWarning');
-    expect(source).toContain('labToast.interactiveInfo');
-    expect(source).toContain("field.value_type === 'numeric'");
+  it('renders saved server assessment and keeps clinical thresholds out of input event handlers', () => {
+    expect(source).toContain("t(getEvaluationLabelKey(field))");
+    expect(source).not.toContain('rangeMatch');
+    expect(source).not.toContain('isCritical');
   });
 
   it('has STRAT#24 marker in JSDoc', () => {

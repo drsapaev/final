@@ -1,5 +1,6 @@
 
 import { Button } from '../ui/macos';
+import type { MouseEventHandler } from 'react';
 import { useTranslation } from '../../i18n/useTranslation';
 import { Download, Eye, GitBranch, Lock, Printer, Send } from 'lucide-react';
 
@@ -15,7 +16,7 @@ interface LabReportActionsBarProps {
   canPreview?: boolean;
   onSaveDraft: () => void;
   onFinalize: () => void;
-  onRevise: () => void;
+  onRevise: MouseEventHandler<HTMLButtonElement>;
   onPrint: () => void;
   onNotify?: () => void;
   onPreview?: () => void;
@@ -61,8 +62,8 @@ export default function LabReportActionsBar({
   onPreview,
 }: LabReportActionsBarProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
-  const showPrimaryGroup = canSaveDraft || canFinalize;
-  const showSecondaryGroup = canRevise || canPrint || canNotify || canPreview;
+  const showPrimaryGroup = canSaveDraft || canFinalize || canPreview;
+  const showSecondaryGroup = canRevise || canPrint || canNotify;
 
   if (!showPrimaryGroup && !showSecondaryGroup) {
     return null;

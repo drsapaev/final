@@ -11,25 +11,44 @@ from __future__ import annotations
 import os
 import threading
 import time
-from datetime import UTC, datetime
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, date, datetime
+from queue import Queue
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, text
+from fastapi import HTTPException
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
+from app.api.v1.endpoints.lab_reporting import (
+    bulk_save_lab_report_values,
+    finalize_lab_report,
+    update_lab_report_instance,
+)
+from app.core.config import settings
 from app.db.base_class import Base
 from app.models.lab import (
+    LabClinicalConfigurationVersion,
     LabReportFieldDef,
     LabReportInstance,
     LabReportSection,
     LabReportTemplate,
     LabReportTemplateVersion,
+    LabReportValue,
 )
+from app.models.lab_release import LabDraftMutationReceipt, LabReportWorkflowEvent
 from app.models.patient import Patient
+from app.models.user import User
 from app.repositories.lab_reporting_api_repository import LabReportingApiRepository
+from app.schemas.lab_release import LabReportVersionCommand
+from app.schemas.lab_reporting import LabReportInstanceUpdate, LabReportValueIn
+from app.services.lab_clinical_configuration_service import (
+    submit_for_approval,
+    update_draft,
+)
 from app.services.lab_reporting_service import (
     LabReportingDomainError,
     LabReportingService,
@@ -129,8 +148,86 @@ def lab_instance_version(lab_lock_engine):
             updated_at=datetime(2026, 9, 20, 9, 30, 0, 123456, tzinfo=UTC),
         )
         session.add(instance)
+        session.flush()
+        version.status = "PUBLISHED"
+        version.published_at = datetime(2026, 9, 20, 9, 0, tzinfo=UTC)
         session.commit()
         return instance.id, instance.updated_at
+
+
+class _DisconnectedAfterCommit(Session):
+    def commit(self) -> None:
+        super().commit()
+        raise OSError("synthetic disconnect after PostgreSQL commit")
+
+
+@pytest.mark.parametrize("operation", ["metadata", "values"])
+def test_committed_draft_write_with_lost_response_replays_across_sessions(
+    lab_lock_engine,
+    lab_instance_version,
+    operation,
+):
+    instance_id, original = lab_instance_version
+    request_id = uuid4()
+    with Session(lab_lock_engine) as setup:
+        actor = User(
+            username=f"synthetic_lab_replay_{uuid4().hex[:8]}",
+            full_name="SYNTHETIC Lab Staff",
+            hashed_password="synthetic-unused",
+            role="Lab",
+        )
+        setup.add(actor)
+        setup.flush()
+        actor_id = actor.id
+        setup.commit()
+
+    def send(session: Session):
+        args = {
+            "instance_id": instance_id,
+            "expected_updated_at": original.isoformat(),
+            "draft_request_id": request_id,
+            "db": session,
+            "user": session.get(User, actor_id),
+        }
+        if operation == "metadata":
+            return update_lab_report_instance(
+                payload=LabReportInstanceUpdate(study_date=date(2026, 9, 21)), **args,
+            )
+        return bulk_save_lab_report_values(
+            payload=[LabReportValueIn(field_key="wbc", value_text="5.2")], **args,
+        )
+
+    # Keep the first connection checked out so the retry must use a different
+    # PostgreSQL backend, even when the process connection pool is warm.
+    with lab_lock_engine.connect() as first_connection:
+        with _DisconnectedAfterCommit(first_connection) as disconnected:
+            first_pid = disconnected.scalar(text("SELECT pg_backend_pid()"))
+            with pytest.raises(OSError, match="after PostgreSQL commit"):
+                send(disconnected)
+
+        with Session(lab_lock_engine) as retry:
+            assert retry.scalar(text("SELECT pg_backend_pid()")) != first_pid
+            receipt = retry.get(
+                LabDraftMutationReceipt, (instance_id, actor_id, operation, request_id),
+            )
+            assert receipt is not None
+            assert len(receipt.request_digest) == 64
+            applied_version = receipt.applied_version
+            assert applied_version > original
+            replay = send(retry)
+            if operation == "metadata":
+                assert replay.updated_at == applied_version
+                assert replay.patient_snapshot["study_date"] == "2026-09-21"
+            else:
+                assert replay.instance.updated_at == applied_version
+                assert replay.updated_field_keys == ["wbc"]
+                assert [event.kind for event in replay.instance.workflow_events] == ["entered"]
+
+    with Session(lab_lock_engine) as verification:
+        stored = verification.get(LabReportInstance, instance_id)
+        assert stored is not None and stored.updated_at == applied_version
+        if operation == "values":
+            assert [(value.field_key, value.value_text) for value in stored.values] == [("wbc", "5.2")]
 
 
 def _wait_for_blocker(engine, pid: int, finished: threading.Event) -> bool:
@@ -144,6 +241,183 @@ def _wait_for_blocker(engine, pid: int, finished: threading.Event) -> bool:
             if finished.wait(0.01):
                 return False
     return False
+
+
+class _PausingClinicalConfigurationSession(Session):
+    def __init__(
+        self,
+        bind,
+        *,
+        lock_acquired: threading.Event,
+        release: threading.Event,
+    ):
+        super().__init__(bind=bind)
+        self._lock_acquired = lock_acquired
+        self._release = release
+        self._paused = False
+
+    def scalar(self, statement, *args, **kwargs):  # type: ignore[no-untyped-def]
+        result = super().scalar(statement, *args, **kwargs)
+        if getattr(statement, "_for_update_arg", None) is not None and not self._paused:
+            self._paused = True
+            self._lock_acquired.set()
+            if not self._release.wait(8):
+                raise AssertionError(
+                    "clinical configuration lock holder was not released"
+                )
+        return result
+
+
+def test_clinical_draft_update_and_submit_serialize_the_approved_snapshot(
+    lab_lock_engine,
+):
+    now = datetime.now(UTC)
+    initial_instruction = "Synthetic instruction version one."
+    updated_instruction = "Synthetic instruction version two."
+    snapshot = {
+        "method_instructions": [
+            {
+                "method_code": "SYNTHETIC-METHOD",
+                "method_version": "SYNTHETIC-1",
+                "instruction_text": initial_instruction,
+                "source_ref": "clinic-document://synthetic/method-1",
+            }
+        ],
+        "reference_intervals": [
+            {
+                "rule_code": "SYNTHETIC-RANGE-1",
+                "analyte_code": "SYNTHETIC-ANALYTE",
+                "method_code": "SYNTHETIC-METHOD",
+                "unit_code": "synthetic_unit",
+                "low": 1.0,
+                "high": 10.0,
+                "source_ref": "clinic-document://synthetic/reference-1",
+            }
+        ],
+        "critical_values": [],
+        "qc_rules": [],
+        "not_applicable_reasons": {
+            "critical_values": "No separate critical threshold in this synthetic profile.",
+            "qc_rules": "No instrument-specific QC rule in this synthetic profile.",
+        },
+    }
+    with Session(lab_lock_engine) as setup:
+        admin = User(
+            username=f"synthetic_config_admin_{uuid4().hex[:8]}",
+            full_name="SYNTHETIC Configuration Admin",
+            hashed_password="synthetic-unused",
+            role="Admin",
+            is_active=True,
+        )
+        physician = User(
+            username=f"synthetic_config_lab_{uuid4().hex[:8]}",
+            full_name="SYNTHETIC Lab Physician",
+            hashed_password="synthetic-unused",
+            role="Lab",
+            is_active=True,
+        )
+        setup.add_all([admin, physician])
+        setup.flush()
+        version = LabClinicalConfigurationVersion(
+            version_no=1,
+            status="DRAFT",
+            configuration_schema_version=1,
+            configuration_snapshot=snapshot,
+            primary_lab_physician_user_id=physician.id,
+            created_by_user_id=admin.id,
+            created_at=now,
+            updated_at=now,
+        )
+        setup.add(version)
+        setup.commit()
+        version_id = version.id
+        admin_id = admin.id
+        physician_id = physician.id
+
+    lock_acquired = threading.Event()
+    release = threading.Event()
+    submit_ready = threading.Event()
+    submit_finished = threading.Event()
+    outcome: dict[str, object] = {}
+    updated_snapshot = {
+        **snapshot,
+        "method_instructions": [
+            {
+                **snapshot["method_instructions"][0],
+                "instruction_text": updated_instruction,
+            }
+        ],
+    }
+
+    def edit_draft() -> None:
+        try:
+            with _PausingClinicalConfigurationSession(
+                lab_lock_engine,
+                lock_acquired=lock_acquired,
+                release=release,
+            ) as session:
+                actor = session.get(User, admin_id)
+                assert actor is not None
+                update_draft(
+                    session,
+                    version_id=version_id,
+                    configuration_snapshot=updated_snapshot,
+                    primary_lab_physician_user_id=physician_id,
+                    substitute_lab_physician_user_id=None,
+                    actor=actor,
+                )
+        except Exception as exc:  # noqa: BLE001 - surfaced in parent assertion
+            outcome["edit_error"] = repr(exc)
+
+    def submit_draft() -> None:
+        try:
+            with Session(lab_lock_engine) as session:
+                actor = session.get(User, admin_id)
+                assert actor is not None
+                outcome["submit_pid"] = session.scalar(
+                    text("SELECT pg_backend_pid()")
+                )
+                submit_ready.set()
+                submitted = submit_for_approval(
+                    session, version_id=version_id, actor=actor
+                )
+                outcome["submitted_status"] = submitted.status
+                outcome["submitted_instruction"] = submitted.configuration_snapshot[
+                    "method_instructions"
+                ][0]["instruction_text"]
+        except Exception as exc:  # noqa: BLE001 - surfaced in parent assertion
+            outcome["submit_error"] = repr(exc)
+        finally:
+            submit_finished.set()
+
+    editor = threading.Thread(target=edit_draft, daemon=True)
+    submitter = threading.Thread(target=submit_draft, daemon=True)
+    editor.start()
+    try:
+        assert lock_acquired.wait(5), outcome
+        submitter.start()
+        assert submit_ready.wait(5), outcome
+        blocked = _wait_for_blocker(
+            lab_lock_engine, int(outcome["submit_pid"]), submit_finished
+        )
+    finally:
+        release.set()
+        editor.join(timeout=10)
+        if submitter.ident is not None:
+            submitter.join(timeout=10)
+
+    assert blocked, "submission returned before the locked draft edit committed"
+    assert not editor.is_alive() and not submitter.is_alive(), outcome
+    assert "edit_error" not in outcome and "submit_error" not in outcome, outcome
+    assert outcome["submitted_status"] == "PENDING_APPROVAL", outcome
+    assert outcome["submitted_instruction"] == updated_instruction, outcome
+    with Session(lab_lock_engine) as verification:
+        stored = verification.get(LabClinicalConfigurationVersion, version_id)
+        assert stored is not None
+        assert stored.status == "PENDING_APPROVAL"
+        assert stored.configuration_snapshot["method_instructions"][0][
+            "instruction_text"
+        ] == updated_instruction
 
 
 class _PausingLockRepository(LabReportingApiRepository):
@@ -244,6 +518,9 @@ def test_finalize_blocks_a_late_draft_save(
     lab_instance_version,
 ):
     instance_id, original = lab_instance_version
+    with Session(lab_lock_engine) as setup:
+        setup.add(LabReportValue(instance_id=instance_id, field_key="wbc", value_text="7.1"))
+        setup.commit()
     locked = threading.Event()
     release = threading.Event()
     save_ready = threading.Event()
@@ -309,4 +586,168 @@ def test_finalize_blocks_a_late_draft_save(
         stored = verification.get(LabReportInstance, instance_id)
         assert stored is not None
         assert stored.status == "FINALIZED"
-        assert stored.values == []
+        assert [(value.field_key, value.value_text) for value in stored.values] == [("wbc", "7.1")]
+
+
+def test_stale_finalize_after_second_save_preserves_latest_draft(
+    lab_lock_engine,
+    lab_instance_version,
+):
+    instance_id, original = lab_instance_version
+    with Session(lab_lock_engine) as setup:
+        actors = [
+            User(
+                username=f"synthetic_lab_{suffix}_{uuid4().hex[:8]}",
+                full_name=f"SYNTHETIC Lab Staff {suffix}",
+                hashed_password="synthetic-unused",
+                role="Lab",
+            )
+            for suffix in ("first", "second")
+        ]
+        setup.add_all(actors)
+        setup.flush()
+        first_actor_id, second_actor_id = (actor.id for actor in actors)
+        setup.commit()
+
+    # Hold both PostgreSQL backends throughout the sequence, even after commit.
+    with (
+        lab_lock_engine.connect() as first_connection,
+        lab_lock_engine.connect() as second_connection,
+        Session(first_connection) as first,
+        Session(second_connection) as second,
+    ):
+        assert first.scalar(text("SELECT pg_backend_pid()")) != second.scalar(
+            text("SELECT pg_backend_pid()")
+        )
+        first_save = bulk_save_lab_report_values(
+            instance_id=instance_id,
+            payload=[LabReportValueIn(field_key="wbc", value_text="5.2")],
+            expected_updated_at=original.isoformat(),
+            draft_request_id=uuid4(),
+            db=first,
+            user=first.get(User, first_actor_id),
+        )
+        first_version = first_save.instance.updated_at
+        assert first_version > original
+
+        second_save = bulk_save_lab_report_values(
+            instance_id=instance_id,
+            payload=[LabReportValueIn(field_key="wbc", value_text="9.9")],
+            expected_updated_at=first_version.isoformat(),
+            draft_request_id=uuid4(),
+            db=second,
+            user=second.get(User, second_actor_id),
+        )
+        latest_version = second_save.instance.updated_at
+        assert latest_version > first_version
+
+        with pytest.raises(HTTPException) as stale:
+            finalize_lab_report(
+                instance_id=instance_id,
+                command=LabReportVersionCommand(expected_updated_at=first_version.isoformat()),
+                db=first,
+                user=first.get(User, first_actor_id),
+            )
+        assert stale.value.status_code == 409
+        assert "Бланк был изменён другим пользователем" in stale.value.detail
+
+    with Session(lab_lock_engine) as verification:
+        stored = verification.get(LabReportInstance, instance_id)
+        assert stored is not None
+        assert stored.status == "IN_PROGRESS"
+        assert stored.finalized_at is None
+        assert stored.updated_at == latest_version
+        assert [(value.field_key, value.value_text) for value in stored.values] == [("wbc", "9.9")]
+        events = verification.execute(
+            select(LabReportWorkflowEvent.kind, LabReportWorkflowEvent.actor_user_id)
+            .where(LabReportWorkflowEvent.instance_id == instance_id)
+            .order_by(LabReportWorkflowEvent.id)
+        ).all()
+        assert events == [("entered", first_actor_id), ("entered", second_actor_id)]
+
+
+def test_concurrent_managed_corrections_create_one_draft(
+    lab_lock_engine, lab_instance_version, monkeypatch
+):
+    instance_id, original = lab_instance_version
+    reading = "SYNTHETIC-READING"
+    with Session(lab_lock_engine) as setup:
+        actors = [
+            User(
+                username=f"synthetic_correction_{uuid4().hex[:8]}",
+                full_name="SYNTHETIC Correction Staff",
+                hashed_password="synthetic-unused",
+                role="Lab",
+            )
+            for _ in range(2)
+        ]
+        setup.add_all(actors)
+        setup.flush()
+        first_actor_id, second_actor_id = (actor.id for actor in actors)
+        service = LabReportingService(setup)
+        saved, _ = service.bulk_upsert_values(
+            instance_id,
+            [{"field_key": "wbc", "value_text": reading}],
+            expected_updated_at=original.isoformat(),
+        )
+        released = service.finalize(
+            instance_id, expected_updated_at=saved.updated_at.isoformat()
+        )
+        assert released.status == "FINALIZED"
+        released_version = released.updated_at
+        finalized_at = released.finalized_at
+
+    # Managed corrections also apply to reports released before rollout.
+    monkeypatch.setattr(settings, "LAB_MANAGED_RELEASE_ENABLED", True)
+    command = {
+        "expected_updated_at": released_version.isoformat(),
+        "reason": "SYNTHETIC correction",
+    }
+    second_ready: Queue[int] = Queue()
+    second_finished = threading.Event()
+
+    def compete() -> None:
+        try:
+            with Session(lab_lock_engine) as session:
+                second_ready.put(session.scalar(text("SELECT pg_backend_pid()")))
+                LabReportingService(session).revise(
+                    instance_id, actor_user_id=second_actor_id, **command
+                )
+        finally:
+            second_finished.set()
+
+    with ThreadPoolExecutor(max_workers=1) as worker, Session(lab_lock_engine) as first:
+        repository = LabReportingApiRepository(first)
+        first_pid = first.scalar(text("SELECT pg_backend_pid()"))
+        assert repository.get_instance_for_update(instance_id) is not None
+        contender = worker.submit(compete)
+        second_pid = second_ready.get(timeout=5)
+        assert first_pid != second_pid
+        assert _wait_for_blocker(lab_lock_engine, second_pid, second_finished)
+
+        revision = LabReportingService(first, repository=repository).revise(
+            instance_id, actor_user_id=first_actor_id, **command
+        )
+        draft_id = revision.id
+        with pytest.raises(LabReportingDomainError, match="A correction already exists") as conflict:
+            contender.result(timeout=10)
+        assert conflict.value.status_code == 409
+
+    with Session(lab_lock_engine) as verification:
+        service = LabReportingService(verification)
+        replay = service.revise(instance_id, actor_user_id=first_actor_id, **command)
+        assert replay.id == draft_id
+        assert replay.status == "DRAFT" and replay.managed_release
+        assert [(value.field_key, value.value_text) for value in replay.values] == [("wbc", reading)]
+        assert verification.scalars(
+            select(LabReportInstance.id)
+            .where(LabReportInstance.supersedes_instance_id == instance_id)
+        ).all() == [draft_id]
+        events = service.workflow_history(draft_id)
+        assert [(event.kind, event.actor_user_id) for event in events] == [
+            ("revision_created", first_actor_id)
+        ]
+        source = verification.get(LabReportInstance, instance_id)
+        assert source is not None and source.status == "FINALIZED"
+        assert source.updated_at == released_version and source.finalized_at == finalized_at
+        assert [(value.field_key, value.value_text) for value in source.values] == [("wbc", reading)]

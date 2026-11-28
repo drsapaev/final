@@ -35,13 +35,14 @@ import { CheckCircle2 } from 'lucide-react';
  * но вспомогательные тексты (aria-label, title-атрибуты) теперь через t().
  */
 const HIDDEN_STEPPER_STATUSES = new Set(['READY']);
+const MANAGED_STEPPER_STATUSES = new Set(['IN_REVIEW', 'REVIEWED']);
 
 // Видимые шаги степпера. READY исключён: нет ручного действия для перехода.
 const VISIBLE_STEPPER_STEPS = LAB_REPORT_STATUS_CONFIG.filter(
   (step) => !HIDDEN_STEPPER_STATUSES.has(step.key)
 );
 
-export default function LabStatusStepper({ status }: { status: string }) {
+export default function LabStatusStepper({ status, managed = false }: { status: string; managed?: boolean }) {
   const { t } = useTranslation();
   // Индекс считаем по полной конфигурации, чтобы READY (если пришёл с бэкенда)
   // корректно отображался как текущий шаг.
@@ -53,9 +54,11 @@ export default function LabStatusStepper({ status }: { status: string }) {
 
   // Маппинг полного индекса на видимый индекс: если текущий статус — READY,
   // показываем его на месте IN_PROGRESS (как «почти готов»).
+  const visibleSteps = managed ? VISIBLE_STEPPER_STEPS
+    : VISIBLE_STEPPER_STEPS.filter((step) => !MANAGED_STEPPER_STATUSES.has(step.key));
   const currentIndex = HIDDEN_STEPPER_STATUSES.has(status)
-    ? VISIBLE_STEPPER_STEPS.findIndex((s) => s.key === 'IN_PROGRESS')
-    : VISIBLE_STEPPER_STEPS.findIndex((s) => s.key === status);
+    ? visibleSteps.findIndex((s) => s.key === 'IN_PROGRESS')
+    : visibleSteps.findIndex((s) => s.key === status);
 
   return (
     <div
@@ -69,11 +72,12 @@ export default function LabStatusStepper({ status }: { status: string }) {
         marginTop: 'var(--mac-spacing-2)',
       }}
     >
-      {VISIBLE_STEPPER_STEPS.map((step, index) => {
+      {visibleSteps.map((step, index) => {
         const isCompleted = index < currentIndex;
         const isCurrent = index === currentIndex;
         const isFuture = index > currentIndex;
-        const isLast = index === VISIBLE_STEPPER_STEPS.length - 1;
+        const isLast = index === visibleSteps.length - 1;
+        const label = t(step.translationKey, { defaultValue: step.label });
 
         // STRAT#6: title-атрибуты через t() для i18n
         const titleSuffix = isCompleted
@@ -90,7 +94,7 @@ export default function LabStatusStepper({ status }: { status: string }) {
             <div
               className={`lab-status-step ${isCurrent ? 'lab-status-step-current' : ''} ${isCompleted ? 'lab-status-step-completed' : ''} ${isFuture ? 'lab-status-step-future' : ''}`}
               aria-current={isCurrent ? 'step' : undefined}
-              title={`${step.label} — ${titleSuffix}`}
+              title={`${label} — ${titleSuffix}`}
             >
               {isCompleted && (
                 <CheckCircle2 size={12} aria-hidden="true" />
@@ -107,7 +111,7 @@ export default function LabStatusStepper({ status }: { status: string }) {
                   aria-hidden="true"
                 />
               )}
-              {step.label}
+              {label}
             </div>
             {!isLast && (
               <div

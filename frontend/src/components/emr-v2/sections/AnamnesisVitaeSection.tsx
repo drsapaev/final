@@ -20,7 +20,7 @@ import { useTranslation } from '@/i18n/useTranslation';
  */
 interface AnamnesisVitaeSectionProps {
   value?: string;
-  onChange?: ((value: string) => void) | undefined;
+  onChange?: ((value: string, options?: Record<string, unknown>) => void) | undefined;
   disabled?: boolean;
   defaultOpen?: boolean;
   vitals?: Record<string, unknown>;
@@ -35,7 +35,7 @@ export function AnamnesisVitaeSection({
     onChange,
     disabled = false,
     defaultOpen = true,
-    vitals = {},
+    vitals,
     onVitalsChange
 }: AnamnesisVitaeSectionProps) {
     const [showMyExperience, setShowMyExperience] = useState(false);
@@ -51,13 +51,13 @@ export function AnamnesisVitaeSection({
     });
 
     // Handle template apply
-    const handleApplyTemplate = useCallback((text: string) => {
+    const handleApplyTemplate = useCallback((text: string, source?: Record<string, unknown>) => {
         if (!text) return;
         const current = value || '';
         const newValue = current.trim()
             ? `${current.trim()}\n\n${text}`
             : text;
-        onChange?.(newValue);
+        onChange?.(newValue, source);
     }, [value, onChange]);
 
     return (
@@ -76,7 +76,7 @@ export function AnamnesisVitaeSection({
             }
         >
             {/* Vitals Widget */}
-            <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+            {vitals && <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
                 <h4 style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-2)' }}>
                     Витальные показатели
                 </h4>
@@ -85,7 +85,7 @@ export function AnamnesisVitaeSection({
                     onChange={onVitalsChange}
                     disabled={disabled}
                 />
-            </div>
+            </div>}
 
             <EMRTextField
                 value={value}

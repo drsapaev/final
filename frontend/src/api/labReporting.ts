@@ -1,8 +1,33 @@
 import { getApiBaseUrl } from './runtime';
 import tokenManager from '../utils/tokenManager';
 import { forceRefreshToken } from './client';
+import type { LabWorklistPage, LabWorklistQuery } from '../types/features/labWorkspace';
 
 const API_V1_BASE = getApiBaseUrl();
+const DRAFT_REQUEST_TIMEOUT_MS = 25_000;
+
+function normalizePatientId(value: unknown) {
+  const id = typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+function isAmbiguousCreationError(error: unknown) {
+  if (typeof error === 'object' && error !== null && 'status' in error && typeof error.status === 'number') {
+    return error.status >= 500 || (error.status === 409 && 'code' in error
+      && (error.code === 'idempotency_uncertain_outcome' || error.code === 'idempotency_in_flight'));
+  }
+  return error instanceof TypeError || error instanceof SyntaxError || (
+    error instanceof DOMException && ['AbortError', 'TimeoutError', 'NetworkError'].includes(error.name)
+  );
+}
+
+function draftWriteSearch(expectedUpdatedAt: string | null, draftRequestId?: string) {
+  const search = new URLSearchParams();
+  if (expectedUpdatedAt) search.set('expected_updated_at', expectedUpdatedAt);
+  if (draftRequestId) search.set('draft_request_id', draftRequestId);
+  const query = search.toString();
+  return query ? `?${query}` : '';
+}
 
 /**
  * UX-AUDIT-FIX12: добавлена поддержка AbortSignal во все запросы.
@@ -24,6 +49,7 @@ interface RequestOptions {
   headers?: Record<string, string>;
   signal?: AbortSignal;
   method?: string;
+  responseType?: 'blob';
 }
 
 /** LABR-FE-001 (audit 3886): true for a rejected 401 from an expired access JWT. */
@@ -39,9 +65,8 @@ function isAuthRejected(error: unknown): boolean {
  * LABR-FE-001 (audit 3886): converge the lab transport on the canonical
  * shared expired-JWT refresh. A rejected 401 (the server did NOT execute
  * the command) is safely retried once after a single-flight refresh —
- * including for mutations, which keep their Idempotency-Key and fail
- * closed on any transport error (no automatic retry of ambiguous POSTs:
- * network/timeout failures still surface as before).
+ * including for mutations, which keep their Idempotency-Key. Ambiguous
+ * transport errors are handled by the calling operation.
  */
 async function withAuthRetry<T>(perform: () => Promise<T>): Promise<T> {
   try {
@@ -59,6 +84,7 @@ async function withAuthRetry<T>(perform: () => Promise<T>): Promise<T> {
 }
 
 async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
+  const { responseType, ...requestOptions } = options;
   const run = async (): Promise<unknown> => {
     const token = tokenManager.getAccessToken();
     const headers: Record<string, string> = {
@@ -68,7 +94,7 @@ async function request(path: string, options: RequestOptions = {}): Promise<unkn
     };
 
     const fetchInit: RequestInit = {
-      ...(options as Record<string, unknown>),
+      ...(requestOptions as Record<string, unknown>),
       headers,
       // UX-AUDIT-FIX12: пробрасываем signal в fetch, если передан.
       // Если signal уже отменён — fetch выбросит AbortError сразу.
@@ -79,25 +105,55 @@ async function request(path: string, options: RequestOptions = {}): Promise<unkn
 
     if (!response.ok) {
       let detail = `${response.status} ${response.statusText}`;
+      let code: string | undefined;
       try {
         const payload = await response.json();
         detail = payload.detail || detail;
+        if (typeof payload.code === 'string') code = payload.code;
       } catch {
         // Ignore JSON parsing failures and use the fallback detail.
       }
-      throw Object.assign(new Error(detail), { status: response.status });
+      throw Object.assign(new Error(detail), {
+        status: response.status,
+        ...(code ? { code } : {}),
+      });
     }
 
     if (response.status === 204) {
       return null;
     }
+    if (responseType === 'blob') return response.blob();
     return response.json();
   };
 
   return withAuthRetry(run);
 }
 
+export { request as requestLab };
+
 export const labReportingApi = {
+  listWorklist(query: LabWorklistQuery, options: { cursor?: string; signal?: AbortSignal } = {}) {
+    return request('/lab/worklist/search', {
+      method: 'POST',
+      body: JSON.stringify({
+        view: query.view,
+        sort: query.sort,
+        limit: 50,
+        q: query.q.trim() || undefined,
+        barcode: query.barcode,
+        from_date: query.fromDate,
+        to_date: query.toDate,
+        cursor: options.cursor,
+      }),
+      signal: options.signal,
+    }) as Promise<LabWorklistPage>;
+  },
+
+  cancelOrderedTest(visitId: number, visitServiceId: number, orderId: number | null, reason: string) {
+    return request(`/lab/visits/${visitId}/tests/${visitServiceId}/cancel`, {
+      method: 'POST', body: JSON.stringify({ order_id: orderId, reason }),
+    });
+  },
   // P-03 fix: lab-specific façade для очереди лаборатории.
   // Раньше LabPanel делал прямой fetch к /registrar/queues/today?department=lab.
   // Теперь использует этот метод — собственный контракт, собственная RBAC,
@@ -233,26 +289,47 @@ export const labReportingApi = {
     return request(`/lab/report-instances?${search.toString()}`);
   },
 
-  getInstance(instanceId: string | number) {
-    return request(`/lab/report-instances/${instanceId}`);
+  getInstance(instanceId: string | number, options?: Pick<RequestOptions, 'signal'>) {
+    return request(`/lab/report-instances/${instanceId}`, options);
   },
 
-  createInstance(
+  async createInstance(
     payload: Record<string, unknown>,
     options: { idempotencyKey?: string } = {},
   ) {
-    // PR 3351 (review round 9, P1): устойчивый Idempotency-Key операции
-    // создания. IdempotencyMiddleware — opt-in: без заголовка POST просто
-    // проходит в хендлер и каждый ретрай коммитит НОВЫЙ бланк. С ключом
-    // потерянный ответ (502 proxy / crash вкладки / retry после reload)
-    // безопасен: повтор с тем же ключом получает закоммиченный ответ.
-    return request('/lab/report-instances', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      ...(options.idempotencyKey
-        ? { headers: { 'Idempotency-Key': options.idempotencyKey } }
-        : {}),
-    });
+    const { idempotencyKey } = options;
+    const body = JSON.stringify(payload);
+    try {
+      return await request('/lab/report-instances', {
+        method: 'POST',
+        body,
+        ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+      });
+    } catch (error) {
+      if (!idempotencyKey || !isAmbiguousCreationError(error)) throw error;
+      // Recover only from a committed receipt for the original serialized request.
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), DRAFT_REQUEST_TIMEOUT_MS);
+      try {
+        const originalRequest = JSON.parse(body) as Record<string, unknown>;
+        const patientId = normalizePatientId(originalRequest?.patient_id);
+        const recovered = await request('/lab/report-instances/creation-result', {
+          method: 'POST',
+          body: JSON.stringify({ idempotency_key: idempotencyKey, request: originalRequest }),
+          signal: controller.signal,
+        });
+        if (typeof recovered === 'object' && recovered !== null && 'id' in recovered
+          && typeof recovered.id === 'number' && Number.isSafeInteger(recovered.id) && recovered.id > 0
+          && patientId !== null && 'patient_id' in recovered && normalizePatientId(recovered.patient_id) === patientId
+          && 'updated_at' in recovered && typeof recovered.updated_at === 'string' && recovered.updated_at.trim()
+          && 'sections' in recovered && Array.isArray(recovered.sections)) return recovered;
+      } catch {
+        // Preserve the original creation error when reconciliation is unavailable.
+      } finally {
+        clearTimeout(timeout);
+      }
+      throw error;
+    }
   },
 
   // P1 fix: doctor-initiated lab order — creates a LabReportInstance in DRAFT
@@ -267,23 +344,31 @@ export const labReportingApi = {
   // WF-06 fix: expectedUpdatedAt — optimistic locking via updated_at.
   // Если backend обнаружит, что бланк был изменён после этого timestamp,
   // вернёт 409 Conflict. Frontend показывает dialog "обновите страницу".
-  updateInstance(instanceId: string | number, payload: Record<string, unknown>, expectedUpdatedAt: string | null = null) {
-    const search = expectedUpdatedAt
-      ? `?expected_updated_at=${encodeURIComponent(expectedUpdatedAt)}`
-      : '';
+  updateInstance(
+    instanceId: string | number,
+    payload: Record<string, unknown>,
+    expectedUpdatedAt: string | null = null,
+    draftRequestId?: string,
+  ) {
+    const search = draftWriteSearch(expectedUpdatedAt, draftRequestId);
     return request(`/lab/report-instances/${instanceId}${search}`, {
       method: 'PUT',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout?.(DRAFT_REQUEST_TIMEOUT_MS),
     });
   },
 
-  bulkSaveValues(instanceId: string | number, payload: Array<Record<string, unknown>>, expectedUpdatedAt: string | null = null) {
-    const search = expectedUpdatedAt
-      ? `?expected_updated_at=${encodeURIComponent(expectedUpdatedAt)}`
-      : '';
+  bulkSaveValues(
+    instanceId: string | number,
+    payload: Array<Record<string, unknown>>,
+    expectedUpdatedAt: string | null = null,
+    draftRequestId?: string,
+  ) {
+    const search = draftWriteSearch(expectedUpdatedAt, draftRequestId);
     return request(`/lab/report-instances/${instanceId}/bulk-values${search}`, {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout?.(DRAFT_REQUEST_TIMEOUT_MS),
     });
   },
 
@@ -292,15 +377,52 @@ export const labReportingApi = {
   // backend разрешал одинаковые действия для DRAFT/IN_PROGRESS/READY).
   // Если backend endpoint потребуется снова — добавлять вместе с UI-кнопкой.
 
-  finalize(instanceId: string | number) {
+  finalize(instanceId: string | number, expectedUpdatedAt?: string) {
     return request(`/lab/report-instances/${instanceId}/finalize`, {
-      method: 'POST'
+      method: 'POST',
+      ...(expectedUpdatedAt ? { body: JSON.stringify({ expected_updated_at: expectedUpdatedAt }) } : {}),
     });
   },
 
-  revise(instanceId: string | number) {
+  revise(instanceId: string | number, payload?: { expected_updated_at?: string; reason: string }) {
     return request(`/lab/report-instances/${instanceId}/revise`, {
-      method: 'POST'
+      method: 'POST',
+      ...(payload ? { body: JSON.stringify(payload) } : {}),
+    });
+  },
+
+  submitReview(instanceId: string | number, expectedUpdatedAt: string) {
+    return request(`/lab/report-instances/${instanceId}/submit-review`, {
+      method: 'POST', body: JSON.stringify({ expected_updated_at: expectedUpdatedAt }),
+    });
+  },
+
+  review(instanceId: string | number, expectedUpdatedAt: string, reason?: string) {
+    return request(`/lab/report-instances/${instanceId}/review`, {
+      method: 'POST', body: JSON.stringify({ expected_updated_at: expectedUpdatedAt, reason }),
+    });
+  },
+
+  returnToDraft(instanceId: string | number, payload: {
+    expected_updated_at: string;
+    reason: string;
+    unusual_change?: boolean;
+  }) {
+    return request(`/lab/report-instances/${instanceId}/return-to-draft`, {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+  },
+
+  recordQC(instanceId: string | number, payload: {
+    expected_updated_at: string;
+    status: 'accepted' | 'rejected' | 'not_applicable';
+    reason?: string;
+    method?: string;
+    instrument_ref?: string;
+    series_ref?: string;
+  }) {
+    return request(`/lab/report-instances/${instanceId}/qc`, {
+      method: 'POST', body: JSON.stringify(payload),
     });
   },
 

@@ -23,13 +23,15 @@ const LAB_PROFILE = {
   roles: ['Lab'],
 };
 
-// Minimal unsigned token shape: the UI only decodes claims client-side and
-// every API call is mocked, so the signature is irrelevant here.
-const FAKE_TOKEN = [
-  'eyJhbGciOiJIUzI1NiJ9',
-  'eyJzdWIiOiI3Iiwicm9sZSI6IkxhYiIsImV4cCI6OTk5OTk5OTk5OX0',
-  'sig',
-].join('.');
+// Browser-only test session. Every API request in this spec is mocked.
+function mockSessionToken(expiresAtSeconds: number): string {
+  const encode = (claims: object) => Buffer.from(JSON.stringify(claims)).toString('base64url');
+  const header = encode({ alg: 'none', typ: 'JWT' });
+  const claims = encode({ sub: String(LAB_PROFILE.id), role: LAB_PROFILE.role, exp: expiresAtSeconds });
+  return [header, claims, 'qa'].join('.');
+}
+
+const FAKE_TOKEN = mockSessionToken(9_999_999_999);
 
 const TEMPLATES_SUMMARY = [
   { id: 5, code: 'rule_demo', name: 'Rule Demo', family: 'chemistry', is_active: true, published_version_id: 51, draft_version_id: null, latest_version_id: 51 },
@@ -89,6 +91,7 @@ const INSTANCE_B = {
   ...INSTANCE_A,
   id: 89,
   patient_id: 102,
+  visit_id: 702,
   patient_snapshot: { patient_id: 102, full_name: 'Пациент Два' },
 };
 
@@ -109,11 +112,26 @@ const INSTANCE_CREATED = {
 };
 
 const QUEUE_ENTRIES = [
-  { id: 1, appointment_id: 'a-1', patient_id: 101, patient_fio: 'Пациент Один', patient_phone: '', status: 'waiting', report_instance_id: 88, services: [], service_codes: [], service_details: [] },
-  { id: 2, appointment_id: 'a-2', patient_id: 102, patient_fio: 'Пациент Два', patient_phone: '', status: 'waiting', report_instance_id: 89, services: [], service_codes: [], service_details: [] },
-  { id: 3, appointment_id: 'a-3', patient_id: 103, patient_fio: 'Пациент Без Бланка', patient_phone: '', status: 'waiting', report_instance_id: null, services: [], service_codes: [], service_details: [] },
-  { id: 4, appointment_id: 'a-4', patient_id: 103, patient_fio: 'Пациент Без Бланка Повтор', patient_phone: '', status: 'waiting', report_instance_id: null, services: [], service_codes: [], service_details: [] },
+  { id: 'visit:701', appointment_id: 'a-1', visit_id: 701, patient_id: 101, patient_fio: 'Пациент Один', work_date: '2026-09-12', status: 'in_progress', report_instance_id: 88, services: [], service_codes: [], service_details: [] },
+  { id: 'visit:702', appointment_id: 'a-2', visit_id: 702, patient_id: 102, patient_fio: 'Пациент Два', work_date: '2026-09-12', status: 'in_progress', report_instance_id: 89, services: [], service_codes: [], service_details: [] },
+  { id: 'visit:703', appointment_id: 'a-3', visit_id: 703, patient_id: 103, patient_fio: 'Пациент Без Бланка', work_date: '2026-09-13', status: 'pending', report_instance_id: null, services: [], service_codes: [], service_details: [] },
+  { id: 'visit:704', appointment_id: 'a-4', visit_id: 704, patient_id: 103, patient_fio: 'Пациент Без Бланка Повтор', work_date: '2026-09-13', status: 'pending', report_instance_id: null, services: [], service_codes: [], service_details: [] },
 ];
+
+const WORKLIST_ROUTE = '**/api/v1/lab/worklist/search';
+const WORKLIST_PATH = '/api/v1/lab/worklist/search';
+const NEXT_WORKLIST_CURSOR = 'next-worklist-page';
+
+function worklistPage(entries: typeof QUEUE_ENTRIES, total = entries.length, nextCursor: string | null = null) {
+  return {
+    entries,
+    total,
+    counts: { actionable: total, today: 2, overdue: 0, awaiting_specimen: 0, in_review: 0, ready: 0 },
+    next_cursor: nextCursor,
+    date: '2026-09-13',
+    timezone: 'Asia/Tashkent',
+  };
+}
 
 let templateCreatePostCount = 0;
 let reportInstanceCreatePostCount = 0;
@@ -304,12 +322,7 @@ async function installApiMocks(page: Page) {
     body: JSON.stringify(payload),
   });
 
-  await page.route('**/api/v1/lab/queue/today**', (route) => json(route, {
-    entries: QUEUE_ENTRIES,
-    total: QUEUE_ENTRIES.length,
-    date: '2026-09-13',
-    timezone: 'Asia/Tashkent',
-  }));
+  await page.route(WORKLIST_ROUTE, (route) => json(route, worklistPage(QUEUE_ENTRIES)));
   await page.route('**/api/v1/lab/templates/5', async (route) => {
     template5GetCount += 1;
     if (template5GetCount === 1 && template5FirstResponseGate) {
@@ -551,11 +564,9 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // Ждём подтверждения dirty-state (isDirtyRef обновляется в effect).
     await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
 
-    // Возвращаемся в очередь (вкладка скрылась при открытии отчёта).
-    await page.getByRole('tab').first().click();
-
-    // Клик по другому пациенту очереди -> guard-диалог.
-    await page.getByRole('button', { name: /Пациент Два/ }).first().dispatchEvent('click');
+    // На широком экране кликаем по соседнему пациенту, не уходя из редактора.
+    await expect(page.locator('#lab-panel-tabpanel-queue')).toBeVisible();
+    await queuePatientButton(page, 'Пациент Два').click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
 
@@ -576,8 +587,8 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await fieldInput.fill('6.5');
     await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
 
-    await page.getByRole('tab').first().click();
-    await page.getByRole('button', { name: /Пациент Два/ }).first().dispatchEvent('click');
+    await expect(page.locator('#lab-panel-tabpanel-queue')).toBeVisible();
+    await queuePatientButton(page, 'Пациент Два').click();
     // Вложенного guard быть не должно: РОВНО один диалог на переход.
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -587,7 +598,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // Согласованный контекст: пациент Два И его отчёт #89 (не отчёт A).
     await expect.poll(() => instance89GetCount).toBeGreaterThan(0);
     expect(instance88GetCount).toBe(1);
-    await expect(page.getByText('Пациент Два').first()).toBeVisible();
+    await expect(page.locator('#lab-panel-tabpanel-reports').getByRole('heading', { name: 'Пациент Два' })).toBeVisible();
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     // Диалог закрыт, повторного подтверждения нет.
     await expect(dialog).toHaveCount(0);
@@ -601,9 +612,10 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     });
     await page.goto('/lab');
 
-    await queuePatientButton(page, 'Пациент Один').dispatchEvent('click');
+    const queue = page.getByRole('tabpanel', { name: /^Очередь/ });
+    await queue.getByRole('button', { name: /Пациент Один/ }).click();
     await expect.poll(() => instance88GetCount).toBe(1);
-    await queuePatientButton(page, 'Пациент Два').dispatchEvent('click');
+    await queue.getByRole('button', { name: /Пациент Два/ }).click();
 
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     const staleResponse = page.waitForResponse((response) => response.url().includes('/report-instances/88'));
@@ -620,11 +632,20 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     history101ResponseGate = new Promise<void>((resolve) => {
       releaseHistory101Response = resolve;
     });
+    instance88ResponseGate = new Promise<void>((resolve) => {
+      releaseInstance88Response = resolve;
+    });
     await page.goto('/lab');
 
-    await queuePatientButton(page, 'Пациент Один').dispatchEvent('click');
+    const queue = page.getByRole('tabpanel', { name: /^Очередь/ });
+    await queue.getByRole('button', { name: /Пациент Один/ }).click();
+    // Let the appointment start history loading before the report can try to load it.
+    await expect.poll(() => instance88GetCount).toBe(1);
     await expect.poll(() => reportHistoryPatientRequests.includes('101')).toBe(true);
-    await queuePatientButton(page, 'Пациент Два').dispatchEvent('click');
+    releaseInstance88Response?.();
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await page.getByRole('tab', { name: /^Очередь/ }).click();
+    await queue.getByRole('button', { name: /Пациент Два/ }).click();
 
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     const reportsPanel = page.locator('#lab-panel-tabpanel-reports');
@@ -801,9 +822,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
 
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
-    const breadcrumb = page.getByRole('navigation', { name: 'Навигация' });
-    await expect(breadcrumb).toContainText('Пациент Два');
-    await expect(breadcrumb).not.toContainText('Пациент Один');
+    await expect(page.locator('#lab-order-title')).toHaveText('Пациент Два');
     await page.waitForTimeout(300);
     await expect(page.getByText('Отчёт #88')).toHaveCount(0);
     expect(instance88GetCount).toBe(1);
@@ -1644,11 +1663,16 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     });
     await page.goto('/lab');
 
-    await queuePatientButton(page, 'Пациент Один').dispatchEvent('click');
+    const queue = page.getByRole('tabpanel', { name: /^Очередь/ });
+    await queue.getByRole('button', { name: /Пациент Один/ }).click();
     await expect.poll(() => templateResolutionPatientRequests.includes('101')).toBe(true);
-    await queuePatientButton(page, 'Пациент Два').dispatchEvent('click');
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await page.getByRole('tab', { name: /^Очередь/ }).click();
+    await queue.getByRole('button', { name: /Пациент Два/ }).click();
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     await expect.poll(() => templateResolutionPatientRequests.includes('102')).toBe(true);
+    const addReport = page.getByRole('button', { name: 'Добавить бланк' });
+    await expect(addReport).toBeVisible();
     const staleResolutionResponse = page.waitForResponse((response) => {
       if (!response.url().endsWith('/api/v1/lab/template-resolutions/resolve')) return false;
       return String(response.request().postDataJSON()?.patient_id ?? '') === '101';
@@ -1657,7 +1681,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await staleResolutionResponse;
     await waitForReactToSettle(page);
 
-    await page.getByRole('button', { name: 'Добавить бланк' }).click();
+    await addReport.click();
     await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
     expect(lastReportInstanceCreatePayload).toMatchObject({
       patient_id: 102,
@@ -2224,28 +2248,10 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
   // закрывается ТОЛЬКО после нового значения access token с будущим exp;
   // неудача оставляет его открытым с явной ошибкой.
   test('the extend-session button performs a real refresh: failure keeps the warning open, success lands a new token (review round 9)', async ({ page }) => {
-    // Токен внутри 5-минутного порога: предупреждение срабатывает на
-    // mount-проверке опроса. Собирается в рантайме (как installToken в
-    // компонентных тестах) — единый JWT-литерал в исходнике триггерит
-    // secret-сканер CI.
-    const nearExpiryToken = [
-      'eyJhbGciOiJIUzI1NiJ9',
-      Buffer.from(JSON.stringify({
-        sub: '7',
-        role: 'Lab',
-        exp: Math.floor((Date.now() + 4 * 60_000) / 1000),
-      })).toString('base64'),
-      'sig',
-    ].join('.');
-    const freshToken = [
-      'eyJhbGciOiJIUzI1NiJ9',
-      Buffer.from(JSON.stringify({
-        sub: '7',
-        role: 'Lab',
-        exp: Math.floor((Date.now() + 60 * 60_000) / 1000),
-      })).toString('base64'),
-      'sig',
-    ].join('.');
+    // The near-expiry session is already within the warning window on mount.
+    const now = Math.floor(Date.now() / 1000);
+    const nearExpiryToken = mockSessionToken(now + 4 * 60);
+    const freshToken = mockSessionToken(now + 60 * 60);
     await page.addInitScript((token) => {
       window.sessionStorage.setItem('auth_token', token);
       window.sessionStorage.setItem('refresh_token', token);
@@ -2273,6 +2279,16 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await page.waitForTimeout(700);
     const warning = page.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' });
     await expect(warning).toBeVisible();
+    await expect(warning).toHaveAccessibleDescription(/Несохранённые данные могут быть потеряны/);
+    const later = warning.getByRole('button', { name: 'Позже' });
+    const extend = warning.getByRole('button', { name: 'Продлить сессию' });
+    await expect(later).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(extend).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(later).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(warning).toBeVisible();
     const refreshTokenBefore = await page.evaluate(() => window.sessionStorage.getItem('auth_token'));
     expect(refreshTokenBefore).toBe(nearExpiryToken);
 
@@ -2291,6 +2307,48 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect.poll(() => refreshPostCount).toBeGreaterThanOrEqual(2);
     await expect(warning).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('auth_token'))).toBe(freshToken);
+  });
+
+  test('session warning hands focus to the deferred redirect and restores the original control after recovery', async ({ page }) => {
+    await page.routeWebSocket('**/*', (socket) => socket.close());
+    await page.clock.install();
+    reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
+      releaseReportInstanceCreateResponse = resolve;
+    });
+
+    try {
+      await page.goto('/lab');
+      await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+      await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+      await page.getByRole('button', { name: 'Добавить бланк' }).click();
+      await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
+      const reportTab = page.getByRole('tab', { name: /Отчёты/ });
+      await reportTab.focus();
+
+      const expiresAt = await page.evaluate(() => Math.floor((Date.now() + 40_000) / 1000));
+      await page.evaluate((token) => window.sessionStorage.setItem('auth_token', token), mockSessionToken(expiresAt));
+      await page.clock.fastForward(30_000);
+      const warning = page.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' });
+      await expect(warning.getByRole('button', { name: 'Позже' })).toBeFocused();
+
+      await page.clock.fastForward(30_000);
+      const redirect = page.getByRole('alertdialog', { name: 'Переход после завершения операции' });
+      const heading = redirect.getByRole('heading', { name: 'Сессия истекла: завершаем операцию' });
+      await expect(page.getByRole('alertdialog')).toHaveCount(1);
+      await expect(heading).toBeFocused();
+      await page.keyboard.press('Tab');
+      await page.keyboard.press('Escape');
+      await expect(heading).toBeFocused();
+      await expect(redirect).toBeVisible();
+
+      await page.evaluate((token) => window.sessionStorage.setItem('auth_token', token), FAKE_TOKEN);
+      await page.clock.fastForward(30_000);
+      await expect(redirect).toHaveCount(0);
+      await expect(reportTab).toBeFocused();
+    } finally {
+      releaseReportInstanceCreateResponse?.();
+    }
+    await expect(page.getByText('Отчёт #90').first()).toBeVisible();
   });
 
   // PR 3351 (review round 7, P1): report CREATE больше не обходит защиту
@@ -2560,7 +2618,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // Cold deep-link ?instance=88: бланк открывается из URL, загрузка очереди
     // привязывает запись пациента (report_instance_id=88, первая страница) —
     // карточка выбирается, контекст пациента попадает в адрес.
-    const queueLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
+    const queueLoaded = page.waitForResponse((response) => response.url().endsWith(WORKLIST_PATH));
     const instanceLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/report-instances/88'));
     await page.goto('/lab?instance=88');
     await queueLoaded;
@@ -2585,21 +2643,12 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // У записи очереди пациента Один report_instance_id=88 — ДРУГОЙ бланк
     // того же визита 701. Прямого совпадения по id нет: привязка проходит
     // только по visit_id-фолбэку appointmentMatchesInstance (patient+visit).
-    const SIBLING_QUEUE_ENTRIES = [
-      { id: 1, appointment_id: 'a-1', visit_id: 701, patient_id: 101, patient_fio: 'Пациент Один', patient_phone: '', status: 'waiting', report_instance_id: 88, services: [], service_codes: [], service_details: [] },
-      { id: 2, appointment_id: 'a-2', visit_id: 702, patient_id: 102, patient_fio: 'Пациент Два', patient_phone: '', status: 'waiting', report_instance_id: 89, services: [], service_codes: [], service_details: [] },
-    ];
-    await page.route('**/api/v1/lab/queue/today**', (route) => apiJson(route, {
-      entries: SIBLING_QUEUE_ENTRIES,
-      total: SIBLING_QUEUE_ENTRIES.length,
-      date: '2026-09-13',
-      timezone: 'Asia/Tashkent',
-    }));
+    await page.route(WORKLIST_ROUTE, (route) => apiJson(route, worklistPage(QUEUE_ENTRIES.slice(0, 2))));
     // Сиблинг-бланк #91: тот же пациент 101 и тот же визит 701, что и #88.
     const INSTANCE_SIBLING = { ...INSTANCE_A, id: 91 };
     await page.route('**/api/v1/lab/report-instances/91', (route) => apiJson(route, INSTANCE_SIBLING));
 
-    const queueLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
+    const queueLoaded = page.waitForResponse((response) => response.url().endsWith(WORKLIST_PATH));
     const siblingLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/report-instances/91'));
     await page.goto('/lab?instance=91');
     await queueLoaded;
@@ -2622,7 +2671,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // intent /lab (без параметров) освобождает ОБОИХ одновременно; повторная
     // загрузка очереди (возврат на вкладку queue) не должна воскрешать
     // ни привязку, ни resolve-цепочку контекста.
-    const queueLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
+    const queueLoaded = page.waitForResponse((response) => response.url().endsWith(WORKLIST_PATH));
     await page.goto('/lab?instance=88');
     await queueLoaded;
     await expect(page.getByText('Отчёт #88').first()).toBeVisible();
@@ -2634,7 +2683,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // проверяться ПОСЛЕ фактической доставки и применения ответа.
     // waitForRequest доказывает только отправку запроса — ответ мог бы
     // примениться уже после ассертов, и воскрешение осталось бы незамеченным.
-    const queueRefreshed = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
+    const queueRefreshed = page.waitForResponse((response) => response.url().endsWith(WORKLIST_PATH));
     await page.evaluate(() => {
       window.history.pushState({}, '', '/lab');
       window.dispatchEvent(new PopStateEvent('popstate'));
@@ -2661,34 +2710,29 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // странице: до load-more привязки нет; «Показать ещё» догружает страницу
     // 2 — и привязка закрывается отложенно, ровно одним запросом.
     const PAGINATED_QUEUE = Array.from({ length: 60 }, (_, index) => ({
-      id: index + 1,
+      id: `visit:${800 + index}`,
       appointment_id: `a-${index + 1}`,
       visit_id: 800 + index,
       patient_id: index === 55 ? 102 : 200 + index,
       patient_fio: index === 55 ? 'Пациент Два' : `Пациент Заполнитель ${String(index + 1).padStart(2, '0')}`,
-      patient_phone: '',
-      status: 'waiting',
+      work_date: '2026-09-12',
+      status: index === 55 ? 'in_progress' : 'pending',
       report_instance_id: index === 55 ? 89 : null,
       services: [],
       service_codes: [],
       service_details: [],
     }));
     let secondPageRequests = 0;
-    await page.route('**/api/v1/lab/queue/today**', (route) => {
-      const requestUrl = new URL(route.request().url());
-      const limit = Number(requestUrl.searchParams.get('limit') ?? '50');
-      const offset = Number(requestUrl.searchParams.get('offset') ?? '0');
+    await page.route(WORKLIST_ROUTE, (route) => {
+      const { limit = 50, cursor } = route.request().postDataJSON();
+      const offset = cursor === NEXT_WORKLIST_CURSOR ? 50 : 0;
       if (offset > 0) secondPageRequests += 1;
-      return apiJson(route, {
-        entries: PAGINATED_QUEUE.slice(offset, offset + limit),
-        total: PAGINATED_QUEUE.length,
-        date: '2026-09-13',
-        timezone: 'Asia/Tashkent',
-      });
+      return apiJson(route, worklistPage(PAGINATED_QUEUE.slice(offset, offset + limit), PAGINATED_QUEUE.length,
+        offset + limit < PAGINATED_QUEUE.length ? NEXT_WORKLIST_CURSOR : null));
     });
 
     const firstPageLoaded = page.waitForResponse((response) => (
-      response.url().includes('/api/v1/lab/queue/today') && response.url().includes('offset=0')
+      response.url().endsWith(WORKLIST_PATH) && response.request().postDataJSON().cursor == null
     ));
     const instanceLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/report-instances/89'));
     await page.goto('/lab?instance=89');
@@ -2704,17 +2748,19 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // Вкладка очереди: дождаться refresh повторного входа (замещает список)
     // — только затем load-more, без гонки двух ответов.
     const queueRefreshed = page.waitForResponse((response) => (
-      response.url().includes('/api/v1/lab/queue/today') && response.url().includes('offset=0')
+      response.url().endsWith(WORKLIST_PATH) && response.request().postDataJSON().cursor == null
     ));
     await page.getByRole('tab').first().click();
     await queueRefreshed;
-    const loadMoreButton = page.locator('#lab-panel-tabpanel-queue').getByRole('button', { name: /Загрузить ещё записи/ });
+    const queuePanel = page.locator('#lab-panel-tabpanel-queue');
+    await expect(queuePanel.getByRole('button', { name: 'Обновить' })).toBeEnabled();
+    const loadMoreButton = queuePanel.getByRole('button', { name: /Загрузить ещё записи/ });
     await expect(loadMoreButton).toBeVisible();
 
     // Gate: запрос второй страницы; программный клик без scroll-событий —
     // infinite-scroll-обработчик не срабатывает, запрос ровно один.
     const secondPageRequested = page.waitForRequest((request) => (
-      request.url().includes('/api/v1/lab/queue/today') && request.url().includes('offset=50')
+      request.url().endsWith(WORKLIST_PATH) && request.postDataJSON().cursor === NEXT_WORKLIST_CURSOR
     ));
     await loadMoreButton.evaluate((el) => { (el as HTMLElement).click(); });
     await secondPageRequested;

@@ -96,11 +96,11 @@ const FINALIZED_INSTANCE = {
 };
 
 const QUEUE_DRAFT = [
-  { id: 1, appointment_id: 'a-1', patient_id: 101, patient_fio: 'Пациент Один', patient_phone: '', status: 'waiting', report_instance_id: 88, services: [], service_codes: [], service_details: [] },
+  { id: 'visit:701', appointment_id: 1, visit_id: 701, patient_id: 101, patient_fio: 'Пациент Один', work_date: '2026-09-24', status: 'in_progress', report_instance_id: 88, services: [], service_codes: [], service_details: [] },
 ];
 
 const QUEUE_FINALIZED = [
-  { id: 2, appointment_id: 'a-2', patient_id: 101, patient_fio: 'Пациент Финал', patient_phone: '', status: 'waiting', report_instance_id: 89, services: [], service_codes: [], service_details: [] },
+  { id: 'visit:701', appointment_id: 2, visit_id: 701, patient_id: 101, patient_fio: 'Пациент Финал', work_date: '2026-09-25', status: 'ready', report_instance_id: 89, services: [], service_codes: [], service_details: [] },
 ];
 
 function json(route: Route, payload: unknown, headers: Record<string, string> = {}) {
@@ -155,9 +155,11 @@ async function installApiMocks(page: Page) {
   });
 
   await page.route('**/api/v1/setup/status**', (route) => json(route, { initialized: true }));
-  await page.route('**/api/v1/lab/queue/today**', (route) => json(route, {
+  await page.route('**/api/v1/lab/worklist/search', (route) => json(route, {
     entries: QUEUE_DRAFT,
     total: QUEUE_DRAFT.length,
+    counts: { actionable: 1, today: 0, overdue: 0, awaiting_specimen: 0, in_review: 0, ready: 0 },
+    next_cursor: null,
     date: '2026-09-25',
     timezone: 'Asia/Tashkent',
   }));
@@ -260,9 +262,11 @@ test.describe('Lab server-rendered PDF preview (PR8)', () => {
   test('finalized report offers print, not preview', async ({ page }) => {
     // Подменяем очередь на пациента с FINALIZED-бланком (регистрация
     // ПОСЛЕ installApiMocks — последний route обрабатывает запрос).
-    await page.route('**/api/v1/lab/queue/today**', (route) => json(route, {
+    await page.route('**/api/v1/lab/worklist/search', (route) => json(route, {
       entries: QUEUE_FINALIZED,
       total: QUEUE_FINALIZED.length,
+      counts: { actionable: 0, today: 1, overdue: 0, awaiting_specimen: 0, in_review: 0, ready: 1 },
+      next_cursor: null,
       date: '2026-09-25',
       timezone: 'Asia/Tashkent',
     }));

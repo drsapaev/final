@@ -335,57 +335,9 @@ async def get_lab_results_trends(
     """Получить тренды лабораторных результатов пациента"""
     _ensure_doctor_can_read_patient_lab_data(db, patient_id, current_user)
     try:
-        date_from = datetime.now(UTC) - timedelta(days=period_days)
-
-        # Получаем результаты за период
-        results = await emr_lab_integration.get_patient_lab_results(
-            db=db, patient_id=patient_id, date_from=date_from, test_types=[test_type]
+        return await emr_lab_integration.get_lab_result_trend(
+            db=db, patient_id=patient_id, test_type=test_type, period_days=period_days
         )
-
-        # Сортируем по дате
-        results.sort(key=lambda x: x["completed_at"])
-
-        # Формируем тренд
-        trend_data = []
-        for result in results:
-            trend_data.append(
-                {
-                    "date": result["completed_at"].strftime("%Y-%m-%d"),
-                    "value": result["value"],
-                    "unit": result["unit"],
-                    "is_abnormal": result["is_abnormal"],
-                    "normal_range": result["normal_range"],
-                }
-            )
-
-        # Рассчитываем статистику тренда
-        values = [r["value"] for r in results if r["value"] is not None]
-        if values:
-            trend_stats = {
-                "min_value": min(values),
-                "max_value": max(values),
-                "avg_value": sum(values) / len(values),
-                "trend_direction": (
-                    "increasing"
-                    if len(values) > 1 and values[-1] > values[0]
-                    else "decreasing"
-                ),
-                "abnormal_percentage": (
-                    len([r for r in results if r["is_abnormal"]]) / len(results)
-                )
-                * 100,
-            }
-        else:
-            trend_stats = {}
-
-        return {
-            "patient_id": patient_id,
-            "test_type": test_type,
-            "period_days": period_days,
-            "trend_data": trend_data,
-            "trend_stats": trend_stats,
-            "total_measurements": len(trend_data),
-        }
 
     except Exception:
         raise HTTPException(

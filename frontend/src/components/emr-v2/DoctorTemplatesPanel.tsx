@@ -15,12 +15,14 @@ import i18n from '../../i18n';
  * - Stale warning (давно не использовал)
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { History, Pin, Edit2, Trash2, X, Save, Plus } from 'lucide-react';
 import { useDoctorSectionTemplates, SECTION_LABELS } from '../../hooks/useDoctorSectionTemplates';
 import './DoctorTemplatesPanel.css';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import { Button, Input, Modal, Textarea } from '../ui/macos';
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 /** EMRTEMPL-FE-001 (audit 3886 round 23): module-level style constant —
@@ -51,7 +53,7 @@ export function DoctorTemplatesPanel({
 }: {
     section: string;
     icd10Code?: string | null;
-    onApply?: (text: string) => void;
+    onApply?: (text: string, source?: Record<string, unknown>) => void;
     onClose?: () => void;
     isOpen?: boolean;
 }) {
@@ -65,24 +67,51 @@ export function DoctorTemplatesPanel({
         pinTemplate,
         unpinTemplate,
         updateTemplate,
+        reviewTemplate,
         deleteTemplate,
     } = useDoctorSectionTemplates({ section, icd10Code });
 
     // Edit state
     const [editingTemplate, setEditingTemplate] = useState<Record<string, unknown> | null>(null);
     const [editText, setEditText] = useState('');
+    const [editShortcut, setEditShortcut] = useState('');
+    const shortcutValid = /^[\p{L}\p{N}_-]{0,16}$/u.test(editShortcut);
     // EMRTEMPL-FE-001 (audit 3886 round 23): a failed update must keep the
     // dialog open with the typed revision — never silently discard it.
     const [editError, setEditError] = useState('');
     const [editSaving, setEditSaving] = useState(false);
+    const [search, setSearch] = useState('');
+    const [preview, setPreview] = useState<{ item: Record<string, unknown>; text: string }>();
+    const [reviewBusy, setReviewBusy] = useState(false);
+    const [reviewFailed, setReviewFailed] = useState(false);
+    const previewTextarea = useRef<HTMLTextAreaElement>(null);
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
 
     // Handle template click (apply)
-    const handleApply = useCallback((template: Record<string, unknown>) => {
-        onApply?.(template.template_text as string);
+    const handleApply = useCallback((template: Record<string, unknown>, text = String(template.template_text ?? '')) => {
+        if (!template.reviewed_at || !text.trim()) return;
+        onApply?.(text, {
+            source: 'section_template',
+            templateId: String(template.id),
+            templateRevision: Number(template.template_revision),
+        });
+        setPreview(undefined);
         onClose?.();
     }, [onApply, onClose]);
+
+    async function handleReview(template: Record<string, unknown>) {
+        setReviewFailed(false);
+        setReviewBusy(true);
+        try {
+            await reviewTemplate(String(template.id), Number(template.template_revision), !template.reviewed_at);
+            setPreview(undefined);
+        } catch {
+            setReviewFailed(true);
+        } finally {
+            setReviewBusy(false);
+        }
+    }
 
     // Handle pin toggle
     const handlePinToggle = useCallback(async (template: Record<string, unknown>, e: React.MouseEvent<HTMLElement>) => {
@@ -99,30 +128,35 @@ export function DoctorTemplatesPanel({
         e.stopPropagation();
         setEditingTemplate(template);
         setEditText(template.template_text as string);
+        setEditShortcut(String(template.shortcut ?? ''));
         setEditError('');
+        setPreview(undefined);
+        setSearch('');
     }, []);
 
     // Handle edit save
     const handleEditSave = useCallback(async (mode: string) => {
-        if (!editingTemplate || !editText.trim() || editSaving) return;
+        if (!editingTemplate || !editText.trim() || editSaving || !shortcutValid) return;
         setEditSaving(true);
         setEditError('');
         const result = await updateTemplate(
             String((editingTemplate as { id: string | number }).id),
             editText,
             mode as 'replace' | 'save_as_new',
-        ) as { success?: boolean; error?: string } | undefined;
+            editShortcut,
+            typeof editingTemplate.template_revision === 'number' ? editingTemplate.template_revision : undefined,
+        );
         setEditSaving(false);
         // EMRTEMPL-FE-001: a FAILED update must NOT close the dialog or
         // discard the typed revision — surface the failure and let the
         // doctor retry or cancel explicitly.
         if (!result?.success) {
-            setEditError(result?.error || t18('misc.dtp_edit_save_failed'));
+            setEditError(result?.status === 409 ? t('emr_workspace.conflict') : result?.error || t18('misc.dtp_edit_save_failed'));
             return;
         }
         setEditingTemplate(null);
         setEditText('');
-    }, [editingTemplate, editText, editSaving, updateTemplate]);
+    }, [editingTemplate, editText, editShortcut, editSaving, shortcutValid, t, updateTemplate]);
 
     // Handle delete
     const handleDelete = useCallback(async (template: Record<string, unknown>, e: React.MouseEvent<HTMLElement>) => {
@@ -146,15 +180,24 @@ export function DoctorTemplatesPanel({
         setEditingTemplate(null);
         setEditText('');
         setEditError('');
+        setPreview(undefined);
+        setSearch('');
         onClose?.();
     }, [onClose]);
 
-    if (!isOpen) return null;
+    if (!isOpen || typeof document === 'undefined') return null;
 
     const sectionLabel = (SECTION_LABELS as Record<string, string>)[section] || section;
     const backdropStyle = { border: 'none', margin: 0, padding: 0 };
+    const query = search.trim().toLocaleLowerCase();
+    const visibleTemplates = templates.filter((template: unknown) => {
+        const item = template as Record<string, unknown>;
+        return [item.shortcut, item.template_text].some(value =>
+            String(value ?? '').toLocaleLowerCase().includes(query),
+        );
+    });
 
-    return (
+    return createPortal(
         <div className="doctor-templates-overlay">
             {/* Backdrop */}
             <button
@@ -215,13 +258,16 @@ export function DoctorTemplatesPanel({
                                     ? t18('misc.dtp_dlya_diagnoza_icd10code', { icd10Code: icd10Code })
                                     : t18('misc.dtp_dlya_etoy_sektsii')}
                             </small>
-                            <small style={{ marginTop: 'var(--mac-spacing-2)', opacity: 0.7 }}>
-                                Шаблоны создаются автоматически при подписании EMR
-                            </small>
+                            <small>{t('emr_workspace.template_learned')}</small>
                         </div>
                     ) : (
                         <div className="doctor-templates-list">
-                            {templates.map((template: unknown) => {
+                            <label className="emr-workspace-field">{t('emr_workspace.template_search')}
+                                <Input aria-label={t('emr_workspace.template_search')} value={search}
+                                    onChange={event => setSearch(event.target.value)} />
+                            </label>
+                            {visibleTemplates.length === 0 && <p>{t('emr_workspace.no_entries')}</p>}
+                            {visibleTemplates.map((template: unknown) => {
                                 const tmpl = template as Record<string, unknown>;
                                 return (
                                 <div
@@ -263,7 +309,10 @@ export function DoctorTemplatesPanel({
                                     <button
                                         type="button"
                                         className="doctor-templates-item-content"
-                                        onClick={() => handleApply(tmpl)}
+                                        onClick={() => {
+                                            setReviewFailed(false);
+                                            setPreview({ item: tmpl, text: String(tmpl.template_text ?? '') });
+                                        }}
                                     >
                                         <div className="doctor-templates-item-text">
                                             {(tmpl.template_text as string).substring(0, 200)}
@@ -272,6 +321,10 @@ export function DoctorTemplatesPanel({
 
                                         {/* Badges */}
                                         <div className="doctor-templates-item-badges">
+                                            {Boolean(tmpl.shortcut) && <code className="doctor-templates-badge">{String(tmpl.shortcut)}</code>}
+                                            <span className="doctor-templates-badge">
+                                                {t(tmpl.reviewed_at ? 'emr_workspace.template_reviewed' : 'emr_workspace.template_needs_review')}
+                                            </span>
                                             {Boolean(tmpl.is_stale) && (
                                                 <span className="doctor-templates-badge doctor-templates-badge--stale">
                                                     Давно не использовал
@@ -289,12 +342,42 @@ export function DoctorTemplatesPanel({
                                             )}
                                         </div>
                                     </button>
+                                    {Boolean(tmpl.reviewed_at) && String(tmpl.template_text).length <= 100
+                                      && !/[\n\r]|\{\{/.test(String(tmpl.template_text)) && (
+                                        <Button type="button" size="small" variant="outline" onClick={() => handleApply(tmpl)}>
+                                            {t('emr_workspace.template_quick_insert')}
+                                        </Button>
+                                    )}
                                 </div>
                                 );
                             })}
                         </div>
                     )}
                 </div>
+
+                {preview && <Modal isOpen onClose={() => setPreview(undefined)} size="large"
+                    title={t('emr_workspace.template_preview')} actions={<>
+                        <Button type="button" size="small" variant="ghost" onClick={() => setPreview(undefined)}>{t('misc.cancel')}</Button>
+                        <Button type="button" size="small" variant="outline" disabled={reviewBusy}
+                            onClick={() => void handleReview(preview.item)}>
+                            {t(preview.item.reviewed_at ? 'emr_workspace.template_revoke' : 'emr_workspace.template_approve')}
+                        </Button>
+                        {Boolean(preview.item.reviewed_at) && <Button type="button" size="small"
+                            disabled={!preview.text.trim() || /\{\{[^}]*\}\}/.test(preview.text)} onClick={() => {
+                                const field = previewTextarea.current;
+                                const selection = field && field.selectionStart !== field.selectionEnd
+                                    ? preview.text.slice(field.selectionStart, field.selectionEnd) : preview.text;
+                                handleApply(preview.item, selection);
+                            }}>{t('emr_workspace.template_insert')}</Button>}
+                    </>}>
+                    <label className="emr-workspace-field">{t('emr_workspace.template_text')}
+                        <Textarea ref={previewTextarea} aria-label={t('emr_workspace.template_text')}
+                            rows={9} value={preview.text} readOnly={!preview.item.reviewed_at}
+                            onChange={event => setPreview({ ...preview, text: event.target.value })} />
+                    </label>
+                    <p>{t(preview.item.reviewed_at ? 'emr_workspace.template_select_help' : 'emr_workspace.template_review_help')}</p>
+                    {reviewFailed && <p role="alert">{t('emr_workspace.save_error')}</p>}
+                </Modal>}
 
                 {/* Edit Modal */}
                 {editingTemplate && (
@@ -312,6 +395,12 @@ export function DoctorTemplatesPanel({
                                 rows={6}
                                 autoFocus
                             />
+                            <label className="emr-workspace-field">
+                                {t('emr_workspace.template_shortcut')}
+                                <Input value={editShortcut} maxLength={16} aria-invalid={!shortcutValid}
+                                    onChange={event => setEditShortcut(event.target.value)} />
+                            </label>
+                            {!shortcutValid && <p role="alert">{t('emr_workspace.template_shortcut_format')}</p>}
                             {editError && (
                                 <div role="alert" style={EDIT_ERROR_STYLE}>
                                     {editError}
@@ -328,7 +417,7 @@ export function DoctorTemplatesPanel({
                                 <button
                                     type="button"
                                     className="doctor-templates-edit-btn doctor-templates-edit-btn--primary"
-                                    disabled={editSaving}
+                                    disabled={editSaving || !shortcutValid}
                                     onClick={() => handleEditSave('replace')}
                                     title={t18('misc.dtp_obnovit_suschestvuyuschiy_sh')}
                                 >
@@ -338,7 +427,7 @@ export function DoctorTemplatesPanel({
                                 <button
                                     type="button"
                                     className="doctor-templates-edit-btn doctor-templates-edit-btn--success"
-                                    disabled={editSaving}
+                                    disabled={editSaving || !shortcutValid}
                                     onClick={() => handleEditSave('save_as_new')}
                                     title={t18('misc.dtp_sozdat_novyy_shablon_s_izmen')}
                                 >
@@ -357,7 +446,8 @@ export function DoctorTemplatesPanel({
             </div>
             {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
             {confirmDialog}
-        </div>
+        </div>,
+        document.body,
     );
 }
 

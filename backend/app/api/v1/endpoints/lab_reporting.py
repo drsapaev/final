@@ -2,14 +2,23 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import AwareDatetime
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_db, require_active_roles, require_roles
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, is_doctor_role_spelling
 from app.models.clinic import Doctor
 from app.models.lab import FINAL_INSTANCE_STATUSES
 from app.models.visit import Visit
+from app.schemas.lab_release import (
+    LabReportQCIn,
+    LabReportReasonCommand,
+    LabReportReturnCommand,
+    LabReportVersionCommand,
+)
 from app.schemas.lab_reporting import (
     LabCatalogAnalyteOut,
     LabCatalogReferenceRangeOut,
@@ -17,6 +26,7 @@ from app.schemas.lab_reporting import (
     LabCriticalFindingOut,
     LabOrderSummaryOut,
     LabReportBulkSaveResponse,
+    LabReportCreationLookupIn,
     LabReportInstanceCreate,
     LabReportInstanceOut,
     LabReportInstanceSummaryOut,
@@ -34,13 +44,20 @@ from app.schemas.lab_reporting import (
     LabTemplateResolutionIn,
     LabTemplateResolutionOut,
 )
+from app.schemas.lab_worklist import LabOrderPriority
+from app.services.lab_report_pdf._context import build_report_pdf_context
 from app.services.lab_report_pdf_service import lab_report_pdf_service
+from app.services.lab_reporting._workflow import MANUAL_REVIEW_HOLDS
 from app.services.lab_reporting_service import (
     LabReportingDomainError,
     LabReportingService,
 )
 
 router = APIRouter(prefix="/lab", tags=["lab-reporting"])
+
+require_lab_workspace_staff = require_active_roles(
+    "Admin", "Lab", *DOCTOR_FAMILY_GATE_ROLES
+)
 
 
 def _handle_domain_error(exc: LabReportingDomainError) -> None:
@@ -91,11 +108,14 @@ def _ensure_doctor_can_read_lab_instance(db: Session, instance, current_user) ->
     """
     if getattr(current_user, "is_superuser", False):
         return
-    if getattr(current_user, "role", None) in ("Admin", "Lab"):
+    role = (getattr(current_user, "role", None) or "").strip().casefold()
+    if role in {"admin", "lab"}:
         return
     if not instance.visit_id:
         raise HTTPException(status_code=403, detail="Access denied")
     _doctor_allowed_visit_ids(db, current_user, requested_visit_ids=[instance.visit_id])
+    if instance.managed_release and instance.status not in FINAL_INSTANCE_STATUSES:
+        raise HTTPException(status_code=404, detail="Lab report instance not found")
 
 
 def _template_summary_out(template) -> LabReportTemplateSummaryOut:
@@ -166,10 +186,25 @@ def _template_out(service: LabReportingService, template) -> LabReportTemplateOu
     )
 
 
-def _instance_out(service: LabReportingService, instance) -> LabReportInstanceOut:
+def _instance_out(
+    service: LabReportingService, instance, actor_user_id: int | None = None,
+) -> LabReportInstanceOut:
     sections = service.materialize_instance(instance)
     critical_findings = service.summarize_critical_findings(sections)
-    available_actions = service.instance_available_actions(instance)
+    available_actions = service.instance_available_actions(instance, actor_user_id)
+    release_holds = service.report_release_holds(instance)
+    if (
+        actor_user_id is not None
+        and instance.clinical_configuration_version_id is None
+        and instance.status not in FINAL_INSTANCE_STATUSES
+        and "clinical_configuration_required" not in release_holds
+    ):
+        release_holds.append("clinical_configuration_required")
+    if release_holds:
+        blocked_actions = {"finalize"}
+        if any(hold not in MANUAL_REVIEW_HOLDS for hold in release_holds):
+            blocked_actions.update({"review", "submit_review"})
+        available_actions = [action for action in available_actions if action not in blocked_actions]
     return LabReportInstanceOut(
         id=instance.id,
         order_id=instance.order_id,
@@ -178,6 +213,9 @@ def _instance_out(service: LabReportingService, instance) -> LabReportInstanceOu
         template_id=instance.template_id,
         template_version_id=instance.template_version_id,
         status=instance.status,
+        managed_release=instance.managed_release,
+        workflow_events=service.workflow_history(instance.id),
+        release_holds=release_holds,
         patient_snapshot=instance.patient_snapshot or {},
         branding_snapshot=instance.branding_snapshot or {},
         signer_snapshot=instance.signer_snapshot or {},
@@ -206,16 +244,26 @@ def _instance_out(service: LabReportingService, instance) -> LabReportInstanceOu
             LabCriticalFindingOut(**finding) for finding in critical_findings
         ],
         available_actions=available_actions,
-        **service.instance_action_flags(instance),
+        **service.instance_action_flags(instance, available_actions=available_actions),
     )
 
 
 def _instance_summary_out(
-    service: LabReportingService, instance
+    service: LabReportingService, instance, actor_user_id: int | None = None,
 ) -> LabReportInstanceSummaryOut:
     sections = service.materialize_instance(instance)
     severity_metrics = service.summarize_instance_severity(sections)
-    available_actions = service.instance_available_actions(instance)
+    available_actions = service.instance_available_actions(instance, actor_user_id)
+    if (
+        actor_user_id is not None
+        and instance.clinical_configuration_version_id is None
+        and instance.status not in FINAL_INSTANCE_STATUSES
+    ):
+        available_actions = [
+            action
+            for action in available_actions
+            if action not in {"finalize", "review", "submit_review"}
+        ]
     return LabReportInstanceSummaryOut(
         id=instance.id,
         patient_id=instance.patient_id,
@@ -223,6 +271,8 @@ def _instance_summary_out(
         template_id=instance.template_id,
         template_version_id=instance.template_version_id,
         status=instance.status,
+        managed_release=instance.managed_release,
+        supersedes_instance_id=instance.supersedes_instance_id,
         created_at=instance.created_at,
         finalized_at=instance.finalized_at,
         printed_at=instance.printed_at,
@@ -232,7 +282,7 @@ def _instance_summary_out(
         critical_findings_count=severity_metrics["critical_findings_count"],
         max_flag_severity=severity_metrics["max_flag_severity"],
         available_actions=available_actions,
-        **service.instance_action_flags(instance),
+        **service.instance_action_flags(instance, available_actions=available_actions),
     )
 
 
@@ -399,7 +449,7 @@ analyte_code: str | None = Query(default=None, max_length=64),
 def list_lab_templates(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
     offset: int = Query(default=0, ge=0, description="Смещение"),
 db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab", "Doctor")),
+    user=Depends(require_lab_workspace_staff),
 ):
     service = LabReportingService(db)
     return [_template_summary_out(template) for template in service.list_templates()]
@@ -556,13 +606,14 @@ def list_lab_report_instances(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab", "Doctor")),
+    user=Depends(require_lab_workspace_staff),
 ):
     service = LabReportingService(db)
     scoped_visit_ids = visit_ids
-    if getattr(user, "role", None) == "Doctor" and not getattr(
+    restrict_doctor_access = is_doctor_role_spelling(user.role) and not getattr(
         user, "is_superuser", False
-    ):
+    )
+    if restrict_doctor_access:
         scoped_visit_ids = _doctor_allowed_visit_ids(
             db,
             user,
@@ -571,13 +622,14 @@ def list_lab_report_instances(
         if not scoped_visit_ids:
             return []
     return [
-        _instance_summary_out(service, instance)
+        _instance_summary_out(service, instance, user.id)
         for instance in service.list_instances(
             patient_id=patient_id,
             visit_ids=scoped_visit_ids,
             status=status,
             limit=limit,
             offset=offset,
+            hide_managed_drafts=restrict_doctor_access,
         )
     ]
 
@@ -585,16 +637,49 @@ def list_lab_report_instances(
 @router.post("/report-instances", response_model=LabReportInstanceOut)
 def create_lab_report_instance(
     payload: LabReportInstanceCreate,
+    request: Request,
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab")),
 ):
     service = LabReportingService(db)
     try:
         actor_name = getattr(user, "full_name", None) or getattr(user, "username", None)
+        idempotency_key = request.headers.get("Idempotency-Key") or None
         return _instance_out(
             service,
-            service.create_instance(payload.model_dump(), actor_name=actor_name),
+            service.create_instance(
+                payload.model_dump(exclude_unset=idempotency_key is not None),
+                actor_name=actor_name, actor_user_id=user.id, idempotency_key=idempotency_key,
+            ),
+            user.id,
         )
+    except LabReportingDomainError as exc:
+        _handle_domain_error(exc)
+
+
+@router.post(
+    "/report-instances/creation-result",
+    response_model=LabReportInstanceOut,
+    responses={
+        404: {"description": "No committed report for this actor and key"},
+        409: {"description": "The key is bound to a different creation request"},
+    },
+)
+def get_lab_report_creation_result(
+    payload: LabReportCreationLookupIn,
+    response: Response,
+    db: Session = Depends(get_db),
+    user=Depends(require_active_roles("Admin", "Lab")),
+):
+    """Read a committed creation using the original request after a lost response."""
+    service = LabReportingService(db)
+    try:
+        instance = service.reconcile_created_instance(
+            payload.request.model_dump(exclude_unset=True),
+            actor_user_id=user.id, idempotency_key=payload.idempotency_key,
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return _instance_out(service, instance, user.id)
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -609,7 +694,7 @@ def get_lab_report_instance(
     try:
         instance = service.get_instance(instance_id)
         _ensure_doctor_can_read_lab_instance(db, instance, user)
-        return _instance_out(service, instance)
+        return _instance_out(service, instance, user.id)
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -620,14 +705,22 @@ def update_lab_report_instance(
     payload: LabReportInstanceUpdate,
     # WF-06 fix: optimistic locking — frontend передаёт updated_at последнего чтения
     expected_updated_at: str | None = Query(default=None, alias="expected_updated_at"),
+    draft_request_id: UUID | None = Query(default=None, description="UUID for retrying the same draft save."),
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab")),
 ):
     service = LabReportingService(db)
     try:
-        return _instance_out(service, service.update_instance(
-            instance_id, payload.model_dump(), expected_updated_at=expected_updated_at
-        ))
+        instance = service.update_instance(
+            instance_id, payload.model_dump(exclude_unset=True),
+            expected_updated_at=expected_updated_at, actor_user_id=user.id,
+            draft_request_id=draft_request_id, commit=draft_request_id is None,
+        )
+        result = _instance_out(service, instance, user.id)
+        if draft_request_id is not None:
+            # Capture this write's own version while the draft lock still holds.
+            db.commit()
+        return result
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -638,6 +731,7 @@ def bulk_save_lab_report_values(
     payload: list[LabReportValueIn],
     # WF-06 fix: optimistic locking — frontend передаёт updated_at последнего чтения
     expected_updated_at: str | None = Query(default=None, alias="expected_updated_at"),
+    draft_request_id: UUID | None = Query(default=None, description="UUID for retrying the same draft save."),
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab")),
 ):
@@ -647,30 +741,102 @@ def bulk_save_lab_report_values(
             instance_id,
             [item.model_dump(mode="json") for item in payload],
             expected_updated_at=expected_updated_at,
+            actor_user_id=user.id,
+            draft_request_id=draft_request_id, commit=draft_request_id is None,
         )
-        return LabReportBulkSaveResponse(
-            instance=_instance_out(service, instance),
+        result = LabReportBulkSaveResponse(
+            instance=_instance_out(service, instance, user.id),
             updated_field_keys=[item.field_key for item in updated],
         )
+        if draft_request_id is not None:
+            db.commit()
+        return result
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
 
-# L-2 fix: /report-instances/{instance_id}/mark-ready endpoint removed.
-# WF-round5: Mark Ready was a functionally empty operation — backend allowed
-# the same actions for DRAFT/IN_PROGRESS/READY statuses, so the frontend
-# stopped calling this endpoint. The implementation was dead code.
+@router.post("/report-instances/{instance_id}/submit-review", response_model=LabReportInstanceOut)
+def submit_lab_report_for_review(
+    instance_id: int,
+    command: LabReportVersionCommand,
+    db: Session = Depends(get_db),
+    user=Depends(require_active_roles("Admin", "Lab")),
+):
+    service = LabReportingService(db)
+    try:
+        instance = service.submit_for_review(
+            instance_id, actor_user_id=user.id, expected_updated_at=command.expected_updated_at,
+        )
+        return _instance_out(service, instance, user.id)
+    except LabReportingDomainError as exc:
+        _handle_domain_error(exc)
+
+
+@router.post("/report-instances/{instance_id}/review", response_model=LabReportInstanceOut)
+def review_lab_report(
+    instance_id: int,
+    command: LabReportReasonCommand | LabReportVersionCommand,
+    db: Session = Depends(get_db),
+    user=Depends(require_active_roles("Admin", "Lab")),
+):
+    service = LabReportingService(db)
+    try:
+        instance = service.review_report(
+            instance_id, actor_user_id=user.id, expected_updated_at=command.expected_updated_at,
+            reason=command.reason if isinstance(command, LabReportReasonCommand) else None,
+        )
+        return _instance_out(service, instance, user.id)
+    except LabReportingDomainError as exc:
+        _handle_domain_error(exc)
+
+
+@router.post("/report-instances/{instance_id}/return-to-draft", response_model=LabReportInstanceOut)
+def return_lab_report_to_draft(
+    instance_id: int,
+    command: LabReportReturnCommand,
+    db: Session = Depends(get_db),
+    user=Depends(require_active_roles("Admin", "Lab")),
+):
+    service = LabReportingService(db)
+    try:
+        instance = service.return_report_to_draft(
+            instance_id, actor_user_id=user.id, expected_updated_at=command.expected_updated_at,
+            reason=command.reason, unusual_change=command.unusual_change,
+        )
+        return _instance_out(service, instance, user.id)
+    except LabReportingDomainError as exc:
+        _handle_domain_error(exc)
+
+
+@router.post("/report-instances/{instance_id}/qc", response_model=LabReportInstanceOut)
+def record_lab_report_qc(
+    instance_id: int,
+    command: LabReportQCIn,
+    db: Session = Depends(get_db),
+    user=Depends(require_active_roles("Admin", "Lab")),
+):
+    service = LabReportingService(db)
+    try:
+        instance = service.record_report_qc(instance_id, actor_user_id=user.id, command=command)
+        return _instance_out(service, instance, user.id)
+    except LabReportingDomainError as exc:
+        _handle_domain_error(exc)
 
 
 @router.post("/report-instances/{instance_id}/finalize", response_model=LabReportInstanceOut)
 def finalize_lab_report(
     instance_id: int,
+    command: LabReportVersionCommand | None = None,
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab")),
+    user=Depends(require_active_roles("Admin", "Lab")),
 ):
     service = LabReportingService(db)
     try:
-        return _instance_out(service, service.finalize(instance_id))
+        instance = service.finalize(
+            instance_id, actor_user_id=user.id,
+            expected_updated_at=command.expected_updated_at if command else None,
+        )
+        return _instance_out(service, instance, user.id)
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -678,12 +844,18 @@ def finalize_lab_report(
 @router.post("/report-instances/{instance_id}/revise", response_model=LabReportInstanceOut)
 def revise_lab_report(
     instance_id: int,
+    command: LabReportReasonCommand | None = None,
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab")),
+    user=Depends(require_active_roles("Admin", "Lab")),
 ):
     service = LabReportingService(db)
     try:
-        return _instance_out(service, service.revise(instance_id))
+        instance = service.revise(
+            instance_id, actor_user_id=user.id,
+            expected_updated_at=command.expected_updated_at if command else None,
+            reason=command.reason if command else None,
+        )
+        return _instance_out(service, instance, user.id)
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -696,7 +868,7 @@ def mark_lab_report_printed(
 ):
     service = LabReportingService(db)
     try:
-        return _instance_out(service, service.mark_printed(instance_id))
+        return _instance_out(service, service.mark_printed(instance_id), user.id)
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -705,7 +877,7 @@ def mark_lab_report_printed(
 def download_lab_report_pdf(
     instance_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab", "Doctor")),
+    user=Depends(require_lab_workspace_staff),
 ):
     service = LabReportingService(db)
     try:
@@ -713,29 +885,17 @@ def download_lab_report_pdf(
         _ensure_doctor_can_read_lab_instance(db, instance, user)
         if instance.status not in {"FINALIZED", "PRINTED"}:
             raise LabReportingDomainError(409, "Only finalized reports can be exported to PDF")
-        materialized_sections = service.materialize_instance(instance)
-        critical_findings = service.summarize_critical_findings(materialized_sections)
         pdf_bytes = lab_report_pdf_service.render_report(
-            {
-                "template_name": instance.template.name,
-                "layout_preset": instance.template_version.layout_preset,
-                "page_settings": instance.template_version.page_settings or {},
-                "branding": instance.branding_snapshot or {},
-                "patient": instance.patient_snapshot or {},
-                "signers": instance.signer_snapshot or {},
-                "sections": materialized_sections,
-                "critical_findings": critical_findings,
-                "footer_notes": instance.template_version.footer_notes,
-                "report_date": (
-                    instance.finalized_at or instance.created_at or datetime.now(UTC)
-                ).strftime("%d.%m.%Y"),
-            }
+            build_report_pdf_context(service, instance)
         )
         filename = f"lab-report-{instance.id}.pdf"
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": f'inline; filename="{filename}"'},
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"',
+                "Cache-Control": "private, no-store",
+            },
         )
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
@@ -764,27 +924,8 @@ def preview_lab_report_instance_pdf(
     service = LabReportingService(db)
     try:
         instance = service.get_instance(instance_id)
-        watermark_text = (
-            "Черновик" if instance.status not in FINAL_INSTANCE_STATUSES else None
-        )
-        materialized_sections = service.materialize_instance(instance)
-        critical_findings = service.summarize_critical_findings(materialized_sections)
         pdf_bytes = lab_report_pdf_service.render_report(
-            {
-                "template_name": instance.template.name,
-                "layout_preset": instance.template_version.layout_preset,
-                "page_settings": instance.template_version.page_settings or {},
-                "branding": instance.branding_snapshot or {},
-                "patient": instance.patient_snapshot or {},
-                "signers": instance.signer_snapshot or {},
-                "sections": materialized_sections,
-                "critical_findings": critical_findings,
-                "footer_notes": instance.template_version.footer_notes,
-                "report_date": (
-                    instance.finalized_at or instance.created_at or datetime.now(UTC)
-                ).strftime("%d.%m.%Y"),
-                "watermark_text": watermark_text,
-            }
+            build_report_pdf_context(service, instance, preview=True)
         )
         filename = f"lab-report-{instance.id}-preview.pdf"
         return Response(
@@ -867,6 +1008,8 @@ class LabOrderCreate(PydBaseModel):
     patient_id: int
     visit_id: int | None = None
     notes: str | None = None
+    due_at: AwareDatetime | None = None
+    priority: LabOrderPriority | None = None
 
 
 class LabOrderResponse(PydBaseModel):
@@ -883,7 +1026,7 @@ class LabOrderResponse(PydBaseModel):
 def create_lab_order(
     payload: LabOrderCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Doctor", "Lab")),
+    user=Depends(require_lab_workspace_staff),
 ):
     """
     Create a lab order from a doctor panel.
@@ -898,12 +1041,28 @@ def create_lab_order(
         if not template:
             raise HTTPException(status_code=404, detail="Шаблон не найден")
 
-        if user.role not in ("Admin", "Lab") and payload.visit_id:
-            visit = db.query(Visit).filter(Visit.id == payload.visit_id).first()
+        if is_doctor_role_spelling(user.role):
+            if payload.visit_id is None:
+                raise HTTPException(
+                    status_code=422, detail="Для назначения анализа требуется визит"
+                )
+            doctor = (
+                db.query(Doctor)
+                .filter(Doctor.user_id == user.id, Doctor.active.is_(True))
+                .first()
+            )
+            if not doctor:
+                raise HTTPException(status_code=403, detail="Нет доступа к этому визиту")
+            visit = (
+                db.query(Visit)
+                .filter(Visit.id == payload.visit_id)
+                .populate_existing()
+                .with_for_update(of=Visit)
+                .one_or_none()
+            )
             if not visit:
                 raise HTTPException(status_code=404, detail="Визит не найден")
-            doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
-            if doctor and visit.doctor_id != doctor.id:
+            if visit.doctor_id != doctor.id:
                 raise HTTPException(status_code=403, detail="Нет доступа к этому визиту")
 
         # LabReportTemplate has no stored published_version_id attribute;
@@ -927,6 +1086,8 @@ def create_lab_order(
             "patient_id": payload.patient_id,
             "visit_id": payload.visit_id,
             "notes": payload.notes or f"Заказан врачом: {actor_name}",
+            "order_due_at": payload.due_at,
+            "order_priority": payload.priority,
         }
         instance = service.create_instance(create_data, actor_name=actor_name)
 

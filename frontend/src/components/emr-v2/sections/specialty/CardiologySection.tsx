@@ -25,6 +25,9 @@ import type { EMRTextFieldChangeEvent } from '../EMRTextField';
 import './CardiologySection.css';
 import { Heart, FileText } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
+import { echoAdultTteFacts, selectEchoMeasurements } from '@/utils/echoMeasurements';
+import { Button } from '../../../ui/macos';
+import { AdultTteSummary } from '../../workspace/AdultTteSummary';
 
 /**
  * CardiologySection Component
@@ -44,6 +47,7 @@ interface CardiologySectionProps {
   disabled?: boolean;
   visitId?: string | number | null | undefined;
   patientId?: string | number | null | undefined;
+  onOpenStudy?: (study: 'ecg' | 'echo') => void;
 }
 
 
@@ -53,10 +57,15 @@ export function CardiologySection({
   labResults: labResultsRaw = {},
   onChange,
   disabled = false,
+  onOpenStudy,
 }: CardiologySectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
   const ecgData = ecgDataRaw as Record<string, any>;
-  const echoData = echoDataRaw as Record<string, any>;
+  const echoData = selectEchoMeasurements(echoDataRaw);
+  const adultTteFacts = echoAdultTteFacts(echoDataRaw);
+  const hasLegacyEchoMeasurements = Boolean(
+    echoData.edd || echoData.esd || echoData.ef || echoData.la || echoData.aorticPeakVelocity,
+  );
   const labResults = labResultsRaw as Record<string, any>;
   const [activeTab, setActiveTab] = useState('ecg'); // 'ecg' | 'echo' | 'labs' | 'risk'
 
@@ -122,6 +131,8 @@ export function CardiologySection({
                                 <p>
                                     {t('misc.cs_ecg_separate_tab_desc')}
                                 </p>
+                                {onOpenStudy && <Button type="button" size="small" variant="outline"
+                                    onClick={() => onOpenStudy('ecg')}>{t('emr_workspace.open_ecg')}</Button>}
                             </div>
                         </div>
 
@@ -172,14 +183,19 @@ export function CardiologySection({
                                 <p>
                                     {t('misc.cs_echo_separate_tab_desc')}
                                 </p>
+                                {onOpenStudy && <Button type="button" size="small" variant="outline"
+                                    onClick={() => onOpenStudy('echo')}>{t('emr_workspace.open_echo')}</Button>}
                             </div>
                         </div>
 
                     {/* Summary of the latest Echo data stored in specialty_data.echo */}
-                    {(echoData?.ef || echoData?.edd || echoData?.la || echoData?.conclusion) &&
+                    {(adultTteFacts.length > 0 || hasLegacyEchoMeasurements || echoData.conclusion) &&
         <div className="cardiology-interpretation">
                             <h4>{t('misc.cs_latest_echo')}</h4>
-                            <div className="cardiology-ecg-summary">
+                            <AdultTteSummary facts={adultTteFacts} />
+                            {adultTteFacts.length > 0 && hasLegacyEchoMeasurements &&
+                              <p><strong>{t('emr_workspace.echo_legacy_measurements')}</strong></p>}
+                            {hasLegacyEchoMeasurements && <div className="cardiology-ecg-summary">
                                 {echoData?.edd &&
                                     <div><strong>{t('misc.cs_edd_lv')}</strong> {echoData.edd} {t('misc.cs_unit_mm')}</div>
                                 }
@@ -192,10 +208,10 @@ export function CardiologySection({
                                 {echoData?.la &&
                                     <div><strong>{t('misc.cs_la')}</strong> {echoData.la} {t('misc.cs_unit_mm')}</div>
                                 }
-                                {echoData?.aortic?.peak_velocity &&
-                                    <div><strong>{t('misc.cs_vmax_av')}</strong> {echoData.aortic.peak_velocity} {t('misc.cs_unit_ms2')}</div>
+                                {echoData.aorticPeakVelocity &&
+                                    <div><strong>{t('misc.cs_vmax_av')}</strong> {echoData.aorticPeakVelocity} {t('misc.cs_unit_ms2')}</div>
                                 }
-                            </div>
+                            </div>}
                             {echoData?.conclusion &&
                                 <p className="cardiology-ecg-interpretation">
                                     <em>{t('misc.cs_conclusion')}</em> {echoData.conclusion}

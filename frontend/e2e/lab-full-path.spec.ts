@@ -99,16 +99,15 @@ const TEMPLATE_DETAIL = {
   versions: [TEMPLATE_VERSION],
 };
 
-// Очередь: пациент без бланка (report_instance_id=null) — стартовая точка
-// пути «создать». appointment a-3 (тот же идентификатор, что в
-// lab-dirty-guard.spec.ts для этого пациента).
+// Незавершённое исследование прошлого дня без отчёта.
 const QUEUE_ENTRY = {
-  id: 3,
-  appointment_id: 'a-3',
+  id: 'visit:703',
+  appointment_id: 3,
+  visit_id: 703,
   patient_id: 103,
   patient_fio: 'Пациент Без Бланка',
-  patient_phone: '',
-  status: 'waiting',
+  work_date: '2026-09-25',
+  status: 'pending',
   report_instance_id: null,
   services: [],
   service_codes: [],
@@ -253,6 +252,7 @@ const printLabResultsBodies: Array<Record<string, unknown>> = [];
 let pdfGetCount = 0;
 let markPrintedPostCount = 0;
 let revisePostCount = 0;
+let revisePayload: Record<string, unknown> | null = null;
 let historyPatientRequests: string[] = [];
 
 function instanceById(id: number) {
@@ -301,7 +301,7 @@ async function installApiMocks(page: Page) {
 
   // Очередь: после создания бланка точка входа пациента ссылается на него
   // (queue refresh после finalize/print получает консистентный read-model).
-  await page.route('**/api/v1/lab/queue/today**', (route) => json(route, {
+  await page.route('**/api/v1/lab/worklist/search', (route) => json(route, {
     entries: [
       {
         ...QUEUE_ENTRY,
@@ -309,6 +309,8 @@ async function installApiMocks(page: Page) {
       },
     ],
     total: 1,
+    counts: { actionable: 1, today: 0, overdue: 0, awaiting_specimen: 0, in_review: 0, ready: 0 },
+    next_cursor: null,
     date: '2026-09-26',
     timezone: 'Asia/Tashkent',
   }));
@@ -462,6 +464,7 @@ async function installApiMocks(page: Page) {
   // service.revise: status DRAFT, supersedes_instance_id, values copied).
   await page.route(`**/api/v1/lab/report-instances/${CREATED_INSTANCE_ID}/revise`, (route) => {
     revisePostCount += 1;
+    revisePayload = route.request().postDataJSON();
     const original = instanceById(CREATED_INSTANCE_ID);
     if (!original) {
       return route.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"not found"}' });
@@ -506,9 +509,459 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     pdfGetCount = 0;
     markPrintedPostCount = 0;
     revisePostCount = 0;
+    revisePayload = null;
     historyPatientRequests = [];
     await installSession(page);
     await installApiMocks(page);
+  });
+
+  test('opens an exact critical task even when it is outside the current open list', async ({ page }) => {
+    const task = { state: 'needs_assignment', attempts: 1, available_actions: [],
+      created_at: '2026-09-26T08:00:00Z', acknowledged_at: null };
+    await page.route('**/api/v1/lab/critical-communications**', route => {
+      const params = new URL(route.request().url()).searchParams;
+      const beforeId = params.get('before_id');
+      if (beforeId !== null) {
+        expect(['9', '10']).toContain(beforeId);
+        expect(params.get('limit')).toBe('1');
+        expect(params.get('open_only')).toBe('false');
+        return json(route, [{ ...task, id: 8, report_instance_id: 42 }]);
+      }
+      return json(route, [{ ...task, id: 100, report_instance_id: 69 }]);
+    });
+
+    await page.goto('/lab?tab=operations&communication_id=8');
+    const operations = page.locator('#lab-panel-tabpanel-operations');
+    const rows = operations.getByRole('listitem');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toContainText(/#42\b/);
+    await expect(rows.first()).toHaveAttribute('aria-current', 'true');
+    await expect(rows.nth(1)).toContainText(/#69\b/);
+
+    await page.goto('/lab?tab=operations&communication_id=9');
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText(/#69\b/);
+    await expect(operations.locator('[aria-current]')).toHaveCount(0);
+  });
+
+  for (const labels of [
+    {
+      language: 'uz-Cyrl',
+      queueError: 'Лаборатория навбатини юклаб бўлмади. Уланишни текшириб, қайта уриниб кўринг.',
+      retry: 'Қайта юклаш',
+      dismiss: 'Билдиришномани ёпиш',
+      saveDraft: 'Қораламани сақлаш',
+    },
+    {
+      language: 'uz-Latn',
+      queueError: 'Laboratoriya navbatini yuklab bo‘lmadi. Ulanishni tekshirib, qayta urinib ko‘ring.',
+      retry: 'Qayta yuklash',
+      dismiss: 'Bildirishnomani yopish',
+      saveDraft: 'Qoralamani saqlash',
+    },
+  ]) {
+    test(`recovers from a worklist network failure in ${labels.language}`, async ({ page }) => {
+      state.instances.push(makeInstanceRecord(CREATED_INSTANCE_ID, 'IN_PROGRESS'));
+      // eslint-disable-next-line no-restricted-properties -- Seed the language preference in the isolated browser.
+      await page.addInitScript(language => localStorage.setItem('language', language), labels.language);
+      let worklistAvailable = false;
+      await page.route('**/api/v1/lab/worklist/search', route => (
+        worklistAvailable ? route.fallback() : route.abort('internetdisconnected')
+      ));
+
+      await page.goto('/lab');
+      await expect(page.getByText(labels.queueError, { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: labels.dismiss, exact: true })).toBeVisible();
+      worklistAvailable = true;
+      const retry = page.getByRole('button', { name: labels.retry, exact: true });
+      await retry.focus();
+      await expect(retry).toBeFocused();
+      await page.keyboard.press('Enter');
+
+      const order = page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) });
+      await expect(order).toBeVisible();
+      await expect(page.getByText(labels.queueError, { exact: true })).toHaveCount(0);
+      await order.click();
+      await expect(page.getByRole('button', { name: labels.saveDraft, exact: true })).toBeVisible();
+      expect(finalizePostCount).toBe(0);
+    });
+  }
+
+  test('finds an older order through worklist search without paging through the list', async ({ page }) => {
+    let requestedCursor = false;
+    await page.route('**/api/v1/lab/worklist/search', (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      const body = route.request().postDataJSON();
+      if (body.cursor) requestedCursor = true;
+      const matching = body.q === QUEUE_ENTRY.patient_fio;
+      return json(route, {
+        entries: matching ? [QUEUE_ENTRY] : [{ ...QUEUE_ENTRY, id: 'visit:801', visit_id: 801, patient_id: 301, patient_fio: 'SYNTHETIC-FIRST-PAGE' }],
+        total: matching ? 1 : 60,
+        counts: { actionable: matching ? 1 : 60, today: 0, overdue: 0, awaiting_specimen: 0, in_review: 0, ready: 0 },
+        next_cursor: matching ? null : 'next-worklist-page',
+        date: '2026-09-26',
+        timezone: 'Asia/Tashkent',
+      });
+    });
+    const initialPage = page.waitForResponse((response) => response.url().endsWith('/lab/worklist/search')
+      && response.request().method() === 'POST');
+    await page.goto('/lab');
+    await initialPage;
+    await expect(page.getByRole('button', { name: /SYNTHETIC-FIRST-PAGE/ })).toBeVisible();
+    const target = page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) });
+    await expect(target).toHaveCount(0);
+    const request = page.waitForRequest((entry) => entry.method() === 'POST' && entry.url().endsWith('/lab/worklist/search')
+      && entry.postDataJSON()?.q === QUEUE_ENTRY.patient_fio);
+    await page.getByRole('searchbox', { name: 'Пациент, заказ, исследование или штрихкод' }).fill(QUEUE_ENTRY.patient_fio);
+    expect((await request).method()).toBe('POST');
+    await expect(target).toBeVisible();
+    expect(requestedCursor).toBe(false);
+  });
+
+  test('records synthetic browser timings for a 602-order queue and 52-report history', async ({ page }) => {
+    const firstPage = Array.from({ length: 8 }, (_, index) => ({
+      ...QUEUE_ENTRY,
+      id: `visit:${1000 + index}`,
+      appointment_id: 1000 + index,
+      visit_id: 1000 + index,
+      patient_id: 2000 + index,
+      patient_fio: `SYNTHETIC-LAB-QUEUE-${String(index).padStart(3, '0')}`,
+    }));
+    const target = {
+      ...QUEUE_ENTRY,
+      id: 'visit:1602',
+      appointment_id: 1602,
+      visit_id: 1602,
+      patient_fio: 'SYNTHETIC-LAB-TARGET-602',
+    };
+    state.instances = Array.from({ length: 52 }, (_, index) => makeInstanceRecord(
+      500 + index,
+      'PRINTED',
+      {
+        wbcValue: String(index + 1),
+        supersedesInstanceId: null,
+        createdAt: `2026-10-${String((index % 28) + 1).padStart(2, '0')}T08:00:00.000000+00:00`,
+      },
+    ));
+    let longHistoryResponseStartedAt: number | null = null;
+    await page.route('**/api/v1/lab/report-instances?**', (route) => {
+      const patientId = new URL(route.request().url()).searchParams.get('patient_id');
+      if (patientId) historyPatientRequests.push(patientId);
+      if (patientId && state.instances.length === 53) {
+        longHistoryResponseStartedAt = performance.now();
+      }
+      const summaries = state.instances
+        .filter((record) => !patientId || record.patient_id === Number(patientId))
+        .map(makeHistorySummary);
+      return json(route, summaries);
+    });
+    await page.route('**/api/v1/lab/worklist/search', (route) => {
+      const request = route.request();
+      if (request.method() !== 'POST') return route.fallback();
+      const query = String(request.postDataJSON()?.q ?? '').trim();
+      return json(route, {
+        entries: query ? (query === target.patient_fio ? [target] : []) : firstPage,
+        total: query ? (query === target.patient_fio ? 1 : 0) : 602,
+        counts: { actionable: query ? 1 : 602, today: 0, overdue: 0, awaiting_specimen: 0, in_review: 0, ready: 0 },
+        next_cursor: query ? null : 'synthetic-next-page',
+        date: '2026-11-27',
+        timezone: 'Asia/Tashkent',
+      });
+    });
+
+    const timings: Record<string, number> = {};
+    let started = performance.now();
+    await page.goto('/lab');
+    const firstRow = page.getByRole('button', { name: /SYNTHETIC-LAB-QUEUE-000/ });
+    await expect(firstRow).toBeVisible();
+    await expect(page.getByRole('button', { name: /SYNTHETIC-LAB-QUEUE-/ })).toHaveCount(8);
+    timings.coldFirstVisiblePageMs = performance.now() - started;
+
+    started = performance.now();
+    await page.getByRole('searchbox').fill(target.patient_fio);
+    const targetOrder = page.getByRole('button', { name: new RegExp(target.patient_fio) });
+    await expect(targetOrder).toBeVisible();
+    timings.searchToTargetMs = performance.now() - started;
+
+    started = performance.now();
+    await targetOrder.click();
+    await expect(page.getByRole('button', { name: 'Создать отчёт' })).toBeVisible();
+    timings.orderNavigationMs = performance.now() - started;
+
+    started = performance.now();
+    await page.getByRole('button', { name: 'Создать отчёт' }).click();
+    const resultInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(resultInput).toBeVisible();
+    timings.createToInputReadyMs = performance.now() - started;
+
+    started = performance.now();
+    await resultInput.fill('6.5');
+    await expect(resultInput).toHaveValue('6.5');
+    timings.inputToVisibleValueMs = performance.now() - started;
+
+    const historyCards = page.getByRole('button', { name: /Отчёт Rule Demo,/ });
+    await expect(historyCards).toHaveCount(53);
+    expect(longHistoryResponseStartedAt).not.toBeNull();
+    timings.history52ResponseToRenderMs = performance.now() - longHistoryResponseStartedAt!;
+
+    // eslint-disable-next-line no-console -- The timing record is evidence emitted into the CI job log.
+    console.log(`LAB_SYNTHETIC_PERFORMANCE ${JSON.stringify({
+      workload: { renderedInitialRows: 8, totalOrders: 602, priorReports: 52 },
+      timings: Object.fromEntries(Object.entries(timings).map(([key, value]) => [key, Math.round(value * 100) / 100])),
+      scope: 'mocked browser rendering and interaction only; server/database latency is recorded separately in the plan',
+    })}`);
+  });
+
+  test('keeps the selected order visible across the wide and narrow workspace layouts', async ({ page }) => {
+    await page.goto('/lab');
+    await page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) }).click();
+    const report = page.locator('#lab-panel-tabpanel-reports');
+    const queue = page.locator('#lab-panel-tabpanel-queue');
+    await expect(report.getByRole('heading', { name: QUEUE_ENTRY.patient_fio })).toBeVisible();
+    for (const width of [1920, 1280, 768, 375]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(report).toBeVisible();
+      if (width >= 1100) {
+        await expect(queue).toBeVisible();
+        const queueBox = await queue.boundingBox();
+        const reportBox = await report.boundingBox();
+        expect(queueBox).not.toBeNull();
+        expect(reportBox).not.toBeNull();
+        expect(queueBox!.x + queueBox!.width).toBeLessThanOrEqual(reportBox!.x + 1);
+      } else {
+        await expect(queue).toBeHidden();
+        await expect(report.getByRole('button', { name: 'К рабочему списку' })).toBeVisible();
+      }
+    }
+    const refreshed = page.waitForResponse((response) => response.url().endsWith('/lab/worklist/search')
+      && response.request().method() === 'POST');
+    await report.getByRole('button', { name: 'К рабочему списку' }).click();
+    await refreshed;
+    await expect(queue).toBeVisible();
+    await expect(queue.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) })).toHaveAttribute('aria-current', 'true');
+  });
+
+  test('refreshes managed report holds after accepting its specimen and preserves draft edits', async ({ page }) => {
+    const orderId = 501;
+    const specimenId = 701;
+    const record = {
+      ...makeInstanceRecord(CREATED_INSTANCE_ID, 'IN_PROGRESS', {
+        wbcValue: 'SYNTHETIC initial', createdAt: '2026-09-26T08:00:00+00:00',
+      }),
+      order_id: orderId,
+      managed_release: true,
+      available_actions: ['edit', 'save_draft', 'preview', 'submit_review', 'record_qc'],
+      workflow_events: [],
+    };
+    let accepted = false;
+    let reportReads = 0;
+    await page.route('**/api/v1/lab/worklist/search', (route) => json(route, {
+      entries: [{ ...QUEUE_ENTRY, id: `order:${orderId}`, queue_number: 777, order_id: orderId, report_instance_id: record.id }],
+      total: 1,
+      counts: { actionable: 1, today: 0, overdue: 0, awaiting_specimen: 1, in_review: 0, ready: 0 },
+      next_cursor: null,
+      date: '2026-09-26',
+      timezone: 'Asia/Tashkent',
+    }));
+    const specimen = () => ({
+      id: specimenId,
+      order_id: orderId,
+      visit_id: VISIT_ID,
+      barcode: 'SP-0123456789ABCDEF',
+      material_code: 'blood',
+      container_code: 'tube',
+      status: accepted ? 'accepted' : 'received',
+      revision: accepted ? 4 : 3,
+      collected_at: null,
+      received_at: null,
+      accepted_at: null,
+      latest_reason: null,
+      parent_specimen_id: null,
+      replaces_specimen_id: null,
+      visit_service_ids: [],
+      report_instance_ids: [CREATED_INSTANCE_ID],
+      events: [],
+      available_actions: accepted ? [] : ['accept'],
+    });
+    await page.route(`**/api/v1/lab/report-instances/${CREATED_INSTANCE_ID}`, (route) => {
+      reportReads += 1;
+      return json(route, { ...record, release_holds: accepted ? [] : ['specimen_not_accepted'] });
+    });
+    await page.route(`**/api/v1/lab/orders/${orderId}/specimens`, (route) => json(route, {
+      items: [specimen()], data_status: 'known',
+    }));
+    await page.route(`**/api/v1/lab/specimens/${specimenId}/events`, (route) => {
+      expect(route.request().postDataJSON()).toMatchObject({ action: 'accept', expected_revision: 3 });
+      accepted = true;
+      return json(route, specimen());
+    });
+
+    await page.goto('/lab');
+    await page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) }).click();
+    const report = page.locator('#lab-panel-tabpanel-reports');
+    const releaseHold = report.getByText('Не все связанные пробы приняты');
+    await expect(releaseHold).toBeVisible();
+    const result = report.getByRole('textbox', { name: /Лейкоциты/ });
+    await result.fill('SYNTHETIC unsaved change');
+    await report.getByRole('button', { name: 'Принять пробу' }).click();
+    await expect(report.getByRole('button', { name: 'Принять пробу' })).toHaveCount(0);
+
+    await expect(releaseHold).toHaveCount(0);
+    await expect(result).toHaveValue('SYNTHETIC unsaved change');
+    expect(reportReads).toBe(2);
+    expect(bulkSavePostCount).toBe(0);
+  });
+
+  test('keeps identity and one save action available in a tall report with a critical finding', async ({ page }) => {
+    const record = makeInstanceRecord(CREATED_INSTANCE_ID, 'IN_PROGRESS');
+    const originalField = record.sections[0].fields[0];
+    const fields = Array.from({ length: 32 }, (_, index) => ({
+      ...originalField,
+      id: index + 1,
+      field_key: `synthetic_${index + 1}`,
+      label: `SYNTHETIC-RESULT-${index + 1}`,
+      value_type: 'numeric',
+      value_text: index === 0 ? '24.0' : '4.2',
+      sort_order: index + 1,
+    }));
+    record.sections = [{ ...record.sections[0], fields }];
+    state.instances.push(record);
+    await page.route(`**/api/v1/lab/report-instances/${CREATED_INSTANCE_ID}`, (route) => json(route, {
+      ...record,
+      critical_findings: [{
+        section_key: record.sections[0].key,
+        section_title: 'SYNTHETIC-SECTION',
+        field_key: fields[0].field_key,
+        label: fields[0].label,
+        value_display: fields[0].value_text,
+        unit: 'SYNTHETIC-UNIT',
+        threshold_display: '> 12.0',
+        resolved_flag: 'critical',
+      }],
+    }));
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto('/lab');
+    const appFrame = page.locator('#main-content');
+    await expect(appFrame).toHaveCSS('overflow', 'auto');
+    await page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) }).click();
+    const report = page.getByRole('tabpanel', { name: /Отчёты/ });
+    const identity = report.getByRole('heading', { name: QUEUE_ENTRY.patient_fio });
+    const critical = report.getByRole('alert').filter({ hasText: 'Критические показатели' });
+    const save = report.getByRole('button', { name: 'Сохранить черновик', exact: true });
+    const value = report.getByRole('textbox', { name: 'Результат: SYNTHETIC-RESULT-16' });
+    const nextValue = report.getByRole('textbox', { name: 'Результат: SYNTHETIC-RESULT-17' });
+    const isUnobscured = (element: Element) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      return element.contains(document.elementFromPoint(x + width / 2, y + height / 2));
+    };
+
+    await expect(critical).toBeVisible();
+    await expect(critical).toContainText(
+      /Критические показатели\s*\.\s*SYNTHETIC-RESULT-1\s*\.\s*SYNTHETIC-SECTION\s*\.\s*24\.0 SYNTHETIC-UNIT\s*\.\s*> 12\.0\s*\./,
+    );
+    await page.setViewportSize({ width: 375, height: 600 });
+    await expect(appFrame).toHaveCSS('overflow', 'auto');
+
+    for (const viewport of [
+      { width: 375, height: 812 },
+      { width: 768, height: 1024 },
+      { width: 1280, height: 800 },
+      { width: 1920, height: 1080 },
+    ]) {
+      await test.step(`critical report at ${viewport.width}px`, async () => {
+        await page.setViewportSize(viewport);
+        await expect(appFrame).toHaveCSS('overflow', 'clip');
+        await critical.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+        await expect(critical).toBeInViewport({ ratio: 0.95 });
+        await expect(critical).toContainText('SYNTHETIC-RESULT-1');
+        await expect(critical).toContainText('24.0');
+        expect(await critical.getByText('SYNTHETIC-RESULT-1', { exact: true }).evaluate(isUnobscured)).toBe(true);
+
+        await value.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+        await expect(identity).toBeInViewport({ ratio: 1 });
+        await expect(save).toHaveCount(1);
+        await expect(save).toBeInViewport({ ratio: 1 });
+        expect(await save.evaluate(isUnobscured)).toBe(true);
+
+        await value.focus();
+        await page.keyboard.press('Enter');
+        await expect(nextValue).toBeFocused();
+        expect(await nextValue.evaluate(isUnobscured)).toBe(true);
+
+        await nextValue.evaluate((element) => {
+          const dock = element.closest('.lab-workspace-report')?.querySelector('.lab-report-actions-dock');
+          const scroller = element.closest('.app-shell-grid');
+          if (!dock || !scroller) throw new Error('Missing report dock or scroll container');
+          scroller.scrollTop += element.getBoundingClientRect().top - dock.getBoundingClientRect().top - 8;
+        });
+        await value.focus();
+        await page.keyboard.press('Enter');
+        await expect(nextValue).toBeFocused();
+        expect(await nextValue.evaluate(isUnobscured)).toBe(true);
+        expect(finalizePostCount).toBe(0);
+      });
+    }
+
+    await nextValue.fill('4.3');
+    await save.focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(() => bulkSavePostCount).toBeGreaterThan(0);
+    expect(finalizePostCount).toBe(0);
+  });
+
+  test('keeps the latest draft and caret when a delayed autosave loses its connection', async ({ page }) => {
+    await page.clock.install();
+    state.instances.push(makeInstanceRecord(CREATED_INSTANCE_ID, 'DRAFT', {
+      wbcValue: '4.2',
+      supersedesInstanceId: null,
+      createdAt: '2026-09-26T08:00:00.000000+00:00',
+    }));
+    let receivedAutosave = false;
+    let disconnect!: () => void;
+    const response = new Promise<void>((resolve) => { disconnect = resolve; });
+    await page.route(`**/api/v1/lab/report-instances/${CREATED_INSTANCE_ID}/bulk-values**`, async (route) => {
+      if (receivedAutosave) {
+        await route.fallback();
+        return;
+      }
+      receivedAutosave = true;
+      await response;
+      await route.abort('internetdisconnected');
+    });
+
+    await page.goto('/lab');
+    await page.getByRole('button', { name: new RegExp(QUEUE_ENTRY.patient_fio) }).click();
+    const report = page.getByRole('tabpanel', { name: /Отчёты/ });
+    const value = report.getByRole('textbox', { name: 'Результат: Лейкоциты' });
+    const saveStatus = report.getByRole('status').filter({ hasText: /изменения|сохранен|сохранить/i });
+    await expect(value).toHaveValue('4.2');
+    try {
+      await value.fill('6.1');
+      await expect(saveStatus).toContainText(/несохранённые изменения/i);
+      await page.clock.fastForward(31_000);
+      await expect.poll(() => receivedAutosave).toBe(true);
+      await value.fill('6.12');
+      await value.press('ArrowLeft');
+    } finally {
+      disconnect();
+    }
+
+    await expect(saveStatus).toContainText('Не удалось сохранить');
+    await expect(value).toHaveValue('6.12');
+    await expect(value).toBeFocused();
+    expect(await value.evaluate((input: HTMLInputElement) => input.selectionStart)).toBe(3);
+    expect(bulkSavePostCount).toBe(0);
+    await report.getByRole('button', { name: 'Повторить сохранение' }).click();
+    await expect.poll(() => bulkSavePostCount).toBe(1);
+    expect(lastBulkSavePayload).toEqual([expect.objectContaining({ field_key: 'wbc', value_text: '6.1' })]);
+    await expect(saveStatus).toContainText(/несохранённые изменения/i);
+    await expect(value).toHaveValue('6.12');
+    await page.clock.fastForward(31_000);
+    await expect(saveStatus).toContainText('Сохранено в');
+    expect(bulkSavePostCount).toBe(2);
+    expect(lastBulkSavePayload).toEqual([expect.objectContaining({ field_key: 'wbc', value_text: '6.12' })]);
+    expect(finalizePostCount).toBe(0);
   });
 
   test('queue -> create -> fill -> save -> preview -> finalize -> print(PDF) -> revise -> history, one instance lineage', async ({ page }) => {
@@ -542,7 +995,7 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     // (PR 3351 review round 9 — exactly-once для неидемпотентного POST).
     expect(createPayloads[0]).toMatchObject({
       patient_id: PATIENT_ID,
-      appointment_id: 'a-3',
+      appointment_id: 3,
       visit_id: VISIT_ID,
       template_id: 5,
     });
@@ -565,9 +1018,8 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     await expect.poll(() => bulkSavePostCount).toBe(1);
     // Optimistic locking: bulk-save несёт expected_updated_at (WF-06).
     expect(lastBulkSaveQuery).toContain('expected_updated_at=');
-    // Полная форма payload (persistDraft): field_key + value_text +
-    // обнуленные value_numeric/comment — пиним точную форму контракта.
-    expect(lastBulkSavePayload).toEqual([{ field_key: 'wbc', value_text: '6.5', value_numeric: null, comment: null }]);
+    // Сервер получает исходный текст и владеет типизацией результата.
+    expect(lastBulkSavePayload).toEqual([{ field_key: 'wbc', value_text: '6.5', comment: null }]);
     // Статус DRAFT -> IN_PROGRESS; ре-гидрат ответом сохраняет значение.
     await expect(reportsPanel.getByText('Заполняется').first()).toBeVisible();
     await expect(fieldInput).toHaveValue('6.5');
@@ -648,10 +1100,13 @@ test.describe('Lab full-path (final gate, mocked)', () => {
     const reviseDialog = page.getByRole('dialog');
     await expect(reviseDialog).toBeVisible();
     await expect(reviseDialog.getByRole('heading', { name: 'Создание исправленной версии' })).toBeVisible();
+    await expect(reviseDialog.getByRole('button', { name: 'Создать версию' })).toBeDisabled();
+    await reviseDialog.getByRole('textbox', { name: 'Причина' }).fill('SYNTHETIC: исправление записи');
     await reviseDialog.getByRole('button', { name: 'Создать версию' }).click();
     await expect(reviseDialog).toHaveCount(0);
 
     await expect.poll(() => revisePostCount).toBe(1);
+    expect(revisePayload).toEqual({ reason: 'SYNTHETIC: исправление записи', expected_updated_at: '2026-09-26T08:15:00.000000+00:00' });
     // Ревизия открывается как АКТИВНЫЙ бланк: новый id, статус черновика,
     // значения скопированы, видна связь с оригиналом (supersedes).
     await expect(reportsPanel.getByText(`Отчёт #${REVISED_INSTANCE_ID}`).first()).toBeVisible();

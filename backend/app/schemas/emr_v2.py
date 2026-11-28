@@ -91,6 +91,9 @@ class EMRSaveRequest(ORMModel):
     row_version: int = Field(
         default=0, description="Current row version for optimistic locking"
     )
+    expected_patient_id: int | None = Field(
+        default=None, gt=0, description="Patient ID currently selected in the editor"
+    )
     client_session_id: str | None = Field(
         default=None,
         max_length=64,

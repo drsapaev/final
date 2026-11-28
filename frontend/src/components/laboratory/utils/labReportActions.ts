@@ -45,8 +45,11 @@ export function hasLabReportAction(instance: Record<string, unknown> | null | un
 }
 
 export function flagVariant(flag: string, severity: number | null = null) {
-  if (severity !== null && severity >= 300) {
+  if (flag === 'critical' || (severity !== null && severity >= 300)) {
     return 'danger';
+  }
+  if (flag === 'normal') {
+    return 'success';
   }
   if (flag === 'high' || flag === 'warning' || flag === 'abnormal') {
     return 'warning';

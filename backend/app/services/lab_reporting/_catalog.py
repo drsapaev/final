@@ -140,6 +140,9 @@ class CatalogMixin(LabReportingServiceMixinBase):
                         "sex": item.sex,
                         "age_min_months": item.age_min_months,
                         "age_max_months": item.age_max_months,
+                        "material_code": item.material_code,
+                        "method_code": item.method_code,
+                        "unit_code": item.unit_code,
                         "sort_order": item.sort_order,
                     }
                 ): item
@@ -155,6 +158,9 @@ class CatalogMixin(LabReportingServiceMixinBase):
                         sex=definition.get("sex"),
                         age_min_months=definition.get("age_min_months"),
                         age_max_months=definition.get("age_max_months"),
+                        material_code=definition.get("material_code"),
+                        method_code=definition.get("method_code"),
+                        unit_code=definition.get("unit_code"),
                         sort_order=definition.get("sort_order", 0),
                     )
                     self.repository.add_catalog_reference_range(reference_range)

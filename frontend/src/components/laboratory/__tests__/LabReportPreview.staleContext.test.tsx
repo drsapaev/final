@@ -354,8 +354,13 @@ describe('LABR-FE-003 — a stale preview\'s finally must not clear a newer acti
     // resolves, then the revise request hangs — busyAction = 'revise').
     fireEvent.click(screen.getByRole('button', { name: /Исправленная версия/ }));
     const confirmButton = await screen.findByRole('button', { name: 'Создать версию' });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Причина' }), { target: { value: 'Синтетическая коррекция' } });
     fireEvent.click(confirmButton);
-    await waitFor(() => expect(mockedApi.revise).toHaveBeenCalledWith(92));
+    await waitFor(() => expect(mockedApi.revise).toHaveBeenCalledWith(92, {
+      expected_updated_at: INSTANCE_B_REVISE.updated_at,
+      reason: 'Синтетическая коррекция',
+    }));
 
     // The revise action is visibly busy on the actions bar.
     expect(screen.getByRole('button', { name: /Создаю…/ })).toBeInTheDocument();

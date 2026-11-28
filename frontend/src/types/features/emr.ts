@@ -68,7 +68,7 @@ export interface EmrConflictDetectedPayload {
  */
 export type EmrAction =
   | { type: 'LOAD'; payload: { emr: EmrRecord } }
-  | { type: 'SET_FIELD'; payload: { field: string; value: unknown } }
+  | { type: 'SET_FIELD'; payload: { field: string; value: unknown; source?: Record<string, unknown> } }
   | { type: 'SET_NESTED_FIELD'; payload: { path: string; value: unknown } }
   | { type: 'SAVE_START' }
   | { type: 'SAVE_SUCCESS'; payload: { emr: EmrRecord } }

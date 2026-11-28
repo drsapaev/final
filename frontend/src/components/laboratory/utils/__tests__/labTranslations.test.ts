@@ -1,10 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { t as rawT, tInterpolate, TRANSLATIONS } from '@/i18n/useTranslation';
+import { i18n, t as rawT, tInterpolate, TRANSLATIONS } from '@/i18n/useTranslation';
+import { formatLabStatus, getLabStatusVariant } from '../../labUiLabels';
 
 // Cast t() to a looser signature so we can test null/undefined/number inputs.
 const t = rawT as unknown as (key: unknown) => unknown;
 
 describe('labTranslations (STRAT#3)', () => {
+  it.each([
+    ['ru', 'Заполняется', 'В работе', 'На проверке', 'Неизвестно'],
+    ['uz-Latn', 'To\'ldirilmoqda', 'Ishda', 'Tekshiruvda', 'Noma\'lum'],
+    ['uz-Cyrl', 'Тўлдирилмоқда', 'Ишда', 'Текширувда', 'Номаълум'],
+  ])('localizes distinct report and queue states in %s', async (language, report, queue, review, unknown) => {
+    await i18n.loadLanguages(language);
+    const translate = (key: string, options?: Record<string, unknown>) => rawT(key, { ...options, lng: language });
+
+    expect(formatLabStatus('IN_PROGRESS', translate)).toBe(report);
+    expect(formatLabStatus('in_progress', translate)).toBe(queue);
+    expect(formatLabStatus('IN_REVIEW', translate)).toBe(review);
+    expect(formatLabStatus('', translate)).toBe(unknown);
+    expect(formatLabStatus('UNKNOWN_CODE', translate)).toBe('UNKNOWN_CODE');
+    expect(formatLabStatus('FINALIZED')).toBe('Утверждён');
+    expect(getLabStatusVariant('FINALIZED')).toBe('success');
+  });
+
   describe('t() function', () => {
     it('returns Russian string for valid dotted key', () => {
       expect(t('common.save')).toBe('Сохранить');

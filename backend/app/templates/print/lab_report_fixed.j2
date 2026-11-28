@@ -5,10 +5,31 @@
   <title>{{ branding.document_title or template_name }}</title>
 </head>
 <body>
+  {% macro result_value(row, inline_unit=false) -%}
+    {%- if row.value_display is defined -%}
+      {%- set value = row.value_display -%}
+    {%- elif row.value_numeric is defined and row.value_numeric is not none -%}
+      {%- set value = row.value_numeric -%}
+    {%- else -%}
+      {%- set value = row.value_text or '' -%}
+    {%- endif -%}
+    {%- if value is not none and value != '' -%}
+      {{ value }}{% if inline_unit and row.unit %} {{ row.unit }}{% endif %}
+    {%- endif -%}
+  {%- endmacro %}
   {% if watermark_text %}
   <div class="pdf-watermark">{{ watermark_text }}</div>
   {% endif %}
   <div class="page">
+    {% if report_document_label %}
+    <p class="muted">{{ report_document_label }}</p>
+    {% endif %}
+    {% if report_release_label %}
+    <p class="muted">{{ report_release_label }}</p>
+    {% endif %}
+    {% if report_correction_reason %}
+    <p class="muted">{{ report_correction_reason }}</p>
+    {% endif %}
     {% if oam_docx_mode %}
     {% set physical_section = sections[0] if sections else none %}
     {% set sediment_section = sections[1] if sections|length > 1 else none %}
@@ -69,13 +90,7 @@
           {% for row in physical_section.fields %}
           <tr>
             <td>{{ row.label }}</td>
-            <td class="col-result {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">
-              {% if row.value_numeric is not none %}
-                {{ row.value_numeric }}
-              {% else %}
-                {{ row.value_text or '' }}
-              {% endif %}
-            </td>
+            <td class="col-result {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">{{ result_value(row, inline_unit=true) }}</td>
             <td>{{ row.reference_text or '' }}</td>
           </tr>
           {% endfor %}
@@ -87,13 +102,7 @@
           {% for row in sediment_section.fields %}
           <tr>
             <td>{{ row.label }}</td>
-            <td class="col-result {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">
-              {% if row.value_numeric is not none %}
-                {{ row.value_numeric }}
-              {% else %}
-                {{ row.value_text or '' }}
-              {% endif %}
-            </td>
+            <td class="col-result {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">{{ result_value(row, inline_unit=true) }}</td>
             <td>{{ row.reference_text or '' }}</td>
           </tr>
           {% endfor %}
@@ -166,13 +175,7 @@
         {% for row in first_section.fields if first_section %}
         <tr>
           <td>{{ row.label }}</td>
-          <td class="col-result">
-            {% if row.value_numeric is not none %}
-              {{ row.value_numeric }}
-            {% else %}
-              {{ row.value_text or '' }}
-            {% endif %}
-          </td>
+          <td class="col-result">{{ result_value(row, inline_unit=true) }}</td>
           <td>{{ row.reference_text or '' }}</td>
         </tr>
         {% endfor %}
@@ -252,13 +255,7 @@
             <td>{{ first_section.fields[row_index].label }}</td>
             {% for section in sections %}
               {% set row = section.fields[row_index] %}
-              <td class="smear-site-cell {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">
-                {% if row.value_numeric is not none %}
-                  {{ row.value_numeric }}
-                {% else %}
-                  {{ row.value_text or '' }}
-                {% endif %}
-              </td>
+              <td class="smear-site-cell {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">{{ result_value(row, inline_unit=true) }}</td>
             {% endfor %}
           </tr>
           {% endfor %}
@@ -374,13 +371,7 @@
         {% for row in section.fields %}
         <tr>
           <td>{{ row.label }}</td>
-          <td class="col-result">
-            {% if row.value_numeric is not none %}
-              {{ row.value_numeric }}
-            {% else %}
-              {{ row.value_text or '' }}
-            {% endif %}
-          </td>
+          <td class="col-result">{{ result_value(row) }}</td>
           <td class="col-unit">{{ row.unit or '' }}</td>
           <td>{{ row.reference_text or '' }}</td>
           <td class="col-flag {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">

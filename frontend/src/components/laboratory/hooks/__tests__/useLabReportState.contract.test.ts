@@ -43,8 +43,8 @@ describe('useLabReportState hook (STRAT#1)', () => {
       'printFeedback',
       'historySeverityFilter',
       'escapeHatchActive',
-      'lastAutoSave',
-      'autoSaving',
+      'lastSavedAt',
+      'saveFailure',
     ];
     for (const state of expectedStates) {
       expect(source).toContain(`[${state}, set${state.charAt(0).toUpperCase() + state.slice(1)}]`);

@@ -112,6 +112,9 @@ class Prescription(Base):
     emr_record_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("emr_records.id", ondelete="SET NULL"), nullable=True, index=True
     )  # Canonical EMR v2 reference
+    emr_revision_id: Mapped[int | None] = mapped_column(
+        ForeignKey("emr_revisions.id", ondelete="RESTRICT"), index=True
+    )
 
     # Препараты (JSON массив)
     medications: Mapped[dict | None] = mapped_column(JSON, nullable=True)

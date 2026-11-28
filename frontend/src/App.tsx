@@ -533,7 +533,7 @@ const macOSMainStyle: CSSProperties = {
   width: '100%',
   minWidth: 0,
   boxSizing: 'border-box',
-  overflow: 'auto',
+  overflow: 'var(--app-main-overflow, auto)',
   position: 'relative',
   isolation: 'isolate',
 };

@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -16,6 +17,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     event,
+    false,
     inspect,
     select,
     text,
@@ -26,10 +28,20 @@ from app.db.base_class import Base
 
 FINAL_INSTANCE_STATUSES = {"FINALIZED", "PRINTED"}
 IMMUTABLE_TEMPLATE_VERSION_STATUSES = {"PUBLISHED", "ARCHIVED"}
+LAB_CORE_INTEGRATION_PROTOCOLS = frozenset({"astm_clsi", "hl7_v2", "file", "manual"})
+LAB_CORE_INTEGRATION_TRANSPORTS = frozenset(
+    {"tcp_ip", "rs232", "local_agent", "file_drop", "manual"}
+)
 
 
 class LabOrder(Base):
     __tablename__ = "lab_orders"
+    __table_args__ = (
+        CheckConstraint(
+            "priority IS NULL OR priority IN ('routine', 'urgent')",
+            name="ck_lab_orders_priority",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     visit_id: Mapped[int | None] = mapped_column(
@@ -50,10 +62,43 @@ class LabOrder(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    priority: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     report_instances: Mapped[list[LabReportInstance]] = relationship(
         back_populates="order"
     )
+
+
+class LabOrderTest(Base):
+    """Explicit allocation of a canonical visit service to a lab order/report."""
+
+    __tablename__ = "lab_order_tests"
+    __table_args__ = (
+        UniqueConstraint("visit_service_id", name="uq_lab_order_tests_visit_service"),
+        CheckConstraint(
+            "(canceled_at IS NULL AND canceled_by_user_id IS NULL AND cancel_reason IS NULL) OR "
+            "(canceled_at IS NOT NULL AND canceled_by_user_id IS NOT NULL "
+            "AND cancel_reason IS NOT NULL AND report_instance_id IS NULL)",
+            name="ck_lab_order_tests_cancellation",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("lab_orders.id", ondelete="RESTRICT"), index=True, nullable=False
+    )
+    visit_service_id: Mapped[int] = mapped_column(
+        ForeignKey("visit_services.id", ondelete="RESTRICT"), nullable=False
+    )
+    report_instance_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lab_report_instances.id", ondelete="RESTRICT"), index=True
+    )
+    canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    canceled_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    cancel_reason: Mapped[str | None] = mapped_column(String(300))
 
 
 class LabResult(Base):
@@ -140,13 +185,31 @@ class LabCatalogAnalyte(Base):
 class LabCatalogReferenceRange(Base):
     __tablename__ = "lab_catalog_reference_ranges"
     __table_args__ = (
-        UniqueConstraint(
+        Index(
+            "uq_lab_catalog_reference_range_scope",
             "analyte_code",
             "sex",
             "age_min_months",
             "age_max_months",
             "sort_order",
-            name="uq_lab_catalog_reference_range_scope",
+            unique=True,
+            postgresql_where=text("material_code IS NULL AND method_code IS NULL AND unit_code IS NULL"),
+            sqlite_where=text("material_code IS NULL AND method_code IS NULL AND unit_code IS NULL"),
+        ),
+        Index(
+            "uq_lab_catalog_reference_range_dimensions",
+            "analyte_code",
+            "sex",
+            "age_min_months",
+            "age_max_months",
+            "material_code",
+            "method_code",
+            "unit_code",
+            "sort_order",
+            unique=True,
+            postgresql_where=text("material_code IS NOT NULL OR method_code IS NOT NULL OR unit_code IS NOT NULL"),
+            postgresql_nulls_not_distinct=True,
+            sqlite_where=text("material_code IS NOT NULL OR method_code IS NOT NULL OR unit_code IS NOT NULL"),
         ),
     )
 
@@ -159,6 +222,9 @@ class LabCatalogReferenceRange(Base):
     sex: Mapped[str | None] = mapped_column(String(1), nullable=True, index=True)
     age_min_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
     age_max_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    material_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    method_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    unit_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     text: Mapped[str | None] = mapped_column(String(255), nullable=True)
     low: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     high: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
@@ -297,6 +363,267 @@ class LabReportTemplateVersion(Base):
     )
 
 
+class LabEquipmentIntegrationProfile(Base):
+    """Clinic-local integration settings attached to an existing equipment asset.
+
+    Each clinic deployment has its own database (see .ai-factory/ARCHITECTURE.md),
+    so this deliberately has no hard-coded clinic/vendor/model dimension. Physical
+    inventory remains owned by equipment; this row only adds the lab role.
+    """
+
+    __tablename__ = "lab_equipment_integration_profiles"
+    __table_args__ = (
+        UniqueConstraint(
+            "equipment_id",
+            "device_role",
+            name="uq_lab_equipment_profile_equipment_role",
+        ),
+        CheckConstraint(
+            "device_role IN ('analyzer', 'printer', 'label_printer', 'scanner', 'local_agent')",
+            name="ck_lab_equipment_profile_device_role",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    equipment_id: Mapped[int] = mapped_column(
+        ForeignKey("equipment.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    device_role: Mapped[str] = mapped_column(String(24), nullable=False)
+    created_by_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+
+    versions: Mapped[list[LabEquipmentIntegrationProfileVersion]] = relationship(
+        back_populates="profile",
+        order_by="LabEquipmentIntegrationProfileVersion.version_no",
+    )
+
+
+class LabEquipmentIntegrationProfileVersion(Base):
+    """Versioned protocol, transport and mapping settings for one device role.
+
+    protocol_code and transport_code are strings by design: core values are
+    documented constants, while deployments can register additional adapters
+    without changing a database enum. JSON fields contain configuration only;
+    credentials and patient payloads never belong here.
+    """
+
+    __tablename__ = "lab_equipment_integration_profile_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id", "version_no", name="uq_lab_equipment_profile_version"
+        ),
+        Index(
+            "uq_lab_equipment_profile_active_version",
+            "profile_id",
+            unique=True,
+            postgresql_where=text("status = 'ACTIVE'"),
+            sqlite_where=text("status = 'ACTIVE'"),
+        ),
+        CheckConstraint("version_no > 0", name="ck_lab_equipment_profile_version_positive"),
+        CheckConstraint(
+            "status IN ('DRAFT', 'ACTIVE', 'RETIRED')",
+            name="ck_lab_equipment_profile_version_status",
+        ),
+        CheckConstraint(
+            "simulator_validation_status IN ('NOT_RUN', 'PASS', 'FAIL')",
+            name="ck_lab_equipment_simulator_validation_status",
+        ),
+        CheckConstraint(
+            "physical_validation_status IN ('NOT_RUN', 'PASS', 'FAIL')",
+            name="ck_lab_equipment_physical_validation_status",
+        ),
+        CheckConstraint(
+            "(simulator_validation_status = 'NOT_RUN' AND simulator_validated_at IS NULL "
+            "AND simulator_evidence_ref IS NULL) OR "
+            "(simulator_validation_status IN ('PASS', 'FAIL') AND simulator_validated_at IS NOT NULL "
+            "AND simulator_evidence_ref IS NOT NULL)",
+            name="ck_lab_equipment_simulator_evidence_state",
+        ),
+        CheckConstraint(
+            "(physical_validation_status = 'NOT_RUN' AND physical_validated_at IS NULL "
+            "AND physical_validated_by_user_id IS NULL AND physical_evidence_ref IS NULL) OR "
+            "(physical_validation_status IN ('PASS', 'FAIL') AND physical_validated_at IS NOT NULL "
+            "AND physical_validated_by_user_id IS NOT NULL AND physical_evidence_ref IS NOT NULL)",
+            name="ck_lab_equipment_physical_evidence_state",
+        ),
+        CheckConstraint(
+            "(clinical_approved_by_user_id IS NULL AND clinical_approved_at IS NULL "
+            "AND clinical_approval_configuration_version_id IS NULL "
+            "AND clinical_approval_authority_snapshot IS NULL) OR "
+            "(clinical_approved_by_user_id IS NOT NULL AND clinical_approved_at IS NOT NULL "
+            "AND clinical_approval_configuration_version_id IS NOT NULL "
+            "AND clinical_approval_authority_snapshot IS NOT NULL)",
+            name="ck_lab_equipment_clinical_approval_evidence_state",
+        ),
+        CheckConstraint(
+            "status != 'ACTIVE' OR (activated_at IS NOT NULL "
+            "AND simulator_validation_status = 'PASS' "
+            "AND physical_validation_status = 'PASS')",
+            name="ck_lab_equipment_active_requires_both_validations",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("lab_equipment_integration_profiles.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="DRAFT", index=True
+    )
+    adapter_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    protocol_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    transport_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    mapping_profile: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False, default=dict
+    )
+    transport_settings: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False, default=dict
+    )
+    device_settings: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False, default=dict
+    )
+    simulator_validation_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="NOT_RUN"
+    )
+    simulator_validated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    simulator_evidence_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    physical_validation_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="NOT_RUN"
+    )
+    physical_validated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    physical_validated_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    physical_evidence_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    clinical_approved_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    clinical_approved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    clinical_approval_configuration_version_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+    clinical_approval_authority_snapshot: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
+    created_by_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+    activated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    retired_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    profile: Mapped[LabEquipmentIntegrationProfile] = relationship(
+        back_populates="versions"
+    )
+
+
+class LabClinicalConfigurationVersion(Base):
+    """Approved, immutable snapshot of clinic-owned lab rules and responsibility.
+
+    configuration_snapshot carries method instructions, reference intervals,
+    critical values and QC rules. Responsibility is recorded as user IDs and the
+    authority snapshot that applied at approval time. The schema is clinic-neutral;
+    the actual people and clinical values are configured during deployment.
+    """
+
+    __tablename__ = "lab_clinical_configuration_versions"
+    __table_args__ = (
+        UniqueConstraint("version_no", name="uq_lab_clinical_configuration_version"),
+        Index(
+            "uq_lab_clinical_configuration_approved",
+            "status",
+            unique=True,
+            postgresql_where=text("status = 'APPROVED'"),
+            sqlite_where=text("status = 'APPROVED'"),
+        ),
+        CheckConstraint(
+            "version_no > 0", name="ck_lab_clinical_configuration_version_positive"
+        ),
+        CheckConstraint(
+            "status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'ARCHIVED')",
+            name="ck_lab_clinical_configuration_status",
+        ),
+        CheckConstraint(
+            "substitute_lab_physician_user_id IS NULL OR primary_lab_physician_user_id IS NULL "
+            "OR substitute_lab_physician_user_id != primary_lab_physician_user_id",
+            name="ck_lab_clinical_configuration_distinct_reviewers",
+        ),
+        CheckConstraint(
+            "status != 'APPROVED' OR (primary_lab_physician_user_id IS NOT NULL "
+            "AND approved_by_user_id IS NOT NULL AND approved_at IS NOT NULL "
+            "AND approved_role_code IS NOT NULL AND approval_authority_snapshot IS NOT NULL "
+            "AND (approved_by_user_id = primary_lab_physician_user_id "
+            "OR (substitute_lab_physician_user_id IS NOT NULL "
+            "AND approved_by_user_id = substitute_lab_physician_user_id)))",
+            name="ck_lab_clinical_configuration_approval_owner",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="DRAFT", index=True
+    )
+    configuration_schema_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1
+    )
+    configuration_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    primary_lab_physician_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    substitute_lab_physician_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    approved_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    approved_role_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    approval_authority_snapshot: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
+    created_by_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    report_instances: Mapped[list[LabReportInstance]] = relationship(
+        back_populates="clinical_configuration_version"
+    )
+
+
 class LabReportSection(Base):
     __tablename__ = "lab_report_sections"
     __table_args__ = (
@@ -391,9 +718,17 @@ class LabReportInstance(Base):
         nullable=False,
         index=True,
     )
+    clinical_configuration_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lab_clinical_configuration_versions.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="DRAFT", index=True
-    )  # DRAFT|IN_PROGRESS|READY|FINALIZED|PRINTED
+    )  # DRAFT|IN_PROGRESS|READY|IN_REVIEW|REVIEWED|FINALIZED|PRINTED
+    managed_release: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     patient_snapshot: Mapped[dict[str, Any]] = mapped_column(
         JSON, nullable=False, default=dict
     )
@@ -429,6 +764,9 @@ class LabReportInstance(Base):
     template_version: Mapped[LabReportTemplateVersion] = relationship(
         back_populates="report_instances"
     )
+    clinical_configuration_version: Mapped[
+        LabClinicalConfigurationVersion | None
+    ] = relationship(back_populates="report_instances")
     values: Mapped[list[LabReportValue]] = relationship(
         back_populates="instance",
         cascade="all, delete-orphan",
@@ -437,6 +775,21 @@ class LabReportInstance(Base):
     supersedes_instance: Mapped[LabReportInstance | None] = relationship(
         remote_side="LabReportInstance.id"
     )
+
+
+class LabResultReview(Base):
+    """Clinical review of an immutable report instance, including its corrections."""
+
+    __tablename__ = "lab_result_reviews"
+
+    instance_id: Mapped[int] = mapped_column(
+        ForeignKey("lab_report_instances.id", ondelete="RESTRICT"), primary_key=True
+    )
+    reviewer_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True
+    )
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    next_action: Mapped[str | None] = mapped_column(String(500))
 
 
 class LabReportValue(Base):
@@ -451,11 +804,18 @@ class LabReportValue(Base):
         nullable=False,
         index=True,
     )
+    source_integration_profile_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lab_equipment_integration_profile_versions.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     field_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     value_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     value_numeric: Mapped[Decimal | None] = mapped_column(
         Numeric(18, 4), nullable=True
     )
+    result_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    evaluation_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True), nullable=True)
     resolved_reference_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     resolved_flag: Mapped[str | None] = mapped_column(String(32), nullable=True)
     resolved_flag_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -475,12 +835,88 @@ class LabReportValue(Base):
     )
 
     instance: Mapped[LabReportInstance] = relationship(back_populates="values")
+    source_integration_profile_version: Mapped[
+        LabEquipmentIntegrationProfileVersion | None
+    ] = relationship()
 
 
 def _previous_status(state_attr, current_value: str | None) -> str | None:
     if state_attr.history.deleted:
         return state_attr.history.deleted[0]
     return current_value
+
+
+def _assert_immutable_version_update(
+    *,
+    previous_status: str | None,
+    current_status: str | None,
+    dirty_fields: set[str],
+    immutable_statuses: set[str],
+    retired_status: str,
+    label: str,
+) -> None:
+    if previous_status not in immutable_statuses or not dirty_fields:
+        return
+    retirement_fields = {"status", "updated_at", "retired_at", "archived_at"}
+    if (
+        previous_status != retired_status
+        and current_status == retired_status
+        and dirty_fields.issubset(retirement_fields)
+    ):
+        return
+    raise ValueError(f"{label} versions are immutable after approval or activation")
+
+
+def _immutable_version_dirty_fields(mapper, target) -> tuple[str | None, set[str]]:
+    state = inspect(target)
+    previous_status = _previous_status(state.attrs.status, target.status)
+    scalar_field_keys = {attr.key for attr in mapper.column_attrs}
+    dirty_fields = {
+        attr.key
+        for attr in state.attrs
+        if attr.key in scalar_field_keys and attr.history.has_changes()
+    }
+    return previous_status, dirty_fields
+
+
+@event.listens_for(LabEquipmentIntegrationProfileVersion, "before_update", propagate=True)
+def _enforce_equipment_profile_version_immutability(mapper, connection, target) -> None:
+    previous_status, dirty_fields = _immutable_version_dirty_fields(mapper, target)
+    _assert_immutable_version_update(
+        previous_status=previous_status,
+        current_status=target.status,
+        dirty_fields=dirty_fields,
+        immutable_statuses={"ACTIVE", "RETIRED"},
+        retired_status="RETIRED",
+        label="Active equipment integration profile",
+    )
+
+
+@event.listens_for(
+    LabEquipmentIntegrationProfileVersion, "before_delete", propagate=True
+)
+def _prevent_active_equipment_profile_version_delete(mapper, connection, target) -> None:
+    if target.status in {"ACTIVE", "RETIRED"}:
+        raise ValueError("Active equipment integration profile versions cannot be deleted")
+
+
+@event.listens_for(LabClinicalConfigurationVersion, "before_update", propagate=True)
+def _enforce_clinical_configuration_immutability(mapper, connection, target) -> None:
+    previous_status, dirty_fields = _immutable_version_dirty_fields(mapper, target)
+    _assert_immutable_version_update(
+        previous_status=previous_status,
+        current_status=target.status,
+        dirty_fields=dirty_fields,
+        immutable_statuses={"APPROVED", "ARCHIVED"},
+        retired_status="ARCHIVED",
+        label="Approved clinical configuration",
+    )
+
+
+@event.listens_for(LabClinicalConfigurationVersion, "before_delete", propagate=True)
+def _prevent_approved_clinical_configuration_delete(mapper, connection, target) -> None:
+    if target.status in {"APPROVED", "ARCHIVED"}:
+        raise ValueError("Approved clinical configuration versions cannot be deleted")
 
 
 @event.listens_for(LabReportInstance, "before_update", propagate=True)

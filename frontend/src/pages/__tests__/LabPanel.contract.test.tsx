@@ -65,7 +65,8 @@ describe('LabPanel queue/report status contract', () => {
     expect(loadMoreBlock).toContain('limit: LAB_QUEUE_PAGE_SIZE');
     expect(loadMoreBlock).toContain('offset: queueOffset');
     // Аппендит к существующему списку, не заменяет
-    expect(loadMoreBlock).toContain('setAppointments((current) => [...current, ...newEntries])');
+    expect(loadMoreBlock).toContain('const merged = [...appointmentsRef.current, ...newEntries.filter');
+    expect(loadMoreBlock).toContain('setAppointments(merged)');
     // Обновляет offset и hasMore
     expect(loadMoreBlock).toContain('setQueueOffset((current) => current + newEntries.length)');
     expect(loadMoreBlock).toContain('setHasMoreQueue(');
@@ -77,6 +78,13 @@ describe('LabPanel queue/report status contract', () => {
     expect(source).toContain('hasMore={hasMoreQueue}');
     expect(source).toContain('loadingMore={loadingMore}');
     expect(source).toContain('queueTotal={queueTotal}');
+  });
+
+  it('exposes clinic clinical configuration without changing the workbench tab contract', () => {
+    const source = readLabPanelSource();
+    expect(source).toContain("const LAB_TAB_IDS = ['queue', 'templates', 'reports', 'operations'] as const");
+    expect(source).toContain('aria-controls="lab-clinical-config-panel"');
+    expect(source).toContain('<LabClinicalConfigurationPanel');
   });
 
   it('STRAT#16: AbortController in loadLabAppointments and loadMoreAppointments', () => {
@@ -504,7 +512,8 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(hookSource).toContain('setRedirectPending(true)');
     expect(hookSource).toContain('onExpiredRef.current();');
     // Не-dismissable диалог «операция завершается, затем переход».
-    expect(labPanelSource).toContain('sessionRedirectPending && (');
+    expect(labPanelSource).toContain('sessionWarning !== null || sessionRedirectPending');
+    expect(labPanelSource).toContain('dialog.showModal();');
     expect(labPanelSource).toContain('lp_sessiya_istekla_zavershenie');
   });
 
@@ -516,7 +525,7 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     // canonical /lab рассинхронизировали адрес и экран.
     const labPanelSource = readLabPanelSource();
     expect(labPanelSource).toContain('function resolveLabTabId(');
-    expect(labPanelSource).toContain('const LAB_TAB_IDS = [\'queue\', \'templates\', \'reports\'] as const;');
+    expect(labPanelSource).toContain('const LAB_TAB_IDS = [\'queue\', \'templates\', \'reports\', \'operations\'] as const;');
     // Ранний выход «нет таба → ничего не делать» удалён.
     expect(labPanelSource).not.toContain('if (!nextTab) {');
     // Нормализация применяется и к initial state, и к tab-sync эффекту.
@@ -562,8 +571,8 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     // дубль. Теперь CREATE блокирует ОБА уровня наравне с save/autosave/
     // finalize/revise/print.
     expect(workbenchSource)
-      .toContain('const reportBlocksContextTransition = saving || autoSaving;');
-    expect(workbenchSource).toContain('const reportBlocksDocumentLeave = saving || autoSaving;');
+      .toContain('const reportBlocksContextTransition = saving;');
+    expect(workbenchSource).toContain('const reportBlocksDocumentLeave = saving;');
     expect(workbenchSource).toContain('blocksContextTransition: reportBlocksContextTransition,');
     expect(workbenchSource).toContain('blocksDocumentLeave: reportBlocksDocumentLeave,');
     // Stale-ветка (onInstanceChange отклонил поздний ответ) не теряет
@@ -770,15 +779,11 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(catchBlock).toContain('instanceIdsMatch(currentUrlInstanceId, transitionSourceUrlId)');
   });
 
-  it('sends a persistent Idempotency-Key for report CREATE: bind/proceed on retry, clear on confirmed outcome (review round 9)', () => {
+  it('passes a persistent CREATE idempotency key and clears it on confirmed outcome (review round 9)', () => {
     const workbenchSource = fs.readFileSync(
       path.resolve(__dirname, '../../components/laboratory/LabReportWorkbench.tsx'),
       'utf8',
     );
-    const apiSource = fs.readFileSync(
-      path.resolve(__dirname, '../../api/labReporting.ts'),
-      'utf8',
-    ).replace(/\r\n/g, '\n');
     const idempotencySource = fs.readFileSync(
       path.resolve(__dirname, '../../components/laboratory/createInstanceIdempotency.ts'),
       'utf8',
@@ -791,9 +796,7 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(workbenchSource).toContain('const idempotencyKey = await resolveCreateInstanceIdempotencyKey(createPayload);');
     expect(workbenchSource).toContain('await labReportingApi.createInstance(createPayload, { idempotencyKey });');
     expect(workbenchSource).toContain('clearCreateInstanceIdempotencyKey(createPayload);');
-    // api-клиент: Idempotency-Key — opt-in заголовок (middleware без него
-    // пропускает POST без координации).
-    expect(apiSource).toContain('options.idempotencyKey\n        ? { headers: { \'Idempotency-Key\': options.idempotencyKey } }');
+    // Передачу заголовка POST проверяет API-тест labReporting.contract.test.ts.
     // Модуль: proceed (тот же payload digest → тот же ключ), rotate (изменённый
     // payload → новая операция), reload-safe sessionStorage-слоты; raw payload
     // в storage не пишется (CodeQL #1315, round 10) — только односторонний

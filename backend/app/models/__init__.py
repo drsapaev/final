@@ -99,6 +99,7 @@ from .emr_v2 import (
     EMRRevision,
 )
 from .emr_version import EMRVersion
+from .patient_clinical import PatientClinicalRevision
 from .family_relation import FamilyRelation, RelationType
 from .feature_flags import FeatureFlag, FeatureFlagHistory
 from .file_system import (
@@ -121,9 +122,14 @@ from .lab import (
     LabCatalogAnalyte,
     LabCatalogReferenceRange,
     LabCatalogUnit,
+    LabClinicalConfigurationVersion,
+    LabEquipmentIntegrationProfile,
+    LabEquipmentIntegrationProfileVersion,
     LabOrder,
+    LabOrderTest,
     LabReportFieldDef,
     LabReportInstance,
+    LabResultReview,
     LabReportSection,
     LabReportTemplate,
     LabReportTemplateVersion,
@@ -131,6 +137,10 @@ from .lab import (
     LabResult,
     LabTemplateServiceBinding,
 )
+from .lab_critical_communication import LabCriticalCommunication, LabCriticalCommunicationEvent
+from .lab_import import LabImportReceipt
+from .lab_release import LabReportWorkflowEvent
+from .lab_specimen import LabSpecimen, LabSpecimenAssignment, LabSpecimenEvent
 from .medical_specialty import MedicalSpecialty  # noqa: F401
 from .message import Message
 from .notification import (
@@ -289,9 +299,13 @@ __all__ = [
     "UserGroup",
     "UserPermissionOverride",
     "LabCatalogUnit",
+    "LabClinicalConfigurationVersion",
+    "LabEquipmentIntegrationProfile",
+    "LabEquipmentIntegrationProfileVersion",
     "LabCatalogAnalyte",
     "LabCatalogReferenceRange",
     "LabOrder",
+    "LabOrderTest",
     "LabReportTemplate",
     "LabTemplateServiceBinding",
     "LabReportTemplateVersion",
@@ -300,6 +314,13 @@ __all__ = [
     "LabReportInstance",
     "LabReportValue",
     "LabResult",
+    "LabCriticalCommunication",
+    "LabCriticalCommunicationEvent",
+    "LabImportReceipt",
+    "LabReportWorkflowEvent",
+    "LabSpecimen",
+    "LabSpecimenAssignment",
+    "LabSpecimenEvent",
     "AuditLog",
     "NotificationEvent",
     "NotificationDelivery",

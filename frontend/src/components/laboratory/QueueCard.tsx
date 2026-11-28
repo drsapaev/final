@@ -12,6 +12,11 @@ import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
 import { FileText } from 'lucide-react';
 
+const worklistStatuses = {
+  pending: 'info', awaiting_specimen: 'warning', in_progress: 'info', in_review: 'info',
+  held: 'warning', partial: 'warning', ready: 'success', canceled: 'default',
+} as const;
+
 interface QueueCardAppointment {
   patient_fio?: string;
   patient_id?: string | number;
@@ -49,11 +54,19 @@ interface MaskedPhoneProps {
  * вызывает re-render только отфильтрованных карточек, а не всех.
  */
 function QueueCard({ appointment, isSelected = false, onOpenAppointment }: QueueCardProps) {
-  const { t: rawT } = useTranslation(); const t = rawT;
+  const { t, language } = useTranslation();
+  const worklist = typeof appointment.work_date === 'string';
+  const worklistStatus = appointment.status as keyof typeof worklistStatuses;
+  const progress = appointment.progress as {
+    ordered_tests?: number | null; released_tests?: number | null; canceled_tests?: number | null;
+    total_reports?: number; released_reports?: number;
+  } | undefined;
+  const dueAt = typeof appointment.due_at === 'string' ? new Date(appointment.due_at) : null;
   return (
     <div
       role="button"
       tabIndex={0}
+      aria-current={isSelected || undefined}
       onClick={() => onOpenAppointment(appointment)}
       onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -69,12 +82,14 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }: Queue
             {appointment.patient_fio || t('queue.patient_no_name')}
           </div>
           <div className="lqw-card-meta">
-            {t('queue.visit')}: {appointment.visit_id || t('queue.visit_not_linked')} | {t('queue.phone')}:{' '}
-            <MaskedPhone phone={appointment.patient_phone} />
+            {t('queue.visit')}: {appointment.visit_id || t('queue.visit_not_linked')}
+            {worklist && appointment.order_id != null && <> · {t('labWorkspace.orderId')} #{String(appointment.order_id)}</>}
+            {worklist && appointment.patient_birth_year != null && <> · {String(appointment.patient_birth_year)}</>}
+            {!worklist && <> | {t('queue.phone')}: <MaskedPhone phone={appointment.patient_phone} /></>}
           </div>
         </div>
-        <Badge variant={getLabStatusVariant(appointment.status ?? '')}>
-          {formatLabStatus(appointment.status ?? '')}
+        <Badge variant={worklist ? worklistStatuses[worklistStatus] ?? 'default' : getLabStatusVariant(appointment.status ?? '')}>
+          {worklist ? t(`labWorkspace.work_${worklistStatus}`) : formatLabStatus(appointment.status ?? '', t)}
         </Badge>
       </div>
 
@@ -83,11 +98,28 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }: Queue
       </div>
 
       <div className="lqw-meta-row">
-        <Badge variant="primary">{formatSpecialtyLabel(appointment.specialty ?? '')}</Badge>
+        {!worklist && <Badge variant="primary">{formatSpecialtyLabel(appointment.specialty ?? '')}</Badge>}
         {appointment.payment_status && <Badge variant="info">{t('queue.payment')}: {formatPaymentStatus(appointment.payment_status)}</Badge>}
         {appointment.appointment_time && <Badge variant="default">{appointment.appointment_time}</Badge>}
         {appointment.report_template_name && <Badge variant="info">{appointment.report_template_name ?? ''}</Badge>}
+        {worklist && appointment.priority === 'urgent' && <Badge variant="warning">{t('labWorkspace.urgent')}</Badge>}
       </div>
+
+      {worklist && (
+        <div className="lqw-card-meta">
+          {dueAt && Number.isFinite(dueAt.getTime()) && <div>
+            {t('labWorkspace.dueAt')}: {new Intl.DateTimeFormat(language, {
+              dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Tashkent',
+            }).format(dueAt)}
+          </div>}
+          {progress?.ordered_tests != null ? <div>{t('labWorkspace.progressTests', {
+            released: progress.released_tests ?? 0, total: progress.ordered_tests, canceled: progress.canceled_tests ?? 0,
+          })}</div> : progress?.total_reports != null && progress.total_reports > 0 && <div>{t('labWorkspace.progressReports', {
+            released: progress.released_reports ?? 0, total: progress.total_reports,
+          })}</div>}
+          {typeof appointment.hold_reason === 'string' && <div>{t(`labWorkspace.hold_${appointment.hold_reason}`)}</div>}
+        </div>
+      )}
 
       <div className="lqw-card-bottom">
         <div className="lqw-card-id">

@@ -28,6 +28,29 @@ from app.services.emr_contract import (  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
+_AUDITABLE_DOCUMENT_FIELDS = frozenset({
+    "allergies", "anamnesis", "anamnesis_morbi", "anamnesis_vitae", "attachments",
+    "complaints", "content_sources", "diagnosis", "diagnosis_main", "examination",
+    "follow_up", "icd10_code", "imaging_results", "lab_results", "medications",
+    "notes", "plan", "procedures", "recommendations", "specialty", "specialty_data",
+    "treatment", "vital_signs", "vitals",
+})
+
+
+def get_emr_audit_change_metadata(
+    old_data: dict[str, Any], new_data: dict[str, Any]
+) -> dict[str, Any]:
+    """Summarize changes without retaining clinical values or extension names."""
+    changed = {
+        field
+        for field in old_data.keys() | new_data.keys()
+        if field not in old_data or field not in new_data or old_data[field] != new_data[field]
+    }
+    return {
+        "fields_changed": sorted(changed & _AUDITABLE_DOCUMENT_FIELDS),
+        "other_fields_changed": len(changed - _AUDITABLE_DOCUMENT_FIELDS),
+    }
+
 
 class ConcurrencyError(Exception):
     """Raised when optimistic lock fails"""
@@ -51,6 +74,10 @@ class EMRNotFoundException(Exception):
     """Raised when EMR not found"""
 
     pass
+
+
+class EMRPatientContextMismatch(Exception):
+    """The stored chart and its visit refer to different patients."""
 
 
 class EMRSignedError(Exception):
@@ -85,16 +112,46 @@ class EMRV2Service:
             .first()
         )
 
-    def get_by_visit(self, db: Session, visit_id: int) -> EMRRecord | None:
+    def get_by_visit(
+        self, db: Session, visit_id: int, *, for_update: bool = False,
+        expected_patient_id: int | None = None,
+    ) -> EMRRecord | None:
         """Get EMR by visit ID (primary lookup)"""
-        return (
-            db.query(EMRRecord)
-            .filter(
-                EMRRecord.visit_id == visit_id,
-                EMRRecord.is_active == True,
+        if for_update:
+            # Match the prescription writer's Visit → EMR lock order. The
+            # visit lock also serializes writers before the first EMR exists.
+            visit = (
+                db.query(Visit.patient_id)
+                .filter(Visit.id == visit_id)
+                .with_for_update(of=Visit)
+                .one_or_none()
             )
-            .first()
+            if visit is not None and expected_patient_id not in (None, visit.patient_id):
+                raise EMRPatientContextMismatch
+            record = (
+                db.query(EMRRecord)
+                .filter(EMRRecord.visit_id == visit_id, EMRRecord.is_active.is_(True))
+                .populate_existing()
+                .with_for_update(of=EMRRecord)
+                .one_or_none()
+            )
+            if record is not None and (visit is None or record.patient_id != visit.patient_id):
+                raise EMRPatientContextMismatch
+            return record
+
+        match = (
+            db.query(EMRRecord, Visit.patient_id)
+            .join(Visit, Visit.id == EMRRecord.visit_id)
+            .filter(EMRRecord.visit_id == visit_id, EMRRecord.is_active.is_(True))
+            .populate_existing()
+            .one_or_none()
         )
+        if match is None:
+            return None
+        record, visit_patient_id = match
+        if record.patient_id != visit_patient_id:
+            raise EMRPatientContextMismatch
+        return record
 
     def get_by_patient(
         self, db: Session, patient_id: int, limit: int = 100
@@ -102,8 +159,10 @@ class EMRV2Service:
         """Get all EMRs for a patient"""
         return (
             db.query(EMRRecord)
+            .join(Visit, Visit.id == EMRRecord.visit_id)
             .filter(
                 EMRRecord.patient_id == patient_id,
+                EMRRecord.patient_id == Visit.patient_id,
                 EMRRecord.is_active == True,
             )
             .order_by(desc(EMRRecord.created_at))
@@ -149,6 +208,8 @@ class EMRV2Service:
         row_version: int = 0,
         client_session_id: str | None = None,
         is_draft: bool = True,
+        *,
+        expected_patient_id: int | None = None,
     ) -> EMRRecord:
         """
         Save EMR with versioning and optimistic locking.
@@ -168,7 +229,9 @@ class EMRV2Service:
             ConcurrencyError: If row_version mismatch and different user
         """
         normalized_data = self._normalize_data(data)
-        existing = self.get_by_visit(db, visit_id)
+        existing = self.get_by_visit(
+            db, visit_id, for_update=True, expected_patient_id=expected_patient_id
+        )
 
         if existing:
             return self._update_emr(
@@ -203,8 +266,8 @@ class EMRV2Service:
         normalized_data = self._normalize_data(data)
 
         # Get patient_id from visit
-        visit = db.query(Visit).filter(Visit.id == visit_id).first()
-        if not visit:
+        patient_id = db.query(Visit.patient_id).filter(Visit.id == visit_id).scalar()
+        if patient_id is None:
             raise ValueError(f"Visit {visit_id} not found")
 
         # Extract materialized fields
@@ -212,7 +275,7 @@ class EMRV2Service:
 
         # Create EMR
         emr = EMRRecord(
-            patient_id=visit.patient_id,
+            patient_id=patient_id,
             visit_id=visit_id,
             version=1,
             data=normalized_data,
@@ -329,7 +392,9 @@ class EMRV2Service:
         # current revision (idempotent no-op, no new revision, no version bump).
         if row_version is not None and emr.row_version != row_version:
             identical_duplicate_retry = (
-                client_session_id is not None
+                change_type == "updated"
+                and (is_draft or emr.status != "draft")
+                and client_session_id is not None
                 and emr.last_client_session_id == client_session_id
                 and emr.updated_by == user_id
                 and normalized_data == emr.data
@@ -356,6 +421,7 @@ class EMRV2Service:
             emr.data,
             normalized_data,
         )
+        audit_changes = get_emr_audit_change_metadata(emr.data, normalized_data)
 
         # Create revision snapshot before update
         new_version = emr.version + 1
@@ -403,7 +469,7 @@ class EMRV2Service:
             user_id=user_id,
             extra_data={
                 "version": new_version,
-                "fields_changed": change_summary,
+                **audit_changes,
             },
         )
 
@@ -423,7 +489,7 @@ class EMRV2Service:
         client_session_id: str | None = None,
     ) -> EMRRecord:
         """Sign and finalize EMR"""
-        emr = self.get_by_visit(db, visit_id)
+        emr = self.get_by_visit(db, visit_id, for_update=True)
         if not emr:
             raise EMRNotFoundException(f"EMR for visit {visit_id} not found")
 
@@ -548,7 +614,7 @@ class EMRV2Service:
         row_version: int,
     ) -> EMRRecord:
         """Amend a signed EMR (requires reason)"""
-        emr = self.get_by_visit(db, visit_id)
+        emr = self.get_by_visit(db, visit_id, for_update=True)
         if not emr:
             raise EMRNotFoundException(f"EMR for visit {visit_id} not found")
         normalized_data = self._normalize_data(
@@ -579,6 +645,7 @@ class EMRV2Service:
 
         # Generate change summary
         change_summary = self._generate_change_summary(emr.data, normalized_data)
+        audit_changes = get_emr_audit_change_metadata(emr.data, normalized_data)
 
         # Create amendment revision
         # Note: reason is stored in change_summary for DB compatibility
@@ -617,15 +684,15 @@ class EMRV2Service:
             user_id=user_id,
             extra_data={
                 "version": new_version,
-                "reason": reason,
-                "fields_changed": change_summary,
+                "reason_present": True,
+                **audit_changes,
             },
         )
 
         db.commit()
         db.refresh(emr)
 
-        logger.info(f"Amended EMR {emr.id} with reason: {reason[:50]}...")
+        logger.info("Amended EMR %s to version %s", emr.id, new_version)
         return emr
 
     def restore(
@@ -649,7 +716,7 @@ class EMRV2Service:
           current row_version, so a stale view cannot silently overwrite
           concurrent edits (409 instead).
         """
-        emr = self.get_by_visit(db, visit_id)
+        emr = self.get_by_visit(db, visit_id, for_update=True)
         if not emr:
             raise EMRNotFoundException(f"EMR for visit {visit_id} not found")
 
@@ -721,7 +788,7 @@ class EMRV2Service:
             extra_data={
                 "from_version": target_version,
                 "to_version": new_version,
-                "reason": restore_reason,
+                "reason_present": True,
             },
         )
 
@@ -736,13 +803,9 @@ class EMRV2Service:
     # ==========================================================================
 
     def get_diff(
-        self, db: Session, visit_id: int, version_from: int, version_to: int
+        self, db: Session, emr: EMRRecord, version_from: int, version_to: int
     ) -> dict[str, Any]:
         """Compare two versions and return diff"""
-        emr = self.get_by_visit(db, visit_id)
-        if not emr:
-            raise EMRNotFoundException(f"EMR for visit {visit_id} not found")
-
         rev_from = self.get_revision(db, emr.id, version_from)
         rev_to = self.get_revision(db, emr.id, version_to)
 

@@ -20,6 +20,8 @@
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 import zlib
 from typing import Any
 
@@ -322,6 +324,39 @@ def test_render_long_content_paginates_and_keeps_signers() -> None:
 
 
 @pytest.mark.integration
+def test_weasyprint_keeps_complete_mixed_script_observation_in_pdf() -> None:
+    pdf_text = shutil.which("pdftotext")
+    if not pdf_text:
+        pytest.skip("pdftotext is required to extract the actual PDF text")
+    pytest.importorskip("weasyprint")
+    context = _preview_context()
+    field = context["sections"][0]["fields"][0]
+    observation = " ".join(
+        f"SYNTHETIC Oʻzbek натижа {index}" for index in range(12)
+    )
+    field.update(value_type="text", value_display=observation)
+    payload = LabReportPDFService().render_report(context)
+    text = subprocess.check_output([pdf_text, "-raw", "-", "-"], input=payload)
+    assert observation in " ".join(text.decode("utf-8").split())
+
+
+@pytest.mark.integration
+def test_reportlab_keeps_observation_taller_than_one_page() -> None:
+    pdf_text = shutil.which("pdftotext")
+    if not pdf_text:
+        pytest.skip("pdftotext is required to extract the actual PDF text")
+
+    context = _preview_context(template_name="SYNTHETIC classic")
+    field = context["sections"][0]["fields"][0]
+    tokens = [f"SYNTHETIC{index:03}" for index in range(400)]
+    field.update(value_type="text", value_display=" ".join(tokens))
+    payload = LabReportPDFService()._render_reportlab(context)
+    text = subprocess.check_output([pdf_text, "-raw", "-", "-"], input=payload)
+    assert _pdf_page_count(payload) > 1
+    assert re.findall(r"SYNTHETIC[0-9]{3}", text.decode("utf-8")) == tokens
+
+
+@pytest.mark.integration
 def test_render_weasyprint_output_contains_watermark_text_stream() -> None:
     """WeasyPrint-путь: текст watermark попадает в PDF (проверяем
     распакованные content streams — WeasyPrint пишет текст Tj-операторами)."""
@@ -351,3 +386,73 @@ def test_render_weasyprint_output_contains_watermark_text_stream() -> None:
     # наличие PDF-байтов и отсутствие исключения. Если текст найден —
     # бонус-пин; не делаем тест хрупким.
     assert _is_pdf(payload)
+
+
+@pytest.mark.integration
+def test_pdf_prefers_canonical_qualified_value_over_raw_numeric() -> None:
+    service = LabReportPDFService()
+    context = _preview_context()
+    field = context["sections"][0]["fields"][0]
+    field.update(value_numeric="0.01", value_text="0.01", value_display="<0,01")
+
+    template = service.jinja_env.get_template("lab_report_fixed.j2")
+    html = template.render(**context)
+    assert "&lt;0,01" in html
+    assert '<td class="col-unit">г/л</td>' in html
+    assert "&lt;0,01 г/л" not in html
+    assert service._reportlab_value_display(field) == "<0,01"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "mode", ["docx_three_column_mode", "oam_docx_mode", "smear_matrix_mode"]
+)
+def test_compact_pdf_prints_existing_units_with_the_canonical_values(mode, monkeypatch):
+    from reportlab import platypus
+
+    service = LabReportPDFService()
+    context = _preview_context(copy_count=1, **{mode: True})
+    section = context["sections"][0]
+    field = section["fields"][0]
+    section["fields"] = [
+        {**field, "value_display": "<0,01", "value_numeric": "0.01", "unit": "mg/L"},
+        {**field, "value_numeric": 0, "unit": "U/L"},
+        {**field, "value_display": "", "value_numeric": 900, "unit": "EMPTY-UNIT"},
+        {**field, "value_display": "синтетика", "unit": None},
+    ]
+    expected = ["&lt;0,01 mg/L", "0 U/L", "синтетика"]
+    if mode == "oam_docx_mode":
+        context["sections"].append(
+            {
+                **section,
+                "key": "sediment",
+                "fields": [
+                    {
+                        **field,
+                        "value_display": "≥2",
+                        "value_numeric": 2,
+                        "unit": "cells/µL",
+                    }
+                ],
+            }
+        )
+        expected.append("≥2 cells/µL")
+
+    html = service.jinja_env.get_template("lab_report_fixed.j2").render(**context)
+    for value in expected:
+        assert re.search(rf">\s*{re.escape(value)}\s*</td>", html)
+    assert "EMPTY-UNIT" not in html and ">900<" not in html
+
+    paragraph = platypus.Paragraph
+    rendered_cells = []
+
+    def capture_paragraph(text, *args, **kwargs):
+        rendered_cells.append(text)
+        return paragraph(text, *args, **kwargs)
+
+    monkeypatch.setattr(platypus, "Paragraph", capture_paragraph)
+    assert _is_pdf(service._render_reportlab(context))
+    for value in expected:
+        assert value in rendered_cells
+    assert not any("EMPTY-UNIT" in str(cell) for cell in rendered_cells)
+    assert "900" not in rendered_cells

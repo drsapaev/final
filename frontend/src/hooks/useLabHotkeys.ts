@@ -27,6 +27,14 @@ const LAB_TAB_MAP = {
   '3': 'reports',
 };
 
+export function isLabShortcutBlockedByControl(event: KeyboardEvent): boolean {
+  if (event.defaultPrevented || event.isComposing) return true;
+  // Native dialogs may stay mounted while closed, even with an explicit ARIA role.
+  if (document.querySelector('dialog[open], [role="dialog"]:not(dialog), [role="alertdialog"]:not(dialog)')) return true;
+  return event.target instanceof Element
+    && Boolean(event.target.closest('select, [role="combobox"], [role="listbox"]'));
+}
+
 export const useLabHotkeys = ({
   switchTab,
   refreshData,
@@ -46,31 +54,15 @@ export const useLabHotkeys = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return;
       const {
         switchTab: currentSwitchTab,
         refreshData: currentRefreshData,
         clearSelection: currentClearSelection,
         disabled: currentDisabled,
       } = handlersRef.current;
-      // Dialogs own Escape and every other shortcut while they are open.
-      // Checking the DOM also covers nested confirm dialogs whose state is
-      // local to report/template workbenches and not exposed to LabPanel.
-      if (currentDisabled || document.querySelector('[role="dialog"]')) return;
-      // Ignore shortcuts when the user is interacting with a native control.
-      // LABUX-FE-001 (audit 3886): previously only INPUT/TEXTAREA were
-      // excluded — a native <select> (ReportEditor choice values), a
-      // contenteditable region or an ARIA combobox received global Escape
-      // (clearing the selected patient/report behind the popup) and
-      // Ctrl/⌘+1–3 (switching panel tabs mid-choice). Semantic check via
-      // closest() covers ancestors (e.g. a select inside a labelled
-      // wrapper) the way isContentEditable does for rich text.
-      const target = e.target as HTMLElement | null;
-      if (target?.closest(
-        'input, textarea, select, [contenteditable], [role="combobox"], [role="listbox"]',
-      )) {
-        return;
-      }
+      if (currentDisabled || isLabShortcutBlockedByControl(e)) return;
+      // Panel-level navigation also stays outside text editing.
+      if (e.target instanceof Element && e.target.closest('input, textarea, [contenteditable]')) return;
 
       const isCtrl = e.ctrlKey || e.metaKey;
 

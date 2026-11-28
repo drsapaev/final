@@ -1,6 +1,6 @@
 
 import { useRef, useEffect } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { measureElement as measureVirtualRow, useVirtualizer } from '@tanstack/react-virtual';
 // STRAT#28: QueueCard already wrapped in React.memo for per-item performance.
 import QueueCard from './QueueCard';
 // STRAT#27: t() for load-more button labels.
@@ -65,6 +65,9 @@ export default function VirtualizedQueueList({
     count: appointments.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => CARD_ESTIMATE_HEIGHT,
+    // When the mobile editor hides the queue, its rows measure zero. Keep
+    // the spacer measurable so the observer can recover when it is shown.
+    measureElement: (element, entry, instance) => measureVirtualRow(element, entry, instance) || CARD_ESTIMATE_HEIGHT,
     overscan: OVERSCAN,
   });
 
@@ -112,7 +115,7 @@ export default function VirtualizedQueueList({
       className="lqw-virtualized-list"
       style={{
         height: '100%',
-        maxHeight: '70vh',
+        maxHeight: 'var(--lab-queue-max-height, 70vh)',
         overflow: 'auto',
         position: 'relative',
       }}

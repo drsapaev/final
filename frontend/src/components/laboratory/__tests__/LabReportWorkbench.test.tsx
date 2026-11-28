@@ -3,7 +3,7 @@ import '@testing-library/jest-dom';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportWorkbenchRaw from '../LabReportWorkbench';
@@ -11,6 +11,7 @@ import { peekCreateInstanceIdempotencyKey } from '../createInstanceIdempotency';
 import { labReportingApi } from '@/api/labReporting';
 import { printService } from '@/services/print';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import i18n from '@/i18n';
 
 // The component under test still relies on TS prop types,
 // so the inferred prop types collapse to `never`/`undefined` defaults under
@@ -41,6 +42,7 @@ vi.mock('../../../api/labReporting', () => ({
     bulkSaveValues: vi.fn(),
     // L-1 fix: markReady removed — endpoint was dead code (WF-round5).
     finalize: vi.fn(),
+    recordQC: vi.fn(),
     revise: vi.fn(),
     downloadPdf: vi.fn(),
     markPrinted: vi.fn(),
@@ -320,9 +322,9 @@ describe('LabReportWorkbench', () => {
 
     // Должен быть <details> с подсказкой "Подписи"
     expect(source).toContain('<details open={!canEditActiveInstance}>');
-    expect(source).toContain('Подписи');
+    expect(source).toContain('t(\'workbench.signatures\')');
     // Подсказка "только для чтения" когда не editable
-    expect(source).toContain('только для чтения — отчёт утверждён');
+    expect(source).toContain('t(\'workbench.signatures_readonly_hint\')');
     // Все 4 signer поля внутри details
     expect(source).toContain("'lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'");
   });
@@ -342,11 +344,11 @@ describe('LabReportWorkbench', () => {
     expect(source).toContain("t('confirm.finalize_description')");
     expect(source).toContain("t('confirm.finalize_confirm')");
 
-    // Revise dialog
-    expect(source).toContain("t('confirm.revise_title')");
-    expect(source).toContain("t('confirm.revise_message')");
-    expect(source).toContain("t('confirm.revise_description')");
-    expect(source).toContain("t('confirm.revise_confirm')");
+    const revisionDialog = fs.readFileSync(path.resolve(__dirname, '../ReportWorkflowPanel.tsx'), 'utf8');
+    expect(revisionDialog).toContain("t('confirm.revise_title')");
+    expect(revisionDialog).toContain("t('confirm.revise_message')");
+    expect(revisionDialog).toContain("t('confirm.revise_description')");
+    expect(revisionDialog).toContain("t('confirm.revise_confirm')");
 
     // Notify dialog
     expect(source).toContain("t('confirm.notify_title')");
@@ -382,7 +384,7 @@ describe('LabReportWorkbench', () => {
     // Error messages
     expect(source).toContain("t('errors.select_patient_template')");
     expect(source).toContain("t('errors.no_template_for_services')");
-    expect(source).toContain("t('errors.open_or_create_first')");
+    expect(source).toContain("t('workbench.save_error')");
     expect(source).toContain("t('errors.print_failed')");
     expect(source).toContain("t('errors.notify_failed')");
 
@@ -449,6 +451,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     updateInstance: ReturnType<typeof vi.fn>;
     bulkSaveValues: ReturnType<typeof vi.fn>;
     finalize: ReturnType<typeof vi.fn>;
+    recordQC: ReturnType<typeof vi.fn>;
     downloadPdf: ReturnType<typeof vi.fn>;
     markPrinted: ReturnType<typeof vi.fn>;
   };
@@ -511,6 +514,96 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       </ThemeProvider>
     );
   }
+
+  it.each([
+    {
+      language: 'ru', save: 'Сохранить черновик', preview: 'Предпросмотр PDF', release: 'Утвердить',
+      releaseTitle: 'Утверждение отчёта', releaseMessage: 'После утверждения отчёт становится неизменяемым.',
+      released: 'Отчёт утверждён.', cancel: 'Отмена', print: 'Печать результата', notifyPatient: 'Отправить пациенту',
+      revise: 'Исправленная версия', reviseTitle: 'Создание исправленной версии', reviseConfirm: 'Создать версию',
+    },
+    {
+      language: 'uz-Cyrl', save: 'Қораламани сақлаш', preview: 'PDFни олдиндан кўриш', release: 'Тасдиқлаш',
+      releaseTitle: 'Ҳисоботни тасдиқлаш', releaseMessage: 'Тасдиқлангандан кейин ҳисоботни ўзгартириб бўлмайди.',
+      released: 'Ҳисобот тасдиқланди.', cancel: 'Бекор қилиш', print: 'Натижани чоп этиш', notifyPatient: 'Беморга юбориш',
+      revise: 'Тузатилган версия', reviseTitle: 'Тузатилган версияни яратиш', reviseConfirm: 'Версия яратиш',
+    },
+    {
+      language: 'uz-Latn', save: 'Qoralamani saqlash', preview: 'PDF ko‘rib chiqish', release: 'Tasdiqlash',
+      releaseTitle: 'Hisobotni tasdiqlash', releaseMessage: 'Tasdiqlangandan so\'ng, hisobot o\'zgartirib bo\'lmaydigan bo\'ladi.',
+      released: 'Hisobot tasdiqlandi.', cancel: 'Bekor qilish', print: 'Natijani chop etish', notifyPatient: 'Bemorga yuborish',
+      revise: 'Tuzatilgan versiya', reviseTitle: 'Tuzatilgan versiya yaratish', reviseConfirm: 'Versiya yaratish',
+    },
+  ])('localizes the report actions, dialogs, and outcome in $language', async (labels) => {
+    await i18n.changeLanguage(labels.language);
+    try {
+      const notify = vi.fn();
+      const finalized = { ...reopenedDraftInstance, status: 'FINALIZED', available_actions: ['print', 'revise'] };
+      mockedApi.finalize.mockResolvedValue(finalized);
+      const draft = renderWithActiveInstance({
+        activeInstance: { ...reopenedDraftInstance, available_actions: ['edit', 'save_draft', 'preview', 'finalize'] },
+        notify,
+      });
+
+      expect(screen.getByRole('button', { name: labels.save })).toBeEnabled();
+      expect(screen.getByRole('button', { name: labels.preview })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: labels.release }));
+      const releaseDialog = within(await screen.findByRole('dialog', { name: labels.releaseTitle }));
+      expect(releaseDialog.getByText(labels.releaseMessage)).toBeVisible();
+      expect(releaseDialog.getByRole('button', { name: labels.cancel })).toBeEnabled();
+      fireEvent.click(releaseDialog.getByRole('button', { name: labels.release }));
+      await waitFor(() => expect(notify).toHaveBeenCalledWith('success', labels.released));
+      expect(mockedApi.finalize).toHaveBeenCalledWith(reopenedDraftInstance.id, reopenedDraftInstance.updated_at);
+      draft.unmount();
+
+      renderWithActiveInstance({ activeInstance: finalized });
+      expect(screen.getByRole('button', { name: labels.print })).toBeEnabled();
+      expect(screen.getByRole('button', { name: labels.notifyPatient })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: labels.revise }));
+      const reviseDialog = within(await screen.findByRole('dialog', { name: labels.reviseTitle }));
+      expect(reviseDialog.getByRole('button', { name: labels.reviseConfirm })).toBeDisabled();
+      fireEvent.click(reviseDialog.getByRole('button', { name: labels.cancel }));
+      expect(screen.queryByRole('dialog', { name: labels.reviseTitle })).not.toBeInTheDocument();
+    } finally {
+      cleanup();
+      await i18n.changeLanguage('ru');
+    }
+  });
+
+  it.each([
+    ['ru', 'Подписи', 'только для чтения', 'Подпись лаборанта', 'ФИО лаборанта', 'Подпись утверждающего', 'ФИО утверждающего'],
+    ['uz-Cyrl', 'Имзолар', 'фақат ўқиш учун', 'Лаборант имзоси', 'Лаборантнинг Ф.И.Ш.', 'Тасдиқловчи ходимнинг имзоси', 'Тасдиқловчи ходимнинг Ф.И.Ш.'],
+    ['uz-Latn', 'Imzolar', 'faqat o\'qish uchun', 'Laborant imzosi', 'Laborantning F.I.Sh.', 'Tasdiqlovchi xodimning imzosi', 'Tasdiqlovchi xodimning F.I.Sh.'],
+  ])('localizes locked signer fields on a report in review in %s', async (language, title, readOnly, technician, technicianName, approver, approverName) => {
+    await i18n.changeLanguage(language);
+    try {
+      renderWithActiveInstance({
+        activeInstance: {
+          ...reopenedDraftInstance,
+          managed_release: true,
+          status: 'IN_REVIEW',
+          available_actions: ['preview'],
+          signer_snapshot: {
+            lab_technician_label: 'SYNTHETIC-TECHNICIAN-LABEL',
+            lab_technician_name: 'SYNTHETIC-TECHNICIAN',
+            approver_label: 'SYNTHETIC-APPROVER-LABEL',
+            approver_name: 'SYNTHETIC-APPROVER',
+          },
+        },
+      });
+
+      expect(screen.getByText(title)).toBeVisible();
+      expect(screen.getByText(`(${readOnly})`)).toBeVisible();
+      for (const label of [technician, technicianName, approver, approverName]) {
+        expect(screen.getByRole('textbox', { name: label })).toBeDisabled();
+      }
+      expect(screen.getByRole('textbox', { name: technicianName })).toHaveValue('SYNTHETIC-TECHNICIAN');
+      expect(screen.getByRole('textbox', { name: approverName })).toHaveValue('SYNTHETIC-APPROVER');
+    } finally {
+      cleanup();
+      await i18n.changeLanguage('ru');
+    }
+  });
 
   // ── LABPRINT (audit 3886, round 14) ─────────────────────────────────
   it('LABPRINT-FE-003: an ambiguous 2xx ACK does not mark printed, does not fall back and does not blind-retry', async () => {
@@ -917,7 +1010,8 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(mockedApi.updateInstance).toHaveBeenCalledWith(
       77,
       { signer_snapshot: expect.objectContaining({ lab_technician_name: 'Иванов И.И.' }) },
-      '2026-09-13T08:00:00.123456+00:00'
+      '2026-09-13T08:00:00.123456+00:00',
+      expect.any(String),
     );
     expect(ownBulkCall[2]).toBe(signerResponseUpdated);
   });
@@ -973,7 +1067,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(mockedApi.updateInstance).toHaveBeenCalledTimes(1);
     expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(2);
     expect(mockedApi.bulkSaveValues.mock.calls[0][2]).toBe(signerUpdatedAt);
-    expect(mockedApi.bulkSaveValues.mock.calls[1][2]).toBe(signerUpdatedAt);
+    expect(mockedApi.bulkSaveValues.mock.calls[1]).toEqual(mockedApi.bulkSaveValues.mock.calls[0]);
     expect(
       (mockedApi.bulkSaveValues.mock.calls[1][1] as Array<Record<string, unknown>>)
         .find((item) => item.field_key === 'wbc')?.value_text,
@@ -982,6 +1076,84 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       expect.objectContaining({ updated_at: acceptedUpdatedAt }),
       expect.objectContaining({ kind: 'update', expectedInstanceId: 77 }),
     );
+  });
+
+  it('replays a metadata write after losing its response and uses the confirmed token for values', async () => {
+    const signerUpdatedAt = '2026-09-13T08:00:05.654321+00:00';
+    const committed = {
+      ...reopenedDraftInstance,
+      updated_at: signerUpdatedAt,
+      signer_snapshot: { lab_technician_name: 'SYNTHETIC-SIGNER' },
+    };
+    mockedApi.updateInstance.mockReset()
+      .mockRejectedValueOnce(new TypeError('Response lost after commit'))
+      .mockResolvedValueOnce(committed);
+    mockedApi.bulkSaveValues.mockReset().mockResolvedValueOnce({
+      instance: { ...committed, updated_at: '2026-09-13T08:00:06.654321+00:00' },
+    });
+
+    renderWithActiveInstance();
+    fireEvent.change(screen.getByLabelText('ФИО лаборанта'), { target: { value: 'SYNTHETIC-SIGNER' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    const retry = await screen.findByRole('button', { name: /повторить/i });
+    expect(mockedApi.bulkSaveValues).not.toHaveBeenCalled();
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(1));
+    const [metadataWrite, metadataRetry] = mockedApi.updateInstance.mock.calls;
+    const valuesWrite = mockedApi.bulkSaveValues.mock.calls[0];
+    expect(metadataRetry).toEqual(metadataWrite);
+    expect(metadataWrite[3]).toMatch(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/);
+    expect(valuesWrite[2]).toBe(signerUpdatedAt);
+    expect(valuesWrite[3]).not.toBe(metadataWrite[3]);
+  });
+
+  it('reconciles a lost values response without overwriting newer edits or allowing navigation', async () => {
+    const firstUpdatedAt = '2026-09-13T08:00:12.123456+00:00';
+    const secondUpdatedAt = '2026-09-13T08:00:13.123456+00:00';
+    const notify = vi.fn();
+    const registerDirtySource = vi.fn(
+      (_source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => vi.fn(),
+    );
+    const reportVersion = (value: string, updatedAt: string) => ({
+      ...reopenedDraftInstance,
+      updated_at: updatedAt,
+      sections: reopenedDraftInstance.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => field.field_key === 'wbc' ? { ...field, value_text: value } : field),
+      })),
+    });
+    mockedApi.bulkSaveValues.mockReset()
+      .mockRejectedValueOnce(new TypeError('Response lost after commit'))
+      .mockResolvedValueOnce({ instance: reportVersion('6.1', firstUpdatedAt) })
+      .mockResolvedValueOnce({ instance: reportVersion('6.2', secondUpdatedAt) });
+
+    renderWithActiveInstance({ registerDirtySource, notify });
+    const input = screen.getByLabelText('Результат: Лейкоциты');
+    fireEvent.change(input, { target: { value: '6.1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    await screen.findByRole('button', { name: /повторить/i });
+    fireEvent.change(input, { target: { value: '6.2' } });
+
+    const source = registerDirtySource.mock.calls[0][0];
+    await act(async () => {
+      await expect(source.save()).rejects.toBeInstanceOf(Error);
+    });
+    const [valuesWrite, valuesRetry] = mockedApi.bulkSaveValues.mock.calls;
+    expect(valuesRetry).toEqual(valuesWrite);
+    expect(input).toHaveValue('6.2');
+    expect(source.isDirty()).toBe(true);
+    expect(screen.getByRole('status')).toHaveTextContent(/несохранённые изменения/i);
+    expect(notify).not.toHaveBeenCalledWith('success', expect.any(String));
+
+    await act(async () => { await source.save(); });
+    const nextWrite = mockedApi.bulkSaveValues.mock.calls[2];
+    expect(nextWrite[1]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field_key: 'wbc', value_text: '6.2' }),
+    ]));
+    expect(nextWrite[2]).toBe(firstUpdatedAt);
+    expect(nextWrite[3]).not.toBe(valuesWrite[3]);
+    expect(source.isDirty()).toBe(false);
   });
 
   it('clears a partial signer commit after the active instance changes', async () => {
@@ -1092,21 +1264,81 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(mockedApi.bulkSaveValues.mock.calls[1][2]).toBe('2026-09-13T08:00:08.000000+00:00');
   });
 
-  it('locks values and signer inputs until an in-flight manual save settles', async () => {
-    let resolveBulk: ((value: unknown) => void) | null = null;
-    mockedApi.bulkSaveValues.mockReset().mockImplementationOnce(() => new Promise((resolve) => {
-      resolveBulk = resolve;
-    }));
+  it('keeps typing during a manual save and uses the accepted version for the newer edit', async () => {
+    let resolveBulk: ((value: unknown) => void) | undefined;
+    const phaseOne = new Promise((resolve) => { resolveBulk = resolve; });
+    const updatedAt = '2026-09-13T08:00:10.000000+00:00';
+    const reportVersion = (value: string, token: string) => ({
+      ...reopenedDraftInstance,
+      updated_at: token,
+      sections: reopenedDraftInstance.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => ({ ...field, value_text: value })),
+      })),
+    });
+    mockedApi.bulkSaveValues.mockReset()
+      .mockImplementationOnce(() => phaseOne)
+      .mockResolvedValueOnce({ instance: reportVersion('6.2', '2026-09-13T08:00:11.000000+00:00') });
     renderWithActiveInstance();
+    const input = screen.getByLabelText('Результат: Лейкоциты') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '6.1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
     await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(1));
-    expect(screen.getByLabelText('Результат: Лейкоциты')).toBeDisabled();
-    expect(screen.getByLabelText('ФИО лаборанта')).toBeDisabled();
-    await act(async () => {
-      resolveBulk?.({ instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:10.000000+00:00' } });
-      await Promise.resolve();
-    });
-    await waitFor(() => expect(screen.getByLabelText('Результат: Лейкоциты')).toBeEnabled());
+    expect(input).toBeEnabled();
+    expect(screen.getByLabelText('ФИО лаборанта')).toBeEnabled();
+    act(() => { input.focus(); });
+    fireEvent.change(input, { target: { value: '6.2' } });
+    input.setSelectionRange(2, 2);
+    await act(async () => { resolveBulk?.({ instance: reportVersion('6.1', updatedAt) }); });
+    expect(input).toHaveValue('6.2');
+    expect(input).toHaveFocus();
+    expect(input.selectionStart).toBe(2);
+    expect(screen.getByRole('status')).toHaveTextContent(/несохранённые изменения/i);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(2));
+    expect(mockedApi.bulkSaveValues.mock.calls[1][2]).toBe(updatedAt);
+    expect(mockedApi.bulkSaveValues.mock.calls[1][1]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field_key: 'wbc', value_text: '6.2' }),
+    ]));
+  });
+
+  it('compares a stale draft and keeps local edits without overwriting untouched server fields', async () => {
+    const updatedAt = '2026-09-13T08:01:00.123456+00:00';
+    const serverReport = {
+      ...reopenedDraftInstance,
+      updated_at: updatedAt,
+      sections: reopenedDraftInstance.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => ({
+          ...field,
+          value_text: field.field_key === 'wbc' ? '7.1' : '145',
+        })),
+      })),
+    };
+    mockedApi.bulkSaveValues.mockReset()
+      .mockRejectedValueOnce(Object.assign(new Error('Version conflict'), { status: 409 }))
+      .mockResolvedValueOnce({ instance: serverReport });
+    mockedApi.getInstance.mockReset().mockResolvedValueOnce(serverReport);
+    renderWithActiveInstance();
+
+    fireEvent.change(screen.getByLabelText('Результат: Лейкоциты'), { target: { value: '6.3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Сравнить версии' }));
+    expect(await screen.findByRole('table', { name: 'Изменения в бланке' })).toBeInTheDocument();
+    expect(screen.getByText('Изменено в обеих версиях')).toBeInTheDocument();
+    expect(screen.getByLabelText('Результат: Лейкоциты')).toHaveValue('6.3');
+    fireEvent.click(screen.getByRole('button', { name: 'Перенести мои правки' }));
+    expect(screen.getByLabelText('Результат: Лейкоциты')).toHaveValue('6.3');
+    expect(screen.getByLabelText('Результат: Гемоглобин')).toHaveValue('145');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(2));
+    expect(mockedApi.bulkSaveValues.mock.calls[1][2]).toBe(updatedAt);
+    expect(mockedApi.bulkSaveValues.mock.calls[1][1]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field_key: 'wbc', value_text: '6.3' }),
+      expect.objectContaining({ field_key: 'hgb', value_text: '145' }),
+    ]));
   });
 
   it('does not open a stale PDF fallback after the report context changes', async () => {
@@ -1221,7 +1453,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       // Все autosave-попытки в этом тесте неудачны: base после неудачи всё
       // равно ставит lastAutoSave, исправленный код — нет.
       mockedApi.bulkSaveValues.mockRejectedValue(
-        new Error('Бланк был изменён другим пользователем')
+        Object.assign(new Error('SYNTHETIC report version conflict'), { status: 409 })
       );
 
       const utils = renderWithActiveInstance();
@@ -1263,7 +1495,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
         await Promise.resolve();
       });
 
-      expect(screen.queryByText((content) => content.includes('✓ сохранено'))).toBeNull();
+      expect(screen.getByRole('status')).toHaveTextContent('Изменений нет');
     } finally {
       vi.useRealTimers();
       vi.clearAllMocks();
@@ -1373,6 +1605,82 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(onOpenInstance).toHaveBeenCalledWith(76);
     expect(mockedApi.getInstance).not.toHaveBeenCalled();
     expect(onInstanceChange).not.toHaveBeenCalled();
+  });
+
+  it('returns focus to the workflow trigger once the successful command refresh settles', async () => {
+    const activeInstance = { ...reopenedDraftInstance, managed_release: true, available_actions: ['record_qc'] };
+    let completeRefresh!: () => void;
+    const refresh = new Promise<void>((resolve) => { completeRefresh = resolve; });
+    const onRefreshHistory = vi.fn(() => refresh);
+    mockedApi.recordQC.mockResolvedValueOnce(activeInstance);
+    renderWithActiveInstance({ activeInstance, onRefreshHistory });
+    const trigger = screen.getByRole('button', { name: 'Записать контроль качества' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = within(screen.getByRole('dialog', { name: 'Записать контроль качества' }));
+    fireEvent.change(dialog.getByRole('combobox'), { target: { value: 'not_applicable' } });
+    const reason = dialog.getByRole('textbox', { name: 'Причина' });
+    reason.focus();
+    fireEvent.change(reason, { target: { value: 'SYNTHETIC reason' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Записать контроль качества' }));
+    await waitFor(() => expect(onRefreshHistory).toHaveBeenCalledWith(444));
+    expect(trigger).toBeDisabled();
+
+    await act(async () => completeRefresh());
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(trigger).toBeEnabled();
+  });
+
+  it('keeps the draft shortcut in the result input and leaves choice controls and dialogs in control', async () => {
+    const section = reopenedDraftInstance.sections[0];
+    const activeInstance = {
+      ...reopenedDraftInstance,
+      managed_release: true,
+      available_actions: ['edit', 'save_draft', 'record_qc'],
+      sections: [{ ...section, fields: [section.fields[0], {
+        ...section.fields[1],
+        value_type: 'choice',
+        choice_options: ['140', '141'],
+      }] }],
+    };
+    renderWithActiveInstance({ activeInstance });
+    const choice = screen.getByRole('combobox', { name: 'Результат: Гемоглобин' });
+    expect(fireEvent.keyDown(choice, { key: 's', ctrlKey: true, cancelable: true })).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Записать контроль качества' }));
+    const dialog = within(screen.getByRole('dialog'));
+    const reason = dialog.getByRole('textbox', { name: 'Причина' });
+    expect(fireEvent.keyDown(reason, { key: 's', metaKey: true, cancelable: true })).toBe(true);
+    expect(mockedApi.bulkSaveValues).not.toHaveBeenCalled();
+    fireEvent.click(dialog.getByRole('button', { name: 'Отмена' }));
+
+    mockedApi.bulkSaveValues.mockResolvedValueOnce(activeInstance);
+    const value = screen.getByRole('textbox', { name: 'Результат: Лейкоциты' });
+    fireEvent.change(value, { target: { value: '6.6' } });
+    expect(fireEvent.keyDown(value, { key: 's', ctrlKey: true, cancelable: true })).toBe(false);
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(1));
+  });
+
+  it.each([
+    ['ru', 'Пациент #444', 'Визит: без визита | Отчёт #77', 'исправленная версия отчёта #76'],
+    ['uz-Cyrl', 'Бемор #444', 'Ташриф: ташрифсиз | Ҳисобот #77', 'ҳисоботнинг тузатилган версияси #76'],
+    ['uz-Latn', 'Bemor #444', 'Tashrif: tashrifsiz | Hisobot #77', 'hisobotning tuzatilgan versiyasi #76'],
+  ])('uses %s for the open report identity and source version', async (language, patient, identity, correction) => {
+    await i18n.changeLanguage(language);
+    try {
+      const onOpenInstance = vi.fn();
+      renderWithActiveInstance({
+        activeInstance: { ...reopenedDraftInstance, supersedes_instance_id: 76 },
+        onOpenInstance,
+      });
+
+      expect(screen.getByText(patient)).toBeVisible();
+      expect(screen.getByText(identity)).toBeVisible();
+      fireEvent.click(screen.getByRole('button', { name: correction }));
+      expect(onOpenInstance).toHaveBeenCalledWith(76);
+    } finally {
+      await act(async () => { await i18n.changeLanguage('ru'); });
+    }
   });
 
   it('notifies and rethrows when the registered report save fails', async () => {
@@ -1605,6 +1913,26 @@ describe('LabReportWorkbench add-blank action (PR6)', () => {
     );
   }
 
+  it.each([
+    ['uz-Latn', 'Ruxsat etilgan hisobot', 'Hisobot yaratish', 'Qo‘shimcha blank shabloni', 'Blank qo‘shish', 'Qoralama'],
+    ['uz-Cyrl', 'Рухсат этилган ҳисобот', 'Ҳисобот яратиш', 'Қўшимча бланк шаблони', 'Бланк қўшиш', 'Қоралама'],
+  ])('localizes primary and additional report selection in %s', async (language, allowed, create, additional, add, draft) => {
+    await i18n.changeLanguage(language);
+    try {
+      const creating = renderAddBlank({ activeInstance: null });
+      expect(screen.getByRole('combobox', { name: allowed })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: create })).toBeInTheDocument();
+      creating.unmount();
+
+      renderAddBlank();
+      expect(screen.getByRole('combobox', { name: additional })).toHaveValue('3');
+      expect(screen.getByRole('button', { name: add })).toBeEnabled();
+      expect(screen.getAllByText(draft)).not.toHaveLength(0);
+    } finally {
+      await act(async () => { await i18n.changeLanguage('ru'); });
+    }
+  });
+
   it('renders the add-blank action from server-resolved templates and creates the chosen blank', async () => {
     const onInstanceChange = vi.fn();
     mockedApi.createInstance.mockResolvedValue({
@@ -1635,6 +1963,64 @@ describe('LabReportWorkbench add-blank action (PR6)', () => {
       expectedInstanceId: 91,
       operation: { epoch: 0, selectionKey: null, patientId: null },
     });
+  });
+
+  it.each(['historical_allocation_unknown', 'specimen_order_ambiguous'])(
+    'blocks report creation and template prefill for %s when no exact assignment is available',
+    (holdReason) => {
+      const first = renderAddBlank({
+        activeInstance: null,
+        selectedAppointment: {
+          patient_id: 444,
+          visit_id: 728,
+          hold_reason: holdReason,
+          service_codes: ['CBC'],
+          service_details: [{ id: 28, visit_service_id: null, name: 'SYNTHETIC held service' }],
+        },
+        templateResolution: { ...resolution, default_template: resolution.allowed_templates[0] },
+      });
+      const create = screen.getByRole('button', { name: 'Создать отчёт' });
+      expect(create).toBeDisabled();
+      expect(screen.getByRole('combobox', { name: 'Допустимый отчёт' })).toHaveValue('');
+      fireEvent.click(create);
+      expect(mockedApi.createInstance).not.toHaveBeenCalled();
+      first.unmount();
+
+      renderAddBlank({
+        selectedAppointment: {
+          patient_id: 444,
+          visit_id: 728,
+          hold_reason: holdReason,
+          service_details: [{ id: 28, visit_service_id: null, name: 'SYNTHETIC held service' }],
+        },
+      });
+      expect(screen.getByRole('button', { name: /Добавить бланк/ })).toBeDisabled();
+    },
+  );
+
+  it('lets a mixed held row create a report for the selected exact assignment', async () => {
+    mockedApi.createInstance.mockResolvedValue({ ...openInstance, id: 92 });
+    renderAddBlank({
+      selectedAppointment: {
+        patient_id: 444,
+        visit_id: 728,
+        order_id: 39,
+        hold_reason: 'historical_allocation_unknown',
+        service_details: [
+          { id: 28, visit_service_id: null, name: 'SYNTHETIC held service' },
+          { id: 29, visit_service_id: 544, name: 'SYNTHETIC new service' },
+        ],
+      },
+    });
+    const addBlank = screen.getByRole('button', { name: /Добавить бланк/ });
+    expect(addBlank).toBeDisabled();
+    expect(screen.queryByRole('checkbox', { name: 'SYNTHETIC held service' })).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'SYNTHETIC new service' }));
+    fireEvent.click(addBlank);
+    await waitFor(() => expect(mockedApi.createInstance).toHaveBeenCalledWith(
+      expect.objectContaining({ order_id: 39, visit_service_ids: [544] }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) }),
+    ));
   });
 
   it('reconciles the committed blank in the background when the parent rejects a late create result (review round 8)', async () => {

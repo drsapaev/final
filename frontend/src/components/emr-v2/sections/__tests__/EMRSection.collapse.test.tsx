@@ -125,14 +125,11 @@ describe('EMRREAD-FE-001: read-only sections remain expandable', () => {
     expect(header.getAttribute('aria-expanded')).toBe('true');
   });
 
-  // Source contract (repo precedent): jsdom cannot enforce CSS pointer-events,
-  // so pin the mechanism itself — the section ROOT must no longer carry
-  // pointer-events:none; only the BODY (clinical inputs) is shielded.
-  it('CSS: pointer-events:none is scoped to the section body, not the section root', () => {
+  it('keeps both the header and the read-only body navigable by pointer', () => {
     const css = fs.readFileSync(path.join(__dirname, '..', 'EMRSection.css'), 'utf-8');
     const rootRule = css.match(/\.emr-section--disabled\s*\{[^}]*\}/)?.[0] ?? '';
     expect(rootRule).not.toMatch(/pointer-events/);
-    expect(css).toMatch(
+    expect(css).not.toMatch(
       /\.emr-section--disabled\s+\.emr-section__body\s*\{[^}]*pointer-events:\s*none[^}]*\}/
     );
   });

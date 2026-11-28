@@ -23,6 +23,7 @@ from app.services.lab_reporting._payload import PayloadMixin
 from app.services.lab_reporting._rule_engine import RuleEngineMixin
 from app.services.lab_reporting._templates import TemplatesMixin
 from app.services.lab_reporting._versions import VersionsMixin
+from app.services.lab_reporting._workflow import WorkflowMixin
 
 __all__ = ["LabReportingService"]
 
@@ -39,6 +40,7 @@ class LabReportingService(
     PayloadMixin,
     CatalogHelpersMixin,
     RuleEngineMixin,
+    WorkflowMixin,
     LabReportingServiceMixinBase,
 ):
     """Composed of focused mixin modules under lab_reporting/."""

@@ -3,7 +3,7 @@
 Поддержка массовых рассылок, планировщика и аналитики
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from html import escape
 from typing import Any
 
@@ -289,6 +289,7 @@ async def send_lab_report_instance_notification(
     фронтенд обязан показывать это как неудачу (LABN-FE-002), а не как
     «отправлено».
     """
+    from app.services.lab_report_pdf._context import build_report_pdf_context
     from app.services.lab_report_pdf_service import lab_report_pdf_service
     from app.services.lab_reporting import LabReportingDomainError, LabReportingService
 
@@ -311,25 +312,8 @@ async def send_lab_report_instance_notification(
         report_identity = (instance.id, instance.patient_id, instance.visit_id,
                            instance.order_id, instance.status, instance.updated_at)
 
-        # Identical render payload to the download endpoint, so the
-        # delivered PDF is byte-equivalent to what staff prints.
-        materialized_sections = service.materialize_instance(instance)
-        critical_findings = service.summarize_critical_findings(materialized_sections)
         pdf_bytes = lab_report_pdf_service.render_report(
-            {
-                "template_name": instance.template.name,
-                "layout_preset": instance.template_version.layout_preset,
-                "page_settings": instance.template_version.page_settings or {},
-                "branding": instance.branding_snapshot or {},
-                "patient": instance.patient_snapshot or {},
-                "signers": instance.signer_snapshot or {},
-                "sections": materialized_sections,
-                "critical_findings": critical_findings,
-                "footer_notes": instance.template_version.footer_notes,
-                "report_date": (
-                    instance.finalized_at or instance.created_at or datetime.now(UTC)
-                ).strftime("%d.%m.%Y"),
-            }
+            build_report_pdf_context(service, instance)
         )
 
         bot_service = await _fresh_bot(db)
