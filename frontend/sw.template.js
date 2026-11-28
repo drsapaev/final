@@ -157,30 +157,25 @@ self.addEventListener('activate', (event) => {
       console.warn('Service Worker: Failed to clean sensitive cache entries');
     }
 
-    // Регистрируем background sync если поддерживается
-    if ('sync' in self.registration) {
-      try {
-        await self.registration.sync.register(BACKGROUND_SYNC_TAG);
-        console.log('Service Worker: Background sync registered');
-      } catch {
-        console.log('Service Worker: Background sync not supported');
-      }
-    }
-
-    // Periodic sync для современных браузеров
-    if ('periodicSync' in self.registration) {
-      try {
-        await self.registration.periodicSync.register('clinic-data-sync', {
-          minInterval: 24 * 60 * 60 * 1000, // 24 часа
-        });
-        console.log('Service Worker: Periodic sync registered');
-      } catch {
-        console.log('Service Worker: Periodic sync not supported');
-      }
-    }
-
+    await self.clients.claim();
     console.log('Service Worker: Activation complete');
-    return self.clients.claim();
+
+    // Browsers can defer optional sync registration until activation finishes.
+    if ('sync' in self.registration) {
+      void Promise.resolve()
+        .then(() => self.registration.sync.register(BACKGROUND_SYNC_TAG))
+        .then(() => console.log('Service Worker: Background sync registered'))
+        .catch(() => console.log('Service Worker: Background sync not supported'));
+    }
+
+    if ('periodicSync' in self.registration) {
+      void Promise.resolve()
+        .then(() => self.registration.periodicSync.register('clinic-data-sync', {
+          minInterval: 24 * 60 * 60 * 1000,
+        }))
+        .then(() => console.log('Service Worker: Periodic sync registered'))
+        .catch(() => console.log('Service Worker: Periodic sync not supported'));
+    }
   })());
 });
 
