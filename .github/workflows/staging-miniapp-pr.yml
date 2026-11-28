@@ -1290,12 +1290,10 @@ jobs:
               networks:
                 default: {}
                 menu-egress: {}
-              extra_hosts:
-                - "api.telegram.org:172.30.242.2"
             telegram-relay:
               image: $project-backend
               build: !reset null
-              entrypoint: [python, /telegram-relay.py, 172.30.242.2, "$upstream"]
+              entrypoint: [python, /telegram-relay.py, 0.0.0.0, "$upstream"]
               command: []
               user: "65534:65534"
               read_only: true
@@ -1309,7 +1307,7 @@ jobs:
                 net.ipv4.ip_unprivileged_port_start: 443
               networks:
                 menu-egress:
-                  ipv4_address: 172.30.242.2
+                  aliases: [api.telegram.org]
                 ingress: {}
             menu-webhook-proxy:
               image: $project-backend
@@ -1330,9 +1328,6 @@ jobs:
           networks:
             menu-egress:
               internal: true
-              ipam:
-                config:
-                  - subnet: 172.30.242.0/28
           YAML
             chmod 600 "$d/menu.yml"
           fi
@@ -1366,9 +1361,11 @@ jobs:
           if menu:
               relay, proxy = s["telegram-relay"], s["menu-webhook-proxy"]
               assert set(s["backend"]["networks"]) == {"default", "menu-egress"}
-              hosts = json.dumps(s["backend"].get("extra_hosts", {}))
-              assert "api.telegram.org" in hosts and "172.30.242.2" in hosts
+              assert not s["backend"].get("extra_hosts")
               assert set(relay["networks"]) == {"menu-egress", "ingress"}
+              assert relay["networks"]["menu-egress"].get("aliases") == ["api.telegram.org"]
+              assert "ipv4_address" not in relay["networks"]["menu-egress"]
+              assert not c["networks"]["menu-egress"].get("ipam")
               assert set(proxy["networks"]) == {"default"}
               assert not relay.get("build") and not proxy.get("build")
               assert relay["read_only"] is True and proxy["read_only"] is True
@@ -1475,7 +1472,7 @@ jobs:
               emit_startup_failure menu_services
               exit 1
             fi
-            if ! "$d/compose" exec -T backend python -c 'import socket,ssl,time; assert socket.gethostbyname("api.telegram.org")=="172.30.242.2"; ctx=ssl.create_default_context();
+            if ! "$d/compose" exec -T backend python -c 'import ipaddress,socket,ssl,time; assert ipaddress.ip_address(socket.gethostbyname("api.telegram.org")).is_private; ctx=ssl.create_default_context();
           for attempt in range(8):
               try:
                   with socket.create_connection(("api.telegram.org",443),timeout=5) as tcp:

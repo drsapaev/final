@@ -164,8 +164,11 @@ It checks the Telegram bot and approved private chat from the backend process,
 then reads getWebhookInfo; it stops unless the webhook URL is empty and the
 pending-update count is zero. The bot token remains in the backend container.
 No worker or polling process starts, and this check never calls getUpdates.
-The backend reaches only api.telegram.org:443 through a fixed-IP TLS relay;
-the webhook proxy has no Telegram token or public port and forwards only
+The backend reaches only api.telegram.org:443 through the relay's private
+`api.telegram.org` service alias on the isolated internal Compose network; it
+checks that DNS resolves privately and verifies the Telegram TLS handshake.
+The relay itself connects to a pre-resolved Telegram address. The webhook
+proxy has no Telegram token or public port and forwards only
 allowlisted menu commands from the approved private chat. It replaces Telegram
 profile fields with a synthetic name and removes usernames before forwarding.
 Messages from any other chat, unsupported buttons, contacts and free text are
